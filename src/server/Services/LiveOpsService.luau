@@ -126,6 +126,12 @@ function LiveOpsService.publishAttributes()
 	workspace:SetAttribute("LuckMultiplier", luck)
 	workspace:SetAttribute("LuckEndsAt", if luck > 1 then luckEndsAt else 0)
 	workspace:SetAttribute("EventBanner", banner)
+	local activeIds: { string } = {}
+	for id in LiveOpsService.activeEventIds() do
+		table.insert(activeIds, id)
+	end
+	table.sort(activeIds)
+	workspace:SetAttribute("ActiveEventIds", table.concat(activeIds, ","))
 
 	local cash = LiveOpsService.cashMultiplier()
 	workspace:SetAttribute("CashMultiplier", cash)
