@@ -16,6 +16,7 @@ export type GrabContext = {
 	creatureBusy: boolean, -- already being carried by someone
 	distance: number,
 	grabRange: number,
+	thiefInsideBase: boolean, -- no grabbing through walls: the thief must be inside the victim's plot
 	thiefHasFreePodium: boolean,
 	holdStartedAt: number?, -- when the thief began holding the prompt (server time), nil if never
 	holdSeconds: number,
@@ -64,6 +65,9 @@ function StealRules.canGrab(ctx: GrabContext): (boolean, string?)
 	end
 	if not (ctx.distance <= ctx.grabRange) then
 		return false, "far"
+	end
+	if not ctx.thiefInsideBase then
+		return false, "outside"
 	end
 	if not ctx.thiefHasFreePodium then
 		return false, "full"
@@ -135,6 +139,7 @@ function StealRules.messageKey(reason: string): string?
 		locked = "cantStealLocked",
 		protected = "cantStealProtected",
 		far = "tooFar",
+		outside = "stealFromInside",
 		full = "baseFull",
 	}
 	return map[reason]

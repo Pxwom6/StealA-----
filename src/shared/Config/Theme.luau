@@ -102,6 +102,7 @@ local Theme = {
 		cantStealLocked = "That base is locked!",
 		cantStealProtected = "New players are protected for a few minutes.",
 		cantStealOwn = "That's yours!",
+		stealFromInside = "Get inside their base first!",
 		stealCooldown = "Catch your breath... {time}",
 		alreadyCarrying = "You're already carrying one!",
 		stealStarted = "Run home! Don't get tagged!",
@@ -152,6 +153,7 @@ local Theme = {
 		storeOwned = "Owned",
 		storeUnavailable = "Coming soon",
 		storeStudioGrant = "(Studio) Grant",
+		storeLuckMaxed = "Luck maxed",
 		oddsHeader = "Belt odds now -> with Server Luck",
 	},
 

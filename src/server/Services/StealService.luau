@@ -271,6 +271,7 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 		creatureBusy = PlotService.isBusy(plot, podium),
 		distance = (root.Position - podiumRefs.base.Position).Magnitude,
 		grabRange = CFG.grabRange,
+		thiefInsideBase = PlotService.isInside(plot, root.Position),
 		thiefHasFreePodium = EconomyService.freePodium(thief) ~= nil,
 		holdStartedAt = holdStartedAt,
 		holdSeconds = CFG.holdSeconds,
@@ -382,16 +383,18 @@ local function checkCarries()
 			StealService.cancel(thief, "timeout")
 			continue
 		end
-		-- Speed is judged over windows of at least SPEED_WINDOW seconds so the leeway can't be farmed.
+		-- Movement is checked on EVERY tick (so teleporting home right after a grab is caught before delivery),
+		-- measured from the start of the current window; the window only restarts after SPEED_WINDOW seconds,
+		-- so the per-window leeway can't be farmed by frequent checks.
 		local dt = clockNow - carry.lastCheckAt
+		local delta = root.Position - carry.lastPosition
+		local horizontal = Vector3.new(delta.X, 0, delta.Z).Magnitude
+		local tolerance, leeway = CFG.speedCheckTolerance, CFG.speedCheckLeeway
+		if not StealRules.isMovementPlausible(horizontal, dt, maxSpeed, tolerance, leeway) then
+			StealService.cancel(thief, "speed")
+			continue
+		end
 		if dt >= SPEED_WINDOW then
-			local delta = root.Position - carry.lastPosition
-			local horizontal = Vector3.new(delta.X, 0, delta.Z).Magnitude
-			local tolerance, leeway = CFG.speedCheckTolerance, CFG.speedCheckLeeway
-			if not StealRules.isMovementPlausible(horizontal, dt, maxSpeed, tolerance, leeway) then
-				StealService.cancel(thief, "speed")
-				continue
-			end
 			carry.lastPosition = root.Position
 			carry.lastCheckAt = clockNow
 		end

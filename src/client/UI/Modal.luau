@@ -13,7 +13,7 @@ local Modal = {}
 
 export type ModalHandle = {
 	root: Frame,
-	panel: Frame,
+	panel: TextButton,
 	body: Frame,
 	close: () -> (),
 	isOpen: () -> boolean,
@@ -56,15 +56,20 @@ function Modal.open(title: string, size: Vector2, onClose: (() -> ())?): ModalHa
 		Parent = root,
 	}) :: TextButton
 
-	local panel = UiKit.panel({
+	-- The panel is a (text-less) button so taps on its labels and empty space land on it instead of falling
+	-- through to the backdrop, which would close the dialog. Plain Frames/labels do not sink input.
+	local panel = UiKit.new("TextButton", {
 		Name = "Panel",
+		AutoButtonColor = false,
+		Text = "",
+		BackgroundColor3 = UiTheme.palette("panel"),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Size = UDim2.fromOffset(size.X, size.Y),
 		Parent = root,
-	})
-	-- Never taller / wider than the screen allows (in reference pixels).
-	UiKit.new("UISizeConstraint", { MaxSize = Vector2.new(size.X, size.Y), Parent = panel })
+	}) :: TextButton
+	UiKit.corner(18).Parent = panel
+	UiKit.stroke(4).Parent = panel
 	UiKit.label({
 		Name = "Title",
 		Text = title,

@@ -15,6 +15,7 @@ local function grab(overrides: { [string]: any }?): StealRules.GrabContext
 		creatureBusy = false,
 		distance = 5,
 		grabRange = 12,
+		thiefInsideBase = true,
 		thiefHasFreePodium = true,
 		holdStartedAt = 98,
 		holdSeconds = 1.5,
@@ -47,6 +48,7 @@ T.describe("StealRules.canGrab", function()
 		T.expect(reason(grab({ creatureBusy = true }))).toBe("busy")
 		T.expect(reason(grab({ distance = 30 }))).toBe("far")
 		T.expect(reason(grab({ distance = 0 / 0 }))).toBe("far")
+		T.expect(reason(grab({ thiefInsideBase = false }))).toBe("outside")
 		T.expect(reason(grab({ thiefHasFreePodium = false }))).toBe("full")
 	end)
 	T.it("requires the hold to have actually lasted (server-timed)", function()
@@ -91,6 +93,12 @@ T.describe("StealRules.canTag", function()
 end)
 
 T.describe("StealRules movement and timing", function()
+	T.it("catches a teleport home even when checked only 0.2s into a window", function()
+		-- grab at the podium, then appear 40 studs away (inside your own base) one tick later
+		T.expect(StealRules.isMovementPlausible(40, 0.2, 10, 1.6, 6)).toBe(false)
+		-- honest carry speed over the same tick is fine
+		T.expect(StealRules.isMovementPlausible(2, 0.2, 10, 1.6, 6)).toBe(true)
+	end)
 	T.it("flags implausible carry speed", function()
 		-- carry speed 10 studs/s, tolerance 1.6, leeway 6
 		T.expect(StealRules.isMovementPlausible(10, 1, 10, 1.6, 6)).toBe(true)
@@ -116,6 +124,7 @@ T.describe("StealRules movement and timing", function()
 	end)
 	T.it("maps reasons to theme message keys", function()
 		T.expect(StealRules.messageKey("locked")).toBe("cantStealLocked")
+		T.expect(StealRules.messageKey("outside")).toBe("stealFromInside")
 		T.expect(StealRules.messageKey("hold")).toBeNil()
 	end)
 end)

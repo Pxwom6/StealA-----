@@ -172,22 +172,29 @@ local function padCheck()
 		if root == nil or not PlotService.isInside(session.plot, root.Position) then
 			continue
 		end
+		-- Collect from the NEAREST pad the owner is standing on (pads in a column are close together).
 		local refs = PlotService.refs(session.plot)
+		local nearest: typeof(refs.podiums[1])? = nil
+		local nearestDistance = range
 		for _, podium in refs.podiums do
 			if podium.index > session.capacity then
 				break
 			end
 			local offset = root.Position - podium.padPosition
-			if Vector3.new(offset.X, 0, offset.Z).Magnitude <= range and math.abs(offset.Y) < 8 then
-				local amount = EconomyService.collect(session, podium.index)
-				if amount > 0 then
-					Remotes.fire(session.player, "Effect", {
-						kind = "collect",
-						amount = amount,
-						position = podium.padPosition,
-					})
-				end
-				break
+			local distance = Vector3.new(offset.X, 0, offset.Z).Magnitude
+			if distance <= nearestDistance and math.abs(offset.Y) < 8 then
+				nearest = podium
+				nearestDistance = distance
+			end
+		end
+		if nearest then
+			local amount = EconomyService.collect(session, nearest.index)
+			if amount > 0 then
+				Remotes.fire(session.player, "Effect", {
+					kind = "collect",
+					amount = amount,
+					position = nearest.padPosition,
+				})
 			end
 		end
 	end

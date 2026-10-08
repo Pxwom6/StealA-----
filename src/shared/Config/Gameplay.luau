@@ -39,7 +39,9 @@ local Gameplay = {
 	},
 
 	collect = {
-		padRange = 7, -- how close the owner's root part must be to a collect pad
+		-- How close (horizontally) the owner's root part must be to a collect pad's centre: roughly "standing on
+		-- the 4.2-stud pad". Must stay below half of map.podiumRowSpacing so neighbouring pads never overlap.
+		padRange = 3.2,
 	},
 
 	steal = {

@@ -44,7 +44,9 @@ local LiveOps = {
 	limits = {
 		maxLuckMultiplier = 6, -- product of every active boost and event is clamped to this
 		maxCashMultiplier = 3,
-		maxBoostSeconds = 60 * 60, -- purchased luck boosts stack duration up to this much remaining time
+		-- Luck boosts stack duration up to this much remaining time. For the paid Server Luck it is a soft cap: the
+		-- store stops offering it once another purchase would pass the cap, but a receipt always adds its full time.
+		maxBoostSeconds = 60 * 60,
 	},
 
 	remoteConfig = {

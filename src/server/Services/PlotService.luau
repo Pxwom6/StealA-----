@@ -226,12 +226,15 @@ function PlotService.applyShield(plot: number, mode: ShieldMode)
 		refs.barrier.CanCollide = false
 		return
 	end
-	local color = if mode == "Locked" then UiTheme.world("lockField") else UiTheme.world("graceField")
+	local locked = mode == "Locked"
+	local color = if locked then UiTheme.world("lockField") else UiTheme.world("graceField")
 	refs.dome.Color = color
 	refs.dome.Transparency = 0.55
 	refs.barrier.Color = color
-	refs.barrier.Transparency = 0.25
-	refs.barrier.CanCollide = true
+	refs.barrier.Transparency = if locked then 0.25 else 0.6
+	-- Only a real lock blocks the entrance (and LockService ejects anyone inside). The new-player shield is
+	-- visual: visitors may walk through — they just can't steal — so nobody gets trapped when a plot is claimed.
+	refs.barrier.CanCollide = locked
 end
 
 function PlotService.setShieldTimes(plot: number, lockedUntil: number, graceUntil: number)

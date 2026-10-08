@@ -67,7 +67,9 @@ transactions in DataStores), mitigated by saving both immediately.
 ### 8. Locks are enforced by ejection, not collision
 
 **Chose:** while locked, the server teleports non-owners out of the plot 4×/s; the entrance barrier is collidable
-for visuals/honest clients, and the owner's client turns its collision off locally.
+for visuals/honest clients, and the owner's client turns its collision off locally. The yellow new-player shield
+is visual only (stealing is refused server-side), so claiming a plot can never trap a visitor inside. Grabbing
+also requires the thief to stand inside the victim's plot (no reaching through walls).
 **Why:** character physics is client-owned, so a collidable wall alone stops nobody who no-clips. A thief still
 inside when the owner locks drops the creature.
 
@@ -78,7 +80,9 @@ inside when the owner locks drops the creature.
   (`Gameplay.lock.minVulnerableSeconds`). A unit test proves infinite tokens still leave a base open ≥ 1/3 of the time.
 * No pass or product blocks stealing; passes only change income, podium count and lock length.
 * Server Luck (the only random-effect product) shows exact before/after rarity odds in the store, and benefits
-  everyone in the server.
+  everyone in the server. Its 60-minute stacking cap is soft: the store stops offering it once another purchase
+  would pass the cap, but a receipt that still arrives (e.g. two players buying at once) always adds its full
+  15 minutes — a purchase never takes Robux without an effect.
 * Cash packs scale with income (always "about N minutes of your income"), so they never trivialise the game.
 * Stealing ends your own new-player protection.
 

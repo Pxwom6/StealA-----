@@ -162,6 +162,10 @@ T.describe("Config integrity", function()
 		end
 	end)
 
+	T.it("collect pads never overlap their neighbours", function()
+		T.expect(Gameplay.collect.padRange).toBeLessThan(Gameplay.map.podiumRowSpacing / 2)
+	end)
+
 	T.it("podium geometry fits the plot", function()
 		local map = Gameplay.map
 		local rows = math.ceil(map.maxPodiums / map.podiumColumns)

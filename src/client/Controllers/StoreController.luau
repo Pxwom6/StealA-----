@@ -112,7 +112,18 @@ type CardSpec = {
 	accent: Color3,
 	detail: string?,
 	richDetail: boolean?,
+	blockedText: string?, -- when set, the item can't be bought right now and the button shows this
 }
+
+-- True when one more Server Luck purchase would push the server's paid luck past the cap.
+local function luckMaxed(): boolean
+	local endsAt = workspace:GetAttribute("PurchasedLuckEndsAt")
+	if type(endsAt) ~= "number" then
+		return false
+	end
+	local remaining = endsAt - workspace:GetServerTimeNow()
+	return remaining + Monetization.perks.serverLuckSeconds > LiveOps.limits.maxBoostSeconds
+end
 
 local function card(parent: Instance, spec: CardSpec, owned: boolean): Frame
 	local copy = Theme.store[spec.key]
@@ -172,18 +183,19 @@ local function card(parent: Instance, spec: CardSpec, owned: boolean): Frame
 	local buyButton: TextButton
 	local isStudio = RunService:IsStudio()
 	local configured = spec.id ~= 0
+	local blocked = spec.blockedText ~= nil
 	buyButton = UiKit.button({
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -12, 0.5, 0),
 		Size = UDim2.fromOffset(160, 58),
-		BackgroundColor3 = if owned
+		BackgroundColor3 = if owned or blocked
 			then UiTheme.palette("panel")
 			elseif configured or isStudio then UiTheme.palette("robux")
 			else UiTheme.palette("panel"),
 		Text = "",
 		Parent = frame,
 	}, function()
-		if owned then
+		if owned or blocked then
 			return
 		end
 		SoundPlayer.ui("click")
@@ -204,6 +216,8 @@ local function card(parent: Instance, spec: CardSpec, owned: boolean): Frame
 	local priceLabel = UiKit.label({ Size = UDim2.fromScale(1, 1), Parent = buyButton })
 	if owned then
 		priceLabel.Text = Theme.text.storeOwned
+	elseif blocked then
+		priceLabel.Text = spec.blockedText :: string
 	elseif configured then
 		fetchPrice(spec.kind, spec.id, priceLabel)
 	elseif isStudio then
@@ -261,6 +275,7 @@ function StoreController.open(focusKey: string?)
 	for _, key in Monetization.storeProducts do
 		local product = Monetization.products[key]
 		local detail: string? = nil
+		local blockedText: string? = nil
 		local rich = false
 		local accent = UiTheme.palette("cash")
 		if product.kind == "Cash" then
@@ -270,6 +285,9 @@ function StoreController.open(focusKey: string?)
 			detail = Theme.text.oddsHeader .. "\n" .. oddsText()
 			rich = true
 			accent = UiTheme.palette("luck")
+			if luckMaxed() then
+				blockedText = Theme.text.storeLuckMaxed
+			end
 		elseif product.kind == "LockToken" then
 			accent = UiTheme.palette("lock")
 			if state.lockTokens > 0 then
@@ -284,6 +302,7 @@ function StoreController.open(focusKey: string?)
 			accent = accent,
 			detail = detail,
 			richDetail = rich,
+			blockedText = blockedText,
 		}, false)
 	end
 

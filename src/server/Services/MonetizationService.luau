@@ -195,7 +195,7 @@ local function applyProduct(session: Session, key: string, receipt: { [string]: 
 		end
 	elseif product.kind == "ServerLuck" then
 		local perks = Monetization.perks
-		LiveOpsService.addLuckBoost(perks.serverLuckSeconds, perks.serverLuckMultiplier, "purchase")
+		LiveOpsService.addLuckBoost(perks.serverLuckSeconds, perks.serverLuckMultiplier, "purchase", true)
 		return function()
 			Announcer.broadcast({
 				text = Format.template(Theme.text.luckActivated, {

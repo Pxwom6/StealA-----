@@ -57,8 +57,15 @@ function LiveOpsService.activeEventIds(): { [string]: boolean }
 	return LiveOpsRules.activeEventIds(LiveOpsService.events(), LiveOpsService.now())
 end
 
--- Adds (or extends) a luck boost. Boosts from the same source and multiplier stack time, capped.
-function LiveOpsService.addLuckBoost(seconds: number, multiplier: number, source: string): LiveOpsRules.Boost
+-- Adds (or extends) a luck boost. Boosts from the same source and multiplier stack time, capped at
+-- LiveOps.limits.maxBoostSeconds of remaining time — unless `uncapped` (paid boosts: a receipt must always deliver
+-- its full duration; the store stops offering the product near the cap instead, see `purchasedLuckRemaining`).
+function LiveOpsService.addLuckBoost(
+	seconds: number,
+	multiplier: number,
+	source: string,
+	uncapped: boolean?
+): LiveOpsRules.Boost
 	local now = LiveOpsService.now()
 	local existingIndex: number? = nil
 	for index, boost in boosts do
@@ -67,13 +74,18 @@ function LiveOpsService.addLuckBoost(seconds: number, multiplier: number, source
 			break
 		end
 	end
+	local limits = LiveOps.limits
+	if uncapped then
+		limits = table.clone(LiveOps.limits)
+		limits.maxBoostSeconds = math.huge
+	end
 	local updated = LiveOpsRules.extendBoost(
 		if existingIndex then boosts[existingIndex] else nil,
 		now,
 		seconds,
 		multiplier,
 		source,
-		LiveOps.limits
+		limits
 	)
 	if existingIndex then
 		boosts[existingIndex] = updated
@@ -134,6 +146,13 @@ function LiveOpsService.publishAttributes()
 			banner = event.bannerText
 		end
 	end
+	local purchasedEndsAt = 0
+	for _, boost in boosts do
+		if boost.source == "purchase" then
+			purchasedEndsAt = math.max(purchasedEndsAt, boost.endsAt)
+		end
+	end
+	workspace:SetAttribute("PurchasedLuckEndsAt", purchasedEndsAt)
 	workspace:SetAttribute("LuckMultiplier", luck)
 	workspace:SetAttribute("LuckEndsAt", if luck > 1 then luckEndsAt else 0)
 	workspace:SetAttribute("EventBanner", banner)
