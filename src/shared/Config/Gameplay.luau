@@ -52,7 +52,7 @@ local Gameplay = {
 		tagCooldownSeconds = 1,
 		thiefCooldownAfterTagSeconds = 6,
 		speedCheckTolerance = 1.6, -- multiplier on the allowed carry speed before we drop the creature
-		speedCheckLeeway = 6, -- extra studs forgiven per check (jumps, lag)
+		speedCheckLeeway = 6, -- extra studs forgiven per 1-second check window (jumps, lag)
 		deliveryCheckInterval = 0.2,
 	},
 

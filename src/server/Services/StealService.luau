@@ -51,6 +51,7 @@ export type CancelReason =
 local StealService = {}
 
 local CFG = Gameplay.steal
+local SPEED_WINDOW = 1
 
 local function now(): number
 	return workspace:GetServerTimeNow()
@@ -148,6 +149,8 @@ function StealService.cancel(thief: Session, reason: CancelReason, taggerName: s
 		)
 	elseif reason == "full" then
 		Remotes.notify(thief.player, Theme.text.baseFull, "error")
+	elseif reason == "locked" or reason == "rebirth" then
+		Remotes.notify(thief.player, Format.template(Theme.text.creatureReturned, { creature = creatureName }), "error")
 	elseif reason == "ownerLeft" then
 		Remotes.notify(
 			thief.player,
@@ -379,17 +382,19 @@ local function checkCarries()
 			StealService.cancel(thief, "timeout")
 			continue
 		end
-		local delta = root.Position - carry.lastPosition
-		local horizontal = Vector3.new(delta.X, 0, delta.Z).Magnitude
+		-- Speed is judged over windows of at least SPEED_WINDOW seconds so the leeway can't be farmed.
 		local dt = clockNow - carry.lastCheckAt
-		if
-			not StealRules.isMovementPlausible(horizontal, dt, maxSpeed, CFG.speedCheckTolerance, CFG.speedCheckLeeway)
-		then
-			StealService.cancel(thief, "speed")
-			continue
+		if dt >= SPEED_WINDOW then
+			local delta = root.Position - carry.lastPosition
+			local horizontal = Vector3.new(delta.X, 0, delta.Z).Magnitude
+			local tolerance, leeway = CFG.speedCheckTolerance, CFG.speedCheckLeeway
+			if not StealRules.isMovementPlausible(horizontal, dt, maxSpeed, tolerance, leeway) then
+				StealService.cancel(thief, "speed")
+				continue
+			end
+			carry.lastPosition = root.Position
+			carry.lastCheckAt = clockNow
 		end
-		carry.lastPosition = root.Position
-		carry.lastCheckAt = clockNow
 		if thief.plot ~= 0 and PlotService.isInside(thief.plot, root.Position) then
 			deliver(thief)
 		end
