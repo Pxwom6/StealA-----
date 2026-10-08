@@ -1,0 +1,6 @@
+std = "roblox"
+exclude = ["Packages/*", "ServerPackages/*"]
+
+[lints]
+# Luau's `--!strict` mode already reports shadowing that matters; keep selene focused on real bugs.
+shadowing = "allow"

@@ -1,0 +1,37 @@
+{
+	"name": "StealASnackling",
+	"tree": {
+		"$className": "DataModel",
+		"ReplicatedStorage": {
+			"Shared": {
+				"$path": "src/shared"
+			},
+			"CreatureModels": {
+				"$className": "Folder",
+				"$ignoreUnknownInstances": true
+			}
+		},
+		"ServerScriptService": {
+			"Server": {
+				"$path": "src/server"
+			},
+			"ServerPackages": {
+				"$path": {
+					"optional": "ServerPackages"
+				}
+			}
+		},
+		"StarterPlayer": {
+			"StarterPlayerScripts": {
+				"Client": {
+					"$path": "src/client"
+				}
+			}
+		},
+		"Workspace": {
+			"$properties": {
+				"StreamingEnabled": false
+			}
+		}
+	}
+}
