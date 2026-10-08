@@ -36,6 +36,7 @@ function Modal.closeCurrent()
 end
 
 -- Opens a modal of `size` (reference pixels) with a title. `onClose` runs once when it closes.
+-- Keep heights <= 340 so modals fit a landscape phone after UiKit's minimum scale.
 function Modal.open(title: string, size: Vector2, onClose: (() -> ())?): ModalHandle
 	Modal.closeCurrent()
 	local open = true

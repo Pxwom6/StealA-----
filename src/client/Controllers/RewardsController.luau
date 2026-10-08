@@ -36,9 +36,9 @@ function RewardsController.openDaily()
 		return
 	end
 	local daily = state.daily
-	local modal = Modal.open(Theme.text.dailyTitle, Vector2.new(600, 330))
+	local modal = Modal.open(Theme.text.dailyTitle, Vector2.new(600, 320))
 	local track = UiKit.new("Frame", {
-		Size = UDim2.new(1, 0, 0, 150),
+		Size = UDim2.new(1, 0, 0, 124),
 		BackgroundTransparency = 1,
 		Parent = modal.body,
 	}) :: Frame
@@ -80,7 +80,7 @@ function RewardsController.openDaily()
 	UiKit.label({
 		Text = Format.template(Theme.text.dailyBody, { day = daily.streak }),
 		Size = UDim2.new(1, 0, 0, 30),
-		Position = UDim2.fromOffset(0, 160),
+		Position = UDim2.fromOffset(0, 130),
 		TextColor3 = UiTheme.palette("textDim"),
 		Parent = modal.body,
 	})
@@ -125,8 +125,8 @@ local function showWelcome(payload: { amount: number, seconds: number })
 	UiKit.label({
 		Text = "+" .. UiTheme.cash(payload.amount),
 		TextColor3 = UiTheme.palette("cash"),
-		Size = UDim2.new(1, 0, 0, 44),
-		Position = UDim2.fromOffset(0, 92),
+		Size = UDim2.new(1, 0, 0, 40),
+		Position = UDim2.fromOffset(0, 86),
 		Parent = modal.body,
 	})
 	UiKit.button({

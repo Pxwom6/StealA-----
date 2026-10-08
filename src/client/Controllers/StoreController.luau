@@ -232,7 +232,7 @@ function StoreController.open(focusKey: string?)
 	end
 	Net.get("ClientEvent"):FireServer("store_opened")
 	SoundPlayer.ui("click")
-	local modal = Modal.open(Theme.text.storeTitle, Vector2.new(640, 440))
+	local modal = Modal.open(Theme.text.storeTitle, Vector2.new(640, 340))
 	local scroller = UiKit.new("ScrollingFrame", {
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,

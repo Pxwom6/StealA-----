@@ -146,8 +146,9 @@ local function build()
 	sideColumn = UiKit.new("Frame", {
 		Name = "SideColumn",
 		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, 10, 0.5, 0),
-		Size = UDim2.fromOffset(80, 330),
+		-- Slightly above centre: the bottom-left of a phone belongs to the movement thumbstick.
+		Position = UDim2.new(0, 10, 0.42, 0),
+		Size = UDim2.fromOffset(80, 270),
 		BackgroundTransparency = 1,
 		Parent = screen,
 	}) :: Frame

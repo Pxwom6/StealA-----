@@ -43,7 +43,7 @@ local function row(parent: Instance, order: number, text: string, color: Color3?
 	return UiKit.label({
 		LayoutOrder = order,
 		Text = text,
-		Size = UDim2.new(1, 0, 0, 30),
+		Size = UDim2.new(1, 0, 0, 24),
 		TextColor3 = color or UiTheme.palette("text"),
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Parent = parent,
@@ -52,13 +52,13 @@ end
 
 local function column(parent: Instance, title: string, color: Color3, position: UDim2): Frame
 	local frame = UiKit.panel({
-		Size = UDim2.new(0.5, -6, 0, 200),
+		Size = UDim2.new(0.5, -6, 0, 150),
 		Position = position,
 		BackgroundColor3 = UiTheme.palette("panelLight"),
 		Parent = parent,
 	})
-	UiKit.padding(10).Parent = frame
-	UiKit.new("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4), Parent = frame })
+	UiKit.padding(8).Parent = frame
+	UiKit.new("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 3), Parent = frame })
 	row(frame, 0, title, color)
 	return frame
 end
@@ -69,7 +69,7 @@ function RebirthController.open()
 		return
 	end
 	local preview = previewFor(state)
-	local modal = Modal.open(Theme.text.rebirthTitle, Vector2.new(560, 400))
+	local modal = Modal.open(Theme.text.rebirthTitle, Vector2.new(580, 340))
 	local body = modal.body
 
 	local lose = column(body, Theme.text.rebirthLose, UiTheme.palette("danger"), UDim2.fromOffset(0, 0))
@@ -100,15 +100,15 @@ function RebirthController.open()
 		UiTheme.palette("lock")
 	)
 	local keepRow = row(gain, 3, Theme.text.rebirthKeep, UiTheme.palette("textDim"))
-	keepRow.Size = UDim2.new(1, 0, 0, 44)
+	keepRow.Size = UDim2.new(1, 0, 0, 34)
 	keepRow.TextWrapped = true
 
 	-- Requirement progress bar
 	local cost = preview.cost
 	local progress = if cost and cost > 0 then math.clamp(state.cash / cost, 0, 1) else 1
 	local bar = UiKit.panel({
-		Position = UDim2.fromOffset(0, 212),
-		Size = UDim2.new(1, 0, 0, 34),
+		Position = UDim2.fromOffset(0, 158),
+		Size = UDim2.new(1, 0, 0, 30),
 		BackgroundColor3 = UiTheme.palette("stroke"),
 		Parent = body,
 	})
@@ -132,7 +132,7 @@ function RebirthController.open()
 	confirm = UiKit.button({
 		AnchorPoint = Vector2.new(0.5, 1),
 		Position = UDim2.fromScale(0.5, 1),
-		Size = UDim2.fromOffset(260, 60),
+		Size = UDim2.fromOffset(260, 56),
 		BackgroundColor3 = if preview.canRebirth then UiTheme.palette("primary") else UiTheme.palette("panelLight"),
 		Text = if preview.canRebirth
 			then Theme.text.rebirthConfirm
