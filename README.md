@@ -63,6 +63,25 @@ tests               Lune unit tests for src/shared/Logic and config integrity
 tools               Lune scripts (balance simulation)
 ```
 
+### Before publishing
+
+1. **Game Settings → Places → Max Players = 8** (one base per player; see DECISIONS.md #14).
+2. **Game Settings → Security → enable Studio Access to API Services** (to test saving/leaderboards in Studio).
+3. Create the 4 game passes and 5 developer products on the Creator Hub and paste their IDs into
+   `src/shared/Config/Monetization.luau` (every placeholder is marked `TODO(owner)`).
+4. Add your UserId to `adminUserIds` in `src/shared/Config/LiveOps.luau`.
+5. Optional: sound IDs in `src/shared/Config/Sounds.luau`, models in `ReplicatedStorage/CreatureModels`.
+
+### LiveOps without a code change
+
+* **Planned events:** add an entry to `events` in `src/shared/Config/LiveOps.luau` (Unix times, UTC).
+* **No publish needed:** put the same JSON list in the DataStore `LiveOpsConfig`, key `events` (Creator Hub →
+  Data Stores manager). Servers re-read it every 5 minutes, e.g.
+  `[{"id":"FridayLuck","startsAt":1767312000,"endsAt":1767398400,"luckMultiplier":2,"bannerText":"2x Luck Friday!"}]`
+* **Right now, every server:** admin chat commands `/luck 2 30` (2× luck for 30 min), `/event <id>`,
+  `/announce <text>` (filtered). In Studio anyone can use them for testing.
+* **Limited-time creatures:** give a creature an `eventId`; it only appears on the belt while that event runs.
+
 ### Swapping in your own art
 
 * **Creature models:** put a Model named exactly as the creature's `modelName` (see
