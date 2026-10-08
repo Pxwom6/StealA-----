@@ -16,6 +16,11 @@ export type Belt = {
 
 local BeltMath = {}
 
+-- The standard layout: a straight belt along +X, centred on the origin.
+function BeltMath.centered(length: number, travelSeconds: number): Belt
+	return { startX = -length / 2, startZ = 0, dirX = 1, dirZ = 0, length = length, travelSeconds = travelSeconds }
+end
+
 function BeltMath.speed(belt: Belt): number
 	return belt.length / belt.travelSeconds
 end

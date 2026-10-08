@@ -46,7 +46,7 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | Plots | `PlotService` (assign / release / reset, podium attributes) | `PlotController` (billboards, owner barrier pass-through) | `PlotAssignment`, `Inventory` |
 | Map | `MapBuilder` | – | – |
 | Conveyor | `BeltService` (weighted spawns, buy validation) | `BeltController` (pooled models, local prompts) | `BeltMath`, `RarityRoll`, `Catalog` |
-| Economy | `EconomyService` (1 s income tick, collect pads, podium upgrades, sell) | `HudController` | `EconomyMath` |
+| Economy | `EconomyService` (1 s income tick, collect pads checked server-side from the owner's position, podium upgrades, sell) | `HudController` | `EconomyMath` |
 | Stealing | `StealService` (grab, carry, deliver, tag, timeout, speed sanity) | `StealController` (TAG button, alerts) | `StealRules` |
 | Base lock | `LockService` | lock pill + barrier | `LockRules` |
 | Rebirth | `RebirthService` | `RebirthController` (trade-off dialog) | `RebirthMath` |
@@ -125,7 +125,6 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `BuyBeltItem` | `itemId: int` | item exists, not sold, within buy range of *computed* belt position, cash ≥ server price, free podium |
 | `BuyPodium` | – | inside own plot, below cap, cash ≥ server cost |
 | `SellCreature` | `podium: int` | own podium, creature present, not being stolen, near podium |
-| `CollectPodium` | `podium: int` | (pads are server `Touched`; this is a fallback for the HUD "collect" tap when standing on a pad) near pad |
 | `StealBegin` | `plot: int, podium: int` | starts the server-side hold timer |
 | `StealConfirm` | `plot: int, podium: int` | hold time elapsed, `StealRules.canGrab` (lock, grace, range, own free podium, not carrying) |
 | `TagThief` | `userId: int` | target is carrying, within tag range, tag cooldown |

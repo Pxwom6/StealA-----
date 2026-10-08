@@ -1,0 +1,247 @@
+--!strict
+--[[
+	Renders the conveyor locally. The server only sends {id, creatureId, spawnAt}; positions come from
+	Logic/BeltMath and the shared server clock, so movement costs zero network traffic.
+
+	Models are pooled per creature type (built once, reused forever) and each item gets a local "Buy" prompt that
+	sends the BuyBeltItem intent — the server re-validates price, range and space.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
+local Theme = require(ReplicatedStorage.Shared.Config.Theme)
+local GameData = require(ReplicatedStorage.Shared.GameData)
+local Net = require(ReplicatedStorage.Shared.Net)
+local Types = require(ReplicatedStorage.Shared.Types)
+local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
+local CreatureVisuals = require(ReplicatedStorage.Shared.CreatureVisuals)
+local BeltMath = require(ReplicatedStorage.Shared.Logic.BeltMath)
+local UiKit = require(script.Parent.Parent.UI.UiKit)
+local NotificationController = require(script.Parent.NotificationController)
+local SoundPlayer = require(script.Parent.SoundPlayer)
+local StateStore = require(script.Parent.StateStore)
+
+type Pooled = {
+	creatureId: string,
+	model: Model,
+	prompt: ProximityPrompt,
+	priceLabel: TextLabel,
+	height: number,
+}
+
+type Active = { item: Types.BeltItem, pooled: Pooled, connection: RBXScriptConnection }
+
+local BeltController = {}
+
+local belt = BeltMath.centered(Gameplay.belt.length, Gameplay.belt.travelSeconds)
+local surfaceY = Gameplay.belt.surfaceY
+local active: { [number]: Active } = {}
+local pools: { [string]: { Pooled } } = {}
+local folder: Folder
+local hidden = CFrame.new(0, -500, 0)
+
+local function makeBillboard(model: Model, def: Types.CreatureDef, rarity: Types.RarityDef, height: number): TextLabel
+	local root = model.PrimaryPart :: BasePart
+	local big = rarity.order >= 6
+	local gui = UiKit.new("BillboardGui", {
+		Name = "Info",
+		Size = UDim2.fromOffset(if big then 230 else 190, if big then 96 else 80),
+		StudsOffsetWorldSpace = Vector3.new(0, height + 2.2, 0),
+		MaxDistance = 90,
+		LightInfluence = 0,
+		Parent = root,
+	}) :: BillboardGui
+	UiKit.new("UIListLayout", {
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		Parent = gui,
+	})
+	UiKit.label({
+		LayoutOrder = 1,
+		Text = string.upper(rarity.displayName),
+		TextColor3 = UiTheme.color(rarity.color),
+		Size = UDim2.fromScale(1, 0.26),
+		Parent = gui,
+	})
+	UiKit.label({
+		LayoutOrder = 2,
+		Text = def.displayName,
+		Size = UDim2.fromScale(1, 0.3),
+		Parent = gui,
+	})
+	local price = UiKit.label({
+		LayoutOrder = 3,
+		Text = `{UiTheme.cash(def.price)}  {UiTheme.perSecond(def.income)}`,
+		TextColor3 = UiTheme.palette("cash"),
+		Size = UDim2.fromScale(1, 0.26),
+		Parent = gui,
+	})
+	return price
+end
+
+local function build(creatureId: string): Pooled
+	local def = GameData.catalog.creatures[creatureId]
+	local rarity = GameData.catalog.rarities[def.rarity]
+	local model = CreatureVisuals.build(def, rarity, { anchored = true })
+	local height = CreatureVisuals.height(model)
+	local priceLabel = makeBillboard(model, def, rarity, height)
+	local prompt = UiKit.new("ProximityPrompt", {
+		ActionText = Theme.text.buyAction,
+		ObjectText = `{def.displayName} - {UiTheme.cash(def.price)}`,
+		HoldDuration = 0,
+		MaxActivationDistance = Gameplay.belt.buyRange - 2,
+		RequiresLineOfSight = false,
+		KeyboardKeyCode = Enum.KeyCode.E,
+		Parent = model.PrimaryPart,
+	}) :: ProximityPrompt
+	model.Parent = folder
+	return { creatureId = creatureId, model = model, prompt = prompt, priceLabel = priceLabel, height = height }
+end
+
+local function acquire(creatureId: string): Pooled
+	local pool = pools[creatureId]
+	if pool and #pool > 0 then
+		local pooled = table.remove(pool) :: Pooled
+		pooled.prompt.Enabled = true
+		return pooled
+	end
+	return build(creatureId)
+end
+
+local function release(pooled: Pooled)
+	pooled.prompt.Enabled = false
+	pooled.model:PivotTo(hidden)
+	local pool = pools[pooled.creatureId]
+	if pool == nil then
+		pool = {}
+		pools[pooled.creatureId] = pool
+	end
+	table.insert(pool, pooled)
+end
+
+local function refreshAffordability(cash: number)
+	for _, entry in active do
+		local def = GameData.catalog.creatures[entry.item.creatureId]
+		entry.pooled.priceLabel.TextColor3 = if cash >= def.price
+			then UiTheme.palette("cash")
+			else UiTheme.palette("danger")
+	end
+end
+
+local function add(item: Types.BeltItem)
+	if active[item.id] or GameData.catalog.creatures[item.creatureId] == nil then
+		return
+	end
+	local pooled = acquire(item.creatureId)
+	local connection = pooled.prompt.Triggered:Connect(function()
+		Net.get("BuyBeltItem"):FireServer(item.id)
+	end)
+	active[item.id] = { item = item, pooled = pooled, connection = connection }
+	local state = StateStore.get()
+	if state then
+		refreshAffordability(state.cash)
+	end
+	local def = GameData.catalog.creatures[item.creatureId]
+	local rarity = GameData.catalog.rarities[def.rarity]
+	if rarity.order >= 5 then
+		SoundPlayer.rarity(rarity.id)
+	end
+end
+
+local function remove(id: number): Active?
+	local entry = active[id]
+	if entry then
+		active[id] = nil
+		entry.connection:Disconnect()
+		release(entry.pooled)
+	end
+	return entry
+end
+
+-- Flies a glowing orb from the belt to the buyer's podium: the "teleport home" moment.
+local function flyHome(from: Vector3, to: Vector3, color: Color3)
+	local orb = Instance.new("Part")
+	orb.Shape = Enum.PartType.Ball
+	orb.Size = Vector3.one * 1.6
+	orb.Material = Enum.Material.Neon
+	orb.Color = color
+	orb.Anchored = true
+	orb.CanCollide = false
+	orb.CanQuery = false
+	orb.CanTouch = false
+	orb.Position = from
+	orb.Parent = folder
+	local mid = (from + to) / 2 + Vector3.new(0, 18, 0)
+	local t0 = os.clock()
+	local duration = 0.8
+	local connection: RBXScriptConnection
+	connection = RunService.RenderStepped:Connect(function()
+		local a = math.min(1, (os.clock() - t0) / duration)
+		local p1 = from:Lerp(mid, a)
+		local p2 = mid:Lerp(to, a)
+		orb.Position = p1:Lerp(p2, a)
+		if a >= 1 then
+			connection:Disconnect()
+			NotificationController.sparkle(to + Vector3.new(0, 2, 0), color)
+			local tween = TweenService:Create(orb, TweenInfo.new(0.2), { Size = Vector3.zero })
+			tween:Play()
+			tween.Completed:Wait()
+			orb:Destroy()
+		end
+	end)
+end
+
+local function onRemove(payload: { id: number, buyerUserId: number?, target: Vector3? })
+	local entry = active[payload.id]
+	local position: Vector3? = nil
+	if entry then
+		position = entry.pooled.model:GetPivot().Position
+	end
+	local removed = remove(payload.id)
+	if removed and position and payload.target then
+		local def = GameData.catalog.creatures[removed.item.creatureId]
+		flyHome(position, payload.target, UiTheme.rarityColor(def.rarity))
+		SoundPlayer.world("buy")
+	end
+end
+
+local function step()
+	local now = workspace:GetServerTimeNow()
+	for id, entry in active do
+		local item = entry.item
+		if BeltMath.isExpired(belt, item.spawnAt, now) then
+			remove(id)
+			continue
+		end
+		local x, z = BeltMath.position(belt, item.spawnAt, now)
+		local bob = math.abs(math.sin((now - item.spawnAt) * 6)) * 0.35
+		local position = Vector3.new(x, surfaceY + bob, z)
+		entry.pooled.model:PivotTo(CFrame.lookAt(position, position + Vector3.new(belt.dirX, 0, belt.dirZ)))
+	end
+end
+
+function BeltController.start()
+	folder = Instance.new("Folder")
+	folder.Name = "BeltItems"
+	folder.Parent = workspace
+
+	Net.get("BeltSnapshot").OnClientEvent:Connect(function(items: { Types.BeltItem })
+		for id in active do
+			remove(id)
+		end
+		for _, item in items do
+			add(item)
+		end
+	end)
+	Net.get("BeltSpawn").OnClientEvent:Connect(add)
+	Net.get("BeltRemove").OnClientEvent:Connect(onRemove)
+	StateStore.onChange(function(state)
+		refreshAffordability(state.cash)
+	end)
+	RunService.RenderStepped:Connect(step)
+end
+
+return BeltController

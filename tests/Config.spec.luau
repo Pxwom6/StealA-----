@@ -145,7 +145,6 @@ T.describe("Config integrity", function()
 				"BuyBeltItem",
 				"BuyPodium",
 				"SellCreature",
-				"CollectPodium",
 				"StealBegin",
 				"StealConfirm",
 				"TagThief",

@@ -32,6 +32,7 @@ local Gameplay = {
 		length = 260,
 		travelSeconds = 30,
 		width = 9,
+		surfaceY = 1.2, -- height of the belt surface items ride on
 		buyRange = 16,
 		latencyTolerance = 0.75, -- seconds of belt movement forgiven when checking buy range
 		maxItems = 16,
@@ -76,7 +77,6 @@ local Gameplay = {
 		BuyBeltItem = { burst = 4, perSecond = 2 },
 		BuyPodium = { burst = 3, perSecond = 1 },
 		SellCreature = { burst = 4, perSecond = 2 },
-		CollectPodium = { burst = 6, perSecond = 4 },
 		StealBegin = { burst = 4, perSecond = 2 },
 		StealConfirm = { burst = 4, perSecond = 2 },
 		TagThief = { burst = 4, perSecond = 3 },

@@ -109,4 +109,50 @@ export type PlayerData = {
 	lastSeen: number,
 }
 
+-- Runtime / network ---------------------------------------------------------------------------------------------
+
+export type Passes = {
+	DoubleCash: boolean,
+	VIP: boolean,
+	ExtraPodiums: boolean,
+	LongerLock: boolean,
+}
+
+export type DailyView = {
+	canClaim: boolean,
+	streak: number,
+	nextStreak: number,
+	secondsUntilNext: number,
+	reward: number,
+}
+
+-- What the server sends the owning client in StateUpdate (see server/Services/Replication.luau).
+-- Costs of -1 mean "not available" (max reached).
+export type ClientState = {
+	cash: number,
+	income: number,
+	multiplier: number,
+	rebirths: number,
+	rebirthMultiplier: number,
+	rebirthCost: number,
+	creatureCount: number,
+	capacity: number,
+	podiumUpgrades: number,
+	nextPodiumCost: number,
+	lockTokens: number,
+	lockedUntil: number,
+	lockCooldownUntil: number,
+	lockVulnerableUntil: number,
+	lockDuration: number,
+	graceUntil: number,
+	plot: number,
+	passes: Passes,
+	carrying: string, -- creature id being carried, "" when not stealing
+	stealCooldownUntil: number,
+	steals: number,
+	daily: DailyView,
+}
+
+export type BeltItem = { id: number, creatureId: string, spawnAt: number }
+
 return {}
