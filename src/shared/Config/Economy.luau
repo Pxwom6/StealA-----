@@ -30,7 +30,7 @@ local Economy = {
 
 	-- Rebirth: reset cash + Snacklings for a permanent multiplier and a longer base lock.
 	rebirth = {
-		baseCost = 1500000,
+		baseCost = 25000000,
 		costGrowth = 6,
 		multiplierPerRebirth = 0.5, -- x1 → x1.5 → x2 → ...
 		lockBonusPerRebirth = 5, -- extra lock seconds per rebirth
