@@ -10,6 +10,7 @@ local Services = script.Services
 local Analytics = require(Services.Analytics)
 local BeltService = require(Services.BeltService)
 local DataService = require(Services.DataService)
+local DevCommands = require(Services.DevCommands)
 local EconomyService = require(Services.EconomyService)
 local LeaderboardService = require(Services.LeaderboardService)
 local LiveOpsService = require(Services.LiveOpsService)
@@ -41,6 +42,7 @@ RebirthService.start()
 MonetizationService.start()
 RetentionService.start()
 LeaderboardService.start(world)
+DevCommands.start() -- Studio only
 
 local hooks = PlayerLifecycle.hooks()
 hooks.checkPasses = MonetizationService.checkPasses

@@ -59,27 +59,28 @@ local function prune(t: number)
 	end
 end
 
-local function spawnOne()
+local function spawnOne(forcedId: string?)
 	local t = now()
 	prune(t)
 	local count = 0
 	for _ in items do
 		count += 1
 	end
-	if count >= Gameplay.belt.maxItems then
+	if count >= Gameplay.belt.maxItems and forcedId == nil then
 		return
 	end
 	local catalog = GameData.catalog
-	local creatureId = RarityRoll.roll(
-		catalog.rarityList,
-		catalog.creatureList,
-		LiveOpsService.luckMultiplier(),
-		LiveOpsService.activeEventIds(),
-		function(): number
-			return rng:NextNumber()
-		end
-	)
-	if creatureId == nil then
+	local creatureId = forcedId
+		or RarityRoll.roll(
+			catalog.rarityList,
+			catalog.creatureList,
+			LiveOpsService.luckMultiplier(),
+			LiveOpsService.activeEventIds(),
+			function(): number
+				return rng:NextNumber()
+			end
+		)
+	if creatureId == nil or catalog.creatures[creatureId] == nil then
 		return
 	end
 	local item: BeltItem = { id = nextId, creatureId = creatureId, spawnAt = t }
@@ -172,6 +173,11 @@ end
 function BeltService.sendSnapshot(player: Player)
 	prune(now())
 	Remotes.fire(player, "BeltSnapshot", itemList())
+end
+
+-- Puts a specific creature on the belt now (Studio dev command / future events).
+function BeltService.spawnCreature(creatureId: string)
+	spawnOne(creatureId)
 end
 
 function BeltService.belt(): BeltMath.Belt
