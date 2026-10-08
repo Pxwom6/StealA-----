@@ -127,24 +127,25 @@ function UiKit.addPressFeedback(button: GuiButton)
 	button.MouseLeave:Connect(release)
 end
 
--- Big chunky button. `onActivated` fires on tap/click.
+-- Big chunky button. `onActivated` fires on tap/click. The text lives in a child "Label" (so the button's own
+-- UIStroke can be the border); change it later with UiKit.setButtonText.
 function UiKit.button(props: Props, onActivated: () -> ()): TextButton
+	local text = if type(props.Text) == "string" then props.Text else ""
 	local defaults: Props = {
 		AutoButtonColor = false,
 		BackgroundColor3 = UiTheme.palette("primary"),
-		FontFace = UiTheme.displayFont,
-		TextColor3 = UiTheme.palette("text"),
-		TextScaled = true,
 		Size = UDim2.fromOffset(160, 56),
-		Text = "",
 	}
 	for key, value in props do
-		defaults[key] = value
+		if key ~= "Text" then
+			defaults[key] = value
+		end
 	end
+	defaults.Text = ""
 	local button = UiKit.new("TextButton", defaults) :: TextButton
 	UiKit.corner(14).Parent = button
 	UiKit.stroke(3).Parent = button
-	UiKit.textStroke(2).Parent = button
+	UiKit.label({ Name = "Label", Text = text, Size = UDim2.fromScale(1, 1), Parent = button })
 	UiKit.new("UIPadding", {
 		PaddingTop = UDim.new(0, 6),
 		PaddingBottom = UDim.new(0, 6),
@@ -155,6 +156,13 @@ function UiKit.button(props: Props, onActivated: () -> ()): TextButton
 	UiKit.addPressFeedback(button)
 	button.Activated:Connect(onActivated)
 	return button
+end
+
+function UiKit.setButtonText(button: TextButton, text: string)
+	local label = button:FindFirstChild("Label")
+	if label and label:IsA("TextLabel") then
+		label.Text = text
+	end
 end
 
 function UiKit.panel(props: Props): Frame

@@ -146,12 +146,12 @@ function RebirthController.open()
 		end
 		if not armed then
 			armed = true
-			confirm.Text = "Tap again to confirm!"
+			UiKit.setButtonText(confirm, "Tap again to confirm!")
 			confirm.BackgroundColor3 = UiTheme.palette("danger")
 			task.delay(3, function()
 				if armed and modal.isOpen() then
 					armed = false
-					confirm.Text = Theme.text.rebirthConfirm
+					UiKit.setButtonText(confirm, Theme.text.rebirthConfirm)
 					confirm.BackgroundColor3 = UiTheme.palette("primary")
 				end
 			end)
