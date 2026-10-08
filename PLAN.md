@@ -28,7 +28,8 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 ```
 
 * **Server-authoritative.** Clients send intents through RemoteEvents. Every remote passes through
-  `RemoteGateway`: per-player token-bucket rate limit → argument type guards → handler. Handlers re-derive
+  `Remotes.onIntent`: per-player token-bucket rate limit → `pcall` → handler, which validates every argument
+  with `Logic/Guard`. Handlers re-derive
   prices, rarities and positions from server state; nothing numeric from the client is trusted.
 * **Pure logic has no Roblox dependencies.** `src/shared/Logic/*` and `src/shared/Config/*` never touch
   `game`, `Instance`, `Vector3`, `Color3`, `os.clock` etc. Clocks and RNGs are passed in. They only require
@@ -50,12 +51,14 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | Stealing | `StealService` (grab, carry, deliver, tag, timeout, speed sanity) | `StealController` (TAG button, alerts) | `StealRules` |
 | Base lock | `LockService` | lock pill + barrier | `LockRules` |
 | Rebirth | `RebirthService` | `RebirthController` (trade-off dialog) | `RebirthMath` |
+| Base lock UI | `LockService` | `LockController` (lock button prompt, HUD pill) | `LockRules` |
 | Monetisation | `MonetizationService` (ProcessReceipt, passes) | `StoreController` | `ReceiptLedger`, `EconomyMath.cashPackAmount` |
 | Retention | `RetentionService` (daily streak, offline earnings), `LeaderboardService` | `RewardsController` | `DailyStreak`, `OfflineEarnings` |
-| Social | `AnnouncementService` (server-wide banners) | `NotificationController`, `ChatTagController` | – |
+| Social | `Announcer` (server-wide banners) | `NotificationController`, `ChatTagController` | – |
 | LiveOps | `LiveOpsService` (scheduled events, luck boosts, admin commands, cross-server) | luck banner | `LiveOpsRules` |
-| Analytics | `AnalyticsTracker` (funnel + economy events) | sends whitelisted `store_opened` | – |
-| State sync | `ReplicationService` (dirty-flag batching, 5 Hz) | `StateStore` | – |
+| Analytics | `Analytics` (funnel + economy events) | sends whitelisted `store_opened` | – |
+| State sync | `Replication` (dirty-flag batching, 5 Hz) | `StateStore` | – |
+| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn`, `/noshield`) | – | – |
 
 ## 3. Module list
 
@@ -96,15 +99,16 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `PlotAssignment` | pick a free plot, release |
 
 ### `src/shared` (Roblox helpers, not unit-tested)
-`Net` (create/get remotes by name), `CreatureVisuals` (build placeholder model or clone from
-`ReplicatedStorage.CreatureModels`, apply rarity glow / particles / banner), `UiTheme` (hex → Color3, fonts),
-`Types` re-exports.
+`Net` (create/get remotes by name), `GameData` (catalogue built once from config), `CreatureVisuals` (build
+placeholder model or clone from `ReplicatedStorage.CreatureModels`, apply rarity glow / particles / aura),
+`UiTheme` (hex → Color3, fonts, text templates).
 
 ### `src/server`
 `init.server.luau` bootstraps in order:
-`RemoteGateway → DataService → MapBuilder → PlotService → ReplicationService → AnalyticsTracker →
-LiveOpsService → EconomyService → BeltService → LockService → StealService → RebirthService →
-MonetizationService → RetentionService → LeaderboardService → AnnouncementService → PlayerLifecycle`.
+`Remotes → DataService → MapBuilder → PlotService → Analytics → LiveOpsService → Replication →
+EconomyService → BeltService → LockService → StealService → RebirthService → MonetizationService →
+RetentionService → LeaderboardService → DevCommands → PlayerLifecycle`, and wires cross-service join/leave steps
+through `PlayerLifecycle.hooks()` (keeps services free of circular requires). `Sessions` holds per-player state.
 
 `PlayerLifecycle` owns join/leave ordering: load profile → assign plot → check passes → offline earnings →
 spawn creatures → send initial state; on leave: cancel steals involving the player → auto-collect stored cash →
@@ -112,8 +116,9 @@ release plot → release profile.
 
 ### `src/client`
 `init.client.luau` waits for `game:IsLoaded()` then starts controllers:
-`StateStore, UiKit, HudController, BeltController, PlotController, InteractionController, StealController,
-StoreController, RebirthController, RewardsController, NotificationController, ChatTagController`.
+`StateStore, HudController, NotificationController, BeltController, PlotController, InteractionController,
+StealController, LockController, RebirthController, StoreController, ChatTagController, RewardsController`
+(UI helpers: `UI/UiKit`, `UI/Modal`; audio: `SoundPlayer`).
 
 ## 4. Remotes (all in `ReplicatedStorage.Remotes`, created by the server)
 
