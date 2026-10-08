@@ -93,6 +93,7 @@ local function onPlayerAdded(player: Player)
 		DataService.release(profile)
 		return
 	end
+	local lastSeenAtJoin = profile.Data.lastSeen
 
 	local passes: Sessions.Passes = if hooks.checkPasses
 		then hooks.checkPasses(player)
@@ -117,6 +118,7 @@ local function onPlayerAdded(player: Player)
 		stealCooldownUntil = 0,
 		tagCooldownUntil = 0,
 		joinedAt = now,
+		lastSeenAtJoin = lastSeenAtJoin,
 		playClock = os.clock(),
 		ready = false,
 		dirty = true,

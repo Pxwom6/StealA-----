@@ -59,6 +59,7 @@ export type Session = {
 	stealCooldownUntil: number,
 	tagCooldownUntil: number,
 	joinedAt: number,
+	lastSeenAtJoin: number, -- the save's lastSeen when it was loaded (offline earnings)
 	playClock: number, -- os.clock() of the last play-time accrual
 	ready: boolean, -- the client has finished loading and asked for state
 	dirty: boolean, -- state changed since the last StateUpdate

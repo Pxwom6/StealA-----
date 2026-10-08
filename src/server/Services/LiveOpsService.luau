@@ -2,14 +2,25 @@
 --[[
 	Server-wide modifiers: scheduled events (Config/LiveOps), purchased / admin luck boosts, and the cash
 	multiplier from events. Current values are mirrored to workspace attributes (LuckMultiplier, LuckEndsAt,
-	EventBanner, CashMultiplier) so every client can show them without extra remotes.
+	EventBanner, CashMultiplier, ActiveEventIds) so every client can show them without extra remotes.
+
+	Runtime control without publishing:
+	  * remote config: event list JSON in a DataStore entry, re-read every few minutes
+	  * admin chat commands (/luck, /event, /announce), broadcast to every server with MessagingService
 ]]
 
+local DataStoreService = game:GetService("DataStoreService")
+local HttpService = game:GetService("HttpService")
+local MessagingService = game:GetService("MessagingService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local TextChatService = game:GetService("TextChatService")
+local TextService = game:GetService("TextService")
 
 local LiveOps = require(ReplicatedStorage.Shared.Config.LiveOps)
 local LiveOpsRules = require(ReplicatedStorage.Shared.Logic.LiveOpsRules)
 local Types = require(ReplicatedStorage.Shared.Types)
+local Announcer = require(script.Parent.Announcer)
 
 local LiveOpsService = {}
 
@@ -143,6 +154,130 @@ function LiveOpsService.publishAttributes()
 	end
 end
 
+-- Remote config ------------------------------------------------------------------------------------------------
+
+local function loadRemoteConfig()
+	local cfg = LiveOps.remoteConfig
+	local ok, raw = pcall(function(): any
+		return DataStoreService:GetDataStore(cfg.dataStoreName):GetAsync(cfg.key)
+	end)
+	if not ok or raw == nil then
+		return
+	end
+	local decoded: any = raw
+	if type(raw) == "string" then
+		local decodeOk, value = pcall(function(): any
+			return HttpService:JSONDecode(raw)
+		end)
+		if not decodeOk then
+			warn("[LiveOps] remote config is not valid JSON")
+			return
+		end
+		decoded = value
+	end
+	local events, problems = LiveOpsRules.validateEvents(decoded, LiveOps.limits)
+	for _, problem in problems do
+		warn(`[LiveOps] remote config: {problem}`)
+	end
+	LiveOpsService.setRemoteEvents(events)
+end
+
+-- Admin commands -----------------------------------------------------------------------------------------------
+
+type Command = { kind: string, multiplier: number?, minutes: number?, eventId: string?, text: string? }
+
+local function applyCommand(command: Command)
+	if command.kind == "luck" then
+		local multiplier = math.clamp(command.multiplier or 2, 1, LiveOps.limits.maxLuckMultiplier)
+		local minutes = math.clamp(command.minutes or 15, 1, 24 * 60)
+		LiveOpsService.addLuckBoost(minutes * 60, multiplier, "admin")
+		Announcer.broadcast({ text = `{multiplier}x LUCK for {minutes} minutes!`, rarity = "Legendary", kind = "luck" })
+	elseif command.kind == "event" and command.eventId then
+		local event = LiveOpsService.findConfiguredEvent(command.eventId)
+		if event then
+			LiveOpsService.startEventNow(event, event.durationSeconds or 1800)
+			if event.bannerText then
+				Announcer.broadcast({ text = event.bannerText, rarity = "Mythic", kind = "admin" })
+			end
+		end
+	elseif command.kind == "announce" and command.text then
+		Announcer.broadcast({ text = command.text, kind = "admin" })
+	end
+end
+
+-- Publishes to every server (including this one); falls back to applying locally (e.g. in Studio).
+local function broadcastCommand(command: Command)
+	local ok = pcall(function()
+		MessagingService:PublishAsync(LiveOps.messagingTopic, HttpService:JSONEncode(command))
+	end)
+	if not ok then
+		applyCommand(command)
+	end
+end
+
+local function isAdmin(userId: number): boolean
+	return RunService:IsStudio() or table.find(LiveOps.adminUserIds, userId) ~= nil
+end
+
+local function filterForBroadcast(text: string, fromUserId: number): string?
+	local ok, result = pcall(function(): string
+		return TextService:FilterStringAsync(text, fromUserId):GetNonChatStringForBroadcastAsync()
+	end)
+	return if ok then result else nil
+end
+
+local function addCommand(alias: string, handler: (userId: number, args: { string }, rawArgs: string) -> ())
+	local command = Instance.new("TextChatCommand")
+	command.Name = "LiveOps" .. alias
+	command.PrimaryAlias = "/" .. alias
+	command.AutocompleteVisible = false
+	command.Parent = TextChatService
+	command.Triggered:Connect(function(source: TextSource, text: string)
+		if not isAdmin(source.UserId) then
+			return
+		end
+		local rawArgs = string.match(text, "^%S+%s*(.*)$") or ""
+		local args: { string } = {}
+		for word in string.gmatch(rawArgs, "%S+") do
+			table.insert(args, word)
+		end
+		handler(source.UserId, args, rawArgs)
+	end)
+end
+
+local function startAdminTools()
+	pcall(function()
+		MessagingService:SubscribeAsync(LiveOps.messagingTopic, function(message: any)
+			local ok, decoded = pcall(function(): any
+				return HttpService:JSONDecode(message.Data)
+			end)
+			if ok and type(decoded) == "table" and type(decoded.kind) == "string" then
+				applyCommand(decoded :: Command)
+			end
+		end)
+	end)
+
+	addCommand("luck", function(_userId: number, args: { string })
+		broadcastCommand({ kind = "luck", multiplier = tonumber(args[1]), minutes = tonumber(args[2]) })
+	end)
+	addCommand("event", function(_userId: number, args: { string })
+		if args[1] then
+			broadcastCommand({ kind = "event", eventId = args[1] })
+		end
+	end)
+	addCommand("announce", function(userId: number, _args: { string }, rawArgs: string)
+		local text = string.sub(rawArgs, 1, 120)
+		if #text == 0 then
+			return
+		end
+		-- Text shown to every player must go through Roblox filtering, even from admins.
+		local filtered = filterForBroadcast(text, userId)
+		if filtered then
+			broadcastCommand({ kind = "announce", text = filtered })
+		end
+	end)
+end
+
 function LiveOpsService.start()
 	LiveOpsService.publishAttributes()
 	task.spawn(function()
@@ -151,6 +286,15 @@ function LiveOpsService.start()
 			LiveOpsService.publishAttributes()
 		end
 	end)
+	if LiveOps.remoteConfig.enabled then
+		task.spawn(function()
+			while true do
+				loadRemoteConfig()
+				task.wait(LiveOps.remoteConfig.refreshSeconds)
+			end
+		end)
+	end
+	startAdminTools()
 end
 
 return LiveOpsService
