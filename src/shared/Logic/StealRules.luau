@@ -35,6 +35,24 @@ export type TagContext = {
 	tagRange: number,
 	tagVerticalAllowance: number,
 	taggerCooldownUntil: number,
+	taggerTrusted: boolean, -- see isPositionTrusted: the tagger's reported position matches what the server saw
+}
+
+-- A character's movement as the server observed it (see stepWalkTrack). Times are server time.
+export type WalkTrack = {
+	lastX: number,
+	lastY: number,
+	lastZ: number,
+	lastT: number,
+	climbY: number, -- highest height already paid for: climbing costs once, jumping back up to it is free
+	budget: number, -- studs the character may still move; refills over time, capped
+}
+
+export type WalkLimits = {
+	maxSpeed: number, -- walk speed (studs/s)
+	tolerance: number, -- refill rate multiplier on maxSpeed
+	budgetSeconds: number, -- the budget never holds more than this many seconds of refill
+	leeway: number, -- starting budget
 }
 
 export type Rect = { minX: number, maxX: number, minZ: number, maxZ: number }
@@ -95,6 +113,9 @@ function StealRules.canTag(ctx: TagContext): (boolean, string?)
 	end
 	if ctx.now < ctx.taggerCooldownUntil then
 		return false, "cooldown"
+	end
+	if not ctx.taggerTrusted then
+		return false, "untrusted"
 	end
 	if
 		not StealRules.withinTagReach(
@@ -159,6 +180,76 @@ function StealRules.isMovementPlausible(
 		return distance <= leeway
 	end
 	return distance <= maxSpeed * dt * tolerance + leeway
+end
+
+-- Starts tracking a character's movement at a server-observed position.
+function StealRules.newWalkTrack(x: number, y: number, z: number, t: number, limits: WalkLimits): WalkTrack
+	return { lastX = x, lastY = y, lastZ = z, lastT = t, climbY = y, budget = limits.leeway }
+end
+
+-- One server-observed step. The budget refills by maxSpeed * dt * tolerance (holding at most budgetSeconds of
+-- refill) and pays for the distance moved: horizontal, plus height gained above the highest point already paid for,
+-- so jumping again and again costs one jump and falling is free. Returns false when the budget goes negative, i.e.
+-- faster than anyone can walk: a teleport or a sustained speed hack. A short stall followed by a catch-up jump (lag)
+-- is paid for by the budget built up meanwhile. Mutates `track`.
+function StealRules.stepWalkTrack(
+	track: WalkTrack,
+	x: number,
+	y: number,
+	z: number,
+	t: number,
+	limits: WalkLimits
+): boolean
+	if x ~= x or y ~= y or z ~= z then
+		return false
+	end
+	local dt = math.max(0, t - track.lastT)
+	local cap = limits.maxSpeed * limits.tolerance * limits.budgetSeconds
+	track.budget = math.min(cap, track.budget + limits.maxSpeed * dt * limits.tolerance)
+	local climb = math.max(0, y - track.climbY)
+	track.budget -= math.sqrt((x - track.lastX) ^ 2 + (z - track.lastZ) ^ 2) + climb
+	track.climbY += climb
+	track.lastX, track.lastY, track.lastZ, track.lastT = x, y, z, math.max(track.lastT, t)
+	return track.budget >= 0
+end
+
+-- How bad a step was, after stepWalkTrack: "ok"; "overrun" (a little more than the budget could pay: a long lag
+-- stall, a server hitch, a physics fling); or "teleport" (more than `teleportDeficit` studs beyond it).
+function StealRules.walkStepVerdict(track: WalkTrack, teleportDeficit: number): "ok" | "overrun" | "teleport"
+	if track.budget >= 0 then
+		return "ok"
+	elseif track.budget < -teleportDeficit then
+		return "teleport"
+	end
+	return "overrun"
+end
+
+-- What the server knows when judging a client-reported position (see isPositionTrusted). Times are server time.
+export type TrustContext = {
+	track: WalkTrack?, -- nil until the first sample
+	flaggedAt: number, -- last step that overran the walk budget at all
+	teleportedAt: number, -- last step that overran it grossly (a teleport)
+	flagSince: number, -- any overrun at or after this time makes the position untrusted
+	teleportSince: number, -- a teleport at or after this time does
+	x: number,
+	z: number,
+	t: number,
+	stepSlack: number, -- studs allowed beyond walking speed between the latest sample and now (jitter)
+}
+
+-- Character physics is client-owned, so a reported position (a tagger's, or a thief's at a podium) is only trusted
+-- when it fits what the server itself observed: they are being tracked, nothing flagged since the given times (the
+-- server asks for "no teleport since just before this carry started", so teleporting ahead of a thief and waiting
+-- doesn't work), and the step from the latest sample to the reported position is walkable in the time since. That
+-- step never spends the stored budget, so a tagger can't blink toward a thief, tag and blink back.
+function StealRules.isPositionTrusted(ctx: TrustContext, limits: WalkLimits): boolean
+	local track = ctx.track
+	if track == nil or ctx.flaggedAt >= ctx.flagSince or ctx.teleportedAt >= ctx.teleportSince then
+		return false
+	end
+	local dt = math.max(0, ctx.t - track.lastT)
+	local step = math.sqrt((ctx.x - track.lastX) ^ 2 + (ctx.z - track.lastZ) ^ 2)
+	return step <= limits.maxSpeed * limits.tolerance * dt + ctx.stepSlack -- false for NaN
 end
 
 function StealRules.isCarryExpired(startedAt: number, now: number, timeoutSeconds: number): boolean

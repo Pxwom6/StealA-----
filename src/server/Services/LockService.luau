@@ -19,6 +19,7 @@ local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local LockRules = require(ReplicatedStorage.Shared.Logic.LockRules)
 local RebirthMath = require(ReplicatedStorage.Shared.Logic.RebirthMath)
 local PlotService = require(script.Parent.PlotService)
+local PositionTracker = require(script.Parent.PositionTracker)
 local Remotes = require(script.Parent.Remotes)
 local Replication = require(script.Parent.Replication)
 local Sessions = require(script.Parent.Sessions)
@@ -83,8 +84,11 @@ local function ejectVisitors(owner: Session)
 		if root and PlotService.isInside(owner.plot, root.Position) then
 			local character = visitor.player.Character
 			if character then
+				-- Judge how they got in first (a teleport into a locked base is still a teleport), then move them.
+				PositionTracker.record(visitor, root.Position)
 				local target = refs.exitPosition + Vector3.new(math.random(-4, 4), 0, 0)
 				character:PivotTo(CFrame.new(target))
+				PositionTracker.reset(visitor, target) -- a server move, not a teleport exploit
 				local carry = visitor.carry
 				if carry then
 					-- A server teleport is not a speed exploit.

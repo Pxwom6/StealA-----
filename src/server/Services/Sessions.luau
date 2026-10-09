@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types = require(ReplicatedStorage.Shared.Types)
 local LockRules = require(ReplicatedStorage.Shared.Logic.LockRules)
+local StealRules = require(ReplicatedStorage.Shared.Logic.StealRules)
 
 type Connection = { Disconnect: (self: any) -> () }
 type Signal<T...> = { Connect: (self: any, listener: (T...) -> ()) -> Connection }
@@ -58,6 +59,9 @@ export type Session = {
 	hold: Hold?,
 	stealCooldownUntil: number,
 	tagCooldownUntil: number,
+	walk: StealRules.WalkTrack?, -- server-observed movement (PositionTracker); nil until the first sample
+	flaggedAt: number, -- server time of the last step the walk budget couldn't pay for (-inf: never)
+	teleportedAt: number, -- server time of the last gross overrun, i.e. a teleport (-inf: never)
 	joinedAt: number,
 	lastSeenAtJoin: number, -- the save's lastSeen when it was loaded (offline earnings)
 	playClock: number, -- os.clock() of the last play-time accrual

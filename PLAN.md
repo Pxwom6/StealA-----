@@ -132,7 +132,7 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `SellCreature` | `podium: int` | own podium, creature present, not being stolen, near podium |
 | `StealBegin` | `plot: int, podium: int` | starts the server-side hold timer |
 | `StealConfirm` | `plot: int, podium: int` | hold time elapsed, `StealRules.canGrab` (lock, grace, range, inside the base at floor level, own free podium, not carrying) |
-| `TagThief` | `userId: int` | target is carrying, within tag reach (horizontal range + vertical allowance), tag cooldown |
+| `TagThief` | `userId: int` | target is carrying, within tag reach (horizontal range + vertical allowance), tag cooldown, tagger's position trusted (`PositionTracker`) |
 | `LockBase` | – | owner, near lock button, `LockRules` (cooldown, or a lock token) |
 | `Rebirth` | – | `RebirthMath.canRebirth` |
 | `ClaimDaily` | – | `DailyStreak.canClaim` |

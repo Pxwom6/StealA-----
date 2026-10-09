@@ -18,6 +18,7 @@ local BeltService = require(script.Parent.BeltService)
 local DataService = require(script.Parent.DataService)
 local EconomyService = require(script.Parent.EconomyService)
 local PlotService = require(script.Parent.PlotService)
+local PositionTracker = require(script.Parent.PositionTracker)
 local Remotes = require(script.Parent.Remotes)
 local Replication = require(script.Parent.Replication)
 local Sessions = require(script.Parent.Sessions)
@@ -61,10 +62,13 @@ local function placeAtBase(session: Session, character: Model)
 	if root == nil or session.plot == 0 or character.Parent == nil then
 		return
 	end
-	character:PivotTo(PlotService.refs(session.plot).spawnCFrame)
+	local spawnCFrame = PlotService.refs(session.plot).spawnCFrame
+	character:PivotTo(spawnCFrame)
+	PositionTracker.reset(session, spawnCFrame.Position) -- a server move, not a teleport exploit
 end
 
 local function onCharacterAdded(session: Session, character: Model)
+	PositionTracker.reset(session, nil)
 	local humanoid = character:WaitForChild("Humanoid", 10)
 	if humanoid and humanoid:IsA("Humanoid") then
 		humanoid.WalkSpeed = Gameplay.walkSpeed
@@ -117,6 +121,9 @@ local function onPlayerAdded(player: Player)
 		hold = nil,
 		stealCooldownUntil = 0,
 		tagCooldownUntil = 0,
+		walk = nil,
+		flaggedAt = -math.huge,
+		teleportedAt = -math.huge,
 		joinedAt = now,
 		lastSeenAtJoin = lastSeenAtJoin,
 		playClock = os.clock(),

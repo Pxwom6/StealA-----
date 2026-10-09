@@ -73,7 +73,11 @@ also requires the thief to stand inside the victim's plot at floor level (no rea
 from the air), delivery requires floor level inside the thief's own plot, a carrying thief's root must stay between
 `Gameplay.steal.minCarryHeight` and `maxCarryHeight` above the ground (no flying up, no sinking under the map),
 and tag reach is horizontal range plus a vertical allowance larger than that cap — so gaining height never escapes
-a tag.
+a tag. A tagger's client-reported position is only trusted when it matches the
+server's own 4 Hz position samples (`PositionTracker`, a walking movement budget in which jumps and short lag stalls
+are free): a tag is refused if the tagger overran that budget in the last 2 s, was caught teleporting (24+ studs
+beyond it) at any point since just before that carry started, or could not have walked from the latest sample to
+where they claim to be in the time since (the stored budget doesn't pay for that last step, so no blink-tagging).
 **Why:** character physics is client-owned, so a collidable wall alone stops nobody who no-clips. A thief still
 inside when the owner locks drops the creature.
 

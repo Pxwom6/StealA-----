@@ -30,6 +30,7 @@ local DataService = require(script.Parent.DataService)
 local EconomyService = require(script.Parent.EconomyService)
 local LockService = require(script.Parent.LockService)
 local PlotService = require(script.Parent.PlotService)
+local PositionTracker = require(script.Parent.PositionTracker)
 local Remotes = require(script.Parent.Remotes)
 local Replication = require(script.Parent.Replication)
 local Sessions = require(script.Parent.Sessions)
@@ -353,6 +354,11 @@ local function onTag(player: Player, targetArg: unknown)
 		tagRange = CFG.tagRange,
 		tagVerticalAllowance = CFG.tagVerticalAllowance,
 		taggerCooldownUntil = tagger.tagCooldownUntil,
+		taggerTrusted = PositionTracker.isTrusted(
+			tagger,
+			taggerRoot.Position,
+			if thief.carry then thief.carry.startedAt else t
+		),
 	})
 	if not ok then
 		return

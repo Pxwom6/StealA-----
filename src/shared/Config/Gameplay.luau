@@ -63,6 +63,22 @@ local Gameplay = {
 		deliveryCheckInterval = 0.2,
 	},
 
+	-- Server-side position sampling (every player, a few times per second) against a walking movement budget
+	-- (Logic/StealRules.stepWalkTrack). Used to decide whether a client's reported position can be trusted, e.g. for
+	-- tagging.
+	tracking = {
+		sampleInterval = 0.25,
+		walkTolerance = 1.5, -- the budget refills at walk speed x this
+		walkBudgetSeconds = 1.5, -- and holds at most this much refill (a stall/catch-up up to ~1.5 s is forgiven)
+		walkLeeway = 12, -- starting budget after spawning or a server move (covers an immediate jump)
+		-- A step the budget can't pay makes the position untrusted for teleportPenaltySeconds. A step more than
+		-- teleportDeficit studs beyond the budget is a teleport: a tag is then refused for any carry that started
+		-- less than teleportPenaltySeconds before it.
+		teleportPenaltySeconds = 2,
+		teleportDeficit = 24,
+		stepSlack = 4, -- studs beyond walking speed allowed between the latest sample and a tag (jitter)
+	},
+
 	lock = {
 		durationSeconds = 60,
 		cooldownSeconds = 90, -- after a lock ends, free players wait this long before locking again
