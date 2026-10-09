@@ -49,6 +49,7 @@ export type CancelReason =
 	| "flying"
 	| "full"
 	| "rebirth"
+	| "error"
 
 local StealService = {}
 
@@ -136,8 +137,8 @@ function StealService.cancel(thief: Session, reason: CancelReason, taggerName: s
 	if carry == nil then
 		return
 	end
+	PlotService.setBusy(carry.plot, carry.podium, false) -- first, so nothing below can leave the podium stuck
 	clearCarry(thief)
-	PlotService.setBusy(carry.plot, carry.podium, false)
 	local victim = Sessions.getByUserId(carry.victimUserId)
 	if victim then
 		EconomyService.refresh(victim)
@@ -201,8 +202,8 @@ local function deliver(thief: Session)
 	end
 	-- Atomic (no yields): remove from victim, add to thief.
 	local moved = Inventory.transfer(victim.data, thief.data, carry.uid, podium, os.time())
-	clearCarry(thief)
 	PlotService.setBusy(carry.plot, carry.podium, false)
+	clearCarry(thief)
 	if moved == nil then
 		EconomyService.refresh(victim)
 		return
@@ -306,9 +307,10 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 
 	-- The victim keeps the cash that was sitting on the podium.
 	EconomyService.collect(victim, podium)
-	PlotService.setBusy(plot, podium, true)
-	EconomyService.refresh(victim)
 
+	-- The carry exists before the podium is marked busy, and everything after that runs protected: if any of it
+	-- throws, cancelling the carry frees the podium again (a busy podium with no carry would hide the creature
+	-- forever).
 	local carry: Carry = {
 		victimUserId = victim.userId,
 		plot = plot,
@@ -321,21 +323,29 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 		marker = nil,
 	}
 	thief.carry = carry
-	LockService.endGrace(thief) -- stealing forfeits your own new-player protection
-	attachCarryVisuals(thief, carry)
-	player:SetAttribute("Carrying", record.id)
-	setWalkSpeed(thief, Gameplay.walkSpeed * CFG.carrySpeedMultiplier)
-	Replication.markDirty(thief)
+	PlotService.setBusy(plot, podium, true)
+	local started, err = pcall(function()
+		EconomyService.refresh(victim)
+		LockService.endGrace(thief) -- stealing forfeits your own new-player protection
+		attachCarryVisuals(thief, carry)
+		player:SetAttribute("Carrying", record.id)
+		setWalkSpeed(thief, Gameplay.walkSpeed * CFG.carrySpeedMultiplier)
+		Replication.markDirty(thief)
 
-	local def = GameData.catalog.creatures[record.id]
-	Remotes.notify(player, Theme.text.stealStarted, "warning")
-	Remotes.fire(victim.player, "StealAlert", {
-		thiefUserId = thief.userId,
-		thiefName = player.DisplayName,
-		creatureId = record.id,
-		text = Format.template(Theme.text.beingStolen, { thief = player.DisplayName, creature = def.displayName }),
-	})
-	Analytics.custom(thief, "steal_started", GameData.catalog.rarities[def.rarity].order)
+		local def = GameData.catalog.creatures[record.id]
+		Remotes.notify(player, Theme.text.stealStarted, "warning")
+		Remotes.fire(victim.player, "StealAlert", {
+			thiefUserId = thief.userId,
+			thiefName = player.DisplayName,
+			creatureId = record.id,
+			text = Format.template(Theme.text.beingStolen, { thief = player.DisplayName, creature = def.displayName }),
+		})
+		Analytics.custom(thief, "steal_started", GameData.catalog.rarities[def.rarity].order)
+	end)
+	if not started then
+		warn(`[StealService] starting a carry failed, sending the creature home: {err}`)
+		StealService.cancel(thief, "error")
+	end
 end
 
 local function onTag(player: Player, targetArg: unknown)
@@ -435,7 +445,14 @@ end
 
 local function checkCarries()
 	for _, thief in Sessions.all() do
-		checkCarry(thief, true)
+		-- One failing carry must not stop the loop (every later carry would hang with its podium busy).
+		local ok, err = pcall(checkCarry :: (Session, boolean) -> ...any, thief, true)
+		if not ok then
+			warn(`[StealService] carry check failed for {thief.player.Name}, sending the creature home: {err}`)
+			pcall(function()
+				StealService.cancel(thief, "error")
+			end)
+		end
 	end
 end
 
@@ -474,6 +491,9 @@ function StealService.start()
 		local ok, err = pcall(checkCarry :: (Session, boolean) -> ...any, visitor, false)
 		if not ok then
 			warn(`[StealService] carry check before eject failed for {visitor.player.Name}: {err}`)
+			pcall(function()
+				StealService.cancel(visitor, "error")
+			end)
 		end
 	end)
 	task.spawn(function()
