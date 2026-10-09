@@ -159,25 +159,25 @@ World state the client reads from **attributes** (replicated automatically): plo
 ## 5. Data schema (version 2)
 
 ```lua
-type CreatureRecord = { uid: string, id: string, podium: number, acquiredAt: number, variant: string? }
+type CreatureRecord = { uid: string, id: string, podium: number, acquiredAt: number, stored: number, variant: string? }
 type PurchaseRecord = { purchaseId: string, productId: number, key: string, robux: number, at: number }
-type PlayerData = {
+type PlayerData = {   -- exactly Types.PlayerData
     version: number,             -- schema version for migrate()
     cash: number,
-    totalEarned: number,
-    creatures: { CreatureRecord }, -- what sits on podiums
+    creatures: { CreatureRecord }, -- what sits on podiums (`stored` = uncollected cash on that podium)
     quarantine: { CreatureRecord }, -- kept off the podiums (unknown id, or no free podium); restored later (v2)
     nextUid: number,             -- per-player creature uid counter
     podiumUpgrades: number,      -- bought with cash (pass bonus is not saved, it is checked live)
     rebirths: number,
-    rebirthMultiplier: number,   -- stored at rebirth time (non-retroactive balance, DECISIONS #6)
+    rebirthMultiplier: number,   -- stored at rebirth time (non-retroactive balance, DECISIONS #12)
     lockTokens: number,          -- from "Instant Base Lock" product
     lockTimers: { cooldownUntil: number, vulnerableUntil: number }, -- os.time; survive leaving (v2)
     processedReceipts: { string },  -- bounded ring of PurchaseIds (idempotency)
+    cashPackQuotes: { { purchaseId: string, amount: number } }, -- pack amount fixed at first sight (v2)
     purchaseHistory: { PurchaseRecord }, -- bounded
     daily: { streak: number, lastClaimDay: number },
     stats: { steals: number, timesStolenFrom: number, beltPurchases: number, playTime: number,
-             bestCashPerSec: number, robuxSpent: number, rebirthsLifetime: number },
+             bestCashPerSecond: number, robuxSpent: number, totalEarned: number },
     flags: { [string]: boolean },  -- onboarding funnel milestones
     firstJoin: number, lastSeen: number,
 }

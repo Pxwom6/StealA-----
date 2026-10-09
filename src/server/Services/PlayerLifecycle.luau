@@ -134,6 +134,7 @@ local function onPlayerAdded(player: Player)
 		ready = false,
 		dirty = true,
 		incomePerSecond = 0,
+		packIncome = 0,
 		multiplier = 1,
 		capacity = 0,
 		lockDuration = Gameplay.lock.durationSeconds,

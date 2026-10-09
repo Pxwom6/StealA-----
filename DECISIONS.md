@@ -119,7 +119,11 @@ inside when the owner locks drops the creature.
   store says "+15 min (odds stay the same)" instead of showing a stronger boost. Its 60-minute stacking cap is soft: the store stops offering it once another purchase
   would pass the cap, but a receipt that still arrives (e.g. two players buying at once) always adds its full
   15 minutes — a purchase never takes Robux without an effect.
-* Cash packs scale with income (always "about N minutes of your income"), so they never trivialise the game.
+* Cash packs scale with income (always "about N minutes of your income"), so they never trivialise the game. The
+  basis is the steady income (`EconomyMath.packIncome`: active podiums only, nothing mid-steal, no LiveOps cash
+  event). A pack's amount is fixed the first time its receipt reaches the player's session (`data.cashPackQuotes`),
+  so a retry after a failed grant pays that amount even if the player rebirthed meanwhile; a receipt that arrives
+  while the player's save is still loading waits for the load, so it is sized before they can play.
 * Stealing ends your own new-player protection.
 
 ### 10. Receipt idempotency in the save

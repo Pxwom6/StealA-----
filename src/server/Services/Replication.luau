@@ -40,6 +40,7 @@ function Replication.snapshot(session: Session): Types.ClientState
 		rebirthCost = RebirthMath.cost(data.rebirths, Economy.rebirth) or -1,
 		creatureCount = #data.creatures,
 		capacity = session.capacity,
+		packIncome = session.packIncome,
 		podiumUpgrades = data.podiumUpgrades,
 		nextPodiumCost = EconomyMath.podiumUpgradeCost(data.podiumUpgrades, Economy.podiumUpgrade) or -1,
 		lockTokens = data.lockTokens,

@@ -223,6 +223,28 @@ T.describe("DataSchema", function()
 		T.expect(live.version).toBe(DataSchema.VERSION)
 	end)
 
+	T.it("keeps valid cash pack quotes, bounded like receipts", function()
+		local saved: any = {
+			cashPackQuotes = {
+				{ purchaseId = "a", amount = 100 },
+				{ purchaseId = "b", amount = 0 / 0 },
+				{ purchaseId = 5, amount = 10 } :: any,
+				"junk" :: any,
+				{ purchaseId = "c", amount = 300 },
+				{ purchaseId = "d", amount = 400 },
+				{ purchaseId = "e", amount = -5 },
+			},
+		}
+		local clean = DataSchema.sanitise(saved, 100, rules)
+		T.expect(clean.cashPackQuotes).toEqual({
+			{ purchaseId = "c", amount = 300 },
+			{ purchaseId = "d", amount = 400 },
+			{ purchaseId = "e", amount = 0 },
+		})
+		T.expect(DataSchema.template(100).cashPackQuotes).toEqual({})
+		T.expect(DataSchema.migrate({ version = 1 }).cashPackQuotes).toEqual({})
+	end)
+
 	T.it("detects saves written by a newer release", function()
 		T.expect(DataSchema.isFromNewerVersion({ version = DataSchema.VERSION + 1 })).toBe(true)
 		T.expect(DataSchema.isFromNewerVersion({ version = DataSchema.VERSION })).toBe(false)

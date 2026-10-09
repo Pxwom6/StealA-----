@@ -79,6 +79,9 @@ export type PurchaseRecord = {
 	at: number,
 }
 
+-- A cash pack's amount, fixed when its receipt is first seen (ReceiptLedger.quote).
+export type ReceiptQuote = { purchaseId: string, amount: number }
+
 export type Stats = {
 	steals: number,
 	timesStolenFrom: number,
@@ -110,6 +113,7 @@ export type PlayerData = {
 	lockTokens: number,
 	lockTimers: LockTimers,
 	processedReceipts: { string },
+	cashPackQuotes: { ReceiptQuote },
 	purchaseHistory: { PurchaseRecord },
 	daily: DailyState,
 	stats: Stats,
@@ -146,6 +150,7 @@ export type ClientState = {
 	rebirthCost: number,
 	creatureCount: number,
 	capacity: number,
+	packIncome: number, -- steady income cash packs are sized from (EconomyMath.packIncome)
 	podiumUpgrades: number,
 	nextPodiumCost: number,
 	lockTokens: number,

@@ -68,6 +68,7 @@ export type Session = {
 	dirty: boolean, -- state changed since the last StateUpdate
 	-- caches maintained by the services that own them
 	incomePerSecond: number,
+	packIncome: number, -- steady income cash packs are sized from (EconomyMath.packIncome)
 	multiplier: number,
 	capacity: number,
 	lockDuration: number,

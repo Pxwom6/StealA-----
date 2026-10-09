@@ -22,6 +22,7 @@ local Types = require("../Types")
 
 export type Decision = "PurchaseGranted" | "NotProcessedYet"
 export type PurchaseRecord = Types.PurchaseRecord
+export type Quote = Types.ReceiptQuote
 
 export type ProcessDeps = {
 	isActive: () -> boolean, -- is the player's profile session still active on this server?
@@ -58,6 +59,23 @@ function ReceiptLedger.appendHistory(history: { PurchaseRecord }, entry: Purchas
 	while #history > math.max(1, cap) do
 		table.remove(history, 1)
 	end
+end
+
+-- The amount owed for a purchase whose size depends on the buyer's state (cash packs), fixed the first time the
+-- purchase is quoted: a later retry pays the same even if that state changed meanwhile (e.g. a rebirth). Records
+-- the quote in `quotes` (bounded to `cap`).
+function ReceiptLedger.quote(quotes: { Quote }, purchaseId: string, compute: () -> number, cap: number): number
+	for _, quote in quotes do
+		if quote.purchaseId == purchaseId then
+			return quote.amount
+		end
+	end
+	local amount = compute()
+	table.insert(quotes, { purchaseId = purchaseId, amount = amount })
+	while #quotes > math.max(1, cap) do
+		table.remove(quotes, 1)
+	end
+	return amount
 end
 
 local function deepCopy(value: any): any

@@ -2,7 +2,8 @@
 --[[
 	The Snack Shop.
 	  * Forever perks (game passes) show "Owned" once bought.
-	  * Cash packs show the exact amount you'd get right now (scaled to your current income).
+	  * Cash packs show the exact amount you'd get right now (scaled to your steady income: no event boost, no
+	    creature that is being stolen or parked beyond your podium capacity).
 	  * Server Luck shows the exact belt odds now vs. with the boost before you buy (random effect → disclose odds);
 	    while a bought boost is running, buying only adds time, and the card says so.
 	  * Items whose id is still 0 show "Coming soon" — or, in Studio, a "(Studio) Grant" button that runs the real
@@ -294,7 +295,7 @@ local function fillCards(scroller: ScrollingFrame): { [string]: Frame }
 		local accent = UiTheme.palette("cash")
 		if product.kind == "Cash" then
 			local pack = (Economy.cashPacks :: any)[key] :: EconomyMath.CashPack
-			detail = "+" .. UiTheme.cash(EconomyMath.cashPackAmount(state.income, pack))
+			detail = "+" .. UiTheme.cash(EconomyMath.cashPackAmount(state.packIncome, pack))
 		elseif product.kind == "ServerLuck" then
 			local maxed = luckMaxed()
 			detail = oddsText(maxed)

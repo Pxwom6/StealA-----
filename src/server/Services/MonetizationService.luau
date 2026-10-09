@@ -20,11 +20,9 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Monetization = require(ReplicatedStorage.Shared.Config.Monetization)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local Types = require(ReplicatedStorage.Shared.Types)
-local EconomyMath = require(ReplicatedStorage.Shared.Logic.EconomyMath)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local Guard = require(ReplicatedStorage.Shared.Logic.Guard)
 local LiveOpsRules = require(ReplicatedStorage.Shared.Logic.LiveOpsRules)
@@ -42,7 +40,9 @@ local Sessions = require(script.Parent.Sessions)
 
 type Session = Sessions.Session
 local PASS_KEYS: { string } = { "DoubleCash", "VIP", "ExtraPodiums", "LongerLock" }
-local SESSION_WAIT_SECONDS = 20
+-- A receipt can arrive while the buyer's save is still loading (e.g. a retry on join): wait for it, longer than
+-- DataService's 60 s load timeout, so the receipt is handled before the player can play (or rebirth).
+local SESSION_WAIT_SECONDS = 75
 local SAVE_TIMEOUT_SECONDS = 15
 local MAX_SAVE_ATTEMPTS = 4
 
@@ -162,7 +162,12 @@ type AfterGrant = () -> ()
 -- Works out everything a product grants WITHOUT changing anything (it may throw: nothing is lost, Roblox retries).
 -- Returns `apply`, which only writes the precomputed results (plain table writes: no yields, nothing that can fail;
 -- see ReceiptLedger), and a follow-up that runs once the purchase is confirmed saved (announcements, auto-lock...).
-local function prepareProduct(session: Session, key: string, receipt: { [string]: any }): (() -> (), AfterGrant?)
+local function prepareProduct(
+	session: Session,
+	key: string,
+	receipt: { [string]: any },
+	quotedCash: number
+): (() -> (), AfterGrant?)
 	local product = Monetization.products[key]
 	local perks = Monetization.perks
 	local data = session.data
@@ -180,8 +185,7 @@ local function prepareProduct(session: Session, key: string, receipt: { [string]
 	local after: AfterGrant
 
 	if product.kind == "Cash" then
-		local pack = (Economy.cashPacks :: any)[key] :: EconomyMath.CashPack
-		cash = EconomyMath.cashPackAmount(session.incomePerSecond, pack)
+		cash = quotedCash
 		after = function()
 			Analytics.economySource(session, cash, "IAP", key)
 			Remotes.notify(session.player, `+{UiTheme.cash(cash)}! {Theme.text.purchaseThanks}`, "success")
@@ -248,6 +252,15 @@ local function processFor(player: Player, key: string, receipt: { [string]: any 
 	local purchaseId = tostring(receipt.PurchaseId)
 	local after: AfterGrant? = nil
 	local profile = session.profile
+	-- A cash pack's amount is fixed the first time its receipt reaches the player's session (and saved with the data),
+	-- so if that grant fails and Roblox retries after the player's income changed (e.g. they rebirthed), the retry
+	-- pays what the purchase was worth then. A receipt that finds no session yet waits for the load (see above).
+	local quotedCash = 0
+	if Monetization.products[key].kind == "Cash" and profile:IsActive() then
+		quotedCash = ReceiptLedger.quote(session.data.cashPackQuotes, purchaseId, function(): number
+			return EconomyService.cashPackAmount(session, key)
+		end, Monetization.purchaseIdCacheSize)
+	end
 	local decision = ReceiptLedger.process(purchaseId, Monetization.purchaseIdCacheSize, {
 		isActive = function(): boolean
 			return profile:IsActive()
@@ -263,7 +276,7 @@ local function processFor(player: Player, key: string, receipt: { [string]: any 
 			return (profile.Data :: any) :: { [string]: any }
 		end,
 		prepare = function(): () -> ()
-			local apply, followUp = prepareProduct(session, key, receipt)
+			local apply, followUp = prepareProduct(session, key, receipt, quotedCash)
 			after = followUp
 			return apply
 		end,

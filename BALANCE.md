@@ -93,7 +93,8 @@ Cash and Snacklings reset; podium upgrades, passes and stats stay.
 The first rebirth lands around the first-Legendary stage (~1 h free); later ones need Mythic-level income, so
 rebirths become a multi-session goal. The multiplier is saved when earned, so later tuning never lowers it.
 
-**Cash packs** (`Economy.cashPacks`) pay N seconds of the buyer's current income, rounded down to 2 significant
+**Cash packs** (`Economy.cashPacks`) pay N seconds of the buyer's steady income (creatures on active podiums that
+are not being stolen, at the rebirth and pass multipliers, without LiveOps cash events), rounded down to 2 significant
 digits, with a floor so they are worth something on day one: Snack Pack 15 min (min $2.5K), Snack Crate 1 h
 (min $15K), Snack Truck 6 h (min $120K). They therefore stay meaningful at every stage instead of becoming
 worthless (fixed amounts) or game-breaking (huge fixed amounts).

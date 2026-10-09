@@ -65,6 +65,31 @@ T.describe("EconomyMath podiums", function()
 	end)
 end)
 
+T.describe("EconomyMath cash pack basis", function()
+	T.it("ignores temporary LiveOps cash events", function()
+		local evented = inputs({ rebirthMultiplier = 1.5, hasDoubleCash = true, eventCashMultiplier = 3 })
+		T.expect(EconomyMath.permanentMultiplier(evented)).toBe(3)
+		T.expect(EconomyMath.permanentMultiplier(evented))
+			.toBe(EconomyMath.incomeMultiplier(inputs({ rebirthMultiplier = 1.5, hasDoubleCash = true })))
+		T.expect(evented.eventCashMultiplier).toBe(3) -- the caller's inputs are not modified
+	end)
+
+	T.it("counts only creatures on active podiums that are not being stolen", function()
+		local sources: { EconomyMath.PackSource } = {
+			{ baseIncome = 10, podium = 1, inTransit = false },
+			{ baseIncome = 20, podium = 8, inTransit = false },
+			{ baseIncome = 400, podium = 2, inTransit = true }, -- being carried off by a thief
+			{ baseIncome = 1000, podium = 12, inTransit = false }, -- beyond capacity (e.g. a refunded pass)
+		}
+		T.expect(EconomyMath.packIncome(sources, 8, 2)).toBe(60)
+		T.expect(EconomyMath.packIncome(sources, 12, 1)).toBe(1030)
+		T.expect(EconomyMath.packIncome({}, 8, 2)).toBe(0)
+		-- So a pack bought mid-event / mid-steal pays what the player's steady income says.
+		local pack = { incomeSeconds = 3600, minimum = 1000 }
+		T.expect(EconomyMath.cashPackAmount(EconomyMath.packIncome(sources, 8, 2), pack)).toBe(210000)
+	end)
+end)
+
 T.describe("EconomyMath selling and cash packs", function()
 	T.it("refunds a share of the price", function()
 		T.expect(EconomyMath.sellValue(25, 0.5)).toBe(12)

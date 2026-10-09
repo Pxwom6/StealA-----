@@ -169,6 +169,32 @@ T.describe("ReceiptLedger.process", function()
 	end)
 end)
 
+T.describe("ReceiptLedger.quote", function()
+	T.it("a cash pack retried after a rebirth pays the amount fixed when the purchase was first seen", function()
+		local quotes: { ReceiptLedger.Quote } = {}
+		local income = 5000
+		local function amount(): number
+			return income * 60
+		end
+		T.expect(ReceiptLedger.quote(quotes, "P1", amount, 100)).toBe(300000)
+		income = 2 -- the player rebirths before Roblox retries the receipt
+		T.expect(ReceiptLedger.quote(quotes, "P1", amount, 100)).toBe(300000)
+		T.expect(ReceiptLedger.quote(quotes, "P2", amount, 100)).toBe(120) -- a new purchase uses the new income
+		T.expect(#quotes).toBe(2)
+	end)
+
+	T.it("keeps a bounded list", function()
+		local quotes: { ReceiptLedger.Quote } = {}
+		for i = 1, 5 do
+			ReceiptLedger.quote(quotes, `P{i}`, function(): number
+				return i
+			end, 3)
+		end
+		T.expect(#quotes).toBe(3)
+		T.expect(quotes[1].purchaseId).toBe("P3")
+	end)
+end)
+
 T.describe("ReceiptLedger.record / appendHistory", function()
 	T.it("keeps a bounded ring of ids without duplicates", function()
 		local ids: { string } = {}

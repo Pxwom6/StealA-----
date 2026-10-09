@@ -19,6 +19,7 @@ local Types = require("../Types")
 
 export type CreatureRecord = Types.CreatureRecord
 export type PurchaseRecord = Types.PurchaseRecord
+export type ReceiptQuote = Types.ReceiptQuote
 export type Stats = Types.Stats
 export type PlayerData = Types.PlayerData
 
@@ -50,6 +51,7 @@ function DataSchema.template(startingCash: number): PlayerData
 		lockTokens = 0,
 		lockTimers = { cooldownUntil = 0, vulnerableUntil = 0 },
 		processedReceipts = {},
+		cashPackQuotes = {},
 		purchaseHistory = {},
 		daily = { streak = 0, lastClaimDay = -1 },
 		stats = {
@@ -91,12 +93,15 @@ function DataSchema.migrate(raw: { [string]: any }): { [string]: any }
 	if version < 1 then -- the initial shape
 		version = 1
 	end
-	if version < 2 then -- v2: base-lock timers persist between sessions; unknown creatures are quarantined
+	if version < 2 then -- v2: lock timers persist, unknown creatures are quarantined, cash pack quotes
 		if type(raw.lockTimers) ~= "table" then
 			raw.lockTimers = { cooldownUntil = 0, vulnerableUntil = 0 }
 		end
 		if type(raw.quarantine) ~= "table" then
 			raw.quarantine = {}
+		end
+		if type(raw.cashPackQuotes) ~= "table" then
+			raw.cashPackQuotes = {}
 		end
 		version = 2
 	end
@@ -228,6 +233,19 @@ function DataSchema.sanitise(
 		table.remove(receipts, 1)
 	end
 
+	local quotes: { ReceiptQuote } = {}
+	if type(raw.cashPackQuotes) == "table" then
+		for _, entry in raw.cashPackQuotes do
+			local amount = if type(entry) == "table" then entry.amount else nil
+			if type(entry) == "table" and type(entry.purchaseId) == "string" and finite(amount, 0 / 0) == amount then
+				table.insert(quotes, { purchaseId = entry.purchaseId, amount = math.max(0, amount) })
+			end
+		end
+	end
+	while #quotes > rules.maxReceipts do
+		table.remove(quotes, 1)
+	end
+
 	local history: { PurchaseRecord } = {}
 	if type(raw.purchaseHistory) == "table" then
 		for _, entry in raw.purchaseHistory do
@@ -284,6 +302,7 @@ function DataSchema.sanitise(
 			vulnerableUntil = math.max(0, finite(rawLock.vulnerableUntil, 0)),
 		},
 		processedReceipts = receipts,
+		cashPackQuotes = quotes,
 		purchaseHistory = history,
 		daily = {
 			streak = wholeInRange(rawDaily.streak, 0, 100000, 0),
