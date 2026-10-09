@@ -138,8 +138,10 @@ back to its exact prior state (`ReceiptLedger.applyAtomically`), so a retry neve
 
 ### 11. Game-pass ownership is not saved
 
-**Chose:** passes are checked with `UserOwnsGamePassAsync` on every join (with retries) and on
-`PromptGamePassPurchaseFinished`; ownership lives in the session only.
+**Chose:** passes are checked with `UserOwnsGamePassAsync` on every join (all passes in parallel, with retries)
+and on `PromptGamePassPurchaseFinished`; ownership lives in the session only. A pass whose check still fails counts
+as not owned for now and is re-checked in the background every 60 s until Roblox answers. Known limitation: the
+offline earnings paid on that join were already computed without the pass (2× Cash, VIP) and are not topped up.
 **Why:** Roblox is the source of truth (refunds/gifts), and nothing in the save goes stale.
 
 ### 12. Rebirth multiplier is stored, not derived

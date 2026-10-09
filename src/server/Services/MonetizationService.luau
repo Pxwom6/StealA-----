@@ -43,6 +43,7 @@ local PASS_KEYS: { string } = { "DoubleCash", "VIP", "ExtraPodiums", "LongerLock
 -- A receipt can arrive while the buyer's save is still loading (e.g. a retry on join): wait for it, longer than
 -- DataService's 60 s load timeout, so the receipt is handled before the player can play (or rebirth).
 local SESSION_WAIT_SECONDS = 75
+local PASS_RECHECK_SECONDS = 60
 local SAVE_TIMEOUT_SECONDS = 15
 local MAX_SAVE_ATTEMPTS = 4
 
@@ -97,7 +98,8 @@ local function productKeyForId(productId: number): string?
 	return nil
 end
 
-local function ownsPass(userId: number, passId: number): boolean
+-- Whether the user owns the pass, or nil when Roblox could not be asked (after a few retries).
+local function ownsPass(userId: number, passId: number): boolean?
 	if passId == 0 then
 		return false
 	end
@@ -108,20 +110,37 @@ local function ownsPass(userId: number, passId: number): boolean
 		if ok then
 			return owns
 		end
-		task.wait(attempt)
+		if attempt < 3 then
+			task.wait(attempt)
+		end
 	end
 	warn(`[Monetization] could not check pass {passId} for {userId}`)
-	return false
+	return nil
 end
 
--- PlayerLifecycle hook: runs before the session exists.
-function MonetizationService.checkPasses(player: Player): Types.Passes
-	local passes: Types.Passes = { DoubleCash = false, VIP = false, ExtraPodiums = false, LongerLock = false }
-	for _, key in PASS_KEYS do
-		setPass(passes, key, ownsPass(player.UserId, Monetization.passes[key].id))
+-- Looks up every pass in `keys` at the same time and yields until all are answered. A key is missing from the
+-- result when its lookup failed.
+local function lookupPasses(userId: number, keys: { string }): { [string]: boolean }
+	local results: { [string]: boolean } = {}
+	local remaining = #keys
+	local waiting: thread? = nil
+	for _, key in keys do
+		task.spawn(function()
+			local owns = ownsPass(userId, Monetization.passes[key].id)
+			if owns ~= nil then
+				results[key] = owns
+			end
+			remaining -= 1
+			if remaining == 0 and waiting then
+				task.spawn(waiting)
+			end
+		end)
 	end
-	player:SetAttribute("VIP", passes.VIP)
-	return passes
+	if remaining > 0 then
+		waiting = coroutine.running()
+		coroutine.yield()
+	end
+	return results
 end
 
 -- Re-applies everything a pass affects (income, podiums, lock length, VIP tag/trim).
@@ -129,6 +148,51 @@ local function applyPasses(session: Session)
 	session.player:SetAttribute("VIP", session.passes.VIP)
 	EconomyService.refresh(session)
 	LockService.refresh(session)
+end
+
+-- Passes whose ownership could not be checked at join are re-checked every PASS_RECHECK_SECONDS until Roblox
+-- answers (or the player leaves); an owned one is then applied.
+local function recheckPasses(player: Player, keys: { string })
+	local pending = keys
+	while #pending > 0 do
+		task.wait(PASS_RECHECK_SECONDS)
+		if player.Parent ~= Players then
+			return
+		end
+		local results = lookupPasses(player.UserId, pending)
+		local session = Sessions.get(player)
+		local still: { string } = {}
+		for _, key in pending do
+			local owns = results[key]
+			if owns == nil or (owns and session == nil) then
+				table.insert(still, key) -- unknown, or owned but the session is not ready yet
+			elseif owns and session and not hasPass(session.passes, key) then
+				setPass(session.passes, key, true)
+				applyPasses(session)
+			end
+		end
+		pending = still
+	end
+end
+
+-- PlayerLifecycle hook: runs before the session exists. Lookups run in parallel; any that fail are treated as
+-- not owned for now and re-checked in the background.
+function MonetizationService.checkPasses(player: Player): Types.Passes
+	local passes: Types.Passes = { DoubleCash = false, VIP = false, ExtraPodiums = false, LongerLock = false }
+	local results = lookupPasses(player.UserId, PASS_KEYS)
+	local failed: { string } = {}
+	for _, key in PASS_KEYS do
+		local owns = results[key]
+		if owns == nil then
+			table.insert(failed, key)
+		end
+		setPass(passes, key, owns == true)
+	end
+	player:SetAttribute("VIP", passes.VIP)
+	if #failed > 0 then
+		task.spawn(recheckPasses, player, failed)
+	end
+	return passes
 end
 
 local function grantPass(session: Session, key: string)
