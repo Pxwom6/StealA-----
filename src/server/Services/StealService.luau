@@ -188,6 +188,12 @@ local function deliver(thief: Session)
 		StealService.cancel(thief, "ownerLeft")
 		return
 	end
+	-- A transfer changes two saves. If either session has ended (e.g. the server is shutting down and their final
+	-- save may already be written), moving the creature could duplicate or lose it: send it home instead.
+	if not thief.profile:IsActive() or not victim.profile:IsActive() then
+		StealService.cancel(thief, "left")
+		return
+	end
 	local podium = EconomyService.freePodium(thief)
 	if podium == nil then
 		StealService.cancel(thief, "full")
@@ -264,6 +270,9 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 	local podiumRefs = PlotService.podium(plot, podium)
 	if victim == nil or root == nil or podiumRefs == nil then
 		return
+	end
+	if not thief.profile:IsActive() or not victim.profile:IsActive() then
+		return -- a session has ended (shutting down): no new steals
 	end
 	local t = now()
 	local record = Inventory.findByPodium(victim.data.creatures, podium)

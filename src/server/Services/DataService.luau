@@ -42,6 +42,7 @@ local DataService = {}
 -- ProfileStore is installed by Wally (`wally install`) into ServerScriptService.ServerPackages.
 local ProfileStoreModule: any = require(ServerScriptService.ServerPackages.ProfileStore)
 local store: any = nil
+local closing = false
 
 local sanitiseRules: DataSchema.SanitiseRules = {
 	isValidCreature = function(id: string): boolean
@@ -66,6 +67,7 @@ function DataService.start()
 	end)
 
 	game:BindToClose(function()
+		closing = true
 		-- End every session so the final save happens now; ProfileStore waits for in-flight saves.
 		for _, session in Sessions.all() do
 			session.data.lastSeen = os.time()
@@ -92,6 +94,12 @@ end
 -- Why a load returned no profile: the store failed / timed out / the player left, or the save is from a newer
 -- release than this server runs.
 export type LoadFailure = "failed" | "newerSave"
+
+-- True once the server is shutting down (our BindToClose or ProfileStore's has started): sessions then end
+-- because of the shutdown, not because another server took them.
+function DataService.isClosing(): boolean
+	return closing or ProfileStoreModule.IsClosing == true
+end
 
 -- Starts a session for `player`. Yields (about LOAD_TIMEOUT_SECONDS at most: Cancel is checked between DataStore
 -- calls). Returns the profile, or nil and why.

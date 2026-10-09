@@ -88,7 +88,8 @@ end
 local function onPlayerAdded(player: Player)
 	local profile, failure = DataService.load(player)
 	if profile == nil then
-		if player.Parent == Players then
+		-- A load cut short by a shutdown is not a data problem: no misleading kick (the server is closing anyway).
+		if player.Parent == Players and not DataService.isClosing() then
 			player:Kick(
 				if failure == "newerSave"
 					then "This server is updating — please rejoin!"
@@ -143,7 +144,12 @@ local function onPlayerAdded(player: Player)
 	Sessions.add(session)
 
 	profile.OnSessionEnd:Connect(function()
-		-- Another server took the session (or it ended unexpectedly): never keep playing on stale data.
+		-- Another server took the session (or it ended unexpectedly): never keep playing on stale data. During a
+		-- shutdown every session ends on purpose and players are disconnected when the server closes, so no
+		-- misleading kick then (steals refuse to move creatures between ended sessions, see StealService).
+		if DataService.isClosing() then
+			return
+		end
 		if player.Parent == Players and Sessions.get(player) == session then
 			player:Kick("Your data was opened in another server. Please rejoin.")
 		end
