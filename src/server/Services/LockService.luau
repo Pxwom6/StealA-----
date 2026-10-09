@@ -18,6 +18,7 @@ local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local LockRules = require(ReplicatedStorage.Shared.Logic.LockRules)
 local RebirthMath = require(ReplicatedStorage.Shared.Logic.RebirthMath)
+local StealRules = require(ReplicatedStorage.Shared.Logic.StealRules)
 local PlotService = require(script.Parent.PlotService)
 local PositionTracker = require(script.Parent.PositionTracker)
 local Remotes = require(script.Parent.Remotes)
@@ -35,6 +36,14 @@ local lockListener: ((owner: Session) -> ())? = nil
 -- StealService registers here so a thief still inside a base when it locks drops the creature.
 function LockService.setLockListener(listener: (owner: Session) -> ())
 	lockListener = listener
+end
+
+local beforeEject: ((visitor: Session) -> ())? = nil
+
+-- StealService registers here to check a carrying visitor's movement before the server moves them out of a base,
+-- so the server's move can't launder a teleport into that base.
+function LockService.setBeforeEject(listener: (visitor: Session) -> ())
+	beforeEject = listener
 end
 
 local function now(): number
@@ -86,15 +95,19 @@ local function ejectVisitors(owner: Session)
 			if character then
 				-- Judge how they got in first (a teleport into a locked base is still a teleport), then move them.
 				PositionTracker.record(visitor, root.Position)
+				if visitor.carry and beforeEject then
+					beforeEject(visitor) -- may cancel the carry
+				end
 				local target = refs.exitPosition + Vector3.new(math.random(-4, 4), 0, 0)
+				if visitor.carry then
+					-- A carrying thief goes just outside the nearest side instead, and their carry budget pays for
+					-- the move at the next check, so being ejected is never a shortcut home.
+					local x, z =
+						StealRules.nearestOutside(root.Position.X, root.Position.Z, PlotService.rect(owner.plot), 3)
+					target = Vector3.new(x, refs.exitPosition.Y, z)
+				end
 				character:PivotTo(CFrame.new(target))
 				PositionTracker.reset(visitor, target) -- a server move, not a teleport exploit
-				local carry = visitor.carry
-				if carry then
-					-- A server teleport is not a speed exploit.
-					carry.lastPosition = target
-					carry.lastCheckAt = os.clock()
-				end
 			end
 		end
 	end
@@ -189,7 +202,11 @@ function LockService.start()
 			local t = now()
 			for _, session in Sessions.all() do
 				if session.plot ~= 0 and LockRules.isLocked(session.lock, t) then
-					ejectVisitors(session)
+					-- One failing base must not stop the loop (every locked base would stop ejecting).
+					local ok, err = pcall(ejectVisitors :: (Session) -> ...any, session)
+					if not ok then
+						warn(`[LockService] ejecting from {session.player.Name}'s base failed: {err}`)
+					end
 				end
 			end
 		end

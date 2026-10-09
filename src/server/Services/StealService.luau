@@ -53,7 +53,13 @@ export type CancelReason =
 local StealService = {}
 
 local CFG = Gameplay.steal
-local SPEED_WINDOW = 1
+
+local CARRY_LIMITS: StealRules.CarryLimits = {
+	maxSpeed = Gameplay.walkSpeed * CFG.carrySpeedMultiplier,
+	tolerance = CFG.speedCheckTolerance,
+	budgetSeconds = CFG.speedBudgetSeconds,
+	leeway = CFG.speedCheckLeeway,
+}
 
 local function now(): number
 	return workspace:GetServerTimeNow()
@@ -301,8 +307,7 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 		uid = record.uid,
 		creatureId = record.id,
 		startedAt = t,
-		lastPosition = root.Position,
-		lastCheckAt = os.clock(),
+		track = StealRules.newCarryTrack(root.Position.X, root.Position.Y, root.Position.Z, os.clock(), CARRY_LIMITS),
 		model = nil,
 		marker = nil,
 	}
@@ -376,57 +381,52 @@ local function onTag(player: Player, targetArg: unknown)
 	Analytics.custom(tagger, "tag")
 end
 
+-- One check of one carry: owner still here, thief alive, not timed out, height, movement budget, then delivery.
+-- `allowDeliver` is false when LockService runs it just before ejecting the thief from someone else's base.
+local function checkCarry(thief: Session, allowDeliver: boolean)
+	local carry = thief.carry
+	if carry == nil then
+		return
+	end
+	if Sessions.getByUserId(carry.victimUserId) == nil then
+		StealService.cancel(thief, "ownerLeft")
+		return
+	end
+	local root = Sessions.rootPart(thief)
+	if root == nil then
+		StealService.cancel(thief, "died")
+		return
+	end
+	if StealRules.isCarryExpired(carry.startedAt, now(), CFG.carryTimeoutSeconds) then
+		StealService.cancel(thief, "timeout")
+		return
+	end
+	-- The thief may not climb/fly above maxCarryHeight (or sink under the map). Movement is checked on EVERY tick (so
+	-- teleporting home right after a grab is caught before delivery) against a distance budget: it refills with time
+	-- and pays for distance moved (climbing once, not every jump; falling is free), so lag spikes are forgiven but
+	-- speed hacks are not.
+	local position = root.Position
+	local heightAboveGround = position.Y - PlotService.world().groundY
+	if not StealRules.isCarryHeightAllowed(heightAboveGround, CFG.minCarryHeight, CFG.maxCarryHeight) then
+		StealService.cancel(thief, "flying")
+		return
+	end
+	if not StealRules.stepCarryTrack(carry.track, position.X, position.Y, position.Z, os.clock(), CARRY_LIMITS) then
+		StealService.cancel(thief, "speed")
+		return
+	end
+	if allowDeliver and thief.plot ~= 0 then
+		local refs = PlotService.refs(thief.plot)
+		local inside = PlotService.isInside(thief.plot, position)
+		if StealRules.canDeliver(inside, position.Y - refs.floorY, Gameplay.map.wallHeight) then
+			deliver(thief)
+		end
+	end
+end
+
 local function checkCarries()
-	local t = now()
-	local clockNow = os.clock()
-	local maxSpeed = Gameplay.walkSpeed * CFG.carrySpeedMultiplier
 	for _, thief in Sessions.all() do
-		local carry = thief.carry
-		if carry == nil then
-			continue
-		end
-		if Sessions.getByUserId(carry.victimUserId) == nil then
-			StealService.cancel(thief, "ownerLeft")
-			continue
-		end
-		local root = Sessions.rootPart(thief)
-		if root == nil then
-			StealService.cancel(thief, "died")
-			continue
-		end
-		if StealRules.isCarryExpired(carry.startedAt, t, CFG.carryTimeoutSeconds) then
-			StealService.cancel(thief, "timeout")
-			continue
-		end
-		-- Movement is checked on EVERY tick (so teleporting home right after a grab is caught before delivery),
-		-- measured from the start of the current window; the window only restarts after SPEED_WINDOW seconds,
-		-- so the per-window leeway can't be farmed by frequent checks.
-		-- Upward movement counts too (falling doesn't), and the thief may not climb/fly above maxCarryHeight (or
-		-- sink under the map).
-		local heightAboveGround = root.Position.Y - PlotService.world().groundY
-		if not StealRules.isCarryHeightAllowed(heightAboveGround, CFG.minCarryHeight, CFG.maxCarryHeight) then
-			StealService.cancel(thief, "flying")
-			continue
-		end
-		local dt = clockNow - carry.lastCheckAt
-		local delta = root.Position - carry.lastPosition
-		local moved = StealRules.movementDistance(delta.X, delta.Y, delta.Z)
-		local tolerance, leeway = CFG.speedCheckTolerance, CFG.speedCheckLeeway
-		if not StealRules.isMovementPlausible(moved, dt, maxSpeed, tolerance, leeway) then
-			StealService.cancel(thief, "speed")
-			continue
-		end
-		if dt >= SPEED_WINDOW then
-			carry.lastPosition = root.Position
-			carry.lastCheckAt = clockNow
-		end
-		if thief.plot ~= 0 then
-			local refs = PlotService.refs(thief.plot)
-			local inside = PlotService.isInside(thief.plot, root.Position)
-			if StealRules.canDeliver(inside, root.Position.Y - refs.floorY, Gameplay.map.wallHeight) then
-				deliver(thief)
-			end
-		end
+		checkCarry(thief, true)
 	end
 end
 
@@ -460,6 +460,13 @@ function StealService.start()
 	Remotes.onIntent("StealConfirm", onStealConfirm)
 	Remotes.onIntent("TagThief", onTag)
 	LockService.setLockListener(StealService.onBaseLocked)
+	-- Before a carrying visitor is moved out of a locked base, judge how they got in (a teleport is still caught).
+	LockService.setBeforeEject(function(visitor: Session)
+		local ok, err = pcall(checkCarry :: (Session, boolean) -> ...any, visitor, false)
+		if not ok then
+			warn(`[StealService] carry check before eject failed for {visitor.player.Name}: {err}`)
+		end
+	end)
 	task.spawn(function()
 		while true do
 			task.wait(CFG.deliveryCheckInterval)

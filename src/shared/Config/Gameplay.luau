@@ -58,8 +58,14 @@ local Gameplay = {
 		maxCarryHeight = 24,
 		tagCooldownSeconds = 1,
 		thiefCooldownAfterTagSeconds = 6,
-		speedCheckTolerance = 1.6, -- multiplier on the allowed carry speed before we drop the creature
-		speedCheckLeeway = 6, -- extra studs forgiven per 1-second check window (jumps, lag)
+		-- Carry movement budget (Logic/StealRules.stepCarryTrack): it refills at carry speed x speedCheckTolerance,
+		-- holds at most speedBudgetSeconds of refill (so a lag spike's catch-up jump is paid for, but a sustained
+		-- speed hack runs it dry), and the straight-line distance from the grab point is capped separately.
+		speedCheckTolerance = 1.6,
+		speedBudgetSeconds = 3,
+		-- Starting budget (a jump right after the grab, while the client still walks at full speed for one round
+		-- trip), and studs of slack on the straight-line cap.
+		speedCheckLeeway = 12,
 		deliveryCheckInterval = 0.2,
 	},
 

@@ -38,8 +38,7 @@ export type Carry = {
 	uid: string,
 	creatureId: string,
 	startedAt: number,
-	lastPosition: Vector3,
-	lastCheckAt: number,
+	track: StealRules.CarryTrack, -- movement budget, timed with os.clock()
 	model: Model?,
 	marker: BillboardGui?,
 }

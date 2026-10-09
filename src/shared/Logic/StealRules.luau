@@ -55,6 +55,22 @@ export type WalkLimits = {
 	leeway: number, -- starting budget
 }
 
+-- Movement budget for a carrying thief (see stepCarryTrack): a WalkTrack at carry speed, plus the grab point.
+export type CarryTrack = {
+	grabX: number,
+	grabZ: number,
+	startedAt: number,
+	lastX: number,
+	lastY: number,
+	lastZ: number,
+	lastT: number,
+	climbY: number, -- highest height already paid for (see stepWalkTrack)
+	budget: number, -- studs the thief may still move; refills over time, capped
+}
+
+-- maxSpeed is the carry walk speed; leeway is the starting budget and the slack on the straight-line cap.
+export type CarryLimits = WalkLimits
+
 export type Rect = { minX: number, maxX: number, minZ: number, maxZ: number }
 
 local StealRules = {}
@@ -158,30 +174,6 @@ function StealRules.isCarryHeightAllowed(heightAboveGround: number, minHeight: n
 	return heightAboveGround >= minHeight and heightAboveGround <= maxHeight -- false for NaN
 end
 
--- Movement that counts against a carrying thief: horizontal distance plus any upward rise. Falling is free
--- (gravity), climbing or flying is not.
-function StealRules.movementDistance(dx: number, dy: number, dz: number): number
-	return math.sqrt(dx * dx + dz * dz) + math.max(0, dy)
-end
-
--- Server-side speed sanity check while carrying (character physics is client-owned, so a speed exploit would
--- otherwise make stealing trivial). `distance` is studs moved in `dt` seconds (see movementDistance).
-function StealRules.isMovementPlausible(
-	distance: number,
-	dt: number,
-	maxSpeed: number,
-	tolerance: number,
-	leeway: number
-): boolean
-	if distance ~= distance then
-		return false
-	end
-	if dt <= 0 then
-		return distance <= leeway
-	end
-	return distance <= maxSpeed * dt * tolerance + leeway
-end
-
 -- Starts tracking a character's movement at a server-observed position.
 function StealRules.newWalkTrack(x: number, y: number, z: number, t: number, limits: WalkLimits): WalkTrack
 	return { lastX = x, lastY = y, lastZ = z, lastT = t, climbY = y, budget = limits.leeway }
@@ -250,6 +242,62 @@ function StealRules.isPositionTrusted(ctx: TrustContext, limits: WalkLimits): bo
 	local dt = math.max(0, ctx.t - track.lastT)
 	local step = math.sqrt((ctx.x - track.lastX) ^ 2 + (ctx.z - track.lastZ) ^ 2)
 	return step <= limits.maxSpeed * limits.tolerance * dt + ctx.stepSlack -- false for NaN
+end
+
+-- Starts tracking a carry at the grab position.
+function StealRules.newCarryTrack(x: number, y: number, z: number, t: number, limits: CarryLimits): CarryTrack
+	return {
+		grabX = x,
+		grabZ = z,
+		startedAt = t,
+		lastX = x,
+		lastY = y,
+		lastZ = z,
+		lastT = t,
+		climbY = y,
+		budget = limits.leeway,
+	}
+end
+
+-- One server tick of a carry. The movement budget works like stepWalkTrack at carry speed: it refills by
+-- maxSpeed * dt * tolerance (capped at budgetSeconds of refill) and pays for the distance moved (horizontal, plus
+-- height gained above the highest point already paid for, so repeated jumps cost one jump); the carry fails if it
+-- goes negative. That rejects sustained speed hacks yet forgives a lag spike (positions freeze, then catch up in one
+-- jump: the budget built up while frozen pays for it). Separately the straight-line horizontal distance from the grab
+-- point may never exceed maxSpeed * elapsed + leeway, which stops a teleport home right after a grab.
+-- Returns ok, and a reason ("speed" | "distance") when not ok. Mutates `track`.
+function StealRules.stepCarryTrack(
+	track: CarryTrack,
+	x: number,
+	y: number,
+	z: number,
+	t: number,
+	limits: CarryLimits
+): (boolean, string?)
+	if not StealRules.stepWalkTrack(track, x, y, z, t, limits) then
+		return false, "speed"
+	end
+	local fromGrab = math.sqrt((x - track.grabX) ^ 2 + (z - track.grabZ) ^ 2)
+	if fromGrab > limits.maxSpeed * math.max(0, t - track.startedAt) + limits.leeway then
+		return false, "distance"
+	end
+	return true, nil
+end
+
+-- The nearest point `margin` studs outside `rect` from a point inside it. A carrying thief ejected from a locked base
+-- is put there, and their carry budget pays for that short move like any other: the server's move is never a
+-- shortcut (sending them to the entrance could carry them far toward home for free).
+function StealRules.nearestOutside(x: number, z: number, rect: Rect, margin: number): (number, number)
+	local toMinX, toMaxX, toMinZ, toMaxZ = x - rect.minX, rect.maxX - x, z - rect.minZ, rect.maxZ - z
+	local nearest = math.min(toMinX, toMaxX, toMinZ, toMaxZ)
+	if nearest == toMinX then
+		return rect.minX - margin, z
+	elseif nearest == toMaxX then
+		return rect.maxX + margin, z
+	elseif nearest == toMinZ then
+		return x, rect.minZ - margin
+	end
+	return x, rect.maxZ + margin
 end
 
 function StealRules.isCarryExpired(startedAt: number, now: number, timeoutSeconds: number): boolean
