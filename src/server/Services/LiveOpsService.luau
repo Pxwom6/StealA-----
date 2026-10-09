@@ -62,13 +62,29 @@ end
 -- its full duration; the store stops offering the product near the cap instead, see StoreController's `luckMaxed`).
 -- Uses Logic/LiveOpsRules.addBoost, the same rule the store's odds preview is tested against.
 function LiveOpsService.addLuckBoost(seconds: number, multiplier: number, source: string, uncapped: boolean?)
+	LiveOpsService.setBoosts(LiveOpsService.boostsWith(seconds, multiplier, source, uncapped))
+	LiveOpsService.publishAttributes()
+end
+
+-- The boost list with one more boost added (see addLuckBoost), without applying it. Receipts compute this first and
+-- apply it with setBoosts in their non-failing step.
+function LiveOpsService.boostsWith(
+	seconds: number,
+	multiplier: number,
+	source: string,
+	uncapped: boolean?
+): { LiveOpsRules.Boost }
 	local limits = LiveOps.limits
 	if uncapped then
 		limits = table.clone(LiveOps.limits)
 		limits.maxBoostSeconds = math.huge
 	end
-	boosts = LiveOpsRules.addBoost(boosts, LiveOpsService.now(), seconds, multiplier, source, limits)
-	LiveOpsService.publishAttributes()
+	return LiveOpsRules.addBoost(boosts, LiveOpsService.now(), seconds, multiplier, source, limits)
+end
+
+-- Replaces the boost list (plain assignment; attributes catch up on the next publish, at most 1 s later).
+function LiveOpsService.setBoosts(list: { LiveOpsRules.Boost })
+	boosts = list
 end
 
 -- Starts a configured (or ad-hoc) event right now for `seconds`.

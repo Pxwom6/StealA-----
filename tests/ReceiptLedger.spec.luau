@@ -2,26 +2,35 @@
 local T = require("./TestKit")
 local ReceiptLedger = require("../src/shared/Logic/ReceiptLedger")
 
+type FakeData = {
+	cash: number,
+	history: { string },
+	stats: { robuxSpent: number },
+	processedReceipts: { string },
+}
+
 type FakeProfile = {
 	active: boolean,
-	live: { string },
+	data: FakeData,
 	saved: { string },
 	grants: number,
 	saves: number,
 	failNextSaves: number,
-	grantErrors: number,
+	prepareErrors: number,
+	applyErrors: number,
 	endSessionOnSave: boolean,
 }
 
 local function newProfile(): FakeProfile
 	return {
 		active = true,
-		live = {},
+		data = { cash = 50, history = {}, stats = { robuxSpent = 0 }, processedReceipts = {} },
 		saved = {},
 		grants = 0,
 		saves = 0,
 		failNextSaves = 0,
-		grantErrors = 0,
+		prepareErrors = 0,
+		applyErrors = 0,
 		endSessionOnSave = false,
 	}
 end
@@ -32,17 +41,30 @@ local function deps(p: FakeProfile): ReceiptLedger.ProcessDeps
 			return p.active
 		end,
 		liveIds = function(): { string }
-			return p.live
+			return p.data.processedReceipts
 		end,
 		savedIds = function(): { string }?
 			return p.saved
 		end,
-		grant = function()
-			if p.grantErrors > 0 then
-				p.grantErrors -= 1
-				error("grant failed")
+		data = function(): { [string]: any }
+			return (p.data :: any) :: { [string]: any }
+		end,
+		prepare = function(): () -> ()
+			if p.prepareErrors > 0 then
+				p.prepareErrors -= 1
+				error("lookup failed")
 			end
-			p.grants += 1
+			local amount = 100
+			return function()
+				p.data.cash += amount
+				table.insert(p.data.history, "cash pack")
+				if p.applyErrors > 0 then
+					p.applyErrors -= 1
+					error("grant failed halfway")
+				end
+				p.data.stats.robuxSpent += 10
+				p.grants += 1
+			end
 		end,
 		saveAndWait = function()
 			p.saves += 1
@@ -50,7 +72,7 @@ local function deps(p: FakeProfile): ReceiptLedger.ProcessDeps
 				p.failNextSaves -= 1
 				return
 			end
-			p.saved = table.clone(p.live)
+			p.saved = table.clone(p.data.processedReceipts)
 			if p.endSessionOnSave then
 				p.active = false
 			end
@@ -80,7 +102,7 @@ T.describe("ReceiptLedger.process", function()
 		p.failNextSaves = 5
 		T.expect(ReceiptLedger.process("P2", 100, deps(p))).toBe("NotProcessedYet")
 		T.expect(p.grants).toBe(1)
-		T.expect(table.find(p.live, "P2") ~= nil).toBe(true)
+		T.expect(table.find(p.data.processedReceipts, "P2") ~= nil).toBe(true)
 		T.expect(table.find(p.saved, "P2")).toBeNil()
 		-- Roblox retries; saves work again now.
 		p.failNextSaves = 0
@@ -88,14 +110,39 @@ T.describe("ReceiptLedger.process", function()
 		T.expect(p.grants).toBe(1)
 	end)
 
-	T.it("records nothing when the grant throws, and grants on the retry", function()
+	T.it("records and changes nothing when the lookups fail, and grants on the retry", function()
 		local p = newProfile()
-		p.grantErrors = 1
+		p.prepareErrors = 1
 		T.expect(ReceiptLedger.process("P3", 100, deps(p))).toBe("NotProcessedYet")
 		T.expect(p.grants).toBe(0)
-		T.expect(#p.live).toBe(0)
+		T.expect(#p.data.processedReceipts).toBe(0)
+		T.expect(p.data.cash).toBe(50)
 		T.expect(ReceiptLedger.process("P3", 100, deps(p))).toBe("PurchaseGranted")
 		T.expect(p.grants).toBe(1)
+	end)
+
+	T.it("a grant that fails after partly changing the save is rolled back, so the retry applies it once", function()
+		local p = newProfile()
+		local before = {
+			cash = p.data.cash,
+			history = table.clone(p.data.history),
+			stats = table.clone(p.data.stats),
+			processedReceipts = table.clone(p.data.processedReceipts),
+		}
+		local historyTable = p.data.history
+		p.applyErrors = 1
+		T.expect(ReceiptLedger.process("P6", 100, deps(p))).toBe("NotProcessedYet")
+		T.expect(p.data).toEqual(before) -- the half-applied cash and history entry are gone
+		T.expect(p.data.history).toBe(historyTable) -- restored in place: table identities are kept
+
+		-- Roblox retries: the product is applied exactly once.
+		T.expect(ReceiptLedger.process("P6", 100, deps(p))).toBe("PurchaseGranted")
+		T.expect(p.data.cash).toBe(150)
+		T.expect(p.data.history).toEqual({ "cash pack" })
+		T.expect(p.data.stats.robuxSpent).toBe(10)
+		T.expect(p.data.processedReceipts).toEqual({ "P6" })
+		T.expect(ReceiptLedger.process("P6", 100, deps(p))).toBe("PurchaseGranted")
+		T.expect(p.data.cash).toBe(150)
 	end)
 
 	T.it("does nothing for an inactive session", function()
@@ -115,7 +162,7 @@ T.describe("ReceiptLedger.process", function()
 		T.expect(p.grants).toBe(1)
 		-- "another server" loads the saved data
 		local other = newProfile()
-		other.live = table.clone(p.saved)
+		other.data.processedReceipts = table.clone(p.saved)
 		other.saved = table.clone(p.saved)
 		T.expect(ReceiptLedger.process("P5", 100, deps(other))).toBe("PurchaseGranted")
 		T.expect(other.grants).toBe(0)

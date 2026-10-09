@@ -120,6 +120,7 @@ local Theme = {
 		luckActivated = "{player} activated {multiplier}x Server Luck for {minutes} min!",
 		passGranted = "{pass} unlocked!",
 		lockTokenReady = "Instant Lock ready! Tap the lock button.",
+		lockTokenLater = "Instant Lock saved! You can use it in {time}.",
 
 		-- Announcements (server-wide banners)
 		announceSpawn = "A {rarity} {creature} appeared on the belt!",

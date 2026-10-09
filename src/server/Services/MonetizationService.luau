@@ -27,6 +27,7 @@ local Types = require(ReplicatedStorage.Shared.Types)
 local EconomyMath = require(ReplicatedStorage.Shared.Logic.EconomyMath)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local Guard = require(ReplicatedStorage.Shared.Logic.Guard)
+local LiveOpsRules = require(ReplicatedStorage.Shared.Logic.LiveOpsRules)
 local ReceiptLedger = require(ReplicatedStorage.Shared.Logic.ReceiptLedger)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local Analytics = require(script.Parent.Analytics)
@@ -158,45 +159,58 @@ end
 
 type AfterGrant = () -> ()
 
--- Applies a product to the save. MUST NOT YIELD (see ReceiptLedger). Returns an optional follow-up that runs
--- after the purchase is confirmed saved (announcements, auto-lock...).
-local function applyProduct(session: Session, key: string, receipt: { [string]: any }): AfterGrant?
+-- Works out everything a product grants WITHOUT changing anything (it may throw: nothing is lost, Roblox retries).
+-- Returns `apply`, which only writes the precomputed results (plain table writes: no yields, nothing that can fail;
+-- see ReceiptLedger), and a follow-up that runs once the purchase is confirmed saved (announcements, auto-lock...).
+local function prepareProduct(session: Session, key: string, receipt: { [string]: any }): (() -> (), AfterGrant?)
 	local product = Monetization.products[key]
+	local perks = Monetization.perks
 	local data = session.data
 	local robux = if type(receipt.CurrencySpent) == "number" then receipt.CurrencySpent else 0
-	ReceiptLedger.appendHistory(data.purchaseHistory, {
+	local historyEntry: Types.PurchaseRecord = {
 		purchaseId = tostring(receipt.PurchaseId),
 		productId = if type(receipt.ProductId) == "number" then receipt.ProductId else 0,
 		key = key,
 		robux = robux,
 		at = os.time(),
-	}, Monetization.purchaseHistorySize)
-	data.stats.robuxSpent += robux
+	}
+	local historySize = Monetization.purchaseHistorySize
+	local cash, tokens = 0, 0
+	local newBoosts: { LiveOpsRules.Boost }? = nil
+	local after: AfterGrant
 
 	if product.kind == "Cash" then
 		local pack = (Economy.cashPacks :: any)[key] :: EconomyMath.CashPack
-		local amount = EconomyMath.cashPackAmount(session.incomePerSecond, pack)
-		data.cash += amount
-		data.stats.totalEarned += amount
-		Replication.markDirty(session)
-		return function()
-			Analytics.economySource(session, amount, "IAP", key)
-			Remotes.notify(session.player, `+{UiTheme.cash(amount)}! {Theme.text.purchaseThanks}`, "success")
+		cash = EconomyMath.cashPackAmount(session.incomePerSecond, pack)
+		after = function()
+			Analytics.economySource(session, cash, "IAP", key)
+			Remotes.notify(session.player, `+{UiTheme.cash(cash)}! {Theme.text.purchaseThanks}`, "success")
 		end
 	elseif product.kind == "LockToken" then
-		data.lockTokens += 1
-		Replication.markDirty(session)
-		return function()
-			if LockService.canLockNow(session) then
+		tokens = 1
+		after = function()
+			local attempt = LockService.preview(session)
+			if session.data.lockTokens <= 0 then
+				-- Already used (e.g. they tapped lock while the purchase was saving).
+				Remotes.notify(session.player, Theme.text.purchaseThanks, "success")
+			elseif attempt.ok then
 				LockService.tryLock(session)
+			elseif attempt.reason == "locked" or attempt.reason == "vulnerable" then
+				-- The token is kept, but can't be used before the current lock and the open window after it end.
+				local wait = session.lock.vulnerableUntil - workspace:GetServerTimeNow()
+				Remotes.notify(
+					session.player,
+					Format.template(Theme.text.lockTokenLater, { time = Format.clock(wait) }),
+					"info"
+				)
 			else
 				Remotes.notify(session.player, Theme.text.lockTokenReady, "success")
 			end
 		end
 	elseif product.kind == "ServerLuck" then
-		local perks = Monetization.perks
-		LiveOpsService.addLuckBoost(perks.serverLuckSeconds, perks.serverLuckMultiplier, "purchase", true)
-		return function()
+		newBoosts = LiveOpsService.boostsWith(perks.serverLuckSeconds, perks.serverLuckMultiplier, "purchase", true)
+		after = function()
+			LiveOpsService.publishAttributes()
 			Announcer.broadcast({
 				text = Format.template(Theme.text.luckActivated, {
 					player = session.player.DisplayName,
@@ -207,8 +221,22 @@ local function applyProduct(session: Session, key: string, receipt: { [string]: 
 				kind = "luck",
 			})
 		end
+	else
+		error(`unknown product kind for {key}`)
 	end
-	error(`unknown product kind for {key}`)
+
+	local function apply()
+		ReceiptLedger.appendHistory(data.purchaseHistory, historyEntry, historySize)
+		data.stats.robuxSpent += robux
+		data.cash += cash
+		data.stats.totalEarned += cash
+		data.lockTokens += tokens
+		if newBoosts then
+			LiveOpsService.setBoosts(newBoosts) -- the only write outside the save
+		end
+		Replication.markDirty(session) -- a flag: shows the new cash/tokens now, not after the save lands
+	end
+	return apply, after
 end
 
 -- Shared receipt path for real purchases and Studio test grants.
@@ -231,14 +259,20 @@ local function processFor(player: Player, key: string, receipt: { [string]: any 
 			local saved = profile.LastSavedData
 			return if saved then saved.processedReceipts else nil
 		end,
-		grant = function()
-			after = applyProduct(session, key, receipt)
+		data = function(): { [string]: any }
+			return (profile.Data :: any) :: { [string]: any }
+		end,
+		prepare = function(): () -> ()
+			local apply, followUp = prepareProduct(session, key, receipt)
+			after = followUp
+			return apply
 		end,
 		saveAndWait = function()
 			DataService.saveAndWait(profile, SAVE_TIMEOUT_SECONDS)
 		end,
 		maxSaveAttempts = MAX_SAVE_ATTEMPTS,
 	})
+	Replication.markDirty(session)
 	if decision == "PurchaseGranted" then
 		local followUp = after
 		if followUp then

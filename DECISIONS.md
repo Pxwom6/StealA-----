@@ -126,7 +126,9 @@ inside when the owner locks drops the creature.
 
 **Chose:** the last 100 `PurchaseId`s live in `data.processedReceipts`; grant + record happen in one non-yielding
 step; `PurchaseGranted` is returned only when the id is in `profile.LastSavedData` (ProfileStore's recommended
-pattern), otherwise `NotProcessedYet` so Roblox retries. Purchase history (last 100) and Robux spent are saved.
+pattern), otherwise `NotProcessedYet` so Roblox retries. A grant is all or nothing: every lookup and calculation
+runs first and changes nothing, then an `apply` step only writes the results; if it still throws, the save is rolled
+back to its exact prior state (`ReceiptLedger.applyAtomically`), so a retry never applies half a grant twice. Purchase history (last 100) and Robux spent are saved.
 **Why:** retries never double-grant and a crash before saving never loses a purchase.
 **Reversal cost:** high — keep the field name and cap when changing the schema.
 

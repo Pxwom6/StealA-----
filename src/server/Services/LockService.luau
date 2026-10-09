@@ -200,11 +200,6 @@ function LockService.preview(session: Session): LockRules.LockAttempt
 	return LockRules.tryLock(session.lock, now(), session.lockDuration, Gameplay.lock, session.data.lockTokens > 0)
 end
 
--- True when a lock could start right now (used to auto-apply a freshly bought Instant Lock).
-function LockService.canLockNow(session: Session): boolean
-	return LockService.preview(session).ok
-end
-
 -- Ends a session's new-player protection early (e.g. they started stealing).
 function LockService.endGrace(session: Session)
 	if session.graceUntil > 0 then
