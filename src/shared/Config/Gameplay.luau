@@ -91,6 +91,10 @@ local Gameplay = {
 		stealOverrunSeconds = 3,
 		stealTeleportSeconds = 10,
 		stepSlack = 4, -- studs beyond walking speed allowed between the latest sample and a tag (jitter)
+		-- After a server move, samples more than settleRadius studs from where the server put the character are
+		-- ignored for settleSeconds (its client may still report the old position for a moment).
+		settleSeconds = 1,
+		settleRadius = 5,
 	},
 
 	lock = {

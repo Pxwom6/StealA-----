@@ -76,6 +76,10 @@ export type CarryLimits = WalkLimits
 
 export type Rect = { minX: number, maxX: number, minZ: number, maxZ: number }
 
+-- A server move that is still settling (see isSettling): where the server put the character, and until when (server
+-- time) stale samples are ignored.
+export type Settle = { x: number, y: number, z: number, untilT: number }
+
 -- How long a flag keeps a thief from starting or finishing a steal (see stealTrustSince).
 export type StealTrustWindows = {
 	overrunSeconds: number, -- after an overrun (a lag stall, a server hitch, a fling)
@@ -289,6 +293,36 @@ function StealRules.isPositionTrusted(ctx: TrustContext, limits: WalkLimits): bo
 	local dt = math.max(0, ctx.t - track.lastT)
 	local step = math.sqrt((ctx.x - track.lastX) ^ 2 + (ctx.z - track.lastZ) ^ 2)
 	return step <= limits.maxSpeed * limits.tolerance * dt + ctx.stepSlack -- false for NaN
+end
+
+-- After the SERVER moves a character (spawning, respawning, ejecting from a locked base), its client can keep
+-- reporting where it was before the move for a moment (a stale position). Until `untilT` passes, a sample more than
+-- `radius` studs from the target is ignored instead of judged, so that stale position never looks like a teleport;
+-- samples near the target are judged. Returns true when the sample at (x, y, z) should be ignored.
+function StealRules.isSettling(settle: Settle?, x: number, y: number, z: number, t: number, radius: number): boolean
+	if settle == nil or t >= settle.untilT then
+		return false
+	end
+	local distance = math.sqrt((x - settle.x) ^ 2 + (y - settle.y) ^ 2 + (z - settle.z) ^ 2)
+	return not (distance <= radius) -- NaN counts as not arrived
+end
+
+-- One position sample while a server move may be settling: whether to ignore it (see isSettling), and the settle to
+-- keep. A sample near the target does not end the window early: right after the move the server reads its own write
+-- (the target) until the client's updates from before the move arrive, and those must still be ignored. Only
+-- `untilT` ends it.
+function StealRules.settleSample(
+	settle: Settle?,
+	x: number,
+	y: number,
+	z: number,
+	t: number,
+	radius: number
+): (boolean, Settle?)
+	if settle == nil or t >= settle.untilT then
+		return false, nil
+	end
+	return StealRules.isSettling(settle, x, y, z, t, radius), settle
 end
 
 -- The `flagSince` / `teleportSince` times (see TrustContext) for starting or finishing a steal at time `t`: a flag

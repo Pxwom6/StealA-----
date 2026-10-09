@@ -15,8 +15,10 @@
 	one hiccup never locks a thief out of a base but teleporting onto a podium still costs time.
 
 	Whenever the SERVER moves a character (spawning at the base, ejecting from a locked base) call reset(), so the
-	jump is not mistaken for a teleport exploit. A reset never clears the flags: record() the position before a
-	server move, so a teleport into a locked base is still caught.
+	jump is not mistaken for a teleport exploit. For about a second after that, samples far from where the server put
+	the character are ignored (its client may still report the old position; Logic/StealRules.settleSample). A reset
+	never clears the flags: record() the position before a server move, so a teleport into a locked base is still
+	caught.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -47,8 +49,19 @@ local function now(): number
 	return workspace:GetServerTimeNow()
 end
 
+-- True while a server move is settling and `position` is a stale one from before it (see StealRules.isSettling).
+function PositionTracker.isSettling(session: Session, position: Vector3): boolean
+	return StealRules.isSettling(session.settle, position.X, position.Y, position.Z, now(), CFG.settleRadius)
+end
+
 function PositionTracker.record(session: Session, position: Vector3)
 	local t = now()
+	local ignore, settle =
+		StealRules.settleSample(session.settle, position.X, position.Y, position.Z, t, CFG.settleRadius)
+	session.settle = settle
+	if ignore then
+		return -- a stale position from before a server move: not evidence of anything
+	end
 	local track = session.walk
 	if track == nil then
 		session.walk = StealRules.newWalkTrack(position.X, position.Y, position.Z, t, WALK_LIMITS)
@@ -61,11 +74,17 @@ function PositionTracker.record(session: Session, position: Vector3)
 	end
 end
 
--- Restarts tracking after a server-side move (or death). `position`, when given, becomes the first sample.
+-- Restarts tracking after a server-side move (or death). `position`, when given, is where the server put the
+-- character: it becomes the first sample, and stale samples far from it are ignored for settleSeconds.
 function PositionTracker.reset(session: Session, position: Vector3?)
-	session.walk = if position
-		then StealRules.newWalkTrack(position.X, position.Y, position.Z, now(), WALK_LIMITS)
-		else nil
+	local t = now()
+	if position then
+		session.walk = StealRules.newWalkTrack(position.X, position.Y, position.Z, t, WALK_LIMITS)
+		session.settle = { x = position.X, y = position.Y, z = position.Z, untilT = t + CFG.settleSeconds }
+	else
+		session.walk = nil
+		session.settle = nil
+	end
 end
 
 -- True when `position` (the player's current root position) is consistent with what the server observed: not

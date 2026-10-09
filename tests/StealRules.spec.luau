@@ -123,6 +123,66 @@ T.describe("StealRules.canBeginHold", function()
 	end)
 end)
 
+T.describe("StealRules after a server move", function()
+	local walk: StealRules.WalkLimits = { maxSpeed = 16, tolerance = 1.5, budgetSeconds = 1.5, leeway = 12 }
+
+	T.it("ignores stale samples from before the move for ~1 s, and judges ones at the target", function()
+		local settle: StealRules.Settle = { x = 100, y = 3, z = 0, untilT = 11 } -- moved to (100, 3, 0) at t = 10
+		T.expect(StealRules.isSettling(settle, 0, 3, 0, 10.2, 5)).toBe(true) -- still reported where it was: ignore
+		T.expect(StealRules.isSettling(settle, 0 / 0, 3, 0, 10.2, 5)).toBe(true)
+		T.expect(StealRules.isSettling(settle, 102, 3, 0, 10.3, 5)).toBe(false) -- at the target: judged
+		T.expect(StealRules.isSettling(settle, 0, 3, 0, 11.1, 5)).toBe(false) -- window over: judge again
+		T.expect(StealRules.isSettling(nil, 0, 3, 0, 10.2, 5)).toBe(false)
+	end)
+
+	T.it("an honest player ejected from a locked base is not flagged as a teleporter", function()
+		-- The server moves them 60 studs to (60, 3, 0); their client's next two updates still say (0, 3, 0).
+		local track = StealRules.newWalkTrack(60, 3, 0, 10, walk)
+		local settle: StealRules.Settle = { x = 60, y = 3, z = 0, untilT = 11 }
+		local flagged = false
+		for _, sample in { { 0, 10.25 }, { 0, 10.5 }, { 61, 10.75 }, { 64, 11 }, { 68, 11.25 } } do
+			local x, t = sample[1], sample[2]
+			if not StealRules.isSettling(settle, x, 3, 0, t, 5) then
+				flagged = flagged or not StealRules.stepWalkTrack(track, x, 3, 0, t, walk)
+			end
+		end
+		T.expect(flagged).toBe(false)
+
+		-- Without the settle window, the same stale update looked like a 60-stud teleport.
+		local naive = StealRules.newWalkTrack(60, 3, 0, 10, walk)
+		StealRules.stepWalkTrack(naive, 0, 3, 0, 10.25, walk)
+		T.expect(StealRules.walkStepVerdict(naive, 24)).toBe("teleport")
+	end)
+
+	T.it("the server's own write at the target doesn't end the window before the stale updates arrive", function()
+		-- Moved to (60, 3, 0) at t = 10. The sampler first reads the server's own write (the target), then the
+		-- client's updates sent before it saw the move, then where the client really is.
+		local track = StealRules.newWalkTrack(60, 3, 0, 10, walk)
+		local settle: StealRules.Settle? = { x = 60, y = 3, z = 0, untilT = 11 }
+		local flagged = false
+		for _, sample in { { 60, 10.01 }, { 0, 10.26 }, { 0, 10.51 }, { 62, 10.76 }, { 66, 11.01 } } do
+			local x, t = sample[1], sample[2]
+			local ignore
+			ignore, settle = StealRules.settleSample(settle, x, 3, 0, t, 5)
+			if not ignore then
+				flagged = flagged or not StealRules.stepWalkTrack(track, x, 3, 0, t, walk)
+			end
+		end
+		T.expect(flagged).toBe(false)
+		T.expect(settle).toBe(nil) -- the window is over at 11
+		-- far samples are still judged once it ends, and nothing is ignored without a server move
+		T.expect((StealRules.settleSample({ x = 60, y = 3, z = 0, untilT = 11 }, 250, 3, 0, 11.25, 5))).toBe(false)
+		T.expect((StealRules.settleSample(nil, 250, 3, 0, 10.5, 5))).toBe(false)
+	end)
+	T.it("a real teleport right after a server move is still caught once the window ends", function()
+		local track = StealRules.newWalkTrack(60, 3, 0, 10, walk)
+		local settle: StealRules.Settle = { x = 60, y = 3, z = 0, untilT = 11 }
+		T.expect(StealRules.isSettling(settle, 250, 3, 0, 10.5, 5)).toBe(true) -- ignored for now...
+		T.expect(StealRules.isSettling(settle, 250, 3, 0, 11.25, 5)).toBe(false) -- ...then judged
+		T.expect(StealRules.stepWalkTrack(track, 250, 3, 0, 11.25, walk)).toBe(false)
+	end)
+end)
+
 T.describe("StealRules steal trust after a lag spike", function()
 	local walk: StealRules.WalkLimits = { maxSpeed = 16, tolerance = 1.5, budgetSeconds = 1.5, leeway = 12 }
 	local windows: StealRules.StealTrustWindows = { overrunSeconds = 3, teleportSeconds = 10 }

@@ -62,6 +62,7 @@ export type Session = {
 	walk: StealRules.WalkTrack?, -- server-observed movement (PositionTracker); nil until the first sample
 	flaggedAt: number, -- server time of the last step the walk budget couldn't pay for (-inf: never)
 	teleportedAt: number, -- server time of the last gross overrun, i.e. a teleport (-inf: never)
+	settle: StealRules.Settle?, -- a server move whose stale samples are still being ignored (PositionTracker)
 	joinedAt: number,
 	lastSeenAtJoin: number, -- the save's lastSeen when it was loaded (offline earnings)
 	playClock: number, -- os.clock() of the last play-time accrual
