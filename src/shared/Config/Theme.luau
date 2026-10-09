@@ -176,7 +176,7 @@ local Theme = {
 		CashLarge = { name = "Snack Truck", description = "About 6 hours of your income." },
 		InstantLock = {
 			name = "Instant Lock",
-			description = "Lock your base right now, even while the lock recharges. Can't be chained: every base stays open for at least {minVulnerable}s between locks.",
+			description = "Lock your base right now, even while the lock recharges. Can't be chained: every base stays open between locks for at least {minVulnerable}s, or half its lock time if longer.",
 		},
 		ServerLuck = {
 			name = "Server Luck",

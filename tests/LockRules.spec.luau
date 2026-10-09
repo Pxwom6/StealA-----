@@ -1,8 +1,29 @@
 --!strict
 local T = require("./TestKit")
 local LockRules = require("../src/shared/Logic/LockRules")
+local Economy = require("../src/shared/Config/Economy")
+local Gameplay = require("../src/shared/Config/Gameplay")
+local Monetization = require("../src/shared/Config/Monetization")
 
 local cfg = { cooldownSeconds = 90, minVulnerableSeconds = 30 }
+
+-- Spams lock attempts once a second for ten hours with unlimited tokens; returns the share of time left open.
+local function openShareWithUnlimitedTokens(duration: number, config: LockRules.LockConfig): number
+	local state = LockRules.newState()
+	local lockedSeconds, openSeconds = 0, 0
+	for now = 0, 36000 do
+		if LockRules.isLocked(state, now) then
+			lockedSeconds += 1
+		else
+			openSeconds += 1
+			local attempt = LockRules.tryLock(state, now, duration, config, true)
+			if attempt.ok then
+				state = attempt.state
+			end
+		end
+	end
+	return openSeconds / (openSeconds + lockedSeconds)
+end
 
 T.describe("LockRules", function()
 	T.it("locks when ready and reports remaining time", function()
@@ -47,26 +68,43 @@ T.describe("LockRules", function()
 	end)
 
 	T.it("fairness: unlimited tokens still leave the base open a guaranteed share of the time", function()
-		local state = LockRules.newState()
-		local lockedSeconds, openSeconds = 0, 0
-		for now = 0, 36000 do -- ten hours, one attempt per second, infinite tokens
-			if LockRules.isLocked(state, now) then
-				lockedSeconds += 1
-			else
-				openSeconds += 1
-				local attempt = LockRules.tryLock(state, now, 60, cfg, true)
-				if attempt.ok then
-					state = attempt.state
-				end
-			end
+		T.expect(openShareWithUnlimitedTokens(60, cfg)).toBeAtLeast(30 / 90 - 0.01) -- 30s open per 60s locked
+	end)
+
+	T.it("fairness holds for the longest possible lock (max rebirth bonus + Longer Lock pass)", function()
+		local longest = LockRules.duration(
+			Gameplay.lock.durationSeconds,
+			Economy.rebirth.maxLockBonus,
+			Monetization.perks.longerLockSeconds
+		)
+		T.expect(longest).toBeGreaterThan(Gameplay.lock.durationSeconds)
+		T.expect(openShareWithUnlimitedTokens(longest, Gameplay.lock)).toBeAtLeast(1 / 3 - 0.01)
+		for _, duration in { 1, 30, 61, 100, 150, 240, 600 } do
+			T.expect(openShareWithUnlimitedTokens(duration, cfg)).toBeAtLeast(1 / 3 - 0.01)
 		end
-		local openShare = openSeconds / (openSeconds + lockedSeconds)
-		T.expect(openShare).toBeAtLeast(30 / 90 - 0.01) -- 30s open per 60s locked
+	end)
+
+	T.it("the open window after a lock is at least half the lock, and the free cooldown never ends sooner", function()
+		local long = LockRules.tryLock(LockRules.newState(), 0, 150, cfg, false).state
+		T.expect(long.vulnerableUntil - long.lockedUntil).toBe(75)
+		T.expect(long.cooldownUntil - long.lockedUntil).toBe(90)
+		T.expect(LockRules.tryLock(long, 150 + 74, 150, cfg, true).reason).toBe("vulnerable")
+		T.expect(LockRules.tryLock(long, 150 + 75, 150, cfg, true).ok).toBe(true)
+
+		local huge = LockRules.tryLock(LockRules.newState(), 0, 400, cfg, false).state
+		T.expect(huge.vulnerableUntil - huge.lockedUntil).toBe(200)
+		T.expect(huge.cooldownUntil - huge.lockedUntil).toBe(200) -- no free lock inside the open window either
+		T.expect(LockRules.tryLock(huge, 400 + 199, 400, cfg, false).ok).toBe(false)
+
+		-- Ending a long lock early (owner left) keeps its longer window.
+		local ended = LockRules.unlock(long, 10)
+		T.expect(ended.vulnerableUntil).toBe(10 + 75)
+		T.expect(ended.cooldownUntil).toBe(10 + 90)
 	end)
 
 	T.it("unlocking early keeps the cooldown", function()
 		local state = LockRules.tryLock(LockRules.newState(), 0, 60, cfg, false).state
-		local unlocked = LockRules.unlock(state, 20, cfg)
+		local unlocked = LockRules.unlock(state, 20)
 		T.expect(LockRules.isLocked(unlocked, 21)).toBe(false)
 		T.expect(LockRules.status(unlocked, 21)).toBe("Cooldown")
 		T.expect(LockRules.tryLock(unlocked, 40, 60, cfg, true).reason).toBe("vulnerable")
@@ -76,7 +114,7 @@ T.describe("LockRules", function()
 		-- Server clock and wall clock differ on purpose: the save must hold wall-clock times.
 		local state = LockRules.tryLock(LockRules.newState(), 1000, 60, cfg, false).state
 		local leftAt, wallAtLeave = 1010, 50000
-		local saved = LockRules.toSaved(LockRules.unlock(state, leftAt, cfg), leftAt, wallAtLeave)
+		local saved = LockRules.toSaved(LockRules.unlock(state, leftAt), leftAt, wallAtLeave)
 		T.expect(saved.cooldownUntil).toBe(wallAtLeave + 90)
 		T.expect(saved.vulnerableUntil).toBe(wallAtLeave + 30)
 

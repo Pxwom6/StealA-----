@@ -88,7 +88,9 @@ local Gameplay = {
 	lock = {
 		durationSeconds = 60,
 		cooldownSeconds = 90, -- after a lock ends, free players wait this long before locking again
-		minVulnerableSeconds = 30, -- nobody (paid or not) can re-lock sooner than this after a lock ends
+		-- Nobody (paid or not) can re-lock sooner than this after a lock ends, or half the lock's length if that is
+		-- longer (Logic/LockRules.windows), so every base is open at least a third of the time.
+		minVulnerableSeconds = 30,
 		buttonRange = 12,
 	},
 

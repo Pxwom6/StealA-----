@@ -46,7 +46,13 @@ local function describe(): LockView
 		local text =
 			Format.template(Theme.text.lockPillCooldown, { time = Format.clock(state.lockCooldownUntil - now) })
 		if state.lockTokens > 0 then
-			text = Format.template(Theme.text.lockPillToken, { count = state.lockTokens })
+			-- A token can skip the recharge, but never the open window right after a lock.
+			text = if state.lockVulnerableUntil > now
+				then Format.template(
+					Theme.text.lockPillCooldown,
+					{ time = Format.clock(state.lockVulnerableUntil - now) }
+				)
+				else Format.template(Theme.text.lockPillToken, { count = state.lockTokens })
 		end
 		return { text = text, color = UiTheme.palette("panelLight"), recharging = true }
 	end
@@ -98,9 +104,9 @@ local function update()
 		local now = workspace:GetServerTimeNow()
 		if state.lockedUntil > now then
 			label.Text = Format.template(Theme.text.lockButtonLocked, { time = Format.clock(state.lockedUntil - now) })
-		elseif state.lockCooldownUntil > now and state.lockTokens <= 0 then
-			label.Text =
-				Format.template(Theme.text.lockButtonCooldown, { time = Format.clock(state.lockCooldownUntil - now) })
+		elseif state.lockCooldownUntil > now and (state.lockTokens <= 0 or state.lockVulnerableUntil > now) then
+			local readyAt = if state.lockTokens > 0 then state.lockVulnerableUntil else state.lockCooldownUntil
+			label.Text = Format.template(Theme.text.lockButtonCooldown, { time = Format.clock(readyAt - now) })
 		else
 			label.Text = Theme.text.lockButtonReady
 		end

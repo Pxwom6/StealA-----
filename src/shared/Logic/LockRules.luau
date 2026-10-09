@@ -4,10 +4,11 @@
 
 	  Ready ──lock──▶ Locked (duration) ──▶ Cooldown ──▶ Ready
 	                                   └─ tokens (paid Instant Lock) may skip the rest of the cooldown, but
-	                                      never the first `minVulnerableSeconds` after a lock ends.
+	                                      never the open window right after a lock ends: `minVulnerableSeconds`,
+	                                      or half the lock's duration when that is longer (see `windows`).
 
-	That minimum open window is the fairness guarantee: no amount of spending makes a base permanently
-	un-stealable. Pure: no requires, no Roblox APIs. Times are server timestamps in seconds.
+	That open window is the fairness guarantee: however long the lock and however much is spent, a base is open
+	at least a third of the time. Pure: no requires, no Roblox APIs. Times are server timestamps in seconds.
 ]]
 
 export type LockState = {
@@ -61,6 +62,14 @@ function LockRules.duration(baseSeconds: number, rebirthBonus: number, passBonus
 	return math.max(1, baseSeconds + math.max(0, rebirthBonus) + math.max(0, passBonus))
 end
 
+-- For a lock of `duration` seconds: how long the base must then stay open (no token can skip it) and how long the
+-- free lock recharges. The open window is at least half the lock, so open time >= 1/3 of the total even for the
+-- longest lock with unlimited tokens; the recharge is never shorter than the open window.
+function LockRules.windows(duration: number, cfg: LockConfig): (number, number)
+	local open = math.max(cfg.minVulnerableSeconds, duration / 2)
+	return open, math.max(cfg.cooldownSeconds, open)
+end
+
 -- Attempts to lock. Uses a token only when the free lock is on cooldown and the minimum open window has passed.
 function LockRules.tryLock(
 	state: LockState,
@@ -97,6 +106,7 @@ function LockRules.tryLock(
 	end
 
 	local lockedUntil = now + duration
+	local openSeconds, cooldownSeconds = LockRules.windows(duration, cfg)
 	return {
 		ok = true,
 		usedToken = usedToken,
@@ -104,21 +114,22 @@ function LockRules.tryLock(
 		waitSeconds = 0,
 		state = {
 			lockedUntil = lockedUntil,
-			cooldownUntil = lockedUntil + cfg.cooldownSeconds,
-			vulnerableUntil = lockedUntil + math.min(cfg.minVulnerableSeconds, cfg.cooldownSeconds),
+			cooldownUntil = lockedUntil + cooldownSeconds,
+			vulnerableUntil = lockedUntil + openSeconds,
 		},
 	}
 end
 
--- Ends a lock early (e.g. the owner left). Keeps the cooldown so leaving/rejoining can't be abused.
-function LockRules.unlock(state: LockState, now: number, cfg: LockConfig): LockState
+-- Ends a lock early (e.g. the owner left). The cooldown and open window still follow, as long as they would have
+-- after the full lock, so leaving/rejoining can't be abused.
+function LockRules.unlock(state: LockState, now: number): LockState
 	if now >= state.lockedUntil then
 		return state
 	end
 	return {
 		lockedUntil = now,
-		cooldownUntil = now + cfg.cooldownSeconds,
-		vulnerableUntil = now + math.min(cfg.minVulnerableSeconds, cfg.cooldownSeconds),
+		cooldownUntil = now + (state.cooldownUntil - state.lockedUntil),
+		vulnerableUntil = now + (state.vulnerableUntil - state.lockedUntil),
 	}
 end
 

@@ -11,7 +11,7 @@
 	Display names and descriptions live in Config/Theme.luau (store section) so a re-theme never touches this file.
 
 	Fairness rules this config must keep (enforced in code, see DECISIONS.md):
-	  * nothing paid makes a base un-stealable (lock tokens still respect Gameplay.lock.minVulnerableSeconds)
+	  * nothing paid makes a base un-stealable (lock tokens never skip the open window, Logic/LockRules.windows)
 	  * paid items speed progress up; they never gate content
 	  * the only paid item with a random effect (Server Luck) shows exact before/after odds before purchase
 ]]

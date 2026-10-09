@@ -91,8 +91,10 @@ inside when the owner locks drops the creature.
 ### 9. Fairness rules for paid items (young audience)
 
 **Chose:**
-* Instant Lock is a *token*: it can skip the free-lock recharge but never the 30 s minimum open window after a lock
-  (`Gameplay.lock.minVulnerableSeconds`). A unit test proves infinite tokens still leave a base open ≥ 1/3 of the time.
+* Instant Lock is a *token*: it can skip the free-lock recharge but never the open window after a lock: 30 s
+  (`Gameplay.lock.minVulnerableSeconds`) or half the lock's duration, whichever is longer (`LockRules.windows`).
+  Unit tests prove infinite tokens still leave a base open ≥ 1/3 of the time, up to the longest possible lock.
+  The lock pill and board count down that window when a token is held, so the player knows when it can be used.
   The cooldown and open window are saved as wall-clock times (`data.lockTimers`) on every save (on the final save,
   at leave or shutdown, a lock still running counts as ending then; on other saves it keeps its natural end, so a
   crash mid-lock never shortens them) and restored on join, so leaving and rejoining (any server) never resets them.

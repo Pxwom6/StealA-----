@@ -71,7 +71,7 @@ local restored: { [Session]: boolean } = setmetatable({}, { __mode = "k" }) :: a
 local function persist(session: Session, isFinalSave: boolean)
 	if restored[session] then
 		local t = now()
-		local state = if isFinalSave then LockRules.unlock(session.lock, t, Gameplay.lock) else session.lock
+		local state = if isFinalSave then LockRules.unlock(session.lock, t) else session.lock
 		session.data.lockTimers = LockRules.toSaved(state, t, os.time())
 	end
 end
@@ -79,7 +79,8 @@ end
 -- On join (after `refresh`): restores the cooldown and open window saved on the player's last visit, and keeps the
 -- save up to date from then on (every save, including the final one at leave or shutdown).
 function LockService.restore(session: Session)
-	local maxSeconds = session.lockDuration + Gameplay.lock.cooldownSeconds
+	local _, cooldownSeconds = LockRules.windows(session.lockDuration, Gameplay.lock)
+	local maxSeconds = session.lockDuration + cooldownSeconds
 	session.lock = LockRules.fromSaved(session.data.lockTimers, now(), os.time(), maxSeconds)
 	restored[session] = true
 	session.profile.OnSave:Connect(function()
@@ -93,7 +94,7 @@ end
 
 -- On leave: a running lock ends now (the base goes with its owner) and its cooldown is saved for the next join.
 function LockService.onLeaving(session: Session)
-	session.lock = LockRules.unlock(session.lock, now(), Gameplay.lock)
+	session.lock = LockRules.unlock(session.lock, now())
 	persist(session, false)
 end
 
@@ -194,11 +195,14 @@ function LockService.tryLock(session: Session): (boolean, string?)
 	return true, nil
 end
 
+-- What a lock attempt right now would do, without doing it (used after buying Instant Lock).
+function LockService.preview(session: Session): LockRules.LockAttempt
+	return LockRules.tryLock(session.lock, now(), session.lockDuration, Gameplay.lock, session.data.lockTokens > 0)
+end
+
 -- True when a lock could start right now (used to auto-apply a freshly bought Instant Lock).
 function LockService.canLockNow(session: Session): boolean
-	local attempt =
-		LockRules.tryLock(session.lock, now(), session.lockDuration, Gameplay.lock, session.data.lockTokens > 0)
-	return attempt.ok
+	return LockService.preview(session).ok
 end
 
 -- Ends a session's new-player protection early (e.g. they started stealing).
