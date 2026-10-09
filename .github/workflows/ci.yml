@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Format, lint, typecheck, test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install pinned tools (rokit.toml)
+        uses: CompeyDev/setup-rokit@v0.2.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          cache: true
+
+      - name: Install Wally packages
+        run: wally install
+
+      - name: StyLua (format check)
+        run: stylua --check src tests tools
+
+      - name: selene (lint)
+        run: selene src tests tools
+
+      - name: Generate Rojo sourcemap
+        run: rojo sourcemap default.project.json --output sourcemap.json
+
+      - name: Download Roblox type definitions (matched to the pinned luau-lsp)
+        run: |
+          LSP_VERSION=$(grep -oP 'luau-lsp@\K[0-9.]+' rokit.toml)
+          curl -sSfL -o globalTypes.d.luau \
+            "https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/${LSP_VERSION}/scripts/globalTypes.d.luau"
+
+      - name: luau-lsp (strict type analysis, game code)
+        run: |
+          luau-lsp analyze \
+            --platform=roblox \
+            --definitions=@roblox=globalTypes.d.luau \
+            --sourcemap=sourcemap.json \
+            --settings=.vscode/settings.json \
+            --ignore="**/_Index/**" \
+            src
+
+      - name: luau-lsp (strict type analysis, tests and tools)
+        run: luau-lsp analyze --platform=standard --settings=.vscode/settings.json tests tools
+
+      - name: Lune unit tests
+        run: lune run tests/run.luau
