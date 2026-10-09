@@ -373,9 +373,9 @@ function StealRules.stepCarryTrack(
 	return true, nil
 end
 
--- The nearest point `margin` studs outside `rect` from a point inside it. A carrying thief ejected from a locked base
--- is put there, and their carry budget pays for that short move like any other: the server's move is never a
--- shortcut (sending them to the entrance could carry them far toward home for free).
+-- The nearest point `margin` studs outside `rect` from a point inside it. A carrying thief ejected from a third
+-- player's locked base is put there (not at its entrance, which could carry them far toward home); if they were
+-- inside when it locked, shiftCarryTrack keeps that short push off their carry budget.
 function StealRules.nearestOutside(x: number, z: number, rect: Rect, margin: number): (number, number)
 	local toMinX, toMaxX, toMinZ, toMaxZ = x - rect.minX, rect.maxX - x, z - rect.minZ, rect.maxZ - z
 	local nearest = math.min(toMinX, toMaxX, toMinZ, toMaxZ)
@@ -387,6 +387,18 @@ function StealRules.nearestOutside(x: number, z: number, rect: Rect, margin: num
 		return x, rect.minZ - margin
 	end
 	return x, rect.maxZ + margin
+end
+
+-- The SERVER moved a carrying thief to (x, y, z) (ejecting them from a third player's base as it locks): the push is
+-- not theirs, so it costs no budget and doesn't count toward the straight-line cap (the grab point moves with them).
+-- Call after stepping the track to where the push started; elapsed time and the stored budget carry on unchanged.
+-- Mutates `track`.
+function StealRules.shiftCarryTrack(track: CarryTrack, x: number, y: number, z: number)
+	local dx, dy, dz = x - track.lastX, y - track.lastY, z - track.lastZ
+	track.grabX += dx
+	track.grabZ += dz
+	track.climbY += dy -- the height already paid for moves with them too
+	track.lastX, track.lastY, track.lastZ = x, y, z
 end
 
 function StealRules.isCarryExpired(startedAt: number, now: number, timeoutSeconds: number): boolean

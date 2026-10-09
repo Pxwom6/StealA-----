@@ -108,8 +108,10 @@ refills at 1.6× carry speed, holds at most 3 s of refill and pays for every stu
 of new height (jumping again to a height already paid for is free, falling is free), so a lag spike's catch-up jump
 is covered while a sustained speed hack runs it dry; the straight-line distance from the grab point is also capped
 at carry speed × elapsed + 12 studs, which stops a teleport home. Before a lock ejects a carrying visitor, their
-move into that base is checked first, and they are put just outside its nearest side (not at its entrance) with
-their budget paying for that move, so being ejected is never a shortcut.
+move into that base is checked first, and they are put just outside its nearest side (not at its entrance, which
+could be a shortcut home). If they were inside when the lock started, that push is the server's, so it costs no
+budget and the grab point moves with them (`StealRules.shiftCarryTrack`); anyone found inside later got past the
+locked barrier and walls, so their budget pays for it. Their movement checks wait out the settle window.
 **Why:** character physics is client-owned, so a collidable wall alone stops nobody who no-clips. A thief still
 inside when the owner locks drops the creature.
 

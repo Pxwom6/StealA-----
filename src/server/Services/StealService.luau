@@ -449,6 +449,11 @@ local function checkCarry(thief: Session, allowDeliver: boolean)
 		StealService.cancel(thief, "flying")
 		return
 	end
+	if PositionTracker.isSettling(thief, position) then
+		-- A stale position from before an ejection: what they moved in the meantime is charged at the first check
+		-- after the client catches up (so is the push, unless it was made as the lock started; see LockService).
+		return
+	end
 	if not StealRules.stepCarryTrack(carry.track, position.X, position.Y, position.Z, os.clock(), CARRY_LIMITS) then
 		StealService.cancel(thief, "speed")
 		return

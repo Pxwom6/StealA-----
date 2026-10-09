@@ -503,6 +503,64 @@ T.describe("StealRules movement and timing", function()
 		T.expect({ StealRules.nearestOutside(28, 12, rect, 3) }).toEqual({ 28, 7 }) -- near the front
 		T.expect({ StealRules.nearestOutside(28, 85, rect, 3) }).toEqual({ 28, 91 }) -- near the back
 	end)
+	T.it("carry budget: being pushed out of a third player's locked base costs the thief nothing", function()
+		local steal = Gameplay.steal -- the real config
+		local limits = {
+			maxSpeed = Gameplay.walkSpeed * steal.carrySpeedMultiplier,
+			tolerance = steal.speedCheckTolerance,
+			budgetSeconds = steal.speedBudgetSeconds,
+			leeway = steal.speedCheckLeeway,
+		}
+		-- from the middle of a 56-stud-wide plot to 3 studs past its nearest side is at most 31 studs
+		for _, push in { 5, 20, 31 } do
+			local track = StealRules.newCarryTrack(0, 3, 0, 0, limits)
+			local t, x = 0, 0
+			for _ = 1, 15 do -- 3 s at full carry speed through someone else's base
+				t += 0.2
+				x += limits.maxSpeed * 0.2
+				T.expect((StealRules.stepCarryTrack(track, x, 3, 0, t, limits))).toBe(true)
+			end
+			-- the base locks and the server pushes them toward home; charging the push cancelled all but short ones
+			local charged = table.clone(track)
+			T.expect((StealRules.stepCarryTrack(charged, x + push, 3, 0, t + 0.2, limits))).toBe(push < 20)
+			local budget = track.budget
+			StealRules.shiftCarryTrack(track, x + push, 3, 0)
+			T.expect(track.budget).toBe(budget)
+			x += push
+			for _ = 1, 50 do -- then 10 s more at full carry speed, jumping off the ejection point first
+				t += 0.2
+				x += limits.maxSpeed * 0.2
+				local y = if t < 3.6 then 9 else 3
+				T.expect((StealRules.stepCarryTrack(track, x, y, 0, t, limits))).toBe(true)
+			end
+		end
+	end)
+	T.it("carry budget: an ejection gives a thief only the push itself", function()
+		local limits = { maxSpeed = 10, tolerance = 1.6, budgetSeconds = 3, leeway = 6 }
+		local track = StealRules.newCarryTrack(0, 3, 0, 0, limits)
+		T.expect((StealRules.stepCarryTrack(track, 20, 3, 0, 2, limits))).toBe(true)
+		StealRules.shiftCarryTrack(track, 50, 3, 0)
+		T.expect(track.grabX).toBe(30)
+		-- teleporting on from where the server put them is still caught by the straight-line cap
+		track.budget = 1000
+		local ok, why = StealRules.stepCarryTrack(track, 90, 3, 0, 2.5, limits)
+		T.expect(ok).toBe(false)
+		T.expect(why).toBe("distance")
+		-- and so is a speed hack after the push
+		local hack = StealRules.newCarryTrack(0, 3, 0, 0, limits)
+		T.expect((StealRules.stepCarryTrack(hack, 20, 3, 0, 2, limits))).toBe(true)
+		StealRules.shiftCarryTrack(hack, 50, 3, 0)
+		local t, x, caught = 2, 50, false
+		for _ = 1, 50 do
+			t += 0.2
+			x += 10 * 2.2 * 0.2
+			if not StealRules.stepCarryTrack(hack, x, 3, 0, t, limits) then
+				caught = true
+				break
+			end
+		end
+		T.expect(caught).toBe(true)
+	end)
 	T.it("caps a carrying thief's height above the ground", function()
 		T.expect(StealRules.isCarryHeightAllowed(12, 0, 22)).toBe(true) -- jumping off a podium
 		T.expect(StealRules.isCarryHeightAllowed(22.5, 0, 22)).toBe(false)
