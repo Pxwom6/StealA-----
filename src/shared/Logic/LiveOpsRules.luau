@@ -17,6 +17,13 @@ export type Boost = {
 
 export type Limits = { maxLuckMultiplier: number, maxCashMultiplier: number, maxBoostSeconds: number }
 
+-- What the store shows before someone buys a luck boost (see previewBoost).
+export type LuckPreview = {
+	before: number,
+	after: number,
+	extendsOnly: boolean, -- the same boost is already running: buying only adds time, the odds stay the same
+}
+
 local LiveOpsRules = {}
 
 local function isActive(event: EventDef, now: number): boolean
@@ -79,6 +86,54 @@ function LiveOpsRules.extendBoost(
 	end
 	local endsAt = math.min(base + seconds, now + limits.maxBoostSeconds)
 	return { multiplier = multiplier, endsAt = endsAt, source = source }
+end
+
+-- Adds one boost to `boosts` exactly as the server applies it: a running boost with the same source and multiplier
+-- only gains time (extendBoost); otherwise a new boost joins the list. Returns a new list (the input is untouched).
+function LiveOpsRules.addBoost(
+	boosts: { Boost },
+	now: number,
+	seconds: number,
+	multiplier: number,
+	source: string,
+	limits: Limits
+): { Boost }
+	local result = table.clone(boosts)
+	for index, boost in result do
+		if boost.source == source and boost.multiplier == multiplier and boost.endsAt > now then
+			result[index] = LiveOpsRules.extendBoost(boost, now, seconds, multiplier, source, limits)
+			return result
+		end
+	end
+	table.insert(result, LiveOpsRules.extendBoost(nil, now, seconds, multiplier, source, limits))
+	return result
+end
+
+-- When the running boosts from `source` end (0 when none is running).
+function LiveOpsRules.boostEndsAt(boosts: { Boost }, source: string, now: number): number
+	local endsAt = 0
+	for _, boost in boosts do
+		if boost.source == source and boost.endsAt > now then
+			endsAt = math.max(endsAt, boost.endsAt)
+		end
+	end
+	return endsAt
+end
+
+-- The luck before and right after buying a boost of `multiplier`, from what a client can see: the current luck
+-- (luckMultiplier) and whether the same boost is already running. Matches addBoost + luckMultiplier exactly: a
+-- running boost is only extended, otherwise the new multiplier joins the product, clamped the same way.
+function LiveOpsRules.previewBoost(
+	currentLuck: number,
+	sameBoostRunning: boolean,
+	multiplier: number,
+	limits: Limits
+): LuckPreview
+	if sameBoostRunning then
+		return { before = currentLuck, after = currentLuck, extendsOnly = true }
+	end
+	local after = math.clamp(currentLuck * math.max(1, multiplier), 1, limits.maxLuckMultiplier)
+	return { before = currentLuck, after = after, extendsOnly = false }
 end
 
 -- Longest remaining boost (for the HUD). Returns multiplier and seconds left (0 when none).

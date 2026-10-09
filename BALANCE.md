@@ -93,7 +93,8 @@ Cash and Snacklings reset; podium upgrades, passes and stats stay.
 The first rebirth lands around the first-Legendary stage (~1 h free); later ones need Mythic-level income, so
 rebirths become a multi-session goal. The multiplier is saved when earned, so later tuning never lowers it.
 
-**Cash packs** (`Economy.cashPacks`) pay N seconds of the buyer's current income, rounded down to 2 significant
+**Cash packs** (`Economy.cashPacks`) pay N seconds of the buyer's steady income (creatures on active podiums that
+are not being stolen, at the rebirth and pass multipliers, without LiveOps cash events), rounded down to 2 significant
 digits, with a floor so they are worth something on day one: Snack Pack 15 min (min $2.5K), Snack Crate 1 h
 (min $15K), Snack Truck 6 h (min $120K). They therefore stay meaningful at every stage instead of becoming
 worthless (fixed amounts) or game-breaking (huge fixed amounts).
@@ -103,8 +104,10 @@ worthless (fixed amounts) or game-breaking (huge fixed amounts).
 **Daily streak** (`Economy.daily`): 7-day cycle, reward = max(minimum, N minutes of income), from 3 minutes on
 day 1 to 45 minutes on day 7. Missing a day resets the streak.
 
-**Base lock** (`Gameplay.lock`): 60 s lock, 90 s recharge after it ends; nobody can re-lock within 30 s of a lock
-ending, even with Instant Lock — so every base is open at least a third of the time while its owner spams locks.
+**Base lock** (`Gameplay.lock`): 60 s lock (up to 150 s with the max rebirth bonus and the Longer Lock pass), 90 s
+recharge after it ends; nobody can re-lock within 30 s — or half the lock's length, if longer (75 s for a 150 s
+lock) — of a lock ending, even with Instant Lock. So every base is open at least a third of the time while its owner
+spams locks, whatever the lock length.
 
 **New-player shield** (`Gameplay.grace`): the first 4 minutes of total play time; stealing ends it early.
 

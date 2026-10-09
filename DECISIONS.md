@@ -12,7 +12,21 @@ key `Player_<UserId>`, data shape = `Types.PlayerData`, upgraded by `DataSchema.
 **Why:** session locking (no duplication across servers), autosave, BindToClose handling and `LastSavedData`
 (needed for safe receipts) out of the box; it is the de-facto standard.
 **Reversal cost:** high — moving off it means a one-time migration of every save. Never rename the store to
-"fix" data; add a migration step instead (bump `DataSchema.VERSION`).
+"fix" data; add a migration step instead (bump `DataSchema.VERSION`). A server never loads a save whose version is
+newer than its own (`DataSchema.isFromNewerVersion`): during a rolling update an old server would otherwise drop the
+new fields; it releases the session untouched and kicks with "This server is updating — please rejoin!". So:
+bump `DataSchema.VERSION` in every release that adds, removes, renames or changes the meaning of any saved key, even
+with an empty migrate step, and never publish a build with a lower VERSION than an earlier one. To roll back a bad
+release, roll back only code that is not about saves: keep the current save code whole (`DataSchema`: VERSION,
+migrate, sanitise, template; and `Types.PlayerData`), or the older sanitise would drop the newer keys. Test schema
+bumps with Studio API access off (mock store) or in a separate place, never against the live DataStore.
+
+Creature ids are permanent: a save holding an id that is missing from `Config/Creatures` moves that creature to
+`data.quarantine` (off the podiums) instead of deleting it, and it comes back automatically once the id exists
+again (on its own podium if free, else the lowest free podium within the base capacity, else it waits). A creature
+whose podium is invalid or taken (e.g. `maxPodiums` lowered) is moved the same way instead of being dropped. A CI
+test lists every released id and fails if one disappears or a new one isn't added; retire a creature with a
+never-active `eventId` instead.
 
 ### 2. Shared code uses relative string requires; server/client use instance paths
 
@@ -69,35 +83,67 @@ transactions in DataStores), mitigated by saving both immediately.
 **Chose:** while locked, the server teleports non-owners out of the plot 4×/s; the entrance barrier is collidable
 for visuals/honest clients, and the owner's client turns its collision off locally. The yellow new-player shield
 is visual only (stealing is refused server-side), so claiming a plot can never trap a visitor inside. Grabbing
-also requires the thief to stand inside the victim's plot (no reaching through walls).
+also requires the thief to stand inside the victim's plot at floor level (no reaching through walls, no grabbing
+from the air), delivery requires floor level inside the thief's own plot, a carrying thief's root must stay between
+`Gameplay.steal.minCarryHeight` and `maxCarryHeight` above the ground (no flying up, no sinking under the map),
+and tag reach is horizontal range plus a vertical allowance larger than that cap — so gaining height never escapes
+a tag. A tagger's client-reported position is only trusted when it matches the
+server's own 4 Hz position samples (`PositionTracker`, a walking movement budget in which jumps and short lag stalls
+are free): a tag is refused if the tagger overran that budget in the last 2 s, was caught teleporting (24+ studs
+beyond it) at any point since just before that carry started, or could not have walked from the latest sample to
+where they claim to be in the time since (the stored budget doesn't pay for that last step, so no blink-tagging).
+Starting and finishing a steal hold need the same, plus no overrun at all since just before the thief was first
+seen in that plot, so teleporting onto a podium (and waiting) doesn't work; the hold must also start at the podium.
+A carrying thief's movement is checked every tick against a distance budget (`StealRules.stepCarryTrack`): it
+refills at 1.6× carry speed, holds at most 3 s of refill and pays for every stud moved horizontally and every stud
+of new height (jumping again to a height already paid for is free, falling is free), so a lag spike's catch-up jump
+is covered while a sustained speed hack runs it dry; the straight-line distance from the grab point is also capped
+at carry speed × elapsed + 12 studs, which stops a teleport home. Before a lock ejects a carrying visitor, their
+move into that base is checked first, and they are put just outside its nearest side (not at its entrance) with
+their budget paying for that move, so being ejected is never a shortcut.
 **Why:** character physics is client-owned, so a collidable wall alone stops nobody who no-clips. A thief still
 inside when the owner locks drops the creature.
 
 ### 9. Fairness rules for paid items (young audience)
 
 **Chose:**
-* Instant Lock is a *token*: it can skip the free-lock recharge but never the 30 s minimum open window after a lock
-  (`Gameplay.lock.minVulnerableSeconds`). A unit test proves infinite tokens still leave a base open ≥ 1/3 of the time.
+* Instant Lock is a *token*: it can skip the free-lock recharge but never the open window after a lock: 30 s
+  (`Gameplay.lock.minVulnerableSeconds`) or half the lock's duration, whichever is longer (`LockRules.windows`).
+  Unit tests prove infinite tokens still leave a base open ≥ 1/3 of the time, up to the longest possible lock.
+  The lock pill and board count down that window when a token is held, so the player knows when it can be used.
+  The cooldown and open window are saved as wall-clock times (`data.lockTimers`) on every save (on the final save,
+  at leave or shutdown, a lock still running counts as ending then; on other saves it keeps its natural end, so a
+  crash mid-lock never shortens them) and restored on join, so leaving and rejoining (any server) never resets them.
 * No pass or product blocks stealing; passes only change income, podium count and lock length.
 * Server Luck (the only random-effect product) shows exact before/after rarity odds in the store, and benefits
-  everyone in the server. Its 60-minute stacking cap is soft: the store stops offering it once another purchase
+  everyone in the server. The preview uses the same rule the server applies (`LiveOpsRules.previewBoost` vs
+  `addBoost`, tested to give identical odds); while a bought boost is running another purchase only adds time, so the
+  store says "+15 min (odds stay the same)" instead of showing a stronger boost. Its 60-minute stacking cap is soft: the store stops offering it once another purchase
   would pass the cap, but a receipt that still arrives (e.g. two players buying at once) always adds its full
   15 minutes — a purchase never takes Robux without an effect.
-* Cash packs scale with income (always "about N minutes of your income"), so they never trivialise the game.
+* Cash packs scale with income (always "about N minutes of your income"), so they never trivialise the game. The
+  basis is the steady income (`EconomyMath.packIncome`: active podiums only, nothing mid-steal, no LiveOps cash
+  event). A pack's amount is fixed the first time its receipt reaches the player's session (`data.cashPackQuotes`),
+  so a retry after a failed grant pays that amount even if the player rebirthed meanwhile; a receipt that arrives
+  while the player's save is still loading waits for the load, so it is sized before they can play.
 * Stealing ends your own new-player protection.
 
 ### 10. Receipt idempotency in the save
 
 **Chose:** the last 100 `PurchaseId`s live in `data.processedReceipts`; grant + record happen in one non-yielding
 step; `PurchaseGranted` is returned only when the id is in `profile.LastSavedData` (ProfileStore's recommended
-pattern), otherwise `NotProcessedYet` so Roblox retries. Purchase history (last 100) and Robux spent are saved.
+pattern), otherwise `NotProcessedYet` so Roblox retries. A grant is all or nothing: every lookup and calculation
+runs first and changes nothing, then an `apply` step only writes the results; if it still throws, the save is rolled
+back to its exact prior state (`ReceiptLedger.applyAtomically`), so a retry never applies half a grant twice. Purchase history (last 100) and Robux spent are saved.
 **Why:** retries never double-grant and a crash before saving never loses a purchase.
 **Reversal cost:** high — keep the field name and cap when changing the schema.
 
 ### 11. Game-pass ownership is not saved
 
-**Chose:** passes are checked with `UserOwnsGamePassAsync` on every join (with retries) and on
-`PromptGamePassPurchaseFinished`; ownership lives in the session only.
+**Chose:** passes are checked with `UserOwnsGamePassAsync` on every join (all passes in parallel, with retries)
+and on `PromptGamePassPurchaseFinished`; ownership lives in the session only. A pass whose check still fails counts
+as not owned for now and is re-checked in the background every 60 s until Roblox answers. Known limitation: the
+offline earnings paid on that join were already computed without the pass (2× Cash, VIP) and are not topped up.
 **Why:** Roblox is the source of truth (refunds/gifts), and nothing in the save goes stale.
 
 ### 12. Rebirth multiplier is stored, not derived
@@ -114,12 +160,12 @@ paid-for podiums avoids a feel-bad. One config flag flips it.
 ### 14. 8 plots = 8 players per server
 
 **Chose:** `Gameplay.map.plotCount = 8`. **You must set Max Players to 8** in Game Settings → Places, otherwise a
-9th player is kicked with "server full".
+9th player is kicked with "server full" (the server warns in the output at startup when Max Players is higher).
 
 ### 15. Studio-only test hooks
 
-**Chose:** the `DevGrantProduct` handler (simulated purchases through the real receipt path) is only connected
-when `RunService:IsStudio()`, and LiveOps admin commands accept anyone in Studio. Live servers only accept
+**Chose:** the `DevGrantProduct` remote (simulated purchases through the real receipt path) is only created, and
+its handler only connected, when `RunService:IsStudio()`; LiveOps admin commands accept anyone in Studio. Live servers only accept
 `LiveOps.adminUserIds`.
 
 ### 16. Strict typing targets the new Luau type solver

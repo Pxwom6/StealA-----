@@ -38,16 +38,26 @@ local UPGRADE_RANGE = 14
 
 local EconomyService = {}
 
-function EconomyService.multiplier(session: Session): number
+local function multiplierInputs(session: Session): EconomyMath.MultiplierInputs
 	local perks = Monetization.perks
-	return EconomyMath.incomeMultiplier({
+	return {
 		rebirthMultiplier = session.data.rebirthMultiplier,
 		hasDoubleCash = session.passes.DoubleCash,
 		doubleCashMultiplier = perks.doubleCashMultiplier,
 		isVip = session.passes.VIP,
 		vipIncomeBonus = perks.vipIncomeBonus,
 		eventCashMultiplier = LiveOpsService.cashMultiplier(),
-	})
+	}
+end
+
+function EconomyService.multiplier(session: Session): number
+	return EconomyMath.incomeMultiplier(multiplierInputs(session))
+end
+
+-- What a cash pack pays right now (see EconomyMath.packIncome for what counts).
+function EconomyService.cashPackAmount(session: Session, key: string): number
+	local pack = (Economy.cashPacks :: any)[key] :: EconomyMath.CashPack
+	return EconomyMath.cashPackAmount(session.packIncome, pack)
 end
 
 function EconomyService.capacity(session: Session): number
@@ -64,13 +74,24 @@ function EconomyService.refresh(session: Session)
 	session.multiplier = EconomyService.multiplier(session)
 	session.capacity = EconomyService.capacity(session)
 	local incomes: { number } = {}
+	local packSources: { EconomyMath.PackSource } = {}
 	for _, record in session.data.creatures do
 		local def = GameData.catalog.creatures[record.id]
 		if def then
 			table.insert(incomes, def.income)
+			table.insert(packSources, {
+				baseIncome = def.income,
+				podium = record.podium,
+				inTransit = session.plot ~= 0 and PlotService.isBusy(session.plot, record.podium),
+			})
 		end
 	end
 	session.incomePerSecond = EconomyMath.totalIncome(incomes, session.multiplier)
+	session.packIncome = EconomyMath.packIncome(
+		packSources,
+		session.capacity,
+		EconomyMath.permanentMultiplier(multiplierInputs(session))
+	)
 	local stats = session.data.stats
 	stats.bestCashPerSecond = math.max(stats.bestCashPerSecond, session.incomePerSecond)
 	if session.plot ~= 0 then

@@ -16,6 +16,9 @@ export type MultiplierInputs = {
 export type PodiumUpgradeConfig = { basePrice: number, growth: number, maxPurchased: number }
 export type CashPack = { incomeSeconds: number, minimum: number }
 
+-- One creature as a cash pack sees it (see packIncome).
+export type PackSource = { baseIncome: number, podium: number, inTransit: boolean }
+
 local EconomyMath = {}
 
 local function sane(value: number, fallback: number): number
@@ -36,6 +39,13 @@ function EconomyMath.incomeMultiplier(inputs: MultiplierInputs): number
 	end
 	m *= math.max(0, sane(inputs.eventCashMultiplier, 1))
 	return m
+end
+
+-- The multiplier without temporary boosts: rebirths and passes only (LiveOps cash events are left out).
+function EconomyMath.permanentMultiplier(inputs: MultiplierInputs): number
+	local steady = table.clone(inputs)
+	steady.eventCashMultiplier = 1
+	return EconomyMath.incomeMultiplier(steady)
 end
 
 -- Cash per second for one creature (kept fractional; accumulation is fractional and collection floors it).
@@ -81,7 +91,21 @@ function EconomyMath.roundNice(amount: number): number
 	return math.floor(amount / magnitude) * magnitude
 end
 
--- Cash granted by a developer-product pack: N seconds of the buyer's current income, never below the minimum.
+-- The steady income cash packs are sized from ("about N minutes of your income"): creatures on an active podium
+-- (podium <= capacity) that are not being carried off by a thief, at the permanent multiplier. A running event or
+-- creatures parked on podiums beyond capacity never count; a creature being stolen counts again once it is home.
+function EconomyMath.packIncome(sources: { PackSource }, capacity: number, permanentMultiplier: number): number
+	local total = 0
+	for _, source in sources do
+		if source.podium <= capacity and not source.inTransit then
+			total += EconomyMath.creatureIncome(source.baseIncome, permanentMultiplier)
+		end
+	end
+	return total
+end
+
+-- Cash granted by a developer-product pack: N seconds of the buyer's steady income (packIncome), never below the
+-- minimum.
 function EconomyMath.cashPackAmount(incomePerSecond: number, pack: CashPack): number
 	local income = math.max(0, sane(incomePerSecond, 0))
 	return EconomyMath.roundNice(math.max(pack.minimum, income * pack.incomeSeconds))

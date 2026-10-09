@@ -7,6 +7,9 @@
 	* While a base is locked, any non-owner inside it is moved back outside the entrance (4×/s). Character
 	  physics is client-owned, so the visible barrier alone would not stop an exploiter — this does.
 	* A 1 Hz pass keeps each plot's force field (blue = locked, yellow = new-player shield) and attributes in sync.
+	* The cooldown and open window are saved (`data.lockTimers`, wall-clock seconds) when a lock starts and on every
+	  save (on the final save a lock still running counts as ending then), and restored on join, so leaving and
+	  rejoining any server never resets them.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -18,7 +21,9 @@ local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local LockRules = require(ReplicatedStorage.Shared.Logic.LockRules)
 local RebirthMath = require(ReplicatedStorage.Shared.Logic.RebirthMath)
+local StealRules = require(ReplicatedStorage.Shared.Logic.StealRules)
 local PlotService = require(script.Parent.PlotService)
+local PositionTracker = require(script.Parent.PositionTracker)
 local Remotes = require(script.Parent.Remotes)
 local Replication = require(script.Parent.Replication)
 local Sessions = require(script.Parent.Sessions)
@@ -36,6 +41,14 @@ function LockService.setLockListener(listener: (owner: Session) -> ())
 	lockListener = listener
 end
 
+local beforeEject: ((visitor: Session) -> ())? = nil
+
+-- StealService registers here to check a carrying visitor's movement before the server moves them out of a base,
+-- so the server's move can't launder a teleport into that base.
+function LockService.setBeforeEject(listener: (visitor: Session) -> ())
+	beforeEject = listener
+end
+
 local function now(): number
 	return workspace:GetServerTimeNow()
 end
@@ -46,6 +59,43 @@ function LockService.duration(session: Session): number
 		RebirthMath.lockBonusFor(session.data.rebirths, Economy.rebirth),
 		if session.passes.LongerLock then Monetization.perks.longerLockSeconds else 0
 	)
+end
+
+-- Sessions whose saved timers were restored on join. Only those may write timers back: a join that never got that
+-- far (e.g. kicked because the server was full) must not overwrite the saved cooldown with a blank state.
+local restored: { [Session]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+
+-- Writes the lock timers into the save as wall-clock times (LockRules.toSaved). On the final save (leave, shutdown,
+-- another server taking the session) a lock still running counts as ending now, which it does; on any other save it
+-- keeps its natural end, so if the server then crashes mid-lock the next join is not let off early.
+local function persist(session: Session, isFinalSave: boolean)
+	if restored[session] then
+		local t = now()
+		local state = if isFinalSave then LockRules.unlock(session.lock, t) else session.lock
+		session.data.lockTimers = LockRules.toSaved(state, t, os.time())
+	end
+end
+
+-- On join (after `refresh`): restores the cooldown and open window saved on the player's last visit, and keeps the
+-- save up to date from then on (every save, including the final one at leave or shutdown).
+function LockService.restore(session: Session)
+	local _, cooldownSeconds = LockRules.windows(session.lockDuration, Gameplay.lock)
+	local maxSeconds = session.lockDuration + cooldownSeconds
+	session.lock = LockRules.fromSaved(session.data.lockTimers, now(), os.time(), maxSeconds)
+	restored[session] = true
+	session.profile.OnSave:Connect(function()
+		persist(session, false)
+	end)
+	session.profile.OnLastSave:Connect(function()
+		persist(session, true)
+	end)
+	Replication.markDirty(session)
+end
+
+-- On leave: a running lock ends now (the base goes with its owner) and its cooldown is saved for the next join.
+function LockService.onLeaving(session: Session)
+	session.lock = LockRules.unlock(session.lock, now())
+	persist(session, false)
 end
 
 function LockService.refresh(session: Session)
@@ -83,14 +133,21 @@ local function ejectVisitors(owner: Session)
 		if root and PlotService.isInside(owner.plot, root.Position) then
 			local character = visitor.player.Character
 			if character then
-				local target = refs.exitPosition + Vector3.new(math.random(-4, 4), 0, 0)
-				character:PivotTo(CFrame.new(target))
-				local carry = visitor.carry
-				if carry then
-					-- A server teleport is not a speed exploit.
-					carry.lastPosition = target
-					carry.lastCheckAt = os.clock()
+				-- Judge how they got in first (a teleport into a locked base is still a teleport), then move them.
+				PositionTracker.record(visitor, root.Position)
+				if visitor.carry and beforeEject then
+					beforeEject(visitor) -- may cancel the carry
 				end
+				local target = refs.exitPosition + Vector3.new(math.random(-4, 4), 0, 0)
+				if visitor.carry then
+					-- A carrying thief goes just outside the nearest side instead, and their carry budget pays for
+					-- the move at the next check, so being ejected is never a shortcut home.
+					local x, z =
+						StealRules.nearestOutside(root.Position.X, root.Position.Z, PlotService.rect(owner.plot), 3)
+					target = Vector3.new(x, refs.exitPosition.Y, z)
+				end
+				character:PivotTo(CFrame.new(target))
+				PositionTracker.reset(visitor, target) -- a server move, not a teleport exploit
 			end
 		end
 	end
@@ -119,6 +176,7 @@ function LockService.tryLock(session: Session): (boolean, string?)
 	if attempt.usedToken then
 		session.data.lockTokens -= 1
 	end
+	persist(session, false)
 	syncShield(session)
 	if lockListener then
 		lockListener(session)
@@ -137,11 +195,9 @@ function LockService.tryLock(session: Session): (boolean, string?)
 	return true, nil
 end
 
--- True when a lock could start right now (used to auto-apply a freshly bought Instant Lock).
-function LockService.canLockNow(session: Session): boolean
-	local attempt =
-		LockRules.tryLock(session.lock, now(), session.lockDuration, Gameplay.lock, session.data.lockTokens > 0)
-	return attempt.ok
+-- What a lock attempt right now would do, without doing it (used after buying Instant Lock).
+function LockService.preview(session: Session): LockRules.LockAttempt
+	return LockRules.tryLock(session.lock, now(), session.lockDuration, Gameplay.lock, session.data.lockTokens > 0)
 end
 
 -- Ends a session's new-player protection early (e.g. they started stealing).
@@ -185,7 +241,11 @@ function LockService.start()
 			local t = now()
 			for _, session in Sessions.all() do
 				if session.plot ~= 0 and LockRules.isLocked(session.lock, t) then
-					ejectVisitors(session)
+					-- One failing base must not stop the loop (every locked base would stop ejecting).
+					local ok, err = pcall(ejectVisitors :: (Session) -> ...any, session)
+					if not ok then
+						warn(`[LockService] ejecting from {session.player.Name}'s base failed: {err}`)
+					end
 				end
 			end
 		end

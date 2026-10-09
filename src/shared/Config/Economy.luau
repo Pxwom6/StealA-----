@@ -40,7 +40,8 @@ local Economy = {
 		keepPodiumUpgrades = true,
 	},
 
-	-- Developer-product cash packs scale with the buyer's current income so they stay meaningful.
+	-- Developer-product cash packs scale with the buyer's steady income (EconomyMath.packIncome) so they stay
+	-- meaningful.
 	cashPacks = {
 		CashSmall = { incomeSeconds = 15 * 60, minimum = 2500 } :: CashPack,
 		CashMedium = { incomeSeconds = 60 * 60, minimum = 15000 } :: CashPack,

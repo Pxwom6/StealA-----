@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types = require(ReplicatedStorage.Shared.Types)
 local LockRules = require(ReplicatedStorage.Shared.Logic.LockRules)
+local StealRules = require(ReplicatedStorage.Shared.Logic.StealRules)
 
 type Connection = { Disconnect: (self: any) -> () }
 type Signal<T...> = { Connect: (self: any, listener: (T...) -> ()) -> Connection }
@@ -37,8 +38,7 @@ export type Carry = {
 	uid: string,
 	creatureId: string,
 	startedAt: number,
-	lastPosition: Vector3,
-	lastCheckAt: number,
+	track: StealRules.CarryTrack, -- movement budget, timed with os.clock()
 	model: Model?,
 	marker: BillboardGui?,
 }
@@ -58,6 +58,11 @@ export type Session = {
 	hold: Hold?,
 	stealCooldownUntil: number,
 	tagCooldownUntil: number,
+	walk: StealRules.WalkTrack?, -- server-observed movement (PositionTracker); nil until the first sample
+	flaggedAt: number, -- server time of the last step the walk budget couldn't pay for (-inf: never)
+	teleportedAt: number, -- server time of the last gross overrun, i.e. a teleport (-inf: never)
+	samplePlot: number, -- plot of the latest position sample (0 = none, -1 = not sampled yet)
+	enteredPlotAt: number, -- server time that plot was first sampled
 	joinedAt: number,
 	lastSeenAtJoin: number, -- the save's lastSeen when it was loaded (offline earnings)
 	playClock: number, -- os.clock() of the last play-time accrual
@@ -65,6 +70,7 @@ export type Session = {
 	dirty: boolean, -- state changed since the last StateUpdate
 	-- caches maintained by the services that own them
 	incomePerSecond: number,
+	packIncome: number, -- steady income cash packs are sized from (EconomyMath.packIncome)
 	multiplier: number,
 	capacity: number,
 	lockDuration: number,

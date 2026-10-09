@@ -103,6 +103,8 @@ local Theme = {
 		cantStealProtected = "New players are protected for a few minutes.",
 		cantStealOwn = "That's yours!",
 		stealFromInside = "Get inside their base first!",
+		stealOnFloor = "Stand on the floor to steal!",
+		stealHoldNear = "Hold Steal right next to the Snackling!",
 		stealCooldown = "Catch your breath... {time}",
 		alreadyCarrying = "You're already carrying one!",
 		stealStarted = "Run home! Don't get tagged!",
@@ -119,6 +121,7 @@ local Theme = {
 		luckActivated = "{player} activated {multiplier}x Server Luck for {minutes} min!",
 		passGranted = "{pass} unlocked!",
 		lockTokenReady = "Instant Lock ready! Tap the lock button.",
+		lockTokenLater = "Instant Lock saved! You can use it in {time}.",
 
 		-- Announcements (server-wide banners)
 		announceSpawn = "A {rarity} {creature} appeared on the belt!",
@@ -155,6 +158,8 @@ local Theme = {
 		storeStudioGrant = "(Studio) Grant",
 		storeLuckMaxed = "Luck maxed",
 		oddsHeader = "Belt odds now -> with Server Luck",
+		oddsExtendHeader = "Server Luck is on: buying adds +{minutes} min (odds stay the same)",
+		oddsMaxedHeader = "Server Luck is on: maximum time reached",
 	},
 
 	-- Store copy per item key (see Config/Monetization). Available placeholders: {vipBonus} {extraPodiums}
@@ -175,7 +180,7 @@ local Theme = {
 		CashLarge = { name = "Snack Truck", description = "About 6 hours of your income." },
 		InstantLock = {
 			name = "Instant Lock",
-			description = "Lock your base right now, even while the lock recharges. Can't be chained: every base stays open for at least {minVulnerable}s between locks.",
+			description = "Lock your base right now, even while the lock recharges. Can't be chained: every base stays open between locks for at least {minVulnerable}s, or half its lock time if longer.",
 		},
 		ServerLuck = {
 			name = "Server Luck",

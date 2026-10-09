@@ -3,10 +3,11 @@
 	Persistence with ProfileStore (session-locked: a profile can only be active on one server at a time, so data
 	cannot be duplicated by hopping servers).
 
-	* load:        starts the session, reconciles with the template, migrates and sanitises the save in place
+	* load:        starts the session, reconciles with the template, migrates and sanitises the save in place; a
+	               save from a newer release is released untouched and the player asked to rejoin
 	* autosave:    ProfileStore saves every few minutes on its own
 	* on leave:    PlayerLifecycle calls `release`, which ends the session (final save)
-	* on shutdown: BindToClose ends every session and waits for the final saves
+	* on shutdown: BindToClose ends every session; ProfileStore's own BindToClose waits for the final saves
 	* saveAndWait: used by receipts — request a save and yield until it lands (or the session ends / times out)
 
 	In Studio without "Studio Access to API Services", ProfileStore automatically uses a mock store, so the game
@@ -30,11 +31,18 @@ type Profile = Sessions.Profile
 -- Bump the suffix only for a deliberate wipe; schema changes go through DataSchema.migrate instead.
 local STORE_NAME = "PlayerData_v1"
 
+-- Give up loading after about this long (the player is then kicked with "please rejoin"). Passing `Cancel` turns off
+-- ProfileStore's own 120 s timeout, so we need our own. It must outlast ProfileStore's session steal from a crashed
+-- server, which lands 45-51 s in (5 s + 4 x 10 s of waits, plus six DataStore calls); 45 s would cancel just before
+-- it and leave the player locked out until the dead session expires (~10 min).
+local LOAD_TIMEOUT_SECONDS = 60
+
 local DataService = {}
 
 -- ProfileStore is installed by Wally (`wally install`) into ServerScriptService.ServerPackages.
 local ProfileStoreModule: any = require(ServerScriptService.ServerPackages.ProfileStore)
 local store: any = nil
+local closing = false
 
 local sanitiseRules: DataSchema.SanitiseRules = {
 	isValidCreature = function(id: string): boolean
@@ -42,6 +50,7 @@ local sanitiseRules: DataSchema.SanitiseRules = {
 	end,
 	maxPodiums = Gameplay.map.maxPodiums,
 	maxPodiumUpgrades = Economy.podiumUpgrade.maxPurchased,
+	startingPodiums = Economy.startingPodiums,
 	maxRebirths = RebirthConfig.maxRebirths,
 	maxReceipts = Monetization.purchaseIdCacheSize,
 	maxHistory = Monetization.purchaseHistorySize,
@@ -58,43 +67,52 @@ function DataService.start()
 	end)
 
 	game:BindToClose(function()
-		-- End every session so the final save happens now; ProfileStore waits for in-flight saves.
+		closing = true
+		-- End every session so the final save starts now. No need to wait here: EndSession makes IsActive() false
+		-- at once (so polling it waited for nothing), and ProfileStore's own BindToClose keeps the server alive until
+		-- every in-flight save has finished.
 		for _, session in Sessions.all() do
 			session.data.lastSeen = os.time()
 			if session.profile:IsActive() then
 				session.profile:EndSession()
 			end
 		end
-		local deadline = os.clock() + 25
-		while os.clock() < deadline do
-			local anyActive = false
-			for _, session in Sessions.all() do
-				if session.profile:IsActive() then
-					anyActive = true
-				end
-			end
-			if not anyActive then
-				break
-			end
-			task.wait(0.25)
-		end
 	end)
 end
 
--- Starts a session for `player`. Yields. Returns nil if the player left or the store could not start a session.
-function DataService.load(player: Player): Profile?
+-- Why a load returned no profile: the store failed / timed out / the player left, or the save is from a newer
+-- release than this server runs.
+export type LoadFailure = "failed" | "newerSave"
+
+-- True once the server is shutting down (our BindToClose or ProfileStore's has started): sessions then end
+-- because of the shutdown, not because another server took them.
+function DataService.isClosing(): boolean
+	return closing or ProfileStoreModule.IsClosing == true
+end
+
+-- Starts a session for `player`. Yields (about LOAD_TIMEOUT_SECONDS at most: Cancel is checked between DataStore
+-- calls). Returns the profile, or nil and why.
+function DataService.load(player: Player): (Profile?, LoadFailure?)
+	local deadline = os.clock() + LOAD_TIMEOUT_SECONDS
 	local profile: Profile? = store:StartSessionAsync(profileKey(player.UserId), {
 		Cancel = function(): boolean
-			return player.Parent ~= Players
+			return player.Parent ~= Players or os.clock() >= deadline
 		end,
 	})
 	if profile == nil then
-		return nil
+		return nil, "failed"
+	end
+	local raw = (profile.Data :: any) :: { [string]: any }
+	if DataSchema.isFromNewerVersion(raw) then
+		-- Saved by a newer release: this server is outdated. Touching the data here (reconcile, sanitise, save)
+		-- would wipe the fields it doesn't know, so release the session untouched and send the player elsewhere.
+		warn(`[DataService] save for {player.UserId} is version {raw.version}, this server knows {DataSchema.VERSION}`)
+		profile:EndSession()
+		return nil, "newerSave"
 	end
 	profile:AddUserId(player.UserId) -- GDPR: associates the key with the user for erasure requests
 	profile:Reconcile()
 
-	local raw = (profile.Data :: any) :: { [string]: any }
 	DataSchema.migrate(raw)
 	local clean, fixes = DataSchema.sanitise(raw, Economy.startingCash, sanitiseRules)
 	DataSchema.applyInPlace(raw, clean)

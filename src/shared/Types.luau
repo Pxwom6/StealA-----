@@ -79,6 +79,9 @@ export type PurchaseRecord = {
 	at: number,
 }
 
+-- A cash pack's amount, fixed when its receipt is first seen (ReceiptLedger.quote).
+export type ReceiptQuote = { purchaseId: string, amount: number }
+
 export type Stats = {
 	steals: number,
 	timesStolenFrom: number,
@@ -91,16 +94,26 @@ export type Stats = {
 
 export type DailyState = { streak: number, lastClaimDay: number }
 
+-- Base-lock timers carried between sessions, in wall-clock (os.time) seconds; 0 = not running.
+export type LockTimers = { cooldownUntil: number, vulnerableUntil: number }
+
 export type PlayerData = {
 	version: number,
 	cash: number,
 	creatures: { CreatureRecord },
+	-- Creatures the save holds but no podium can show right now, kept off the podiums instead of being deleted: ones
+	-- whose id is missing from the current config (removed or renamed by mistake), and ones whose podium was invalid
+	-- or taken with no free podium in the base. They return automatically on a later load once the id exists again
+	-- and a podium is free (DataSchema.sanitise). A rebirth spends them like any other Snackling.
+	quarantine: { CreatureRecord },
 	nextUid: number,
 	podiumUpgrades: number,
 	rebirths: number,
 	rebirthMultiplier: number,
 	lockTokens: number,
+	lockTimers: LockTimers,
 	processedReceipts: { string },
+	cashPackQuotes: { ReceiptQuote },
 	purchaseHistory: { PurchaseRecord },
 	daily: DailyState,
 	stats: Stats,
@@ -137,6 +150,7 @@ export type ClientState = {
 	rebirthCost: number,
 	creatureCount: number,
 	capacity: number,
+	packIncome: number, -- steady income cash packs are sized from (EconomyMath.packIncome)
 	podiumUpgrades: number,
 	nextPodiumCost: number,
 	lockTokens: number,

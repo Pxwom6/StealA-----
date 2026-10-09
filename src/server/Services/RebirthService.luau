@@ -49,6 +49,7 @@ function RebirthService.rebirth(session: Session): boolean
 
 	data.cash = CFG.cashAfterRebirth
 	table.clear(data.creatures)
+	table.clear(data.quarantine) -- quarantined Snacklings are part of what a rebirth spends
 	if not CFG.keepPodiumUpgrades then
 		data.podiumUpgrades = 0
 	end

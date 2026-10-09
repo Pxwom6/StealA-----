@@ -30,6 +30,7 @@ local DataService = require(script.Parent.DataService)
 local EconomyService = require(script.Parent.EconomyService)
 local LockService = require(script.Parent.LockService)
 local PlotService = require(script.Parent.PlotService)
+local PositionTracker = require(script.Parent.PositionTracker)
 local Remotes = require(script.Parent.Remotes)
 local Replication = require(script.Parent.Replication)
 local Sessions = require(script.Parent.Sessions)
@@ -45,13 +46,21 @@ export type CancelReason =
 	| "ownerLeft"
 	| "locked"
 	| "speed"
+	| "flying"
 	| "full"
 	| "rebirth"
+	| "error"
 
 local StealService = {}
 
 local CFG = Gameplay.steal
-local SPEED_WINDOW = 1
+
+local CARRY_LIMITS: StealRules.CarryLimits = {
+	maxSpeed = Gameplay.walkSpeed * CFG.carrySpeedMultiplier,
+	tolerance = CFG.speedCheckTolerance,
+	budgetSeconds = CFG.speedBudgetSeconds,
+	leeway = CFG.speedCheckLeeway,
+}
 
 local function now(): number
 	return workspace:GetServerTimeNow()
@@ -128,8 +137,8 @@ function StealService.cancel(thief: Session, reason: CancelReason, taggerName: s
 	if carry == nil then
 		return
 	end
+	PlotService.setBusy(carry.plot, carry.podium, false) -- first, so nothing below can leave the podium stuck
 	clearCarry(thief)
-	PlotService.setBusy(carry.plot, carry.podium, false)
 	local victim = Sessions.getByUserId(carry.victimUserId)
 	if victim then
 		EconomyService.refresh(victim)
@@ -141,7 +150,7 @@ function StealService.cancel(thief: Session, reason: CancelReason, taggerName: s
 		thief.stealCooldownUntil = now() + CFG.thiefCooldownAfterTagSeconds
 		Remotes.notify(thief.player, Format.template(Theme.text.gotTagged, { creature = creatureName }), "error")
 		Remotes.fire(thief.player, "Effect", { kind = "tagged" })
-	elseif reason == "timeout" or reason == "speed" then
+	elseif reason == "timeout" or reason == "speed" or reason == "flying" then
 		Remotes.notify(
 			thief.player,
 			Format.template(Theme.text.stealFailedTimeout, { creature = creatureName }),
@@ -180,6 +189,12 @@ local function deliver(thief: Session)
 		StealService.cancel(thief, "ownerLeft")
 		return
 	end
+	-- A transfer changes two saves. If either session has ended (e.g. the server is shutting down and their final
+	-- save may already be written), moving the creature could duplicate or lose it: send it home instead.
+	if not thief.profile:IsActive() or not victim.profile:IsActive() then
+		StealService.cancel(thief, "left")
+		return
+	end
 	local podium = EconomyService.freePodium(thief)
 	if podium == nil then
 		StealService.cancel(thief, "full")
@@ -187,8 +202,8 @@ local function deliver(thief: Session)
 	end
 	-- Atomic (no yields): remove from victim, add to thief.
 	local moved = Inventory.transfer(victim.data, thief.data, carry.uid, podium, os.time())
-	clearCarry(thief)
 	PlotService.setBusy(carry.plot, carry.podium, false)
+	clearCarry(thief)
 	if moved == nil then
 		EconomyService.refresh(victim)
 		return
@@ -237,7 +252,23 @@ local function onStealBegin(player: Player, plotArg: unknown, podiumArg: unknown
 	if plot == nil or podium == nil or session == nil then
 		return
 	end
-	session.hold = { plot = plot, podium = podium, startedAt = now() }
+	session.hold = nil
+	local root = Sessions.rootPart(session)
+	local podiumRefs = PlotService.podium(plot, podium)
+	if root == nil or podiumRefs == nil then
+		return
+	end
+	-- The server-timed hold only starts at the podium (no starting it from across the map or right after a teleport).
+	local inRange = StealRules.canBeginHold({
+		distance = (root.Position - podiumRefs.base.Position).Magnitude,
+		grabRange = CFG.grabRange,
+		rangeSlack = CFG.holdRangeSlack,
+		thiefInsideBase = PlotService.isInside(plot, root.Position),
+		thiefTrusted = PositionTracker.isTrustedForSteal(session, root.Position),
+	})
+	if inRange then
+		session.hold = { plot = plot, podium = podium, startedAt = now() }
+	end
 end
 
 local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unknown)
@@ -257,6 +288,12 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 	if victim == nil or root == nil or podiumRefs == nil then
 		return
 	end
+	if not thief.profile:IsActive() or not victim.profile:IsActive() then
+		return -- a session has ended (shutting down): no new steals
+	end
+	if not PositionTracker.isTrustedForSteal(thief, root.Position) then
+		return -- teleported in to confirm: refused (the hold must have been done on foot)
+	end
 	local t = now()
 	local record = Inventory.findByPodium(victim.data.creatures, podium)
 	local ok, reason = StealRules.canGrab({
@@ -272,6 +309,8 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 		distance = (root.Position - podiumRefs.base.Position).Magnitude,
 		grabRange = CFG.grabRange,
 		thiefInsideBase = PlotService.isInside(plot, root.Position),
+		thiefHeightAboveFloor = root.Position.Y - PlotService.refs(plot).floorY,
+		wallHeight = Gameplay.map.wallHeight,
 		thiefHasFreePodium = EconomyService.freePodium(thief) ~= nil,
 		holdStartedAt = holdStartedAt,
 		holdSeconds = CFG.holdSeconds,
@@ -287,9 +326,10 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 
 	-- The victim keeps the cash that was sitting on the podium.
 	EconomyService.collect(victim, podium)
-	PlotService.setBusy(plot, podium, true)
-	EconomyService.refresh(victim)
 
+	-- The carry exists before the podium is marked busy, and everything after that runs protected: if any of it
+	-- throws, cancelling the carry frees the podium again (a busy podium with no carry would hide the creature
+	-- forever).
 	local carry: Carry = {
 		victimUserId = victim.userId,
 		plot = plot,
@@ -297,27 +337,34 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 		uid = record.uid,
 		creatureId = record.id,
 		startedAt = t,
-		lastPosition = root.Position,
-		lastCheckAt = os.clock(),
+		track = StealRules.newCarryTrack(root.Position.X, root.Position.Y, root.Position.Z, os.clock(), CARRY_LIMITS),
 		model = nil,
 		marker = nil,
 	}
 	thief.carry = carry
-	LockService.endGrace(thief) -- stealing forfeits your own new-player protection
-	attachCarryVisuals(thief, carry)
-	player:SetAttribute("Carrying", record.id)
-	setWalkSpeed(thief, Gameplay.walkSpeed * CFG.carrySpeedMultiplier)
-	Replication.markDirty(thief)
+	PlotService.setBusy(plot, podium, true)
+	local started, err = pcall(function()
+		EconomyService.refresh(victim)
+		LockService.endGrace(thief) -- stealing forfeits your own new-player protection
+		attachCarryVisuals(thief, carry)
+		player:SetAttribute("Carrying", record.id)
+		setWalkSpeed(thief, Gameplay.walkSpeed * CFG.carrySpeedMultiplier)
+		Replication.markDirty(thief)
 
-	local def = GameData.catalog.creatures[record.id]
-	Remotes.notify(player, Theme.text.stealStarted, "warning")
-	Remotes.fire(victim.player, "StealAlert", {
-		thiefUserId = thief.userId,
-		thiefName = player.DisplayName,
-		creatureId = record.id,
-		text = Format.template(Theme.text.beingStolen, { thief = player.DisplayName, creature = def.displayName }),
-	})
-	Analytics.custom(thief, "steal_started", GameData.catalog.rarities[def.rarity].order)
+		local def = GameData.catalog.creatures[record.id]
+		Remotes.notify(player, Theme.text.stealStarted, "warning")
+		Remotes.fire(victim.player, "StealAlert", {
+			thiefUserId = thief.userId,
+			thiefName = player.DisplayName,
+			creatureId = record.id,
+			text = Format.template(Theme.text.beingStolen, { thief = player.DisplayName, creature = def.displayName }),
+		})
+		Analytics.custom(thief, "steal_started", GameData.catalog.rarities[def.rarity].order)
+	end)
+	if not started then
+		warn(`[StealService] starting a carry failed, sending the creature home: {err}`)
+		StealService.cancel(thief, "error")
+	end
 end
 
 local function onTag(player: Player, targetArg: unknown)
@@ -341,9 +388,20 @@ local function onTag(player: Player, targetArg: unknown)
 		taggerUserId = tagger.userId,
 		thiefUserId = thief.userId,
 		thiefCarrying = thief.carry ~= nil,
-		distance = (taggerRoot.Position - thiefRoot.Position).Magnitude,
+		horizontalDistance = Vector3.new(
+			thiefRoot.Position.X - taggerRoot.Position.X,
+			0,
+			thiefRoot.Position.Z - taggerRoot.Position.Z
+		).Magnitude,
+		verticalDistance = thiefRoot.Position.Y - taggerRoot.Position.Y,
 		tagRange = CFG.tagRange,
+		tagVerticalAllowance = CFG.tagVerticalAllowance,
 		taggerCooldownUntil = tagger.tagCooldownUntil,
+		taggerTrusted = PositionTracker.isTrusted(
+			tagger,
+			taggerRoot.Position,
+			if thief.carry then thief.carry.startedAt else t
+		),
 	})
 	if not ok then
 		return
@@ -361,45 +419,58 @@ local function onTag(player: Player, targetArg: unknown)
 	Analytics.custom(tagger, "tag")
 end
 
-local function checkCarries()
-	local t = now()
-	local clockNow = os.clock()
-	local maxSpeed = Gameplay.walkSpeed * CFG.carrySpeedMultiplier
-	for _, thief in Sessions.all() do
-		local carry = thief.carry
-		if carry == nil then
-			continue
-		end
-		if Sessions.getByUserId(carry.victimUserId) == nil then
-			StealService.cancel(thief, "ownerLeft")
-			continue
-		end
-		local root = Sessions.rootPart(thief)
-		if root == nil then
-			StealService.cancel(thief, "died")
-			continue
-		end
-		if StealRules.isCarryExpired(carry.startedAt, t, CFG.carryTimeoutSeconds) then
-			StealService.cancel(thief, "timeout")
-			continue
-		end
-		-- Movement is checked on EVERY tick (so teleporting home right after a grab is caught before delivery),
-		-- measured from the start of the current window; the window only restarts after SPEED_WINDOW seconds,
-		-- so the per-window leeway can't be farmed by frequent checks.
-		local dt = clockNow - carry.lastCheckAt
-		local delta = root.Position - carry.lastPosition
-		local horizontal = Vector3.new(delta.X, 0, delta.Z).Magnitude
-		local tolerance, leeway = CFG.speedCheckTolerance, CFG.speedCheckLeeway
-		if not StealRules.isMovementPlausible(horizontal, dt, maxSpeed, tolerance, leeway) then
-			StealService.cancel(thief, "speed")
-			continue
-		end
-		if dt >= SPEED_WINDOW then
-			carry.lastPosition = root.Position
-			carry.lastCheckAt = clockNow
-		end
-		if thief.plot ~= 0 and PlotService.isInside(thief.plot, root.Position) then
+-- One check of one carry: owner still here, thief alive, not timed out, height, movement budget, then delivery.
+-- `allowDeliver` is false when LockService runs it just before ejecting the thief from someone else's base.
+local function checkCarry(thief: Session, allowDeliver: boolean)
+	local carry = thief.carry
+	if carry == nil then
+		return
+	end
+	if Sessions.getByUserId(carry.victimUserId) == nil then
+		StealService.cancel(thief, "ownerLeft")
+		return
+	end
+	local root = Sessions.rootPart(thief)
+	if root == nil then
+		StealService.cancel(thief, "died")
+		return
+	end
+	if StealRules.isCarryExpired(carry.startedAt, now(), CFG.carryTimeoutSeconds) then
+		StealService.cancel(thief, "timeout")
+		return
+	end
+	-- The thief may not climb/fly above maxCarryHeight (or sink under the map). Movement is checked on EVERY tick (so
+	-- teleporting home right after a grab is caught before delivery) against a distance budget: it refills with time
+	-- and pays for distance moved (climbing once, not every jump; falling is free), so lag spikes are forgiven but
+	-- speed hacks are not.
+	local position = root.Position
+	local heightAboveGround = position.Y - PlotService.world().groundY
+	if not StealRules.isCarryHeightAllowed(heightAboveGround, CFG.minCarryHeight, CFG.maxCarryHeight) then
+		StealService.cancel(thief, "flying")
+		return
+	end
+	if not StealRules.stepCarryTrack(carry.track, position.X, position.Y, position.Z, os.clock(), CARRY_LIMITS) then
+		StealService.cancel(thief, "speed")
+		return
+	end
+	if allowDeliver and thief.plot ~= 0 then
+		local refs = PlotService.refs(thief.plot)
+		local inside = PlotService.isInside(thief.plot, position)
+		if StealRules.canDeliver(inside, position.Y - refs.floorY, Gameplay.map.wallHeight) then
 			deliver(thief)
+		end
+	end
+end
+
+local function checkCarries()
+	for _, thief in Sessions.all() do
+		-- One failing carry must not stop the loop (every later carry would hang with its podium busy).
+		local ok, err = pcall(checkCarry :: (Session, boolean) -> ...any, thief, true)
+		if not ok then
+			warn(`[StealService] carry check failed for {thief.player.Name}, sending the creature home: {err}`)
+			pcall(function()
+				StealService.cancel(thief, "error")
+			end)
 		end
 	end
 end
@@ -434,6 +505,16 @@ function StealService.start()
 	Remotes.onIntent("StealConfirm", onStealConfirm)
 	Remotes.onIntent("TagThief", onTag)
 	LockService.setLockListener(StealService.onBaseLocked)
+	-- Before a carrying visitor is moved out of a locked base, judge how they got in (a teleport is still caught).
+	LockService.setBeforeEject(function(visitor: Session)
+		local ok, err = pcall(checkCarry :: (Session, boolean) -> ...any, visitor, false)
+		if not ok then
+			warn(`[StealService] carry check before eject failed for {visitor.player.Name}: {err}`)
+			pcall(function()
+				StealService.cancel(visitor, "error")
+			end)
+		end
+	end)
 	task.spawn(function()
 		while true do
 			task.wait(CFG.deliveryCheckInterval)

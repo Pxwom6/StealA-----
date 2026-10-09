@@ -18,6 +18,7 @@ local BeltService = require(script.Parent.BeltService)
 local DataService = require(script.Parent.DataService)
 local EconomyService = require(script.Parent.EconomyService)
 local PlotService = require(script.Parent.PlotService)
+local PositionTracker = require(script.Parent.PositionTracker)
 local Remotes = require(script.Parent.Remotes)
 local Replication = require(script.Parent.Replication)
 local Sessions = require(script.Parent.Sessions)
@@ -61,10 +62,13 @@ local function placeAtBase(session: Session, character: Model)
 	if root == nil or session.plot == 0 or character.Parent == nil then
 		return
 	end
-	character:PivotTo(PlotService.refs(session.plot).spawnCFrame)
+	local spawnCFrame = PlotService.refs(session.plot).spawnCFrame
+	character:PivotTo(spawnCFrame)
+	PositionTracker.reset(session, spawnCFrame.Position) -- a server move, not a teleport exploit
 end
 
 local function onCharacterAdded(session: Session, character: Model)
+	PositionTracker.reset(session, nil)
 	local humanoid = character:WaitForChild("Humanoid", 10)
 	if humanoid and humanoid:IsA("Humanoid") then
 		humanoid.WalkSpeed = Gameplay.walkSpeed
@@ -82,10 +86,15 @@ local function markReady(session: Session)
 end
 
 local function onPlayerAdded(player: Player)
-	local profile = DataService.load(player)
+	local profile, failure = DataService.load(player)
 	if profile == nil then
-		if player.Parent == Players then
-			player:Kick("Could not load your data. Please rejoin in a moment!")
+		-- A load cut short by a shutdown is not a data problem: no misleading kick (the server is closing anyway).
+		if player.Parent == Players and not DataService.isClosing() then
+			player:Kick(
+				if failure == "newerSave"
+					then "This server is updating — please rejoin!"
+					else "Could not load your data. Please rejoin in a moment!"
+			)
 		end
 		return
 	end
@@ -117,12 +126,18 @@ local function onPlayerAdded(player: Player)
 		hold = nil,
 		stealCooldownUntil = 0,
 		tagCooldownUntil = 0,
+		walk = nil,
+		flaggedAt = -math.huge,
+		teleportedAt = -math.huge,
+		samplePlot = -1,
+		enteredPlotAt = 0,
 		joinedAt = now,
 		lastSeenAtJoin = lastSeenAtJoin,
 		playClock = os.clock(),
 		ready = false,
 		dirty = true,
 		incomePerSecond = 0,
+		packIncome = 0,
 		multiplier = 1,
 		capacity = 0,
 		lockDuration = Gameplay.lock.durationSeconds,
@@ -131,7 +146,12 @@ local function onPlayerAdded(player: Player)
 	Sessions.add(session)
 
 	profile.OnSessionEnd:Connect(function()
-		-- Another server took the session (or it ended unexpectedly): never keep playing on stale data.
+		-- Another server took the session (or it ended unexpectedly): never keep playing on stale data. During a
+		-- shutdown every session ends on purpose and players are disconnected when the server closes, so no
+		-- misleading kick then (steals refuse to move creatures between ended sessions, see StealService).
+		if DataService.isClosing() then
+			return
+		end
 		if player.Parent == Players and Sessions.get(player) == session then
 			player:Kick("Your data was opened in another server. Please rejoin.")
 		end
@@ -201,6 +221,12 @@ local function onClientReady(player: Player)
 end
 
 function PlayerLifecycle.start()
+	if Players.MaxPlayers > Gameplay.map.plotCount then
+		warn(
+			`[PlayerLifecycle] Max Players is {Players.MaxPlayers} but there are only {Gameplay.map.plotCount} plots: `
+				.. "extra players will be kicked. Set Game Settings > Places > Max Players to the plot count."
+		)
+	end
 	Remotes.onIntent("ClientReady", onClientReady)
 	Players.PlayerAdded:Connect(onPlayerAdded)
 	Players.PlayerRemoving:Connect(onPlayerRemoving)

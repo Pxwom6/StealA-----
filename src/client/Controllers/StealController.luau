@@ -16,6 +16,7 @@ local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local GameData = require(ReplicatedStorage.Shared.GameData)
 local Net = require(ReplicatedStorage.Shared.Net)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
+local StealRules = require(ReplicatedStorage.Shared.Logic.StealRules)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local HudController = require(script.Parent.HudController)
 local InteractionController = require(script.Parent.InteractionController)
@@ -142,10 +143,15 @@ local function nearestThief(): Player?
 		local character = other.Character
 		local otherRoot = character and character:FindFirstChild("HumanoidRootPart")
 		if otherRoot and otherRoot:IsA("BasePart") then
-			local distance = (otherRoot.Position - root.Position).Magnitude
-			if distance <= bestDistance then
+			-- Same reach rule as the server: horizontal range plus a vertical allowance.
+			local offset = otherRoot.Position - root.Position
+			local horizontal = Vector3.new(offset.X, 0, offset.Z).Magnitude
+			if
+				horizontal <= bestDistance
+				and StealRules.withinTagReach(horizontal, offset.Y, CFG.tagRange - 1, CFG.tagVerticalAllowance)
+			then
 				best = other
-				bestDistance = distance
+				bestDistance = horizontal
 			end
 		end
 	end

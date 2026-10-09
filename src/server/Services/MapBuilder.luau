@@ -33,6 +33,7 @@ export type PlotRefs = {
 	rect: StealRules.Rect,
 	spawnCFrame: CFrame,
 	exitPosition: Vector3, -- just outside the entrance (where ejected visitors land)
+	floorY: number, -- world Y of the top of the plot floor
 	podiums: { PodiumRefs },
 	lockButton: BasePart,
 	upgradePad: BasePart,
@@ -51,6 +52,7 @@ export type World = {
 	beltSurfaceY: number,
 	leaderboards: { cash: BasePart, steals: BasePart },
 	lobbySpawn: CFrame,
+	groundY: number, -- world Y of the top of the ground
 }
 
 local MAP = Gameplay.map
@@ -311,6 +313,7 @@ local function buildPlot(index: number, parent: Instance): PlotRefs
 		},
 		spawnCFrame = CFrame.lookAt(spawnPosition, spawnPosition + entranceDirection),
 		exitPosition = (origin * CFrame.new(0, FLOOR_TOP + 3, -d / 2 - 6)).Position,
+		floorY = origin.Position.Y + FLOOR_TOP,
 		podiums = podiums,
 		lockButton = lockButton,
 		upgradePad = upgradePad,
@@ -476,6 +479,7 @@ function MapBuilder.build(): World
 		beltSurfaceY = beltSurfaceY,
 		leaderboards = { cash = cashBoard, steals = stealsBoard },
 		lobbySpawn = spawn.CFrame + Vector3.new(0, 3, 0),
+		groundY = 0,
 	}
 end
 

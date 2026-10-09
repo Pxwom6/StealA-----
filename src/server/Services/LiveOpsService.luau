@@ -59,41 +59,32 @@ end
 
 -- Adds (or extends) a luck boost. Boosts from the same source and multiplier stack time, capped at
 -- LiveOps.limits.maxBoostSeconds of remaining time — unless `uncapped` (paid boosts: a receipt must always deliver
--- its full duration; the store stops offering the product near the cap instead, see `purchasedLuckRemaining`).
-function LiveOpsService.addLuckBoost(
+-- its full duration; the store stops offering the product near the cap instead, see StoreController's `luckMaxed`).
+-- Uses Logic/LiveOpsRules.addBoost, the same rule the store's odds preview is tested against.
+function LiveOpsService.addLuckBoost(seconds: number, multiplier: number, source: string, uncapped: boolean?)
+	LiveOpsService.setBoosts(LiveOpsService.boostsWith(seconds, multiplier, source, uncapped))
+	LiveOpsService.publishAttributes()
+end
+
+-- The boost list with one more boost added (see addLuckBoost), without applying it. Receipts compute this first and
+-- apply it with setBoosts in their non-failing step.
+function LiveOpsService.boostsWith(
 	seconds: number,
 	multiplier: number,
 	source: string,
 	uncapped: boolean?
-): LiveOpsRules.Boost
-	local now = LiveOpsService.now()
-	local existingIndex: number? = nil
-	for index, boost in boosts do
-		if boost.source == source and boost.multiplier == multiplier and boost.endsAt > now then
-			existingIndex = index
-			break
-		end
-	end
+): { LiveOpsRules.Boost }
 	local limits = LiveOps.limits
 	if uncapped then
 		limits = table.clone(LiveOps.limits)
 		limits.maxBoostSeconds = math.huge
 	end
-	local updated = LiveOpsRules.extendBoost(
-		if existingIndex then boosts[existingIndex] else nil,
-		now,
-		seconds,
-		multiplier,
-		source,
-		limits
-	)
-	if existingIndex then
-		boosts[existingIndex] = updated
-	else
-		table.insert(boosts, updated)
-	end
-	LiveOpsService.publishAttributes()
-	return updated
+	return LiveOpsRules.addBoost(boosts, LiveOpsService.now(), seconds, multiplier, source, limits)
+end
+
+-- Replaces the boost list (plain assignment; attributes catch up on the next publish, at most 1 s later).
+function LiveOpsService.setBoosts(list: { LiveOpsRules.Boost })
+	boosts = list
 end
 
 -- Starts a configured (or ad-hoc) event right now for `seconds`.
@@ -146,13 +137,7 @@ function LiveOpsService.publishAttributes()
 			banner = event.bannerText
 		end
 	end
-	local purchasedEndsAt = 0
-	for _, boost in boosts do
-		if boost.source == "purchase" then
-			purchasedEndsAt = math.max(purchasedEndsAt, boost.endsAt)
-		end
-	end
-	workspace:SetAttribute("PurchasedLuckEndsAt", purchasedEndsAt)
+	workspace:SetAttribute("PurchasedLuckEndsAt", LiveOpsRules.boostEndsAt(boosts, "purchase", now))
 	workspace:SetAttribute("LuckMultiplier", luck)
 	workspace:SetAttribute("LuckEndsAt", if luck > 1 then luckEndsAt else 0)
 	workspace:SetAttribute("EventBanner", banner)
@@ -264,17 +249,33 @@ local function addCommand(alias: string, handler: (userId: number, args: { strin
 	end)
 end
 
-local function startAdminTools()
-	pcall(function()
-		MessagingService:SubscribeAsync(LiveOps.messagingTopic, function(message: any)
-			local ok, decoded = pcall(function(): any
-				return HttpService:JSONDecode(message.Data)
+-- Subscribes to admin commands from other servers. MessagingService can fail (limits, outages), so keep retrying
+-- with a growing delay (5 s, 10 s, ... capped at 60 s) until it works.
+local function subscribeToCommands()
+	local attempt = 0
+	while true do
+		attempt += 1
+		local ok, err = pcall(function()
+			MessagingService:SubscribeAsync(LiveOps.messagingTopic, function(message: any)
+				local decodeOk, decoded = pcall(function(): any
+					return HttpService:JSONDecode(message.Data)
+				end)
+				if decodeOk and type(decoded) == "table" and type(decoded.kind) == "string" then
+					applyCommand(decoded :: Command)
+				end
 			end)
-			if ok and type(decoded) == "table" and type(decoded.kind) == "string" then
-				applyCommand(decoded :: Command)
-			end
 		end)
-	end)
+		if ok then
+			return
+		end
+		local delay = math.min(60, 5 * 2 ^ (attempt - 1))
+		warn(`[LiveOps] could not subscribe to admin commands (attempt {attempt}), retrying in {delay}s: {err}`)
+		task.wait(delay)
+	end
+end
+
+local function startAdminTools()
+	task.spawn(subscribeToCommands)
 
 	addCommand("luck", function(_userId: number, args: { string })
 		broadcastCommand({ kind = "luck", multiplier = tonumber(args[1]), minutes = tonumber(args[2]) })

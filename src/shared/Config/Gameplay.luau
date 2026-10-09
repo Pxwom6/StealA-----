@@ -48,20 +48,50 @@ local Gameplay = {
 		holdSeconds = 1.5, -- hold-to-grab duration (the server re-checks it)
 		holdTolerance = 0.8, -- share of holdSeconds the server accepts (network jitter)
 		grabRange = 12,
+		holdRangeSlack = 4, -- extra studs allowed when a hold starts (you may still be running in)
 		carrySpeedMultiplier = 0.62,
 		carryTimeoutSeconds = 75,
-		tagRange = 13,
+		tagRange = 13, -- horizontal studs between tagger and thief
+		tagVerticalAllowance = 28, -- generous height difference still allowed for a tag (> maxCarryHeight)
+		-- A carrying thief's root must stay between these heights above the ground: no flying away, no sinking under
+		-- the map. 24 leaves room for a jump from the highest perch, the entrance sign (root apex about 22.8).
+		minCarryHeight = 0,
+		maxCarryHeight = 24,
 		tagCooldownSeconds = 1,
 		thiefCooldownAfterTagSeconds = 6,
-		speedCheckTolerance = 1.6, -- multiplier on the allowed carry speed before we drop the creature
-		speedCheckLeeway = 6, -- extra studs forgiven per 1-second check window (jumps, lag)
+		-- Carry movement budget (Logic/StealRules.stepCarryTrack): it refills at carry speed x speedCheckTolerance,
+		-- holds at most speedBudgetSeconds of refill (so a lag spike's catch-up jump is paid for, but a sustained
+		-- speed hack runs it dry), and the straight-line distance from the grab point is capped separately.
+		speedCheckTolerance = 1.6,
+		speedBudgetSeconds = 3,
+		-- Starting budget (a jump right after the grab, while the client still walks at full speed for one round
+		-- trip), and studs of slack on the straight-line cap.
+		speedCheckLeeway = 12,
 		deliveryCheckInterval = 0.2,
+	},
+
+	-- Server-side position sampling (every player, a few times per second) against a walking movement budget
+	-- (Logic/StealRules.stepWalkTrack). Used to decide whether a client's reported position can be trusted, e.g. for
+	-- tagging.
+	tracking = {
+		sampleInterval = 0.25,
+		walkTolerance = 1.5, -- the budget refills at walk speed x this
+		walkBudgetSeconds = 1.5, -- and holds at most this much refill (a stall/catch-up up to ~1.5 s is forgiven)
+		walkLeeway = 12, -- starting budget after spawning or a server move (covers an immediate jump)
+		-- A step the budget can't pay makes the position untrusted for teleportPenaltySeconds. A step more than
+		-- teleportDeficit studs beyond the budget is a teleport: a tag is then refused for any carry that started
+		-- less than teleportPenaltySeconds before it.
+		teleportPenaltySeconds = 2,
+		teleportDeficit = 24,
+		stepSlack = 4, -- studs beyond walking speed allowed between the latest sample and a tag (jitter)
 	},
 
 	lock = {
 		durationSeconds = 60,
 		cooldownSeconds = 90, -- after a lock ends, free players wait this long before locking again
-		minVulnerableSeconds = 30, -- nobody (paid or not) can re-lock sooner than this after a lock ends
+		-- Nobody (paid or not) can re-lock sooner than this after a lock ends, or half the lock's length if that is
+		-- longer (Logic/LockRules.windows), so every base is open at least a third of the time.
+		minVulnerableSeconds = 30,
 		buttonRange = 12,
 	},
 

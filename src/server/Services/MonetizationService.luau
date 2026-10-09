@@ -20,13 +20,12 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Monetization = require(ReplicatedStorage.Shared.Config.Monetization)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local Types = require(ReplicatedStorage.Shared.Types)
-local EconomyMath = require(ReplicatedStorage.Shared.Logic.EconomyMath)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local Guard = require(ReplicatedStorage.Shared.Logic.Guard)
+local LiveOpsRules = require(ReplicatedStorage.Shared.Logic.LiveOpsRules)
 local ReceiptLedger = require(ReplicatedStorage.Shared.Logic.ReceiptLedger)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local Analytics = require(script.Parent.Analytics)
@@ -41,7 +40,10 @@ local Sessions = require(script.Parent.Sessions)
 
 type Session = Sessions.Session
 local PASS_KEYS: { string } = { "DoubleCash", "VIP", "ExtraPodiums", "LongerLock" }
-local SESSION_WAIT_SECONDS = 20
+-- A receipt can arrive while the buyer's save is still loading (e.g. a retry on join): wait for it, longer than
+-- DataService's 60 s load timeout, so the receipt is handled before the player can play (or rebirth).
+local SESSION_WAIT_SECONDS = 75
+local PASS_RECHECK_SECONDS = 60
 local SAVE_TIMEOUT_SECONDS = 15
 local MAX_SAVE_ATTEMPTS = 4
 
@@ -96,7 +98,8 @@ local function productKeyForId(productId: number): string?
 	return nil
 end
 
-local function ownsPass(userId: number, passId: number): boolean
+-- Whether the user owns the pass, or nil when Roblox could not be asked (after a few retries).
+local function ownsPass(userId: number, passId: number): boolean?
 	if passId == 0 then
 		return false
 	end
@@ -107,20 +110,37 @@ local function ownsPass(userId: number, passId: number): boolean
 		if ok then
 			return owns
 		end
-		task.wait(attempt)
+		if attempt < 3 then
+			task.wait(attempt)
+		end
 	end
 	warn(`[Monetization] could not check pass {passId} for {userId}`)
-	return false
+	return nil
 end
 
--- PlayerLifecycle hook: runs before the session exists.
-function MonetizationService.checkPasses(player: Player): Types.Passes
-	local passes: Types.Passes = { DoubleCash = false, VIP = false, ExtraPodiums = false, LongerLock = false }
-	for _, key in PASS_KEYS do
-		setPass(passes, key, ownsPass(player.UserId, Monetization.passes[key].id))
+-- Looks up every pass in `keys` at the same time and yields until all are answered. A key is missing from the
+-- result when its lookup failed.
+local function lookupPasses(userId: number, keys: { string }): { [string]: boolean }
+	local results: { [string]: boolean } = {}
+	local remaining = #keys
+	local waiting: thread? = nil
+	for _, key in keys do
+		task.spawn(function()
+			local owns = ownsPass(userId, Monetization.passes[key].id)
+			if owns ~= nil then
+				results[key] = owns
+			end
+			remaining -= 1
+			if remaining == 0 and waiting then
+				task.spawn(waiting)
+			end
+		end)
 	end
-	player:SetAttribute("VIP", passes.VIP)
-	return passes
+	if remaining > 0 then
+		waiting = coroutine.running()
+		coroutine.yield()
+	end
+	return results
 end
 
 -- Re-applies everything a pass affects (income, podiums, lock length, VIP tag/trim).
@@ -128,6 +148,51 @@ local function applyPasses(session: Session)
 	session.player:SetAttribute("VIP", session.passes.VIP)
 	EconomyService.refresh(session)
 	LockService.refresh(session)
+end
+
+-- Passes whose ownership could not be checked at join are re-checked every PASS_RECHECK_SECONDS until Roblox
+-- answers (or the player leaves); an owned one is then applied.
+local function recheckPasses(player: Player, keys: { string })
+	local pending = keys
+	while #pending > 0 do
+		task.wait(PASS_RECHECK_SECONDS)
+		if player.Parent ~= Players then
+			return
+		end
+		local results = lookupPasses(player.UserId, pending)
+		local session = Sessions.get(player)
+		local still: { string } = {}
+		for _, key in pending do
+			local owns = results[key]
+			if owns == nil or (owns and session == nil) then
+				table.insert(still, key) -- unknown, or owned but the session is not ready yet
+			elseif owns and session and not hasPass(session.passes, key) then
+				setPass(session.passes, key, true)
+				applyPasses(session)
+			end
+		end
+		pending = still
+	end
+end
+
+-- PlayerLifecycle hook: runs before the session exists. Lookups run in parallel; any that fail are treated as
+-- not owned for now and re-checked in the background.
+function MonetizationService.checkPasses(player: Player): Types.Passes
+	local passes: Types.Passes = { DoubleCash = false, VIP = false, ExtraPodiums = false, LongerLock = false }
+	local results = lookupPasses(player.UserId, PASS_KEYS)
+	local failed: { string } = {}
+	for _, key in PASS_KEYS do
+		local owns = results[key]
+		if owns == nil then
+			table.insert(failed, key)
+		end
+		setPass(passes, key, owns == true)
+	end
+	player:SetAttribute("VIP", passes.VIP)
+	if #failed > 0 then
+		task.spawn(recheckPasses, player, failed)
+	end
+	return passes
 end
 
 local function grantPass(session: Session, key: string)
@@ -158,45 +223,62 @@ end
 
 type AfterGrant = () -> ()
 
--- Applies a product to the save. MUST NOT YIELD (see ReceiptLedger). Returns an optional follow-up that runs
--- after the purchase is confirmed saved (announcements, auto-lock...).
-local function applyProduct(session: Session, key: string, receipt: { [string]: any }): AfterGrant?
+-- Works out everything a product grants WITHOUT changing anything (it may throw: nothing is lost, Roblox retries).
+-- Returns `apply`, which only writes the precomputed results (plain table writes: no yields, nothing that can fail;
+-- see ReceiptLedger), and a follow-up that runs once the purchase is confirmed saved (announcements, auto-lock...).
+local function prepareProduct(
+	session: Session,
+	key: string,
+	receipt: { [string]: any },
+	quotedCash: number
+): (() -> (), AfterGrant?)
 	local product = Monetization.products[key]
+	local perks = Monetization.perks
 	local data = session.data
 	local robux = if type(receipt.CurrencySpent) == "number" then receipt.CurrencySpent else 0
-	ReceiptLedger.appendHistory(data.purchaseHistory, {
+	local historyEntry: Types.PurchaseRecord = {
 		purchaseId = tostring(receipt.PurchaseId),
 		productId = if type(receipt.ProductId) == "number" then receipt.ProductId else 0,
 		key = key,
 		robux = robux,
 		at = os.time(),
-	}, Monetization.purchaseHistorySize)
-	data.stats.robuxSpent += robux
+	}
+	local historySize = Monetization.purchaseHistorySize
+	local cash, tokens = 0, 0
+	local newBoosts: { LiveOpsRules.Boost }? = nil
+	local after: AfterGrant
 
 	if product.kind == "Cash" then
-		local pack = (Economy.cashPacks :: any)[key] :: EconomyMath.CashPack
-		local amount = EconomyMath.cashPackAmount(session.incomePerSecond, pack)
-		data.cash += amount
-		data.stats.totalEarned += amount
-		Replication.markDirty(session)
-		return function()
-			Analytics.economySource(session, amount, "IAP", key)
-			Remotes.notify(session.player, `+{UiTheme.cash(amount)}! {Theme.text.purchaseThanks}`, "success")
+		cash = quotedCash
+		after = function()
+			Analytics.economySource(session, cash, "IAP", key)
+			Remotes.notify(session.player, `+{UiTheme.cash(cash)}! {Theme.text.purchaseThanks}`, "success")
 		end
 	elseif product.kind == "LockToken" then
-		data.lockTokens += 1
-		Replication.markDirty(session)
-		return function()
-			if LockService.canLockNow(session) then
+		tokens = 1
+		after = function()
+			local attempt = LockService.preview(session)
+			if session.data.lockTokens <= 0 then
+				-- Already used (e.g. they tapped lock while the purchase was saving).
+				Remotes.notify(session.player, Theme.text.purchaseThanks, "success")
+			elseif attempt.ok then
 				LockService.tryLock(session)
+			elseif attempt.reason == "locked" or attempt.reason == "vulnerable" then
+				-- The token is kept, but can't be used before the current lock and the open window after it end.
+				local wait = session.lock.vulnerableUntil - workspace:GetServerTimeNow()
+				Remotes.notify(
+					session.player,
+					Format.template(Theme.text.lockTokenLater, { time = Format.clock(wait) }),
+					"info"
+				)
 			else
 				Remotes.notify(session.player, Theme.text.lockTokenReady, "success")
 			end
 		end
 	elseif product.kind == "ServerLuck" then
-		local perks = Monetization.perks
-		LiveOpsService.addLuckBoost(perks.serverLuckSeconds, perks.serverLuckMultiplier, "purchase", true)
-		return function()
+		newBoosts = LiveOpsService.boostsWith(perks.serverLuckSeconds, perks.serverLuckMultiplier, "purchase", true)
+		after = function()
+			LiveOpsService.publishAttributes()
 			Announcer.broadcast({
 				text = Format.template(Theme.text.luckActivated, {
 					player = session.player.DisplayName,
@@ -207,8 +289,22 @@ local function applyProduct(session: Session, key: string, receipt: { [string]: 
 				kind = "luck",
 			})
 		end
+	else
+		error(`unknown product kind for {key}`)
 	end
-	error(`unknown product kind for {key}`)
+
+	local function apply()
+		ReceiptLedger.appendHistory(data.purchaseHistory, historyEntry, historySize)
+		data.stats.robuxSpent += robux
+		data.cash += cash
+		data.stats.totalEarned += cash
+		data.lockTokens += tokens
+		if newBoosts then
+			LiveOpsService.setBoosts(newBoosts) -- the only write outside the save
+		end
+		Replication.markDirty(session) -- a flag: shows the new cash/tokens now, not after the save lands
+	end
+	return apply, after
 end
 
 -- Shared receipt path for real purchases and Studio test grants.
@@ -220,6 +316,15 @@ local function processFor(player: Player, key: string, receipt: { [string]: any 
 	local purchaseId = tostring(receipt.PurchaseId)
 	local after: AfterGrant? = nil
 	local profile = session.profile
+	-- A cash pack's amount is fixed the first time its receipt reaches the player's session (and saved with the data),
+	-- so if that grant fails and Roblox retries after the player's income changed (e.g. they rebirthed), the retry
+	-- pays what the purchase was worth then. A receipt that finds no session yet waits for the load (see above).
+	local quotedCash = 0
+	if Monetization.products[key].kind == "Cash" and profile:IsActive() then
+		quotedCash = ReceiptLedger.quote(session.data.cashPackQuotes, purchaseId, function(): number
+			return EconomyService.cashPackAmount(session, key)
+		end, Monetization.purchaseIdCacheSize)
+	end
 	local decision = ReceiptLedger.process(purchaseId, Monetization.purchaseIdCacheSize, {
 		isActive = function(): boolean
 			return profile:IsActive()
@@ -231,14 +336,20 @@ local function processFor(player: Player, key: string, receipt: { [string]: any 
 			local saved = profile.LastSavedData
 			return if saved then saved.processedReceipts else nil
 		end,
-		grant = function()
-			after = applyProduct(session, key, receipt)
+		data = function(): { [string]: any }
+			return (profile.Data :: any) :: { [string]: any }
+		end,
+		prepare = function(): () -> ()
+			local apply, followUp = prepareProduct(session, key, receipt, quotedCash)
+			after = followUp
+			return apply
 		end,
 		saveAndWait = function()
 			DataService.saveAndWait(profile, SAVE_TIMEOUT_SECONDS)
 		end,
 		maxSaveAttempts = MAX_SAVE_ATTEMPTS,
 	})
+	Replication.markDirty(session)
 	if decision == "PurchaseGranted" then
 		local followUp = after
 		if followUp then
