@@ -72,6 +72,42 @@ T.describe("LockRules", function()
 		T.expect(LockRules.tryLock(unlocked, 40, 60, cfg, true).reason).toBe("vulnerable")
 	end)
 
+	T.it("leaving and rejoining keeps the cooldown and the open window", function()
+		-- Server clock and wall clock differ on purpose: the save must hold wall-clock times.
+		local state = LockRules.tryLock(LockRules.newState(), 1000, 60, cfg, false).state
+		local leftAt, wallAtLeave = 1010, 50000
+		local saved = LockRules.toSaved(LockRules.unlock(state, leftAt, cfg), leftAt, wallAtLeave)
+		T.expect(saved.cooldownUntil).toBe(wallAtLeave + 90)
+		T.expect(saved.vulnerableUntil).toBe(wallAtLeave + 30)
+
+		-- Rejoin 20 s later on another server whose clock reads 7000.
+		local restored = LockRules.fromSaved(saved, 7000, wallAtLeave + 20, 1000)
+		T.expect(LockRules.isLocked(restored, 7000)).toBe(false)
+		T.expect(LockRules.status(restored, 7000)).toBe("Cooldown")
+		local noToken = LockRules.tryLock(restored, 7000, 60, cfg, false)
+		T.expect(noToken.ok).toBe(false)
+		T.expect(noToken.reason).toBe("cooldown")
+		T.expect(noToken.waitSeconds).toBe(70)
+		local withToken = LockRules.tryLock(restored, 7000, 60, cfg, true)
+		T.expect(withToken.reason).toBe("vulnerable")
+		T.expect(withToken.waitSeconds).toBe(10)
+	end)
+
+	T.it("saved timers that ran out while away restore as ready", function()
+		local state = LockRules.tryLock(LockRules.newState(), 0, 60, cfg, false).state
+		local saved = LockRules.toSaved(state, 10, 500)
+		local restored = LockRules.fromSaved(saved, 0, 500 + 3600, 1000)
+		T.expect(LockRules.status(restored, 0)).toBe("Ready")
+		T.expect(LockRules.tryLock(restored, 0, 60, cfg, false).ok).toBe(true)
+		T.expect(LockRules.toSaved(LockRules.newState(), 10, 500)).toEqual({ cooldownUntil = 0, vulnerableUntil = 0 })
+	end)
+
+	T.it("restored timers are capped (bad clocks or values)", function()
+		local restored = LockRules.fromSaved({ cooldownUntil = 1e12, vulnerableUntil = 0 / 0 }, 100, 0, 150)
+		T.expect(restored.cooldownUntil).toBe(250)
+		T.expect(restored.vulnerableUntil).toBe(0)
+	end)
+
 	T.it("duration adds rebirth and pass bonuses", function()
 		T.expect(LockRules.duration(60, 10, 30)).toBe(100)
 		T.expect(LockRules.duration(60, -5, 0)).toBe(60)

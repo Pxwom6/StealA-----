@@ -91,6 +91,9 @@ export type Stats = {
 
 export type DailyState = { streak: number, lastClaimDay: number }
 
+-- Base-lock timers carried between sessions, in wall-clock (os.time) seconds; 0 = not running.
+export type LockTimers = { cooldownUntil: number, vulnerableUntil: number }
+
 export type PlayerData = {
 	version: number,
 	cash: number,
@@ -100,6 +103,7 @@ export type PlayerData = {
 	rebirths: number,
 	rebirthMultiplier: number,
 	lockTokens: number,
+	lockTimers: LockTimers,
 	processedReceipts: { string },
 	purchaseHistory: { PurchaseRecord },
 	daily: DailyState,

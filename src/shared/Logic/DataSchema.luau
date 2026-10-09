@@ -24,7 +24,7 @@ export type SanitiseRules = {
 	maxHistory: number,
 }
 
-local SCHEMA_VERSION = 1
+local SCHEMA_VERSION = 2
 
 local DataSchema = {}
 DataSchema.VERSION = SCHEMA_VERSION
@@ -39,6 +39,7 @@ function DataSchema.template(startingCash: number): PlayerData
 		rebirths = 0,
 		rebirthMultiplier = 1,
 		lockTokens = 0,
+		lockTimers = { cooldownUntil = 0, vulnerableUntil = 0 },
 		processedReceipts = {},
 		purchaseHistory = {},
 		daily = { streak = 0, lastClaimDay = -1 },
@@ -68,14 +69,19 @@ local function wholeInRange(value: unknown, min: number, max: number, fallback: 
 	return math.clamp(math.floor(finite(value, fallback)), min, max)
 end
 
--- Upgrades `raw` in place to the current schema version and returns it.
--- Version 0 → 1 is the initial shape; future steps go here, e.g.
---   if data.version < 2 then data.newField = default; data.version = 2 end
+-- Upgrades `raw` in place to the current schema version and returns it, one step per version.
 function DataSchema.migrate(raw: { [string]: any }): { [string]: any }
 	local version = finite(raw.version, 0)
-	if version < 1 then
-		raw.version = 1
+	if version < 1 then -- the initial shape
+		version = 1
 	end
+	if version < 2 then -- v2: base-lock timers persist between sessions
+		if type(raw.lockTimers) ~= "table" then
+			raw.lockTimers = { cooldownUntil = 0, vulnerableUntil = 0 }
+		end
+		version = 2
+	end
+	raw.version = version
 	return raw
 end
 
@@ -188,6 +194,7 @@ function DataSchema.sanitise(
 	end
 
 	local rawDaily = if type(raw.daily) == "table" then raw.daily else {}
+	local rawLock = if type(raw.lockTimers) == "table" then raw.lockTimers else {}
 
 	local data: PlayerData = {
 		version = SCHEMA_VERSION,
@@ -198,6 +205,10 @@ function DataSchema.sanitise(
 		rebirths = rebirths,
 		rebirthMultiplier = math.max(1, finite(raw.rebirthMultiplier, template.rebirthMultiplier)),
 		lockTokens = wholeInRange(raw.lockTokens, 0, 1000, 0),
+		lockTimers = {
+			cooldownUntil = math.max(0, finite(rawLock.cooldownUntil, 0)),
+			vulnerableUntil = math.max(0, finite(rawLock.vulnerableUntil, 0)),
+		},
 		processedReceipts = receipts,
 		purchaseHistory = history,
 		daily = {

@@ -49,11 +49,13 @@ DevCommands.start() -- Studio only
 local hooks = PlayerLifecycle.hooks()
 hooks.checkPasses = MonetizationService.checkPasses
 table.insert(hooks.onJoined, LockService.refresh)
+table.insert(hooks.onJoined, LockService.restore)
 table.insert(hooks.onJoined, RetentionService.payOfflineEarnings)
 table.insert(hooks.onReady, RetentionService.sendWelcome)
 table.insert(hooks.onLeaving, function(session)
 	StealService.releaseAll(session, "left")
 end)
+table.insert(hooks.onLeaving, LockService.onLeaving)
 table.insert(hooks.onLeaving, function(session)
 	task.spawn(LeaderboardService.writePlayer, session)
 end)

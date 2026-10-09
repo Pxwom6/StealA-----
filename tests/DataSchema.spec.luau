@@ -26,6 +26,22 @@ T.describe("DataSchema", function()
 		T.expect(raw.version).toBe(DataSchema.VERSION)
 	end)
 
+	T.it("migrates version 1 saves: lock timers start empty, existing ones are kept", function()
+		local v1 = DataSchema.migrate({ version = 1, cash = 5 })
+		T.expect(v1.version).toBe(2)
+		T.expect(v1.lockTimers).toEqual({ cooldownUntil = 0, vulnerableUntil = 0 })
+		local clean = DataSchema.sanitise(v1, 100, rules)
+		T.expect(clean.lockTimers).toEqual({ cooldownUntil = 0, vulnerableUntil = 0 })
+
+		local saved: any = { version = 2, lockTimers = { cooldownUntil = 1700000090, vulnerableUntil = 1700000030 } }
+		T.expect(DataSchema.sanitise(DataSchema.migrate(saved), 100, rules).lockTimers).toEqual({
+			cooldownUntil = 1700000090,
+			vulnerableUntil = 1700000030,
+		})
+		local bad: any = { lockTimers = { cooldownUntil = 0 / 0, vulnerableUntil = -5 } }
+		T.expect(DataSchema.sanitise(bad, 100, rules).lockTimers).toEqual({ cooldownUntil = 0, vulnerableUntil = 0 })
+	end)
+
 	T.it("repairs garbage values", function()
 		local garbage: any = {
 			cash = 0 / 0,

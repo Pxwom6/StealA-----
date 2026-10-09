@@ -93,6 +93,9 @@ inside when the owner locks drops the creature.
 **Chose:**
 * Instant Lock is a *token*: it can skip the free-lock recharge but never the 30 s minimum open window after a lock
   (`Gameplay.lock.minVulnerableSeconds`). A unit test proves infinite tokens still leave a base open ≥ 1/3 of the time.
+  The cooldown and open window are saved as wall-clock times (`data.lockTimers`) on every save (on the final save,
+  at leave or shutdown, a lock still running counts as ending then; on other saves it keeps its natural end, so a
+  crash mid-lock never shortens them) and restored on join, so leaving and rejoining (any server) never resets them.
 * No pass or product blocks stealing; passes only change income, podium count and lock length.
 * Server Luck (the only random-effect product) shows exact before/after rarity odds in the store, and benefits
   everyone in the server. Its 60-minute stacking cap is soft: the store stops offering it once another purchase

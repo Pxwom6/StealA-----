@@ -7,6 +7,9 @@
 	* While a base is locked, any non-owner inside it is moved back outside the entrance (4×/s). Character
 	  physics is client-owned, so the visible barrier alone would not stop an exploiter — this does.
 	* A 1 Hz pass keeps each plot's force field (blue = locked, yellow = new-player shield) and attributes in sync.
+	* The cooldown and open window are saved (`data.lockTimers`, wall-clock seconds) when a lock starts and on every
+	  save (on the final save a lock still running counts as ending then), and restored on join, so leaving and
+	  rejoining any server never resets them.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -56,6 +59,42 @@ function LockService.duration(session: Session): number
 		RebirthMath.lockBonusFor(session.data.rebirths, Economy.rebirth),
 		if session.passes.LongerLock then Monetization.perks.longerLockSeconds else 0
 	)
+end
+
+-- Sessions whose saved timers were restored on join. Only those may write timers back: a join that never got that
+-- far (e.g. kicked because the server was full) must not overwrite the saved cooldown with a blank state.
+local restored: { [Session]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+
+-- Writes the lock timers into the save as wall-clock times (LockRules.toSaved). On the final save (leave, shutdown,
+-- another server taking the session) a lock still running counts as ending now, which it does; on any other save it
+-- keeps its natural end, so if the server then crashes mid-lock the next join is not let off early.
+local function persist(session: Session, isFinalSave: boolean)
+	if restored[session] then
+		local t = now()
+		local state = if isFinalSave then LockRules.unlock(session.lock, t, Gameplay.lock) else session.lock
+		session.data.lockTimers = LockRules.toSaved(state, t, os.time())
+	end
+end
+
+-- On join (after `refresh`): restores the cooldown and open window saved on the player's last visit, and keeps the
+-- save up to date from then on (every save, including the final one at leave or shutdown).
+function LockService.restore(session: Session)
+	local maxSeconds = session.lockDuration + Gameplay.lock.cooldownSeconds
+	session.lock = LockRules.fromSaved(session.data.lockTimers, now(), os.time(), maxSeconds)
+	restored[session] = true
+	session.profile.OnSave:Connect(function()
+		persist(session, false)
+	end)
+	session.profile.OnLastSave:Connect(function()
+		persist(session, true)
+	end)
+	Replication.markDirty(session)
+end
+
+-- On leave: a running lock ends now (the base goes with its owner) and its cooldown is saved for the next join.
+function LockService.onLeaving(session: Session)
+	session.lock = LockRules.unlock(session.lock, now(), Gameplay.lock)
+	persist(session, false)
 end
 
 function LockService.refresh(session: Session)
@@ -136,6 +175,7 @@ function LockService.tryLock(session: Session): (boolean, string?)
 	if attempt.usedToken then
 		session.data.lockTokens -= 1
 	end
+	persist(session, false)
 	syncShield(session)
 	if lockListener then
 		lockListener(session)

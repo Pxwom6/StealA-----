@@ -156,7 +156,7 @@ World state the client reads from **attributes** (replicated automatically): plo
 `GraceUntil`, `PodiumCount`; podium `CreatureId`, `Stored`, `Income`, `BeingStolen`; player `Carrying`,
 `VIP`.
 
-## 5. Data schema (version 1)
+## 5. Data schema (version 2)
 
 ```lua
 type CreatureRecord = { uid: string, id: string, podium: number, acquiredAt: number, variant: string? }
@@ -171,6 +171,7 @@ type PlayerData = {
     rebirths: number,
     rebirthMultiplier: number,   -- stored at rebirth time (non-retroactive balance, DECISIONS #6)
     lockTokens: number,          -- from "Instant Base Lock" product
+    lockTimers: { cooldownUntil: number, vulnerableUntil: number }, -- os.time; survive leaving (v2)
     processedReceipts: { string },  -- bounded ring of PurchaseIds (idempotency)
     purchaseHistory: { PurchaseRecord }, -- bounded
     daily: { streak: number, lastClaimDay: number },

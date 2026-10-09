@@ -23,6 +23,9 @@ export type LockConfig = {
 
 export type Status = "Locked" | "Cooldown" | "Ready"
 
+-- Lock timers as kept in the save: wall-clock (os.time) seconds, so they survive leaving and joining any server.
+export type SavedTimers = { cooldownUntil: number, vulnerableUntil: number }
+
 export type LockAttempt = {
 	ok: boolean,
 	usedToken: boolean,
@@ -116,6 +119,32 @@ function LockRules.unlock(state: LockState, now: number, cfg: LockConfig): LockS
 		lockedUntil = now,
 		cooldownUntil = now + cfg.cooldownSeconds,
 		vulnerableUntil = now + math.min(cfg.minVulnerableSeconds, cfg.cooldownSeconds),
+	}
+end
+
+-- Converts live timers (server clock) into wall-clock timers for the save. Timers already over are saved as 0.
+function LockRules.toSaved(state: LockState, serverNow: number, wallNow: number): SavedTimers
+	local function convert(at: number): number
+		return if at > serverNow then wallNow + (at - serverNow) else 0
+	end
+	return { cooldownUntil = convert(state.cooldownUntil), vulnerableUntil = convert(state.vulnerableUntil) }
+end
+
+-- Restores saved timers on join, so leaving and rejoining never resets the cooldown or the open window. The base
+-- starts unlocked (a lock never outlives its owner's visit); each timer keeps its remaining wall-clock time, capped
+-- at `maxSeconds` so a skewed clock or a bad value can't block locking for long.
+function LockRules.fromSaved(saved: SavedTimers, serverNow: number, wallNow: number, maxSeconds: number): LockState
+	local function convert(at: number): number
+		local remaining = at - wallNow
+		if not (remaining > 0) then -- also catches NaN
+			return 0
+		end
+		return serverNow + math.min(remaining, math.max(0, maxSeconds))
+	end
+	return {
+		lockedUntil = 0,
+		cooldownUntil = convert(saved.cooldownUntil),
+		vulnerableUntil = convert(saved.vulnerableUntil),
 	}
 end
 
