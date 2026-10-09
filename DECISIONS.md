@@ -92,6 +92,8 @@ server's own 4 Hz position samples (`PositionTracker`, a walking movement budget
 are free): a tag is refused if the tagger overran that budget in the last 2 s, was caught teleporting (24+ studs
 beyond it) at any point since just before that carry started, or could not have walked from the latest sample to
 where they claim to be in the time since (the stored budget doesn't pay for that last step, so no blink-tagging).
+Starting and finishing a steal hold need the same, plus no overrun at all since just before the thief was first
+seen in that plot, so teleporting onto a podium (and waiting) doesn't work; the hold must also start at the podium.
 A carrying thief's movement is checked every tick against a distance budget (`StealRules.stepCarryTrack`): it
 refills at 1.6× carry speed, holds at most 3 s of refill and pays for every stud moved horizontally and every stud
 of new height (jumping again to a height already paid for is free, falling is free), so a lag spike's catch-up jump
@@ -158,7 +160,7 @@ paid-for podiums avoids a feel-bad. One config flag flips it.
 ### 14. 8 plots = 8 players per server
 
 **Chose:** `Gameplay.map.plotCount = 8`. **You must set Max Players to 8** in Game Settings → Places, otherwise a
-9th player is kicked with "server full".
+9th player is kicked with "server full" (the server warns in the output at startup when Max Players is higher).
 
 ### 15. Studio-only test hooks
 

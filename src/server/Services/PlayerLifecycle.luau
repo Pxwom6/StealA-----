@@ -129,6 +129,8 @@ local function onPlayerAdded(player: Player)
 		walk = nil,
 		flaggedAt = -math.huge,
 		teleportedAt = -math.huge,
+		samplePlot = -1,
+		enteredPlotAt = 0,
 		joinedAt = now,
 		lastSeenAtJoin = lastSeenAtJoin,
 		playClock = os.clock(),
@@ -219,6 +221,12 @@ local function onClientReady(player: Player)
 end
 
 function PlayerLifecycle.start()
+	if Players.MaxPlayers > Gameplay.map.plotCount then
+		warn(
+			`[PlayerLifecycle] Max Players is {Players.MaxPlayers} but there are only {Gameplay.map.plotCount} plots: `
+				.. "extra players will be kicked. Set Game Settings > Places > Max Players to the plot count."
+		)
+	end
 	Remotes.onIntent("ClientReady", onClientReady)
 	Players.PlayerAdded:Connect(onPlayerAdded)
 	Players.PlayerRemoving:Connect(onPlayerRemoving)

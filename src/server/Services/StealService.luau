@@ -252,7 +252,23 @@ local function onStealBegin(player: Player, plotArg: unknown, podiumArg: unknown
 	if plot == nil or podium == nil or session == nil then
 		return
 	end
-	session.hold = { plot = plot, podium = podium, startedAt = now() }
+	session.hold = nil
+	local root = Sessions.rootPart(session)
+	local podiumRefs = PlotService.podium(plot, podium)
+	if root == nil or podiumRefs == nil then
+		return
+	end
+	-- The server-timed hold only starts at the podium (no starting it from across the map or right after a teleport).
+	local inRange = StealRules.canBeginHold({
+		distance = (root.Position - podiumRefs.base.Position).Magnitude,
+		grabRange = CFG.grabRange,
+		rangeSlack = CFG.holdRangeSlack,
+		thiefInsideBase = PlotService.isInside(plot, root.Position),
+		thiefTrusted = PositionTracker.isTrustedForSteal(session, root.Position),
+	})
+	if inRange then
+		session.hold = { plot = plot, podium = podium, startedAt = now() }
+	end
 end
 
 local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unknown)
@@ -274,6 +290,9 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 	end
 	if not thief.profile:IsActive() or not victim.profile:IsActive() then
 		return -- a session has ended (shutting down): no new steals
+	end
+	if not PositionTracker.isTrustedForSteal(thief, root.Position) then
+		return -- teleported in to confirm: refused (the hold must have been done on foot)
 	end
 	local t = now()
 	local record = Inventory.findByPodium(victim.data.creatures, podium)

@@ -198,6 +198,36 @@ T.describe("DataSchema", function()
 		T.expect(back.quarantine[1].uid).toBe("31")
 	end)
 
+	T.it("nextUid always starts above every existing uid", function()
+		local saved: any = {
+			nextUid = 3, -- behind: the next creature would have reused uid "3"
+			creatures = {
+				{ uid = "3", id = "pizza_pup", podium = 1 },
+				{ uid = "15", id = "pizza_pup", podium = 2 },
+				{ uid = "custom", id = "pizza_pup", podium = 3 },
+			},
+			quarantine = { { uid = "40", id = "gone_pup", podium = 4 } },
+		}
+		local clean = DataSchema.sanitise(saved, 100, rules)
+		T.expect(clean.nextUid).toBe(41)
+		T.expect(clean.creatures[1].uid).toBe("3")
+		T.expect(clean.creatures[2].uid).toBe("15")
+
+		-- A duplicate uid is reassigned above the highest one, never onto an existing uid.
+		local dup: any = {
+			nextUid = 1,
+			creatures = {
+				{ uid = "2", id = "pizza_pup", podium = 1 },
+				{ uid = "2", id = "pizza_pup", podium = 2 },
+				{ uid = "3", id = "pizza_pup", podium = 3 },
+			},
+		}
+		local fixed = DataSchema.sanitise(dup, 100, rules)
+		T.expect(fixed.creatures[2].uid).toBe("4")
+		T.expect(fixed.creatures[3].uid).toBe("3")
+		T.expect(fixed.nextUid).toBe(5)
+	end)
+
 	T.it("bounds receipts and history", function()
 		local saved: any = {
 			processedReceipts = { "a", "b", "c", "d", 5 :: any },

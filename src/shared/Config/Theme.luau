@@ -104,6 +104,7 @@ local Theme = {
 		cantStealOwn = "That's yours!",
 		stealFromInside = "Get inside their base first!",
 		stealOnFloor = "Stand on the floor to steal!",
+		stealHoldNear = "Hold Steal right next to the Snackling!",
 		stealCooldown = "Catch your breath... {time}",
 		alreadyCarrying = "You're already carrying one!",
 		stealStarted = "Run home! Don't get tagged!",

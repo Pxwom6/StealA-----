@@ -130,7 +130,7 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `BuyBeltItem` | `itemId: int` | item exists, not sold, within buy range of *computed* belt position, cash ≥ server price, free podium |
 | `BuyPodium` | – | inside own plot, below cap, cash ≥ server cost |
 | `SellCreature` | `podium: int` | own podium, creature present, not being stolen, near podium |
-| `StealBegin` | `plot: int, podium: int` | starts the server-side hold timer |
+| `StealBegin` | `plot: int, podium: int` | starts the server-side hold timer if `StealRules.canBeginHold` (at the podium, inside the base, position trusted) |
 | `StealConfirm` | `plot: int, podium: int` | hold time elapsed, `StealRules.canGrab` (lock, grace, range, inside the base at floor level, own free podium, not carrying) |
 | `TagThief` | `userId: int` | target is carrying, within tag reach (horizontal range + vertical allowance), tag cooldown, tagger's position trusted (`PositionTracker`) |
 | `LockBase` | – | owner, near lock button, `LockRules` (cooldown, or a lock token) |

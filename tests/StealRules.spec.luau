@@ -73,6 +73,35 @@ T.describe("StealRules.canGrab", function()
 	end)
 end)
 
+T.describe("StealRules.canBeginHold", function()
+	local function hold(overrides: { [string]: any }?): StealRules.HoldContext
+		local ctx: StealRules.HoldContext = {
+			distance = 5,
+			grabRange = 12,
+			rangeSlack = 4,
+			thiefInsideBase = true,
+			thiefTrusted = true,
+		}
+		if overrides then
+			for key, value in overrides do
+				(ctx :: any)[key] = value
+			end
+		end
+		return ctx
+	end
+
+	T.it("starts the hold timer only at the podium, with a trusted position", function()
+		T.expect(StealRules.canBeginHold(hold())).toBe(true)
+		T.expect(StealRules.canBeginHold(hold({ distance = 15 }))).toBe(true) -- running in, a little past the prompt
+		-- Starting the hold from far away (then teleporting in to confirm instantly) is refused.
+		T.expect(StealRules.canBeginHold(hold({ distance = 200 }))).toBe(false)
+		T.expect(StealRules.canBeginHold(hold({ distance = 0 / 0 }))).toBe(false)
+		T.expect(StealRules.canBeginHold(hold({ thiefInsideBase = false }))).toBe(false)
+		-- ...and so is starting it right after teleporting next to the podium.
+		T.expect(StealRules.canBeginHold(hold({ thiefTrusted = false }))).toBe(false)
+	end)
+end)
+
 T.describe("StealRules.canTag", function()
 	local base: StealRules.TagContext = {
 		now = 10,
@@ -376,7 +405,7 @@ T.describe("StealRules movement and timing", function()
 	T.it("maps reasons to theme message keys", function()
 		T.expect(StealRules.messageKey("locked")).toBe("cantStealLocked")
 		T.expect(StealRules.messageKey("outside")).toBe("stealFromInside")
-		T.expect(StealRules.messageKey("hold")).toBeNil()
+		T.expect(StealRules.messageKey("hold")).toBe("stealHoldNear")
 	end)
 end)
 

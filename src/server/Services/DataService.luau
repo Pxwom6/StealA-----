@@ -7,7 +7,7 @@
 	               save from a newer release is released untouched and the player asked to rejoin
 	* autosave:    ProfileStore saves every few minutes on its own
 	* on leave:    PlayerLifecycle calls `release`, which ends the session (final save)
-	* on shutdown: BindToClose ends every session and waits for the final saves
+	* on shutdown: BindToClose ends every session; ProfileStore's own BindToClose waits for the final saves
 	* saveAndWait: used by receipts — request a save and yield until it lands (or the session ends / times out)
 
 	In Studio without "Studio Access to API Services", ProfileStore automatically uses a mock store, so the game
@@ -68,25 +68,14 @@ function DataService.start()
 
 	game:BindToClose(function()
 		closing = true
-		-- End every session so the final save happens now; ProfileStore waits for in-flight saves.
+		-- End every session so the final save starts now. No need to wait here: EndSession makes IsActive() false
+		-- at once (so polling it waited for nothing), and ProfileStore's own BindToClose keeps the server alive until
+		-- every in-flight save has finished.
 		for _, session in Sessions.all() do
 			session.data.lastSeen = os.time()
 			if session.profile:IsActive() then
 				session.profile:EndSession()
 			end
-		end
-		local deadline = os.clock() + 25
-		while os.clock() < deadline do
-			local anyActive = false
-			for _, session in Sessions.all() do
-				if session.profile:IsActive() then
-					anyActive = true
-				end
-			end
-			if not anyActive then
-				break
-			end
-			task.wait(0.25)
 		end
 	end)
 end

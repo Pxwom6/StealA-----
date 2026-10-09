@@ -133,6 +133,18 @@ function DataSchema.sanitise(
 	local usedPodiums: { [number]: boolean } = {}
 	local usedUids: { [string]: boolean } = {}
 	local nextUid = wholeInRange(raw.nextUid, 1, 2 ^ 50, 1)
+	-- New uids are tostring(nextUid): keep the counter above every numeric uid already in the save, so a counter that
+	-- fell behind (corruption, an old bug) can never hand out a uid that is already taken.
+	for _, list in { raw.creatures, raw.quarantine } do
+		if type(list) == "table" then
+			for _, entry in list do
+				local uid = if type(entry) == "table" then tonumber(entry.uid) else nil
+				if uid and uid == math.floor(uid) and uid >= nextUid and uid < 2 ^ 50 then
+					nextUid = uid + 1
+				end
+			end
+		end
+	end
 
 	-- Any saved creature entry as a record (fields repaired), or nil when it isn't a creature at all.
 	local function toRecord(entry: unknown): CreatureRecord?

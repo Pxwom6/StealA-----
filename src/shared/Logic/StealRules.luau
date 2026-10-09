@@ -73,6 +73,15 @@ export type CarryLimits = WalkLimits
 
 export type Rect = { minX: number, maxX: number, minZ: number, maxZ: number }
 
+-- Where the thief is when they start holding Steal (see canBeginHold).
+export type HoldContext = {
+	distance: number, -- thief root to podium
+	grabRange: number,
+	rangeSlack: number, -- extra studs allowed at begin (the prompt shows a little before the server's range)
+	thiefInsideBase: boolean,
+	thiefTrusted: boolean, -- the thief's reported position fits what the server observed (no teleporting in)
+}
+
 local StealRules = {}
 
 -- Order matters: the first failing reason is what the player is told.
@@ -118,6 +127,14 @@ function StealRules.canGrab(ctx: GrabContext): (boolean, string?)
 		return false, "hold"
 	end
 	return true, nil
+end
+
+-- A hold (StealBegin) only starts when the thief is already at the podium: within grab range (plus a little slack),
+-- inside the base, and their position trusted (not teleported in). Otherwise the hold timer could run while they
+-- are far away and they could teleport in and confirm instantly. Floor level is NOT required here: pressing
+-- mid-jump is normal, and canGrab checks floor level when the hold completes.
+function StealRules.canBeginHold(ctx: HoldContext): boolean
+	return ctx.thiefTrusted and ctx.thiefInsideBase and ctx.distance <= ctx.grabRange + ctx.rangeSlack
 end
 
 function StealRules.canTag(ctx: TagContext): (boolean, string?)
@@ -328,6 +345,7 @@ function StealRules.messageKey(reason: string): string?
 		far = "tooFar",
 		outside = "stealFromInside",
 		height = "stealOnFloor",
+		hold = "stealHoldNear",
 		full = "baseFull",
 	}
 	return map[reason]

@@ -249,17 +249,33 @@ local function addCommand(alias: string, handler: (userId: number, args: { strin
 	end)
 end
 
-local function startAdminTools()
-	pcall(function()
-		MessagingService:SubscribeAsync(LiveOps.messagingTopic, function(message: any)
-			local ok, decoded = pcall(function(): any
-				return HttpService:JSONDecode(message.Data)
+-- Subscribes to admin commands from other servers. MessagingService can fail (limits, outages), so keep retrying
+-- with a growing delay (5 s, 10 s, ... capped at 60 s) until it works.
+local function subscribeToCommands()
+	local attempt = 0
+	while true do
+		attempt += 1
+		local ok, err = pcall(function()
+			MessagingService:SubscribeAsync(LiveOps.messagingTopic, function(message: any)
+				local decodeOk, decoded = pcall(function(): any
+					return HttpService:JSONDecode(message.Data)
+				end)
+				if decodeOk and type(decoded) == "table" and type(decoded.kind) == "string" then
+					applyCommand(decoded :: Command)
+				end
 			end)
-			if ok and type(decoded) == "table" and type(decoded.kind) == "string" then
-				applyCommand(decoded :: Command)
-			end
 		end)
-	end)
+		if ok then
+			return
+		end
+		local delay = math.min(60, 5 * 2 ^ (attempt - 1))
+		warn(`[LiveOps] could not subscribe to admin commands (attempt {attempt}), retrying in {delay}s: {err}`)
+		task.wait(delay)
+	end
+end
+
+local function startAdminTools()
+	task.spawn(subscribeToCommands)
 
 	addCommand("luck", function(_userId: number, args: { string })
 		broadcastCommand({ kind = "luck", multiplier = tonumber(args[1]), minutes = tonumber(args[2]) })
