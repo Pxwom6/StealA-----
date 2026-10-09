@@ -45,6 +45,7 @@ export type CancelReason =
 	| "ownerLeft"
 	| "locked"
 	| "speed"
+	| "flying"
 	| "full"
 	| "rebirth"
 
@@ -141,7 +142,7 @@ function StealService.cancel(thief: Session, reason: CancelReason, taggerName: s
 		thief.stealCooldownUntil = now() + CFG.thiefCooldownAfterTagSeconds
 		Remotes.notify(thief.player, Format.template(Theme.text.gotTagged, { creature = creatureName }), "error")
 		Remotes.fire(thief.player, "Effect", { kind = "tagged" })
-	elseif reason == "timeout" or reason == "speed" then
+	elseif reason == "timeout" or reason == "speed" or reason == "flying" then
 		Remotes.notify(
 			thief.player,
 			Format.template(Theme.text.stealFailedTimeout, { creature = creatureName }),
@@ -272,6 +273,8 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 		distance = (root.Position - podiumRefs.base.Position).Magnitude,
 		grabRange = CFG.grabRange,
 		thiefInsideBase = PlotService.isInside(plot, root.Position),
+		thiefHeightAboveFloor = root.Position.Y - PlotService.refs(plot).floorY,
+		wallHeight = Gameplay.map.wallHeight,
 		thiefHasFreePodium = EconomyService.freePodium(thief) ~= nil,
 		holdStartedAt = holdStartedAt,
 		holdSeconds = CFG.holdSeconds,
@@ -341,8 +344,14 @@ local function onTag(player: Player, targetArg: unknown)
 		taggerUserId = tagger.userId,
 		thiefUserId = thief.userId,
 		thiefCarrying = thief.carry ~= nil,
-		distance = (taggerRoot.Position - thiefRoot.Position).Magnitude,
+		horizontalDistance = Vector3.new(
+			thiefRoot.Position.X - taggerRoot.Position.X,
+			0,
+			thiefRoot.Position.Z - taggerRoot.Position.Z
+		).Magnitude,
+		verticalDistance = thiefRoot.Position.Y - taggerRoot.Position.Y,
 		tagRange = CFG.tagRange,
+		tagVerticalAllowance = CFG.tagVerticalAllowance,
 		taggerCooldownUntil = tagger.tagCooldownUntil,
 	})
 	if not ok then
@@ -386,11 +395,18 @@ local function checkCarries()
 		-- Movement is checked on EVERY tick (so teleporting home right after a grab is caught before delivery),
 		-- measured from the start of the current window; the window only restarts after SPEED_WINDOW seconds,
 		-- so the per-window leeway can't be farmed by frequent checks.
+		-- Upward movement counts too (falling doesn't), and the thief may not climb/fly above maxCarryHeight (or
+		-- sink under the map).
+		local heightAboveGround = root.Position.Y - PlotService.world().groundY
+		if not StealRules.isCarryHeightAllowed(heightAboveGround, CFG.minCarryHeight, CFG.maxCarryHeight) then
+			StealService.cancel(thief, "flying")
+			continue
+		end
 		local dt = clockNow - carry.lastCheckAt
 		local delta = root.Position - carry.lastPosition
-		local horizontal = Vector3.new(delta.X, 0, delta.Z).Magnitude
+		local moved = StealRules.movementDistance(delta.X, delta.Y, delta.Z)
 		local tolerance, leeway = CFG.speedCheckTolerance, CFG.speedCheckLeeway
-		if not StealRules.isMovementPlausible(horizontal, dt, maxSpeed, tolerance, leeway) then
+		if not StealRules.isMovementPlausible(moved, dt, maxSpeed, tolerance, leeway) then
 			StealService.cancel(thief, "speed")
 			continue
 		end
@@ -398,8 +414,12 @@ local function checkCarries()
 			carry.lastPosition = root.Position
 			carry.lastCheckAt = clockNow
 		end
-		if thief.plot ~= 0 and PlotService.isInside(thief.plot, root.Position) then
-			deliver(thief)
+		if thief.plot ~= 0 then
+			local refs = PlotService.refs(thief.plot)
+			local inside = PlotService.isInside(thief.plot, root.Position)
+			if StealRules.canDeliver(inside, root.Position.Y - refs.floorY, Gameplay.map.wallHeight) then
+				deliver(thief)
+			end
 		end
 	end
 end

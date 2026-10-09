@@ -16,6 +16,8 @@ local function grab(overrides: { [string]: any }?): StealRules.GrabContext
 		distance = 5,
 		grabRange = 12,
 		thiefInsideBase = true,
+		thiefHeightAboveFloor = 3, -- a character standing on the floor
+		wallHeight = 7,
 		thiefHasFreePodium = true,
 		holdStartedAt = 98,
 		holdSeconds = 1.5,
@@ -58,6 +60,13 @@ T.describe("StealRules.canGrab", function()
 		T.expect(reason(grab({ holdStartedAt = 99.5 }))).toBe("hold")
 		T.expect((StealRules.canGrab(grab({ holdStartedAt = 98.8 })))).toBe(true) -- 1.2s >= 1.5 * 0.8
 	end)
+	T.it("refuses grabs from above the base (flying / hovering over the walls)", function()
+		T.expect(reason(grab({ thiefHeightAboveFloor = 25 }))).toBe("height")
+		T.expect(reason(grab({ thiefHeightAboveFloor = 7.5 }))).toBe("height")
+		T.expect(reason(grab({ thiefHeightAboveFloor = -5 }))).toBe("height")
+		T.expect((StealRules.canGrab(grab({ thiefHeightAboveFloor = 4.4 })))).toBe(true) -- standing on a podium
+		T.expect(StealRules.messageKey("height")).toBe("stealOnFloor")
+	end)
 	T.it("a locked base beats everything after ownership checks", function()
 		T.expect(reason(grab({ baseLocked = true, distance = 999 }))).toBe("locked")
 	end)
@@ -69,8 +78,10 @@ T.describe("StealRules.canTag", function()
 		taggerUserId = 1,
 		thiefUserId = 2,
 		thiefCarrying = true,
-		distance = 5,
+		horizontalDistance = 5,
+		verticalDistance = 0,
 		tagRange = 13,
+		tagVerticalAllowance = 22,
 		taggerCooldownUntil = 0,
 	}
 	T.it("anyone near a carrying thief can tag", function()
@@ -88,7 +99,20 @@ T.describe("StealRules.canTag", function()
 		T.expect(why({ thiefUserId = 1 })).toBe("self")
 		T.expect(why({ thiefCarrying = false })).toBe("not_carrying")
 		T.expect(why({ taggerCooldownUntil = 11 })).toBe("cooldown")
-		T.expect(why({ distance = 14 })).toBe("far")
+		T.expect(why({ horizontalDistance = 14 })).toBe("far")
+		T.expect(why({ verticalDistance = 30 })).toBe("far")
+	end)
+	T.it("measures reach horizontally, so flying up out of 3D range doesn't escape a tag", function()
+		-- thief 18 studs straight above the tagger: 3D distance 18 > tag range 13, but still taggable
+		local ctx = table.clone(base)
+		ctx.horizontalDistance = 2
+		ctx.verticalDistance = 18
+		T.expect((StealRules.canTag(ctx))).toBe(true)
+		ctx.verticalDistance = -18
+		T.expect((StealRules.canTag(ctx))).toBe(true)
+		T.expect(StealRules.withinTagReach(13, 0, 13, 22)).toBe(true)
+		T.expect(StealRules.withinTagReach(13.1, 0, 13, 22)).toBe(false)
+		T.expect(StealRules.withinTagReach(0, 22.5, 13, 22)).toBe(false)
 	end)
 end)
 
@@ -107,6 +131,28 @@ T.describe("StealRules movement and timing", function()
 		T.expect(StealRules.isMovementPlausible(100, 0.2, 10, 1.6, 6)).toBe(false)
 		T.expect(StealRules.isMovementPlausible(0 / 0, 1, 10, 1.6, 6)).toBe(false)
 		T.expect(StealRules.isMovementPlausible(3, 0, 10, 1.6, 6)).toBe(true)
+	end)
+	T.it("counts upward movement (flying) but not falling", function()
+		T.expect(StealRules.movementDistance(3, 0, 4)).toBe(5)
+		T.expect(StealRules.movementDistance(0, 30, 0)).toBe(30)
+		T.expect(StealRules.movementDistance(3, -40, 4)).toBe(5)
+		-- flying straight up 30 studs within one 0.2s tick is not plausible for a carrying thief
+		T.expect(StealRules.isMovementPlausible(StealRules.movementDistance(0, 30, 0), 0.2, 10, 1.6, 6)).toBe(false)
+	end)
+	T.it("caps a carrying thief's height above the ground", function()
+		T.expect(StealRules.isCarryHeightAllowed(12, 0, 22)).toBe(true) -- jumping off a podium
+		T.expect(StealRules.isCarryHeightAllowed(22.5, 0, 22)).toBe(false)
+		T.expect(StealRules.isCarryHeightAllowed(0 / 0, 0, 22)).toBe(false)
+	end)
+	T.it("a carrying thief can't sink under the map, out of every tagger's reach", function()
+		T.expect(StealRules.isCarryHeightAllowed(3, 0, 22)).toBe(true) -- standing on the ground
+		T.expect(StealRules.isCarryHeightAllowed(-0.5, 0, 22)).toBe(false)
+		T.expect(StealRules.isCarryHeightAllowed(-26.6, 0, 22)).toBe(false) -- no-clipped under the ground
+	end)
+	T.it("only delivers at floor level inside your own plot", function()
+		T.expect(StealRules.canDeliver(true, 3, 7)).toBe(true)
+		T.expect(StealRules.canDeliver(true, 40, 7)).toBe(false) -- hovering above your own base
+		T.expect(StealRules.canDeliver(false, 3, 7)).toBe(false)
 	end)
 	T.it("expires long carries", function()
 		T.expect(StealRules.isCarryExpired(0, 74, 75)).toBe(false)

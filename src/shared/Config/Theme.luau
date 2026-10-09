@@ -103,6 +103,7 @@ local Theme = {
 		cantStealProtected = "New players are protected for a few minutes.",
 		cantStealOwn = "That's yours!",
 		stealFromInside = "Get inside their base first!",
+		stealOnFloor = "Stand on the floor to steal!",
 		stealCooldown = "Catch your breath... {time}",
 		alreadyCarrying = "You're already carrying one!",
 		stealStarted = "Run home! Don't get tagged!",

@@ -50,7 +50,12 @@ local Gameplay = {
 		grabRange = 12,
 		carrySpeedMultiplier = 0.62,
 		carryTimeoutSeconds = 75,
-		tagRange = 13,
+		tagRange = 13, -- horizontal studs between tagger and thief
+		tagVerticalAllowance = 28, -- generous height difference still allowed for a tag (> maxCarryHeight)
+		-- A carrying thief's root must stay between these heights above the ground: no flying away, no sinking under
+		-- the map. 24 leaves room for a jump from the highest perch, the entrance sign (root apex about 22.8).
+		minCarryHeight = 0,
+		maxCarryHeight = 24,
 		tagCooldownSeconds = 1,
 		thiefCooldownAfterTagSeconds = 6,
 		speedCheckTolerance = 1.6, -- multiplier on the allowed carry speed before we drop the creature

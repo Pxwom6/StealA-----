@@ -69,7 +69,11 @@ transactions in DataStores), mitigated by saving both immediately.
 **Chose:** while locked, the server teleports non-owners out of the plot 4×/s; the entrance barrier is collidable
 for visuals/honest clients, and the owner's client turns its collision off locally. The yellow new-player shield
 is visual only (stealing is refused server-side), so claiming a plot can never trap a visitor inside. Grabbing
-also requires the thief to stand inside the victim's plot (no reaching through walls).
+also requires the thief to stand inside the victim's plot at floor level (no reaching through walls, no grabbing
+from the air), delivery requires floor level inside the thief's own plot, a carrying thief's root must stay between
+`Gameplay.steal.minCarryHeight` and `maxCarryHeight` above the ground (no flying up, no sinking under the map),
+and tag reach is horizontal range plus a vertical allowance larger than that cap — so gaining height never escapes
+a tag.
 **Why:** character physics is client-owned, so a collidable wall alone stops nobody who no-clips. A thief still
 inside when the owner locks drops the creature.
 

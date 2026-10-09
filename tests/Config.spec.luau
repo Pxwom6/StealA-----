@@ -162,6 +162,14 @@ T.describe("Config integrity", function()
 		end
 	end)
 
+	T.it("any thief allowed to carry can still be tagged from the ground", function()
+		-- a tagger standing on the ground (root ~3 studs up) must reach a thief at the carry height cap
+		T.expect(Gameplay.steal.tagVerticalAllowance).toBeGreaterThan(Gameplay.steal.maxCarryHeight - 3)
+		T.expect(Gameplay.steal.maxCarryHeight).toBeGreaterThan(Gameplay.map.wallHeight)
+		-- and a thief standing on the ground (root ~3 studs up) is never below the carry floor
+		T.expect(Gameplay.steal.minCarryHeight).toBeLessThan(2)
+	end)
+
 	T.it("collect pads never overlap their neighbours", function()
 		T.expect(Gameplay.collect.padRange).toBeLessThan(Gameplay.map.podiumRowSpacing / 2)
 	end)

@@ -17,6 +17,8 @@ export type GrabContext = {
 	distance: number,
 	grabRange: number,
 	thiefInsideBase: boolean, -- no grabbing through walls: the thief must be inside the victim's plot
+	thiefHeightAboveFloor: number, -- thief's root Y minus the plot's floor Y (no grabbing from mid-air)
+	wallHeight: number,
 	thiefHasFreePodium: boolean,
 	holdStartedAt: number?, -- when the thief began holding the prompt (server time), nil if never
 	holdSeconds: number,
@@ -28,8 +30,10 @@ export type TagContext = {
 	taggerUserId: number,
 	thiefUserId: number,
 	thiefCarrying: boolean,
-	distance: number,
+	horizontalDistance: number, -- between the two root parts, ignoring height
+	verticalDistance: number, -- absolute height difference between the two root parts
 	tagRange: number,
+	tagVerticalAllowance: number,
 	taggerCooldownUntil: number,
 }
 
@@ -69,6 +73,9 @@ function StealRules.canGrab(ctx: GrabContext): (boolean, string?)
 	if not ctx.thiefInsideBase then
 		return false, "outside"
 	end
+	if not StealRules.isAtFloorLevel(ctx.thiefHeightAboveFloor, ctx.wallHeight) then
+		return false, "height"
+	end
 	if not ctx.thiefHasFreePodium then
 		return false, "full"
 	end
@@ -89,14 +96,55 @@ function StealRules.canTag(ctx: TagContext): (boolean, string?)
 	if ctx.now < ctx.taggerCooldownUntil then
 		return false, "cooldown"
 	end
-	if not (ctx.distance <= ctx.tagRange) then
+	if
+		not StealRules.withinTagReach(
+			ctx.horizontalDistance,
+			ctx.verticalDistance,
+			ctx.tagRange,
+			ctx.tagVerticalAllowance
+		)
+	then
 		return false, "far"
 	end
 	return true, nil
 end
 
+-- Tag reach is horizontal range plus a generous vertical allowance, so a thief can't escape a tag by gaining
+-- height (the carry height cap keeps every legitimate thief well inside the allowance).
+function StealRules.withinTagReach(
+	horizontalDistance: number,
+	verticalDistance: number,
+	tagRange: number,
+	verticalAllowance: number
+): boolean
+	return horizontalDistance <= tagRange and math.abs(verticalDistance) <= verticalAllowance
+end
+
+-- True when a root part is near floor height: not below the floor, and not higher than the plot's walls.
+-- Used for grabbing and delivering, so neither can be done from the air above a base.
+function StealRules.isAtFloorLevel(heightAboveFloor: number, wallHeight: number): boolean
+	return heightAboveFloor >= -2 and heightAboveFloor <= wallHeight
+end
+
+-- A carried creature is delivered only when the thief stands inside their own plot at floor level.
+function StealRules.canDeliver(insideOwnPlot: boolean, heightAboveFloor: number, wallHeight: number): boolean
+	return insideOwnPlot and StealRules.isAtFloorLevel(heightAboveFloor, wallHeight)
+end
+
+-- While carrying, the thief's root must stay between `minHeight` and `maxHeight` above the ground: no flying away
+-- above every tagger, and no sinking under the map out of their reach either.
+function StealRules.isCarryHeightAllowed(heightAboveGround: number, minHeight: number, maxHeight: number): boolean
+	return heightAboveGround >= minHeight and heightAboveGround <= maxHeight -- false for NaN
+end
+
+-- Movement that counts against a carrying thief: horizontal distance plus any upward rise. Falling is free
+-- (gravity), climbing or flying is not.
+function StealRules.movementDistance(dx: number, dy: number, dz: number): number
+	return math.sqrt(dx * dx + dz * dz) + math.max(0, dy)
+end
+
 -- Server-side speed sanity check while carrying (character physics is client-owned, so a speed exploit would
--- otherwise make stealing trivial). `distance` is horizontal studs moved in `dt` seconds.
+-- otherwise make stealing trivial). `distance` is studs moved in `dt` seconds (see movementDistance).
 function StealRules.isMovementPlausible(
 	distance: number,
 	dt: number,
@@ -140,6 +188,7 @@ function StealRules.messageKey(reason: string): string?
 		protected = "cantStealProtected",
 		far = "tooFar",
 		outside = "stealFromInside",
+		height = "stealOnFloor",
 		full = "baseFull",
 	}
 	return map[reason]
