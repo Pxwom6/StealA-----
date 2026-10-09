@@ -162,8 +162,8 @@ paid-for podiums avoids a feel-bad. One config flag flips it.
 
 ### 15. Studio-only test hooks
 
-**Chose:** the `DevGrantProduct` handler (simulated purchases through the real receipt path) is only connected
-when `RunService:IsStudio()`, and LiveOps admin commands accept anyone in Studio. Live servers only accept
+**Chose:** the `DevGrantProduct` remote (simulated purchases through the real receipt path) is only created, and
+its handler only connected, when `RunService:IsStudio()`; LiveOps admin commands accept anyone in Studio. Live servers only accept
 `LiveOps.adminUserIds`.
 
 ### 16. Strict typing targets the new Luau type solver
