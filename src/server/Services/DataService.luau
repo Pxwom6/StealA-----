@@ -30,6 +30,12 @@ type Profile = Sessions.Profile
 -- Bump the suffix only for a deliberate wipe; schema changes go through DataSchema.migrate instead.
 local STORE_NAME = "PlayerData_v1"
 
+-- Give up loading after about this long (the player is then kicked with "please rejoin"). Passing `Cancel` turns off
+-- ProfileStore's own 120 s timeout, so we need our own. It must outlast ProfileStore's session steal from a crashed
+-- server, which lands 45-51 s in (5 s + 4 x 10 s of waits, plus six DataStore calls); 45 s would cancel just before
+-- it and leave the player locked out until the dead session expires (~10 min).
+local LOAD_TIMEOUT_SECONDS = 60
+
 local DataService = {}
 
 -- ProfileStore is installed by Wally (`wally install`) into ServerScriptService.ServerPackages.
@@ -81,11 +87,13 @@ function DataService.start()
 	end)
 end
 
--- Starts a session for `player`. Yields. Returns nil if the player left or the store could not start a session.
+-- Starts a session for `player`. Yields (about LOAD_TIMEOUT_SECONDS at most: Cancel is checked between DataStore
+-- calls). Returns nil if the player left, the load timed out, or the store could not start a session.
 function DataService.load(player: Player): Profile?
+	local deadline = os.clock() + LOAD_TIMEOUT_SECONDS
 	local profile: Profile? = store:StartSessionAsync(profileKey(player.UserId), {
 		Cancel = function(): boolean
-			return player.Parent ~= Players
+			return player.Parent ~= Players or os.clock() >= deadline
 		end,
 	})
 	if profile == nil then
