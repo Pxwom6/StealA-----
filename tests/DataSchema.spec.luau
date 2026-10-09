@@ -8,6 +8,7 @@ local rules: DataSchema.SanitiseRules = {
 	end,
 	maxPodiums = 20,
 	maxPodiumUpgrades = 8,
+	startingPodiums = 8,
 	maxRebirths = 30,
 	maxReceipts = 3,
 	maxHistory = 2,
@@ -30,6 +31,7 @@ T.describe("DataSchema", function()
 		local v1 = DataSchema.migrate({ version = 1, cash = 5 })
 		T.expect(v1.version).toBe(2)
 		T.expect(v1.lockTimers).toEqual({ cooldownUntil = 0, vulnerableUntil = 0 })
+		T.expect(v1.quarantine).toEqual({})
 		local clean = DataSchema.sanitise(v1, 100, rules)
 		T.expect(clean.lockTimers).toEqual({ cooldownUntil = 0, vulnerableUntil = 0 })
 
@@ -66,7 +68,7 @@ T.describe("DataSchema", function()
 		T.expect(#fixes).toBeGreaterThan(0)
 	end)
 
-	T.it("drops unknown creatures, duplicate podiums and fixes duplicate uids", function()
+	T.it("quarantines unknown creatures, moves ones on a taken or invalid podium and fixes duplicate uids", function()
 		local saved: any = {
 			nextUid = 10,
 			creatures = {
@@ -79,12 +81,121 @@ T.describe("DataSchema", function()
 			},
 		}
 		local clean = DataSchema.sanitise(saved, 100, rules)
-		T.expect(#clean.creatures).toBe(2)
+		T.expect(#clean.creatures).toBe(4)
 		T.expect(clean.creatures[1].uid).toBe("1")
 		T.expect(clean.creatures[1].stored).toBe(12)
 		T.expect(clean.creatures[2].uid).toBe("10")
 		T.expect(clean.creatures[2].stored).toBe(0)
+		-- the one sharing podium 1 and the one on podium 99 move to the lowest free podiums instead of vanishing
+		T.expect(clean.creatures[3].uid).toBe("4")
+		T.expect(clean.creatures[3].podium).toBe(3)
+		T.expect(clean.creatures[4].uid).toBe("5")
+		T.expect(clean.creatures[4].podium).toBe(4)
 		T.expect(clean.nextUid).toBe(11)
+		T.expect(#clean.quarantine).toBe(1)
+		T.expect(clean.quarantine[1].id).toBe("deleted_creature")
+	end)
+
+	T.it("lowering the podium limit in config moves creatures instead of deleting them", function()
+		local saved: any = {
+			podiumUpgrades = 1, -- base capacity 9
+			creatures = {
+				{ uid = "1", id = "pizza_pup", podium = 18 },
+				{ uid = "2", id = "pizza_pup", podium = 19 },
+			},
+		}
+		local lowered = table.clone(rules)
+		lowered.maxPodiums = 16
+		local clean = DataSchema.sanitise(saved, 100, lowered)
+		T.expect(#clean.creatures).toBe(2)
+		T.expect(clean.creatures[1].podium).toBe(1)
+		T.expect(clean.creatures[2].podium).toBe(2)
+
+		-- No free podium within the base capacity: kept safe in quarantine.
+		local full = table.clone(lowered)
+		full.startingPodiums = 1
+		saved.podiumUpgrades = 0
+		saved.creatures[3] = { uid = "3", id = "pizza_pup", podium = 1 }
+		local tight = DataSchema.sanitise(saved, 100, full)
+		T.expect(#tight.creatures).toBe(1)
+		T.expect(#tight.quarantine).toBe(2)
+	end)
+
+	T.it("a creature removed or renamed in config is quarantined, not deleted", function()
+		local saved: any = {
+			creatures = {
+				{ uid = "1", id = "pizza_pup", podium = 1, acquiredAt = 5, stored = 12 },
+				{ uid = "2", id = "old_name_pup", podium = 4, acquiredAt = 7, stored = 30, variant = "gold" },
+			},
+		}
+		local clean, fixes = DataSchema.sanitise(saved, 100, rules)
+		T.expect(#clean.creatures).toBe(1)
+		T.expect(clean.quarantine).toEqual({
+			{ uid = "2", id = "old_name_pup", podium = 4, acquiredAt = 7, stored = 30, variant = "gold" },
+		})
+		T.expect(table.find(fixes, "quarantined unknown creature old_name_pup") ~= nil).toBe(true)
+		-- Still quarantined on the next load (survives the round trip), and template/garbage give an empty list.
+		local again = DataSchema.sanitise(clean :: any, 100, rules)
+		T.expect(again.quarantine).toEqual(clean.quarantine)
+		T.expect(DataSchema.template(100).quarantine).toEqual({})
+		local garbage: any = { quarantine = { "x" :: any, { id = 5 } :: any, { uid = "9" } :: any } }
+		T.expect(DataSchema.sanitise(garbage, 100, rules).quarantine).toEqual({})
+	end)
+
+	T.it("quarantined creatures come back when their id exists again", function()
+		local saved: any = {
+			nextUid = 20,
+			creatures = {
+				{ uid = "1", id = "pizza_pup", podium = 1, acquiredAt = 5, stored = 0 },
+				{ uid = "2", id = "pizza_pup", podium = 2, acquiredAt = 5, stored = 0 },
+			},
+			quarantine = {
+				{ uid = "7", id = "donut_dragon", podium = 3, acquiredAt = 9, stored = 40 }, -- its podium is free
+				{ uid = "1", id = "donut_dragon", podium = 2, acquiredAt = 9, stored = 0 }, -- podium + uid taken
+				{ uid = "8", id = "still_gone", podium = 5, acquiredAt = 9, stored = 0 },
+			},
+		}
+		local clean = DataSchema.sanitise(saved, 100, rules)
+		T.expect(#clean.creatures).toBe(4)
+		T.expect(clean.creatures[3]).toEqual({
+			uid = "7",
+			id = "donut_dragon",
+			podium = 3,
+			acquiredAt = 9,
+			stored = 40,
+			variant = nil,
+		})
+		T.expect(clean.creatures[4].podium).toBe(4) -- lowest free podium
+		T.expect(clean.creatures[4].uid).toBe("20") -- uid "1" is taken
+		T.expect(#clean.quarantine).toBe(1)
+		T.expect(clean.quarantine[1].id).toBe("still_gone")
+
+		-- No free podium: it stays safely in quarantine.
+		local tight = table.clone(rules)
+		tight.maxPodiums = 2
+		local full = DataSchema.sanitise(saved, 100, tight)
+		T.expect(#full.creatures).toBe(2)
+		T.expect(#full.quarantine).toBe(3)
+
+		-- A restored creature goes back to its own podium if free (even past the base capacity, where a pass may have
+		-- put it), but is only moved to another podium within the base capacity (2 here, both taken).
+		local small = table.clone(rules)
+		small.startingPodiums = 2
+		local back = DataSchema.sanitise(
+			{
+				creatures = saved.creatures,
+				quarantine = {
+					{ uid = "30", id = "donut_dragon", podium = 11 },
+					{ uid = "31", id = "donut_dragon", podium = 1 },
+				},
+			} :: any,
+			100,
+			small
+		)
+		T.expect(#back.creatures).toBe(3)
+		T.expect(back.creatures[3].podium).toBe(11)
+		T.expect(#back.quarantine).toBe(1)
+		T.expect(back.quarantine[1].uid).toBe("31")
 	end)
 
 	T.it("bounds receipts and history", function()

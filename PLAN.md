@@ -166,6 +166,7 @@ type PlayerData = {
     cash: number,
     totalEarned: number,
     creatures: { CreatureRecord }, -- what sits on podiums
+    quarantine: { CreatureRecord }, -- kept off the podiums (unknown id, or no free podium); restored later (v2)
     nextUid: number,             -- per-player creature uid counter
     podiumUpgrades: number,      -- bought with cash (pass bonus is not saved, it is checked live)
     rebirths: number,

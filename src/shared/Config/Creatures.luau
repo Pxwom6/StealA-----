@@ -10,6 +10,10 @@
 	eventId     optional: only spawns while the LiveOps event with this id is active (limited-time creatures)
 
 	Balance notes live in BALANCE.md; `lune run tools/simulate.luau` re-runs the numbers after any change here.
+
+	Never remove or rename an `id` once it has shipped: players own them (a save with an unknown id quarantines
+	that creature until the id is back). To stop one spawning, give it an `eventId` that is never active.
+	New ids must also be appended to RELEASED_CREATURE_IDS in tests/Config.spec.luau (CI fails until they are).
 ]]
 
 local Types = require("../Types")

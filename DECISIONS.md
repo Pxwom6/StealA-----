@@ -21,6 +21,13 @@ release, roll back only code that is not about saves: keep the current save code
 migrate, sanitise, template; and `Types.PlayerData`), or the older sanitise would drop the newer keys. Test schema
 bumps with Studio API access off (mock store) or in a separate place, never against the live DataStore.
 
+Creature ids are permanent: a save holding an id that is missing from `Config/Creatures` moves that creature to
+`data.quarantine` (off the podiums) instead of deleting it, and it comes back automatically once the id exists
+again (on its own podium if free, else the lowest free podium within the base capacity, else it waits). A creature
+whose podium is invalid or taken (e.g. `maxPodiums` lowered) is moved the same way instead of being dropped. A CI
+test lists every released id and fails if one disappears or a new one isn't added; retire a creature with a
+never-active `eventId` instead.
+
 ### 2. Shared code uses relative string requires; server/client use instance paths
 
 **Chose:** modules in `src/shared/Config` and `src/shared/Logic` (and `Types.luau`) import each other with

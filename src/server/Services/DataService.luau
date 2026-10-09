@@ -49,6 +49,7 @@ local sanitiseRules: DataSchema.SanitiseRules = {
 	end,
 	maxPodiums = Gameplay.map.maxPodiums,
 	maxPodiumUpgrades = Economy.podiumUpgrade.maxPurchased,
+	startingPodiums = Economy.startingPodiums,
 	maxRebirths = RebirthConfig.maxRebirths,
 	maxReceipts = Monetization.purchaseIdCacheSize,
 	maxHistory = Monetization.purchaseHistorySize,

@@ -98,6 +98,11 @@ export type PlayerData = {
 	version: number,
 	cash: number,
 	creatures: { CreatureRecord },
+	-- Creatures the save holds but no podium can show right now, kept off the podiums instead of being deleted: ones
+	-- whose id is missing from the current config (removed or renamed by mistake), and ones whose podium was invalid
+	-- or taken with no free podium in the base. They return automatically on a later load once the id exists again
+	-- and a podium is free (DataSchema.sanitise). A rebirth spends them like any other Snackling.
+	quarantine: { CreatureRecord },
 	nextUid: number,
 	podiumUpgrades: number,
 	rebirths: number,

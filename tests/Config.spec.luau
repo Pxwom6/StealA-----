@@ -13,7 +13,53 @@ local Sounds = require("../src/shared/Config/Sounds")
 local LiveOps = require("../src/shared/Config/LiveOps")
 local LiveOpsRules = require("../src/shared/Logic/LiveOpsRules")
 
+-- Every creature id that has shipped. APPEND-ONLY: add new ids when they release, never remove or rename one —
+-- players own them. (A save holding an id missing from config quarantines that creature: it vanishes from the
+-- base until the id is back.) To stop a creature spawning, give it an `eventId` that is never active instead.
+local RELEASED_CREATURE_IDS = {
+	"pizza_pup",
+	"pretzel_pal",
+	"gummy_grub",
+	"toast_toad",
+	"sushi_slug",
+	"nacho_newt",
+	"waffle_wombat",
+	"taco_turtle",
+	"burrito_bear",
+	"cupcake_cub",
+	"ramen_raccoon",
+	"popcorn_penguin",
+	"bagel_badger",
+	"donut_dragon",
+	"pancake_panda",
+	"churro_cheetah",
+	"lasagna_lion",
+	"dumpling_dino",
+	"gelato_griffin",
+	"croissant_kraken",
+}
+
 T.describe("Config integrity", function()
+	T.it("every creature id from a past release still exists (never remove or rename one)", function()
+		local byId: { [string]: boolean } = {}
+		for _, creature in Creatures do
+			byId[creature.id] = true
+		end
+		for _, id in RELEASED_CREATURE_IDS do
+			if not byId[id] then
+				error(`creature id "{id}" shipped in a release but is missing from Config/Creatures`)
+			end
+		end
+	end)
+
+	T.it("every creature in config is on the released list (append new ids when they ship)", function()
+		for _, creature in Creatures do
+			if table.find(RELEASED_CREATURE_IDS, creature.id) == nil then
+				error(`append "{creature.id}" to RELEASED_CREATURE_IDS in tests/Config.spec.luau so it is protected`)
+			end
+		end
+	end)
+
 	T.it("creature and rarity config validates", function()
 		local problems = Catalog.validate(Creatures, Rarities)
 		T.expect(#problems).toBe(0)
