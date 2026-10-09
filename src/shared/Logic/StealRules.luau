@@ -418,6 +418,58 @@ function StealRules.graceUntil(now: number, playTimeSeconds: number, graceSecond
 	return now + remaining
 end
 
+-- Why a carry ended without a delivery (see StealService.cancel). "left" / "rebirth": the thief left or rebirthed;
+-- "ownerLeft" / "ownerRebirth": the owner did.
+export type CancelReason =
+	"tagged"
+	| "timeout"
+	| "died"
+	| "left"
+	| "ownerLeft"
+	| "locked"
+	| "speed"
+	| "flying"
+	| "full"
+	| "rebirth"
+	| "ownerRebirth"
+	| "error"
+
+-- Every CancelReason, for checks over all of them.
+local CANCEL_REASONS: { CancelReason } = {
+	"tagged",
+	"timeout",
+	"died",
+	"left",
+	"ownerLeft",
+	"locked",
+	"speed",
+	"flying",
+	"full",
+	"rebirth",
+	"ownerRebirth",
+	"error",
+}
+StealRules.CANCEL_REASONS = table.freeze(CANCEL_REASONS)
+
+-- Message key (in Config/Theme.text) telling the thief why their carry ended, one per reason; nil only for "left"
+-- (the thief is gone).
+function StealRules.cancelMessageKey(reason: string): string?
+	local map: { [string]: string } = {
+		tagged = "gotTagged",
+		timeout = "stealFailedTimeout",
+		died = "stealFailedDied",
+		ownerLeft = "ownerLeftDuringSteal",
+		locked = "stealFailedLocked",
+		speed = "stealFailedSpeed",
+		flying = "stealFailedFlying",
+		full = "baseFull",
+		rebirth = "stealFailedRebirth",
+		ownerRebirth = "ownerRebirthedDuringSteal",
+		error = "stealFailedError",
+	}
+	return map[reason]
+end
+
 -- Friendly message key for a refusal reason (keys are in Config/Theme.text).
 function StealRules.messageKey(reason: string): string?
 	local map: { [string]: string } = {

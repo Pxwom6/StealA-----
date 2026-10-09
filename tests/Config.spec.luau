@@ -64,6 +64,16 @@ T.describe("Config integrity", function()
 		end
 	end)
 
+	T.it("every carry cancel reason with a message has that text in Theme.text", function()
+		local text = (Theme.text :: any) :: { [string]: string }
+		for _, reason in StealRules.CANCEL_REASONS do
+			local key = StealRules.cancelMessageKey(reason)
+			if key ~= nil and type(text[key]) ~= "string" then
+				error(`carry cancel "{reason}" has no message in Theme.text (key {key})`)
+			end
+		end
+	end)
+
 	T.it("every creature id from a past release still exists (never remove or rename one)", function()
 		local byId: { [string]: boolean } = {}
 		for _, creature in Creatures do

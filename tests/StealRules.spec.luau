@@ -595,6 +595,24 @@ T.describe("StealRules movement and timing", function()
 		T.expect(StealRules.messageKey("outside")).toBe("stealFromInside")
 		T.expect(StealRules.messageKey("hold")).toBe("stealHoldNear")
 	end)
+	T.it("a cancelled carry tells the thief its own reason (flying and speed are not 'Too slow!')", function()
+		T.expect(StealRules.cancelMessageKey("timeout")).toBe("stealFailedTimeout")
+		T.expect(StealRules.cancelMessageKey("speed")).toBe("stealFailedSpeed")
+		T.expect(StealRules.cancelMessageKey("flying")).toBe("stealFailedFlying")
+		T.expect(StealRules.cancelMessageKey("left")).toBe(nil) -- the thief is gone
+		local seen: { [string]: string } = {}
+		for _, why in StealRules.CANCEL_REASONS do
+			local key = StealRules.cancelMessageKey(why)
+			if why ~= "left" then
+				if key == nil then
+					error(`cancel reason "{why}" has no message`)
+				elseif seen[key] then
+					error(`cancel reasons "{why}" and "{seen[key]}" share the message {key}`)
+				end
+				seen[key] = why
+			end
+		end
+	end)
 end)
 
 return nil

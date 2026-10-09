@@ -38,18 +38,7 @@ local Sessions = require(script.Parent.Sessions)
 type Session = Sessions.Session
 type Carry = Sessions.Carry
 
-export type CancelReason =
-	"tagged"
-	| "timeout"
-	| "died"
-	| "left"
-	| "ownerLeft"
-	| "locked"
-	| "speed"
-	| "flying"
-	| "full"
-	| "rebirth"
-	| "error"
+export type CancelReason = StealRules.CancelReason
 
 local StealService = {}
 
@@ -148,26 +137,14 @@ function StealService.cancel(thief: Session, reason: CancelReason, taggerName: s
 	local creatureName = def.displayName
 	if reason == "tagged" then
 		thief.stealCooldownUntil = now() + CFG.thiefCooldownAfterTagSeconds
-		Remotes.notify(thief.player, Format.template(Theme.text.gotTagged, { creature = creatureName }), "error")
 		Remotes.fire(thief.player, "Effect", { kind = "tagged" })
-	elseif reason == "timeout" or reason == "speed" or reason == "flying" then
-		Remotes.notify(
-			thief.player,
-			Format.template(Theme.text.stealFailedTimeout, { creature = creatureName }),
-			"error"
-		)
-	elseif reason == "full" then
-		Remotes.notify(thief.player, Theme.text.baseFull, "error")
-	elseif reason == "locked" or reason == "rebirth" then
-		Remotes.notify(thief.player, Format.template(Theme.text.creatureReturned, { creature = creatureName }), "error")
-	elseif reason == "ownerLeft" then
-		Remotes.notify(
-			thief.player,
-			Format.template(Theme.text.ownerLeftDuringSteal, { creature = creatureName }),
-			"info"
-		)
 	end
-	if victim and reason ~= "ownerLeft" and reason ~= "rebirth" then
+	local key = StealRules.cancelMessageKey(reason)
+	if key then
+		local calm = reason == "ownerLeft" or reason == "ownerRebirth" or reason == "rebirth" -- nothing went wrong
+		Remotes.notify(thief.player, UiTheme.text(key, { creature = creatureName }), if calm then "info" else "error")
+	end
+	if victim and reason ~= "ownerLeft" and reason ~= "ownerRebirth" then
 		local text = Format.template(Theme.text.creatureReturned, { creature = creatureName })
 		if taggerName then
 			text = `{taggerName}: {text}`
@@ -487,7 +464,7 @@ function StealService.releaseAll(session: Session, reason: CancelReason)
 	end
 	for _, other in Sessions.all() do
 		if other.carry and other.carry.victimUserId == session.userId then
-			StealService.cancel(other, if reason == "rebirth" then "rebirth" else "ownerLeft")
+			StealService.cancel(other, if reason == "rebirth" then "ownerRebirth" else "ownerLeft")
 		end
 	end
 end
