@@ -12,7 +12,14 @@ key `Player_<UserId>`, data shape = `Types.PlayerData`, upgraded by `DataSchema.
 **Why:** session locking (no duplication across servers), autosave, BindToClose handling and `LastSavedData`
 (needed for safe receipts) out of the box; it is the de-facto standard.
 **Reversal cost:** high — moving off it means a one-time migration of every save. Never rename the store to
-"fix" data; add a migration step instead (bump `DataSchema.VERSION`).
+"fix" data; add a migration step instead (bump `DataSchema.VERSION`). A server never loads a save whose version is
+newer than its own (`DataSchema.isFromNewerVersion`): during a rolling update an old server would otherwise drop the
+new fields; it releases the session untouched and kicks with "This server is updating — please rejoin!". So:
+bump `DataSchema.VERSION` in every release that adds, removes, renames or changes the meaning of any saved key, even
+with an empty migrate step, and never publish a build with a lower VERSION than an earlier one. To roll back a bad
+release, roll back only code that is not about saves: keep the current save code whole (`DataSchema`: VERSION,
+migrate, sanitise, template; and `Types.PlayerData`), or the older sanitise would drop the newer keys. Test schema
+bumps with Studio API access off (mock store) or in a separate place, never against the live DataStore.
 
 ### 2. Shared code uses relative string requires; server/client use instance paths
 

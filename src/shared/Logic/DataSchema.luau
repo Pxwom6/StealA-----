@@ -2,7 +2,11 @@
 --[[
 	The saved player data: type, template, versioned migration and sanitising.
 
-	`migrate` upgrades older saves step by step (bump SCHEMA_VERSION and add a step when the shape changes).
+	`migrate` upgrades older saves step by step. Bump SCHEMA_VERSION in EVERY release that adds, removes, renames or
+	changes the meaning of any saved key (top-level or nested), even when its migrate step is empty: a server never
+	loads a save with a newer version (isFromNewerVersion), and that check is the only thing stopping a server still
+	running the old release from dropping keys it doesn't know. SCHEMA_VERSION must never go down in a published build,
+	and a rollback must keep this module (and Types.PlayerData) as they are.
 	`sanitise` repairs anything out of range so a corrupted or hand-edited save can never crash the server or
 	hand out impossible values (NaN cash, unknown creatures, two creatures on one podium...).
 	Pure: no Roblox APIs.
@@ -69,7 +73,14 @@ local function wholeInRange(value: unknown, min: number, max: number, fallback: 
 	return math.clamp(math.floor(finite(value, fallback)), min, max)
 end
 
--- Upgrades `raw` in place to the current schema version and returns it, one step per version.
+-- True when `raw` was written by a newer release (a schema version this server does not know). Such a save must not
+-- be used here: sanitising it would drop the fields this server doesn't know about, and saving would wipe them.
+function DataSchema.isFromNewerVersion(raw: { [string]: any }): boolean
+	return finite(raw.version, 0) > SCHEMA_VERSION
+end
+
+-- Upgrades `raw` in place to the current schema version and returns it, one step per version. A save from a newer
+-- release is returned untouched.
 function DataSchema.migrate(raw: { [string]: any }): { [string]: any }
 	local version = finite(raw.version, 0)
 	if version < 1 then -- the initial shape
@@ -224,8 +235,12 @@ function DataSchema.sanitise(
 end
 
 -- Writes every field of `clean` into `target` (the live ProfileStore table) and removes unknown keys,
--- so the table identity ProfileStore holds stays the same.
-function DataSchema.applyInPlace(target: { [string]: any }, clean: PlayerData)
+-- so the table identity ProfileStore holds stays the same. Refuses (returns false, changes nothing) when `target`
+-- was written by a newer release: its unknown keys are real data, not junk.
+function DataSchema.applyInPlace(target: { [string]: any }, clean: PlayerData): boolean
+	if DataSchema.isFromNewerVersion(target) then
+		return false
+	end
 	local cleanMap = (clean :: any) :: { [string]: any }
 	for key in target do
 		if cleanMap[key] == nil then
@@ -235,6 +250,7 @@ function DataSchema.applyInPlace(target: { [string]: any }, clean: PlayerData)
 	for key, value in cleanMap do
 		target[key] = value
 	end
+	return true
 end
 
 return DataSchema

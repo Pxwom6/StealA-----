@@ -72,6 +72,11 @@ tools               Lune scripts (balance simulation)
 4. Add your UserId to `adminUserIds` in `src/shared/Config/LiveOps.luau`.
 5. Optional: sound IDs in `src/shared/Config/Sounds.luau`, models in `ReplicatedStorage/CreatureModels`.
 
+**Changing the save format:** bump `DataSchema.VERSION` whenever a saved key is added, removed, renamed or changes
+meaning, and never publish a lower VERSION than before. A rollback keeps the current save code (`DataSchema`,
+`Types.PlayerData`) and rolls back everything else (see DECISIONS.md #1). With Studio API access on, Studio writes
+to the live DataStore: test schema changes with it off.
+
 ### LiveOps without a code change
 
 * **Planned events:** add an entry to `events` in `src/shared/Config/LiveOps.luau` (Unix times, UTC).

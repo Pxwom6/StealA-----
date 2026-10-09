@@ -106,10 +106,35 @@ T.describe("DataSchema", function()
 	T.it("applies in place, keeping the table identity", function()
 		local live: { [string]: any } = { cash = 5, junk = true }
 		local clean = DataSchema.sanitise(live, 100, rules)
-		DataSchema.applyInPlace(live, clean)
+		T.expect(DataSchema.applyInPlace(live, clean)).toBe(true)
 		T.expect(live.junk).toBeNil()
 		T.expect(live.cash).toBe(5)
 		T.expect(live.version).toBe(DataSchema.VERSION)
+	end)
+
+	T.it("detects saves written by a newer release", function()
+		T.expect(DataSchema.isFromNewerVersion({ version = DataSchema.VERSION + 1 })).toBe(true)
+		T.expect(DataSchema.isFromNewerVersion({ version = DataSchema.VERSION })).toBe(false)
+		T.expect(DataSchema.isFromNewerVersion({ version = 1 })).toBe(false)
+		T.expect(DataSchema.isFromNewerVersion({})).toBe(false)
+		T.expect(DataSchema.isFromNewerVersion({ version = 0 / 0 })).toBe(false)
+	end)
+
+	T.it("never strips unknown fields from (or downgrades) a save written by a newer release", function()
+		local newer: { [string]: any } = {
+			version = DataSchema.VERSION + 1,
+			cash = 5,
+			pets = { { id = "future_pet" } },
+			settings = { music = false },
+		}
+		local snapshot = table.clone(newer)
+		DataSchema.migrate(newer)
+		T.expect(newer).toEqual(snapshot)
+		local clean = DataSchema.sanitise(table.clone(newer), 100, rules)
+		T.expect(DataSchema.applyInPlace(newer, clean)).toBe(false)
+		T.expect(newer).toEqual(snapshot)
+		T.expect(newer.version).toBe(DataSchema.VERSION + 1)
+		T.expect(newer.pets).toEqual({ { id = "future_pet" } })
 	end)
 end)
 

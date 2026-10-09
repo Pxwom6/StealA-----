@@ -3,7 +3,8 @@
 	Persistence with ProfileStore (session-locked: a profile can only be active on one server at a time, so data
 	cannot be duplicated by hopping servers).
 
-	* load:        starts the session, reconciles with the template, migrates and sanitises the save in place
+	* load:        starts the session, reconciles with the template, migrates and sanitises the save in place; a
+	               save from a newer release is released untouched and the player asked to rejoin
 	* autosave:    ProfileStore saves every few minutes on its own
 	* on leave:    PlayerLifecycle calls `release`, which ends the session (final save)
 	* on shutdown: BindToClose ends every session and waits for the final saves
@@ -87,9 +88,13 @@ function DataService.start()
 	end)
 end
 
+-- Why a load returned no profile: the store failed / timed out / the player left, or the save is from a newer
+-- release than this server runs.
+export type LoadFailure = "failed" | "newerSave"
+
 -- Starts a session for `player`. Yields (about LOAD_TIMEOUT_SECONDS at most: Cancel is checked between DataStore
--- calls). Returns nil if the player left, the load timed out, or the store could not start a session.
-function DataService.load(player: Player): Profile?
+-- calls). Returns the profile, or nil and why.
+function DataService.load(player: Player): (Profile?, LoadFailure?)
 	local deadline = os.clock() + LOAD_TIMEOUT_SECONDS
 	local profile: Profile? = store:StartSessionAsync(profileKey(player.UserId), {
 		Cancel = function(): boolean
@@ -97,12 +102,19 @@ function DataService.load(player: Player): Profile?
 		end,
 	})
 	if profile == nil then
-		return nil
+		return nil, "failed"
+	end
+	local raw = (profile.Data :: any) :: { [string]: any }
+	if DataSchema.isFromNewerVersion(raw) then
+		-- Saved by a newer release: this server is outdated. Touching the data here (reconcile, sanitise, save)
+		-- would wipe the fields it doesn't know, so release the session untouched and send the player elsewhere.
+		warn(`[DataService] save for {player.UserId} is version {raw.version}, this server knows {DataSchema.VERSION}`)
+		profile:EndSession()
+		return nil, "newerSave"
 	end
 	profile:AddUserId(player.UserId) -- GDPR: associates the key with the user for erasure requests
 	profile:Reconcile()
 
-	local raw = (profile.Data :: any) :: { [string]: any }
 	DataSchema.migrate(raw)
 	local clean, fixes = DataSchema.sanitise(raw, Economy.startingCash, sanitiseRules)
 	DataSchema.applyInPlace(raw, clean)

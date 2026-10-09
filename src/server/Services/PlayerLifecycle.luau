@@ -86,10 +86,14 @@ local function markReady(session: Session)
 end
 
 local function onPlayerAdded(player: Player)
-	local profile = DataService.load(player)
+	local profile, failure = DataService.load(player)
 	if profile == nil then
 		if player.Parent == Players then
-			player:Kick("Could not load your data. Please rejoin in a moment!")
+			player:Kick(
+				if failure == "newerSave"
+					then "This server is updating — please rejoin!"
+					else "Could not load your data. Please rejoin in a moment!"
+			)
 		end
 		return
 	end
