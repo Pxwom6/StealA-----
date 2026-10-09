@@ -156,6 +156,8 @@ local Theme = {
 		storeStudioGrant = "(Studio) Grant",
 		storeLuckMaxed = "Luck maxed",
 		oddsHeader = "Belt odds now -> with Server Luck",
+		oddsExtendHeader = "Server Luck is on: buying adds +{minutes} min (odds stay the same)",
+		oddsMaxedHeader = "Server Luck is on: maximum time reached",
 	},
 
 	-- Store copy per item key (see Config/Monetization). Available placeholders: {vipBonus} {extraPodiums}

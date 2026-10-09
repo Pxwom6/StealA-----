@@ -100,7 +100,9 @@ inside when the owner locks drops the creature.
   crash mid-lock never shortens them) and restored on join, so leaving and rejoining (any server) never resets them.
 * No pass or product blocks stealing; passes only change income, podium count and lock length.
 * Server Luck (the only random-effect product) shows exact before/after rarity odds in the store, and benefits
-  everyone in the server. Its 60-minute stacking cap is soft: the store stops offering it once another purchase
+  everyone in the server. The preview uses the same rule the server applies (`LiveOpsRules.previewBoost` vs
+  `addBoost`, tested to give identical odds); while a bought boost is running another purchase only adds time, so the
+  store says "+15 min (odds stay the same)" instead of showing a stronger boost. Its 60-minute stacking cap is soft: the store stops offering it once another purchase
   would pass the cap, but a receipt that still arrives (e.g. two players buying at once) always adds its full
   15 minutes — a purchase never takes Robux without an effect.
 * Cash packs scale with income (always "about N minutes of your income"), so they never trivialise the game.
