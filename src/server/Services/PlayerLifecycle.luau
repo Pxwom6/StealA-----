@@ -129,8 +129,6 @@ local function onPlayerAdded(player: Player)
 		walk = nil,
 		flaggedAt = -math.huge,
 		teleportedAt = -math.huge,
-		samplePlot = -1,
-		enteredPlotAt = 0,
 		joinedAt = now,
 		lastSeenAtJoin = lastSeenAtJoin,
 		playClock = os.clock(),

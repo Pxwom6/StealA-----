@@ -259,16 +259,15 @@ local function onStealBegin(player: Player, plotArg: unknown, podiumArg: unknown
 		return
 	end
 	-- The server-timed hold only starts at the podium (no starting it from across the map or right after a teleport).
-	local inRange = StealRules.canBeginHold({
+	-- If it doesn't, the reason is kept so the grab can explain it (e.g. a connection hiccup).
+	local ok, refusal = StealRules.canBeginHold({
 		distance = (root.Position - podiumRefs.base.Position).Magnitude,
 		grabRange = CFG.grabRange,
 		rangeSlack = CFG.holdRangeSlack,
 		thiefInsideBase = PlotService.isInside(plot, root.Position),
 		thiefTrusted = PositionTracker.isTrustedForSteal(session, root.Position),
 	})
-	if inRange then
-		session.hold = { plot = plot, podium = podium, startedAt = now() }
-	end
+	session.hold = { plot = plot, podium = podium, startedAt = if ok then now() else nil, refusal = refusal }
 end
 
 local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unknown)
@@ -280,7 +279,7 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 	end
 	local hold = thief.hold
 	thief.hold = nil
-	local holdStartedAt = if hold and hold.plot == plot and hold.podium == podium then hold.startedAt else nil
+	local sameHold = if hold and hold.plot == plot and hold.podium == podium then hold else nil
 
 	local victim = Sessions.getByUserId(PlotService.ownerOf(plot))
 	local root = Sessions.rootPart(thief)
@@ -290,9 +289,6 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 	end
 	if not thief.profile:IsActive() or not victim.profile:IsActive() then
 		return -- a session has ended (shutting down): no new steals
-	end
-	if not PositionTracker.isTrustedForSteal(thief, root.Position) then
-		return -- teleported in to confirm: refused (the hold must have been done on foot)
 	end
 	local t = now()
 	local record = Inventory.findByPodium(victim.data.creatures, podium)
@@ -313,7 +309,10 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 		wallHeight = Gameplay.map.wallHeight,
 		grabJumpAllowance = CFG.grabJumpAllowance,
 		thiefHasFreePodium = EconomyService.freePodium(thief) ~= nil,
-		holdStartedAt = holdStartedAt,
+		-- teleported in to confirm, or a lag spike just now: refused with a "connection hiccup" message
+		thiefTrusted = PositionTracker.isTrustedForSteal(thief, root.Position),
+		holdStartedAt = if sameHold then sameHold.startedAt else nil,
+		holdRefusal = if sameHold then sameHold.refusal else nil,
 		holdSeconds = CFG.holdSeconds,
 		holdTolerance = CFG.holdTolerance,
 	})

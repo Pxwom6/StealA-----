@@ -105,6 +105,7 @@ local Theme = {
 		stealFromInside = "Get inside their base first!",
 		stealOnFloor = "Stand on the floor to steal!",
 		stealHoldNear = "Hold Steal right next to the Snackling!",
+		stealConnectionHiccup = "Connection hiccup — try again in a moment",
 		stealCooldown = "Catch your breath... {time}",
 		alreadyCarrying = "You're already carrying one!",
 		stealStarted = "Run home! Don't get tagged!",

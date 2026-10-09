@@ -86,6 +86,10 @@ local Gameplay = {
 		-- less than teleportPenaltySeconds before it.
 		teleportPenaltySeconds = 2,
 		teleportDeficit = 24,
+		-- Starting or finishing a steal needs this many seconds of normal movement since the last overrun (a lag
+		-- spike), or since the last teleport (Logic/StealRules.stealTrustSince).
+		stealOverrunSeconds = 3,
+		stealTeleportSeconds = 10,
 		stepSlack = 4, -- studs beyond walking speed allowed between the latest sample and a tag (jitter)
 	},
 

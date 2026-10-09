@@ -95,8 +95,10 @@ server's own 4 Hz position samples (`PositionTracker`, a walking movement budget
 are free): a tag is refused if the tagger overran that budget in the last 2 s, was caught teleporting (24+ studs
 beyond it) at any point since just before that carry started, or could not have walked from the latest sample to
 where they claim to be in the time since (the stored budget doesn't pay for that last step, so no blink-tagging).
-Starting and finishing a steal hold need the same, plus no overrun at all since just before the thief was first
-seen in that plot, so teleporting onto a podium (and waiting) doesn't work; the hold must also start at the podium.
+Starting and finishing a steal hold need a position walkable from the latest sample and a few seconds of normal
+movement since the last overrun (3 s; 10 s since a teleport, `StealRules.stealTrustSince`), so one lag spike never
+locks a thief out of a base; such a refusal says "Connection hiccup — try again in a moment". The hold must also
+start at the podium.
 A carrying thief's movement is checked every tick against a distance budget (`StealRules.stepCarryTrack`): it
 refills at 1.6× carry speed, holds at most 3 s of refill and pays for every stud moved horizontally and every stud
 of new height (jumping again to a height already paid for is free, falling is free), so a lag spike's catch-up jump

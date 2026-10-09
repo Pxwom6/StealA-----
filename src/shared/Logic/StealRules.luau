@@ -21,7 +21,9 @@ export type GrabContext = {
 	wallHeight: number,
 	grabJumpAllowance: number, -- studs above the walls a grab still counts (jumping while holding Steal)
 	thiefHasFreePodium: boolean,
+	thiefTrusted: boolean, -- the thief's position fits what the server observed (see stealTrustSince)
 	holdStartedAt: number?, -- when the thief began holding the prompt (server time), nil if never
+	holdRefusal: string?, -- why canBeginHold refused that hold, if it did
 	holdSeconds: number,
 	holdTolerance: number,
 }
@@ -74,6 +76,12 @@ export type CarryLimits = WalkLimits
 
 export type Rect = { minX: number, maxX: number, minZ: number, maxZ: number }
 
+-- How long a flag keeps a thief from starting or finishing a steal (see stealTrustSince).
+export type StealTrustWindows = {
+	overrunSeconds: number, -- after an overrun (a lag stall, a server hitch, a fling)
+	teleportSeconds: number, -- after a gross overrun (a teleport)
+}
+
 -- Where the thief is when they start holding Steal (see canBeginHold).
 export type HoldContext = {
 	distance: number, -- thief root to podium
@@ -123,7 +131,13 @@ function StealRules.canGrab(ctx: GrabContext): (boolean, string?)
 	if not ctx.thiefHasFreePodium then
 		return false, "full"
 	end
+	if not ctx.thiefTrusted then
+		return false, "untrusted"
+	end
 	local started = ctx.holdStartedAt
+	if started == nil and ctx.holdRefusal == "untrusted" then
+		return false, "untrusted" -- the hold never started because of a connection hiccup: say that, not "hold"
+	end
 	if started == nil or ctx.now - started < ctx.holdSeconds * ctx.holdTolerance then
 		return false, "hold"
 	end
@@ -134,8 +148,16 @@ end
 -- inside the base, and their position trusted (not teleported in). Otherwise the hold timer could run while they
 -- are far away and they could teleport in and confirm instantly. Height is NOT checked here: pressing mid-jump is
 -- normal, and canGrab checks the grab height when the hold completes.
-function StealRules.canBeginHold(ctx: HoldContext): boolean
-	return ctx.thiefTrusted and ctx.thiefInsideBase and ctx.distance <= ctx.grabRange + ctx.rangeSlack
+-- Returns ok, and a reason ("far" | "outside" | "untrusted") when not ok.
+function StealRules.canBeginHold(ctx: HoldContext): (boolean, string?)
+	if not (ctx.distance <= ctx.grabRange + ctx.rangeSlack) then
+		return false, "far"
+	elseif not ctx.thiefInsideBase then
+		return false, "outside"
+	elseif not ctx.thiefTrusted then
+		return false, "untrusted"
+	end
+	return true, nil
 end
 
 function StealRules.canTag(ctx: TagContext): (boolean, string?)
@@ -269,6 +291,14 @@ function StealRules.isPositionTrusted(ctx: TrustContext, limits: WalkLimits): bo
 	return step <= limits.maxSpeed * limits.tolerance * dt + ctx.stepSlack -- false for NaN
 end
 
+-- The `flagSince` / `teleportSince` times (see TrustContext) for starting or finishing a steal at time `t`: a flag
+-- only counts while it is recent, so after a lag spike the thief can steal again once they have moved normally for
+-- a few seconds (any new flag restarts that clock), without walking out of the base and back in. A teleport (onto a
+-- podium, say) takes longer to clear.
+function StealRules.stealTrustSince(t: number, windows: StealTrustWindows): (number, number)
+	return t - windows.overrunSeconds, t - windows.teleportSeconds
+end
+
 -- Starts tracking a carry at the grab position.
 function StealRules.newCarryTrack(x: number, y: number, z: number, t: number, limits: CarryLimits): CarryTrack
 	return {
@@ -354,6 +384,7 @@ function StealRules.messageKey(reason: string): string?
 		outside = "stealFromInside",
 		height = "stealOnFloor",
 		hold = "stealHoldNear",
+		untrusted = "stealConnectionHiccup",
 		full = "baseFull",
 	}
 	return map[reason]

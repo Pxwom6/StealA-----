@@ -12,6 +12,7 @@ local Theme = require("../src/shared/Config/Theme")
 local Sounds = require("../src/shared/Config/Sounds")
 local LiveOps = require("../src/shared/Config/LiveOps")
 local LiveOpsRules = require("../src/shared/Logic/LiveOpsRules")
+local StealRules = require("../src/shared/Logic/StealRules")
 
 -- Every creature id that has shipped. APPEND-ONLY: add new ids when they release, never remove or rename one —
 -- players own them. (A save holding an id missing from config quarantines that creature: it vanishes from the
@@ -40,6 +41,29 @@ local RELEASED_CREATURE_IDS = {
 }
 
 T.describe("Config integrity", function()
+	T.it("every grab refusal with a message has that text in Theme.text", function()
+		local text = (Theme.text :: any) :: { [string]: string }
+		local reasons = {
+			"own",
+			"carrying",
+			"cooldown",
+			"locked",
+			"protected",
+			"far",
+			"outside",
+			"height",
+			"hold",
+			"full",
+			"untrusted",
+		}
+		for _, reason in reasons do
+			local key = StealRules.messageKey(reason)
+			if key == nil or type(text[key]) ~= "string" then
+				error(`grab refusal "{reason}" has no message in Theme.text (key {tostring(key)})`)
+			end
+		end
+	end)
+
 	T.it("every creature id from a past release still exists (never remove or rename one)", function()
 		local byId: { [string]: boolean } = {}
 		for _, creature in Creatures do

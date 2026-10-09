@@ -21,6 +21,7 @@ local function grab(overrides: { [string]: any }?): StealRules.GrabContext
 		wallHeight = 7,
 		grabJumpAllowance = 5,
 		thiefHasFreePodium = true,
+		thiefTrusted = true,
 		holdStartedAt = 98,
 		holdSeconds = 1.5,
 		holdTolerance = 0.8,
@@ -104,14 +105,70 @@ T.describe("StealRules.canBeginHold", function()
 	end
 
 	T.it("starts the hold timer only at the podium, with a trusted position", function()
-		T.expect(StealRules.canBeginHold(hold())).toBe(true)
-		T.expect(StealRules.canBeginHold(hold({ distance = 15 }))).toBe(true) -- running in, a little past the prompt
+		T.expect((StealRules.canBeginHold(hold()))).toBe(true)
+		T.expect((StealRules.canBeginHold(hold({ distance = 15 })))).toBe(true) -- running in, a little past the prompt
 		-- Starting the hold from far away (then teleporting in to confirm instantly) is refused.
-		T.expect(StealRules.canBeginHold(hold({ distance = 200 }))).toBe(false)
-		T.expect(StealRules.canBeginHold(hold({ distance = 0 / 0 }))).toBe(false)
-		T.expect(StealRules.canBeginHold(hold({ thiefInsideBase = false }))).toBe(false)
+		T.expect((StealRules.canBeginHold(hold({ distance = 200 })))).toBe(false)
+		T.expect((StealRules.canBeginHold(hold({ distance = 0 / 0 })))).toBe(false)
+		T.expect((StealRules.canBeginHold(hold({ thiefInsideBase = false })))).toBe(false)
 		-- ...and so is starting it right after teleporting next to the podium.
-		T.expect(StealRules.canBeginHold(hold({ thiefTrusted = false }))).toBe(false)
+		T.expect((StealRules.canBeginHold(hold({ thiefTrusted = false })))).toBe(false)
+	end)
+
+	T.it("says why a hold didn't start, so the grab can explain it", function()
+		T.expect(select(2, StealRules.canBeginHold(hold()))).toBeNil()
+		T.expect(select(2, StealRules.canBeginHold(hold({ distance = 200 })))).toBe("far")
+		T.expect(select(2, StealRules.canBeginHold(hold({ thiefInsideBase = false })))).toBe("outside")
+		T.expect(select(2, StealRules.canBeginHold(hold({ thiefTrusted = false })))).toBe("untrusted")
+	end)
+end)
+
+T.describe("StealRules steal trust after a lag spike", function()
+	local walk: StealRules.WalkLimits = { maxSpeed = 16, tolerance = 1.5, budgetSeconds = 1.5, leeway = 12 }
+	local windows: StealRules.StealTrustWindows = { overrunSeconds = 3, teleportSeconds = 10 }
+
+	-- A thief standing at a podium (sampled 0.1 s ago) whose last flags are `flaggedAt` / `teleportedAt`.
+	local function trustedAt(t: number, flaggedAt: number, teleportedAt: number): boolean
+		local flagSince, teleportSince = StealRules.stealTrustSince(t, windows)
+		return StealRules.isPositionTrusted({
+			track = StealRules.newWalkTrack(0, 3, 0, t - 0.1, walk),
+			flaggedAt = flaggedAt,
+			teleportedAt = teleportedAt,
+			flagSince = flagSince,
+			teleportSince = teleportSince,
+			x = 0,
+			z = 0,
+			t = t,
+			stepSlack = 4,
+		}, walk)
+	end
+
+	T.it("a lag spike blocks steals only until a few seconds of normal movement have passed", function()
+		local never = -math.huge
+		T.expect(trustedAt(11, 10, never)).toBe(false) -- 1 s after the overrun
+		T.expect(trustedAt(12.9, 10, never)).toBe(false)
+		T.expect(trustedAt(13.1, 10, never)).toBe(true) -- 3 s of normal movement later: fine, still in the base
+		T.expect(trustedAt(30, 10, never)).toBe(true)
+	end)
+
+	T.it("a real teleport (onto a podium) takes longer to clear", function()
+		T.expect(trustedAt(14, 10, 10)).toBe(false)
+		T.expect(trustedAt(19.9, 10, 10)).toBe(false)
+		T.expect(trustedAt(20.1, 10, 10)).toBe(true)
+	end)
+
+	T.it("a refused steal says it was a connection hiccup, not 'hold next to the Snackling'", function()
+		T.expect(reason(grab({ thiefTrusted = false }))).toBe("untrusted")
+		-- the hold was refused at its start for this reason: the grab says so too
+		local refusedHold = grab({ holdRefusal = "untrusted" })
+		refusedHold.holdStartedAt = nil
+		T.expect(reason(refusedHold)).toBe("untrusted")
+		-- a hold that never started for another reason (pressed from too far) keeps the hold message
+		local farHold = grab({ holdRefusal = "far" })
+		farHold.holdStartedAt = nil
+		T.expect(reason(farHold)).toBe("hold")
+		T.expect(StealRules.messageKey("untrusted")).toBe("stealConnectionHiccup")
+		T.expect(StealRules.messageKey("untrusted") ~= StealRules.messageKey("hold")).toBe(true)
 	end)
 end)
 
