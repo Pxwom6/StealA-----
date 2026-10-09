@@ -83,9 +83,12 @@ transactions in DataStores), mitigated by saving both immediately.
 **Chose:** while locked, the server teleports non-owners out of the plot 4×/s; the entrance barrier is collidable
 for visuals/honest clients, and the owner's client turns its collision off locally. The yellow new-player shield
 is visual only (stealing is refused server-side), so claiming a plot can never trap a visitor inside. Grabbing
-also requires the thief to stand inside the victim's plot at floor level (no reaching through walls, no grabbing
-from the air), delivery requires floor level inside the thief's own plot, a carrying thief's root must stay between
-`Gameplay.steal.minCarryHeight` and `maxCarryHeight` above the ground (no flying up, no sinking under the map),
+also requires the thief to be inside the victim's plot (no reaching through walls) and no higher than a jump above
+its walls (`Gameplay.steal.grabJumpAllowance`, so a jump while holding Steal isn't refused; the Steal prompt hangs
+2 studs above the floor so it stays in range through a jump made within about 5.7 studs of the podium; the 3D grab
+range keeps grabs from high in the air out), delivery requires floor level inside the thief's own plot, a carrying thief's root
+must stay between `Gameplay.steal.minCarryHeight` and `maxCarryHeight` above the ground (no flying up, no sinking
+under the map),
 and tag reach is horizontal range plus a vertical allowance larger than that cap — so gaining height never escapes
 a tag. A tagger's client-reported position is only trusted when it matches the
 server's own 4 Hz position samples (`PositionTracker`, a walking movement budget in which jumps and short lag stalls

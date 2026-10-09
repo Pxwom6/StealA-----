@@ -48,6 +48,9 @@ local Gameplay = {
 		holdSeconds = 1.5, -- hold-to-grab duration (the server re-checks it)
 		holdTolerance = 0.8, -- share of holdSeconds the server accepts (network jitter)
 		grabRange = 12,
+		-- A grab still counts this many studs above the walls (the root at a jump's apex is ~10 above the floor, ~11.6
+		-- from a podium top). Delivery stays at floor level.
+		grabJumpAllowance = 5,
 		holdRangeSlack = 4, -- extra studs allowed when a hold starts (you may still be running in)
 		carrySpeedMultiplier = 0.62,
 		carryTimeoutSeconds = 75,

@@ -311,6 +311,7 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 		thiefInsideBase = PlotService.isInside(plot, root.Position),
 		thiefHeightAboveFloor = root.Position.Y - PlotService.refs(plot).floorY,
 		wallHeight = Gameplay.map.wallHeight,
+		grabJumpAllowance = CFG.grabJumpAllowance,
 		thiefHasFreePodium = EconomyService.freePodium(thief) ~= nil,
 		holdStartedAt = holdStartedAt,
 		holdSeconds = CFG.holdSeconds,

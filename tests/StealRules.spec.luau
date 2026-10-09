@@ -19,6 +19,7 @@ local function grab(overrides: { [string]: any }?): StealRules.GrabContext
 		thiefInsideBase = true,
 		thiefHeightAboveFloor = 3, -- a character standing on the floor
 		wallHeight = 7,
+		grabJumpAllowance = 5,
 		thiefHasFreePodium = true,
 		holdStartedAt = 98,
 		holdSeconds = 1.5,
@@ -63,10 +64,22 @@ T.describe("StealRules.canGrab", function()
 	end)
 	T.it("refuses grabs from above the base (flying / hovering over the walls)", function()
 		T.expect(reason(grab({ thiefHeightAboveFloor = 25 }))).toBe("height")
-		T.expect(reason(grab({ thiefHeightAboveFloor = 7.5 }))).toBe("height")
+		T.expect(reason(grab({ thiefHeightAboveFloor = 12.5 }))).toBe("height") -- above a jump's reach
 		T.expect(reason(grab({ thiefHeightAboveFloor = -5 }))).toBe("height")
 		T.expect((StealRules.canGrab(grab({ thiefHeightAboveFloor = 4.4 })))).toBe(true) -- standing on a podium
 		T.expect(StealRules.messageKey("height")).toBe("stealOnFloor")
+	end)
+	T.it("a thief who jumps while holding Steal still grabs (root ~10 studs up at the apex)", function()
+		T.expect((StealRules.canGrab(grab({ thiefHeightAboveFloor = 3 + 7.2 })))).toBe(true) -- jump from the floor
+		T.expect((StealRules.canGrab(grab({ thiefHeightAboveFloor = 4.4 + 7.2 })))).toBe(true) -- from a podium
+		T.expect(StealRules.isAtGrabHeight(12, 7, 5)).toBe(true)
+		T.expect(StealRules.isAtGrabHeight(12.1, 7, 5)).toBe(false)
+		T.expect(StealRules.isAtGrabHeight(0 / 0, 7, 5)).toBe(false)
+		-- the real config allows a jump from a podium top
+		local steal = Gameplay.steal
+		T.expect(StealRules.isAtGrabHeight(4.4 + 7.2, Gameplay.map.wallHeight, steal.grabJumpAllowance)).toBe(true)
+		-- delivery keeps the strict floor level: no delivering from mid-jump above your own walls
+		T.expect(StealRules.canDeliver(true, 3 + 7.2, Gameplay.map.wallHeight)).toBe(false)
 	end)
 	T.it("a locked base beats everything after ownership checks", function()
 		T.expect(reason(grab({ baseLocked = true, distance = 999 }))).toBe("locked")

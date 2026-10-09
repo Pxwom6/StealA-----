@@ -17,8 +17,9 @@ export type GrabContext = {
 	distance: number,
 	grabRange: number,
 	thiefInsideBase: boolean, -- no grabbing through walls: the thief must be inside the victim's plot
-	thiefHeightAboveFloor: number, -- thief's root Y minus the plot's floor Y (no grabbing from mid-air)
+	thiefHeightAboveFloor: number, -- thief's root Y minus the plot's floor Y (no grabbing from above the base)
 	wallHeight: number,
+	grabJumpAllowance: number, -- studs above the walls a grab still counts (jumping while holding Steal)
 	thiefHasFreePodium: boolean,
 	holdStartedAt: number?, -- when the thief began holding the prompt (server time), nil if never
 	holdSeconds: number,
@@ -116,7 +117,7 @@ function StealRules.canGrab(ctx: GrabContext): (boolean, string?)
 	if not ctx.thiefInsideBase then
 		return false, "outside"
 	end
-	if not StealRules.isAtFloorLevel(ctx.thiefHeightAboveFloor, ctx.wallHeight) then
+	if not StealRules.isAtGrabHeight(ctx.thiefHeightAboveFloor, ctx.wallHeight, ctx.grabJumpAllowance) then
 		return false, "height"
 	end
 	if not ctx.thiefHasFreePodium then
@@ -131,8 +132,8 @@ end
 
 -- A hold (StealBegin) only starts when the thief is already at the podium: within grab range (plus a little slack),
 -- inside the base, and their position trusted (not teleported in). Otherwise the hold timer could run while they
--- are far away and they could teleport in and confirm instantly. Floor level is NOT required here: pressing
--- mid-jump is normal, and canGrab checks floor level when the hold completes.
+-- are far away and they could teleport in and confirm instantly. Height is NOT checked here: pressing mid-jump is
+-- normal, and canGrab checks the grab height when the hold completes.
 function StealRules.canBeginHold(ctx: HoldContext): boolean
 	return ctx.thiefTrusted and ctx.thiefInsideBase and ctx.distance <= ctx.grabRange + ctx.rangeSlack
 end
@@ -175,9 +176,16 @@ function StealRules.withinTagReach(
 end
 
 -- True when a root part is near floor height: not below the floor, and not higher than the plot's walls.
--- Used for grabbing and delivering, so neither can be done from the air above a base.
+-- Delivery uses it, so a creature can't be delivered from the air above a base.
 function StealRules.isAtFloorLevel(heightAboveFloor: number, wallHeight: number): boolean
 	return heightAboveFloor >= -2 and heightAboveFloor <= wallHeight
+end
+
+-- True when a thief's root is low enough to grab: floor level, plus `jumpAllowance` studs above the walls so that
+-- jumping while holding Steal still works (a jump lifts the root ~7 studs). The 3D grab range to the podium
+-- already stops grabs from high in the air.
+function StealRules.isAtGrabHeight(heightAboveFloor: number, wallHeight: number, jumpAllowance: number): boolean
+	return StealRules.isAtFloorLevel(heightAboveFloor, wallHeight + math.max(0, jumpAllowance))
 end
 
 -- A carried creature is delivered only when the thief stands inside their own plot at floor level.
