@@ -122,17 +122,25 @@ local function onEvent(session: Session, event: GameEvents.Event)
 	end
 	Replication.markDirty(session)
 	-- During the first-time tutorial the badge on Rewards is enough: a new player's first minute belongs to the loop.
-	if session.tutorial == nil then
+	if session.tutorial == nil and #finished > 0 then
+		local amounts: { number } = {}
 		for _, index in finished do
 			local quest = questDefs[session.data.quests.list[index].id]
-			Remotes.notify(
-				session.player,
-				Format.template(Theme.text.questComplete, {
-					amount = UiTheme.cash(QuestRules.reward(quest.difficulty, session.packIncome, Quests)),
-				}),
-				"success"
-			)
+			table.insert(amounts, QuestRules.reward(quest.difficulty, session.packIncome, Quests))
 		end
+		-- Deferred: after the toast of the action itself ("You stole ...!").
+		task.defer(function()
+			if session.player.Parent == nil then
+				return
+			end
+			for _, amount in amounts do
+				Remotes.notify(
+					session.player,
+					Format.template(Theme.text.questComplete, { amount = UiTheme.cash(amount) }),
+					"success"
+				)
+			end
+		end)
 	end
 end
 
