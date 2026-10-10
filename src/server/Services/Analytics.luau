@@ -2,14 +2,17 @@
 --[[
 	Thin wrapper over AnalyticsService (Creator Hub → Analytics → Funnels / Economy / Custom).
 
-	Onboarding funnel (each step logged once per player, tracked in the save so rejoining doesn't re-log). Steps 2-5
-	follow the first-time tutorial (Config/Tutorial: buy, collect, lock, steal):
-	  1 Joined  2 FirstBeltPurchase  3 FirstCollect  4 TutorialLock (the lock step ended: locked, or it moved on by
-	  itself)  5 TutorialComplete (completed and rewarded; a skip never logs it)  6 FirstSteal  7 FirstRebirth
-	Roblox counts a logged step as completing every earlier one, so a funnel step must be one every player passes in
-	order: skipping the tutorial is the custom event `tutorial_skipped` instead, and exact completion / skip rates come
-	from `tutorial_step` and `tutorial_skipped` (a player who skipped and later steals shows steps 4-5 as completed in
-	the funnel view). Steps are matched by number: never renumber a step once the game is live (DECISIONS.md #21).
+	Onboarding funnel (Logic/OnboardingFunnel; each step logged once per player, tracked in the save so rejoining
+	doesn't re-log). Steps 2-5 follow the first-time tutorial (Config/Tutorial: buy, collect, lock, steal):
+	  1 Joined  2 FirstBeltPurchase  3 FirstCollect  4 TutorialLock (the tutorial moved past its lock step: locked, or
+	  it moved on by itself)  5 TutorialComplete (completed and rewarded; a skip never logs it)  6 FirstSteal
+	  7 FirstRebirth
+	Roblox counts a logged step as completing every earlier one, so steps are only ever logged in increasing order: a
+	milestone reached early (e.g. a steal during the tutorial's collect step) waits in the save until every earlier
+	step is logged. The tutorial steps stop holding later ones back once the tutorial is over without them (skipped,
+	existing player, switched off). Skipping is the custom event `tutorial_skipped`, and exact completion / skip rates
+	come from `tutorial_step` and `tutorial_skipped` (a player who skipped and later steals shows steps 4-5 as completed
+	in the funnel view). Steps are matched by number: never renumber a step once the game is live (DECISIONS.md #21).
 	Store funnel (recurring, one funnel session per store visit):
 	  1 StoreOpened  2 ProductPrompted  3 ProductPurchased
 	Economy events: cash sources and sinks (collect events are aggregated per minute to stay within limits).
@@ -30,7 +33,11 @@
 
 local AnalyticsService = game:GetService("AnalyticsService")
 local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Tutorial = require(ReplicatedStorage.Shared.Config.Tutorial)
+local OnboardingFunnel = require(ReplicatedStorage.Shared.Logic.OnboardingFunnel)
+local TutorialRules = require(ReplicatedStorage.Shared.Logic.TutorialRules)
 local Sessions = require(script.Parent.Sessions)
 
 type Session = Sessions.Session
@@ -64,15 +71,7 @@ local function customFields(fields: Fields?): { [string]: string }?
 	return result
 end
 
-local ONBOARDING_STEPS: { [string]: number } = {
-	Joined = 1,
-	FirstBeltPurchase = 2,
-	FirstCollect = 3,
-	TutorialLock = 4,
-	TutorialComplete = 5,
-	FirstSteal = 6,
-	FirstRebirth = 7,
-}
+local ONBOARDING_STEPS = OnboardingFunnel.STEPS
 
 local STORE_STEPS: { [string]: number } = {
 	StoreOpened = 1,
@@ -107,21 +106,25 @@ function Analytics.start()
 	end)
 end
 
--- Logs an onboarding milestone once per player (ever). Returns true the first time.
+-- Logs every onboarding step that is due, in increasing order (Logic/OnboardingFunnel). Called after a milestone and
+-- whenever the tutorial ends, which can let waiting steps go.
+function Analytics.flushMilestones(session: Session)
+	local flags = session.data.flags
+	local tutorialOver = TutorialRules.isDone(flags) or not Tutorial.enabled
+	for _, number in OnboardingFunnel.due(flags, ONBOARDING_STEPS, tutorialOver) do
+		local name = ONBOARDING_STEPS[number].name
+		safe(function()
+			AnalyticsService:LogOnboardingFunnelStepEvent(session.player, number, name)
+		end)
+	end
+end
+
+-- Records an onboarding milestone once per player (ever) and logs it as soon as every earlier step is logged.
+-- Returns true the first time it is reached.
 function Analytics.milestone(session: Session, name: string): boolean
-	local step = ONBOARDING_STEPS[name]
-	if step == nil then
-		return false
-	end
-	local flag = "ob_" .. name
-	if session.data.flags[flag] then
-		return false
-	end
-	session.data.flags[flag] = true
-	safe(function()
-		AnalyticsService:LogOnboardingFunnelStepEvent(session.player, step, name)
-	end)
-	return true
+	local first = OnboardingFunnel.reach(session.data.flags, name, ONBOARDING_STEPS)
+	Analytics.flushMilestones(session)
+	return first
 end
 
 function Analytics.storeStep(session: Session, name: string, fields: Fields?)

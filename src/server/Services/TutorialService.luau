@@ -79,11 +79,17 @@ local function finish(session: Session, reason: TutorialRules.FinishReason)
 	elseif reason == "skipped" and run then
 		Analytics.tutorialSkipped(session, run.stepId, TutorialRules.stepIndex(run.stepId, Tutorial))
 	end
+	Analytics.flushMilestones(session) -- the tutorial is over: funnel steps waiting on it can go
 end
 
 -- Moves the session onto the current step (from the saved flags), or finishes the tutorial when every step is done.
 local function sync(session: Session)
-	local step = TutorialRules.currentStep(session.data.flags, Tutorial)
+	local step, index = TutorialRules.currentStep(session.data.flags, Tutorial)
+	-- Funnel step 4 once the tutorial has moved past its lock step (never when the lock was merely done early).
+	local lockIndex = TutorialRules.stepIndex("lock", Tutorial)
+	if lockIndex > 0 and (step == nil or index > lockIndex) then
+		Analytics.milestone(session, "TutorialLock")
+	end
 	if step == nil then
 		finish(session, "completed")
 		return
@@ -102,9 +108,6 @@ local function endStep(session: Session, stepId: string, outcome: TutorialRules.
 	end
 	local seconds = if run.stepId == stepId then now() - run.startedAt else 0
 	Analytics.tutorialStep(session, stepId, outcome, seconds)
-	if stepId == "lock" then
-		Analytics.milestone(session, "TutorialLock")
-	end
 	sync(session)
 end
 
@@ -127,6 +130,7 @@ function TutorialService.onJoined(session: Session)
 	elseif status == "new" or status == "resume" then
 		sync(session)
 	end
+	Analytics.flushMilestones(session) -- e.g. an existing player's steps that waited on the tutorial steps
 end
 
 function TutorialService.onLeaving(session: Session)

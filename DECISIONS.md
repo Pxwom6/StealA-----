@@ -321,12 +321,16 @@ new-player shield instead. Completing it pays `Tutorial.reward` ($500) once per 
   Not covered: the transient toasts and the "X is stealing your Snackling!" alert, which already overlapped the
   pills before the tutorial.
 * **Analytics:** the onboarding funnel follows the tutorial: 1 Joined, 2 FirstBeltPurchase, 3 FirstCollect,
-  4 TutorialLock (the lock step ended, however), 5 TutorialComplete, 6 FirstSteal, 7 FirstRebirth (FirstSteal and
-  FirstRebirth were 4 and 5). Roblox counts a logged step as completing every earlier one, so a funnel step must be
-  one every player passes in order: skipping is the custom event `tutorial_skipped` (field 01 = step id) instead of a
-  funnel step, and `tutorial_step` (value = seconds on the step, fields: step id, outcome) gives exact per-step
-  timings and how each step ended. Renumbering was safe because the game is not live yet; once it is, never renumber
-  a step (Roblox matches steps by number): append, or start a new funnel.
+  4 TutorialLock (the tutorial moved past its lock step, however it ended), 5 TutorialComplete, 6 FirstSteal,
+  7 FirstRebirth (FirstSteal and FirstRebirth were 4 and 5). Roblox counts a logged step as completing every earlier
+  one, so steps are only ever logged in increasing order (`Logic/OnboardingFunnel`): a milestone reached early (a
+  lock or a steal during the collect step, a steal or rebirth while the tutorial runs) is remembered in the save
+  (`obr_<step>`) and logged once every earlier step is (`ob_<step>`, the flag the funnel always used). Steps 4-5 stop
+  holding the later ones back once the tutorial is over without them (skipped, existing player, switched off); they
+  are then never logged, so for such a player Roblox shows them as completed once a later step logs. Skipping is the
+  custom event `tutorial_skipped` (field 01 = step id), and `tutorial_step` (value = seconds on the step, fields: step
+  id, outcome) gives exact per-step timings and how each step ended. Renumbering was safe because the game is not live
+  yet; once it is, never renumber a step (Roblox matches steps by number): append, or start a new funnel.
 
 **Why:** day-1 retention drives Roblox discovery, and the design rule is "the loop must be understood in 10 seconds":
 one short line and an arrow per step, no text walls, no dialog in the way. Finishing steps from what the server saw

@@ -107,6 +107,7 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `Inventory` | podium slot operations on the save table (free slot, place, remove, find by uid) |
 | `PlotAssignment` | pick a free plot, release |
 | `SocialRules` | friend / group income bonus, friend counting per pair, group welcome gift, recheck cooldown, config validation |
+| `OnboardingFunnel` | onboarding funnel steps and their order: a milestone reached early waits until every earlier step is logged |
 | `TutorialRules` | tutorial progress in `flags` (current step, early actions, resume), existing-player detection, automatic step endings, one-time reward, guide targets (belt item, collect pad), config validation |
 
 ### `src/shared` (Roblox helpers, not unit-tested)
