@@ -53,10 +53,6 @@ local function multiplierInputs(session: Session): EconomyMath.MultiplierInputs
 	}
 end
 
-function EconomyService.multiplier(session: Session): number
-	return EconomyMath.incomeMultiplier(multiplierInputs(session))
-end
-
 -- What a cash pack pays right now (see EconomyMath.packIncome for what counts).
 function EconomyService.cashPackAmount(session: Session, key: string): number
 	local pack = (Economy.cashPacks :: any)[key] :: EconomyMath.CashPack
@@ -75,6 +71,8 @@ end
 -- Recomputes cached income / multiplier / capacity and pushes them to the world and the HUD.
 function EconomyService.refresh(session: Session)
 	local inputs = multiplierInputs(session)
+	-- The live multiplier includes temporary bonuses (LiveOps events, friends & group): it drives income ticks and the
+	-- HUD only. Anything paid out or saved uses rewardIncome or packIncome below.
 	session.multiplier = EconomyMath.incomeMultiplier(inputs)
 	session.capacity = EconomyService.capacity(session)
 	local incomes: { number } = {}
