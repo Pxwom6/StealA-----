@@ -86,6 +86,8 @@ to the live DataStore: test schema changes with it off.
 * **Right now, every server:** admin chat commands `/luck 2 30` (2× luck for 30 min), `/event <id>`,
   `/announce <text>` (filtered). In Studio anyone can use them for testing.
 * **Limited-time creatures:** give a creature an `eventId`; it only appears on the belt while that event runs.
+* **Event-only mutations:** give a mutation in `src/shared/Config/Mutations.luau` an `eventId` the same way (e.g.
+  a Halloween "Haunted"); it only rolls while that event runs.
 
 ### Swapping in your own art
 
@@ -93,4 +95,11 @@ to the live DataStore: test schema changes with it off.
   `src/shared/Config/Creatures.luau`) into `ReplicatedStorage/CreatureModels` in Studio. The game clones it instead
   of building the placeholder. Rojo will not delete instances you add there.
 * **Sounds:** paste asset IDs into `src/shared/Config/Sounds.luau`.
-* **Names, colours, UI text:** `src/shared/Config/Theme.luau`, `Creatures.luau`, `Rarities.luau`.
+* **Names, colours, UI text:** `src/shared/Config/Theme.luau`, `Creatures.luau`, `Rarities.luau`, `Mutations.luau`.
+* **Mutations on custom models:** a mutation restyles every visible part of the model (material, colour, ...).
+  Give a part (e.g. eyes) the attribute `MutationSkip = true` to keep its own look.
+
+### Studio test commands
+
+`/cash <amount>`, `/spawn <creatureId> [mutationId]` (e.g. `/spawn pizza_pup rainbow`) and `/noshield` work in
+Studio only (`src/server/Services/DevCommands.luau`).

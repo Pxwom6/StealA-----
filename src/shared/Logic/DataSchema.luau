@@ -161,7 +161,8 @@ function DataSchema.sanitise(
 			podium = finite(e.podium, 0),
 			acquiredAt = finite(e.acquiredAt, 0),
 			stored = math.max(0, finite(e.stored, 0)),
-			variant = if type(e.variant) == "string" then e.variant else nil,
+			-- The mutation id, kept even when the config doesn't know it (it then earns x1 until the id is back).
+			variant = if type(e.variant) == "string" and #e.variant > 0 and #e.variant <= 64 then e.variant else nil,
 		}
 	end
 	local function isFreePodium(podium: number): boolean

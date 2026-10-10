@@ -7,6 +7,14 @@
 	Store funnel (recurring, one funnel session per store visit):
 	  1 StoreOpened  2 ProductPrompted  3 ProductPurchased
 	Economy events: cash sources and sinks (collect events are aggregated per minute to stay within limits).
+	Custom events and funnel steps can carry up to three breakdown fields. AnalyticsService only accepts the keys
+	CustomField01..03 (any other key is silently dropped), so callers pass the values IN ORDER as a list (`Fields`)
+	and they are mapped to those keys here. What each position means, per event:
+	  store funnel ProductPurchased        01 kind ("pass" | "product")  02 item key
+	  store funnel ProductPrompted         01 item key
+	  pass_purchased / product_purchased   01 item key
+	  steal                                01 creature id  02 mutation id ("" when plain)
+	  mutation_bought                      01 mutation id  02 creature id  (value = mutation order)
 
 	Every call is pcall'd: analytics must never break gameplay (and is a no-op in some Studio configurations).
 ]]
@@ -18,7 +26,34 @@ local Sessions = require(script.Parent.Sessions)
 
 type Session = Sessions.Session
 
+-- Breakdown values in order: [1] -> CustomField01, [2] -> CustomField02, [3] -> CustomField03.
+export type Fields = { string }
+
 local Analytics = {}
+
+local FIELD_KEYS: { string } = {
+	Enum.AnalyticsCustomFieldKeys.CustomField01.Name,
+	Enum.AnalyticsCustomFieldKeys.CustomField02.Name,
+	Enum.AnalyticsCustomFieldKeys.CustomField03.Name,
+}
+
+-- The only custom-field shape AnalyticsService accepts. More than three values is a programming error: the extra
+-- ones are dropped with a warning instead of failing the event.
+local function customFields(fields: Fields?): { [string]: string }?
+	if fields == nil then
+		return nil
+	end
+	local result: { [string]: string } = {}
+	for index, value in fields do
+		local key = FIELD_KEYS[index]
+		if key == nil then
+			warn(`[Analytics] only {#FIELD_KEYS} custom fields are allowed; dropped the rest`)
+			break
+		end
+		result[key] = value
+	end
+	return result
+end
 
 local ONBOARDING_STEPS: { [string]: number } = {
 	Joined = 1,
@@ -78,7 +113,7 @@ function Analytics.milestone(session: Session, name: string): boolean
 	return true
 end
 
-function Analytics.storeStep(session: Session, name: string, customFields: { [string]: any }?)
+function Analytics.storeStep(session: Session, name: string, fields: Fields?)
 	local step = STORE_STEPS[name]
 	if step == nil then
 		return
@@ -88,7 +123,7 @@ function Analytics.storeStep(session: Session, name: string, customFields: { [st
 	end
 	local funnelId = storeFunnels[session.userId]
 	safe(function()
-		AnalyticsService:LogFunnelStepEvent(session.player, "Store", funnelId, step, name, customFields)
+		AnalyticsService:LogFunnelStepEvent(session.player, "Store", funnelId, step, name, customFields(fields))
 	end)
 end
 
@@ -131,10 +166,15 @@ function Analytics.collect(session: Session, amount: number)
 	pendingCollect[session.player] = (pendingCollect[session.player] or 0) + amount
 end
 
-function Analytics.custom(session: Session, name: string, value: number?, customFields: { [string]: any }?)
+function Analytics.custom(session: Session, name: string, value: number?, fields: Fields?)
 	safe(function()
-		AnalyticsService:LogCustomEvent(session.player, name, value, customFields)
+		AnalyticsService:LogCustomEvent(session.player, name, value, customFields(fields))
 	end)
+end
+
+-- A mutated creature was bought off the belt.
+function Analytics.mutationBought(session: Session, mutationId: string, mutationOrder: number, creatureId: string)
+	Analytics.custom(session, "mutation_bought", mutationOrder, { mutationId, creatureId })
 end
 
 function Analytics.forget(session: Session)

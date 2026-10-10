@@ -23,6 +23,7 @@ local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local Guard = require(ReplicatedStorage.Shared.Logic.Guard)
 local Inventory = require(ReplicatedStorage.Shared.Logic.Inventory)
 local LockRules = require(ReplicatedStorage.Shared.Logic.LockRules)
+local MutationRules = require(ReplicatedStorage.Shared.Logic.MutationRules)
 local StealRules = require(ReplicatedStorage.Shared.Logic.StealRules)
 local Analytics = require(script.Parent.Analytics)
 local Announcer = require(script.Parent.Announcer)
@@ -70,7 +71,8 @@ local function attachCarryVisuals(session: Session, carry: Carry)
 	end
 	local def = GameData.catalog.creatures[carry.creatureId]
 	local rarity = GameData.catalog.rarities[def.rarity]
-	local model = CreatureVisuals.build(def, rarity, { anchored = false })
+	local mutation = GameData.mutation(carry.variant)
+	local model = CreatureVisuals.build(def, rarity, { anchored = false, mutation = mutation })
 	model:PivotTo(head.CFrame * CFrame.new(0, head.Size.Y / 2 + 0.4, 0))
 	local weld = Instance.new("WeldConstraint")
 	weld.Part0 = head
@@ -80,25 +82,35 @@ local function attachCarryVisuals(session: Session, carry: Carry)
 	model.Parent = character
 	carry.model = model
 
+	-- "THIEF!", plus the mutation's name in its colour underneath when the loot is mutated ("GOLDEN").
 	local marker = Instance.new("BillboardGui")
 	marker.Name = "ThiefMarker"
-	marker.Size = UDim2.fromOffset(150, 44)
+	marker.Size = UDim2.fromOffset(150, if mutation then 68 else 44)
 	marker.StudsOffsetWorldSpace = Vector3.new(0, CreatureVisuals.height(model) + 3.5, 0)
 	marker.AlwaysOnTop = true
 	marker.MaxDistance = 250
 	marker.LightInfluence = 0
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundTransparency = 1
-	label.FontFace = UiTheme.displayFont
-	label.TextScaled = true
-	label.Text = Theme.text.carryMarker
-	label.TextColor3 = UiTheme.palette("danger")
-	label.Parent = marker
-	local stroke = Instance.new("UIStroke")
-	stroke.Thickness = 3
-	stroke.Color = UiTheme.palette("stroke")
-	stroke.Parent = label
+	local function addLabel(text: string, color: Color3, top: number, height: number)
+		local label = Instance.new("TextLabel")
+		label.Position = UDim2.fromScale(0, top)
+		label.Size = UDim2.fromScale(1, height)
+		label.BackgroundTransparency = 1
+		label.FontFace = UiTheme.displayFont
+		label.TextScaled = true
+		label.Text = text
+		label.TextColor3 = color
+		label.Parent = marker
+		local stroke = Instance.new("UIStroke")
+		stroke.Thickness = 3
+		stroke.Color = UiTheme.palette("stroke")
+		stroke.Parent = label
+	end
+	if mutation then
+		addLabel(Theme.text.carryMarker, UiTheme.palette("danger"), 0, 0.62)
+		addLabel(string.upper(mutation.displayName), UiTheme.color(mutation.color), 0.62, 0.38)
+	else
+		addLabel(Theme.text.carryMarker, UiTheme.palette("danger"), 0, 1)
+	end
 	marker.Parent = head
 	carry.marker = marker
 end
@@ -134,7 +146,7 @@ function StealService.cancel(thief: Session, reason: CancelReason, taggerName: s
 	end
 
 	local def = GameData.catalog.creatures[carry.creatureId]
-	local creatureName = def.displayName
+	local creatureName = GameData.displayName(def, carry.variant)
 	if reason == "tagged" then
 		thief.stealCooldownUntil = now() + CFG.thiefCooldownAfterTagSeconds
 		Remotes.fire(thief.player, "Effect", { kind = "tagged" })
@@ -194,10 +206,12 @@ local function deliver(thief: Session)
 
 	local def = GameData.catalog.creatures[moved.id]
 	local rarity = GameData.catalog.rarities[def.rarity]
-	Remotes.notify(thief.player, Format.template(Theme.text.stealSuccess, { creature = def.displayName }), "success")
+	local mutation = GameData.mutation(moved.variant)
+	local name = GameData.displayName(def, moved.variant)
+	Remotes.notify(thief.player, Format.template(Theme.text.stealSuccess, { creature = name }), "success")
 	Remotes.notify(
 		victim.player,
-		Format.template(Theme.text.stolenFromYou, { thief = thief.player.DisplayName, creature = def.displayName }),
+		Format.template(Theme.text.stolenFromYou, { thief = thief.player.DisplayName, creature = name }),
 		"error"
 	)
 	local podiumRefs = PlotService.podium(thief.plot, podium)
@@ -207,16 +221,19 @@ local function deliver(thief: Session)
 	if Analytics.milestone(thief, "FirstSteal") then
 		Analytics.custom(thief, "first_steal_rarity", rarity.order)
 	end
-	Analytics.custom(thief, "steal", rarity.order, { creature = def.id })
-	if rarity.announceOnSteal then
+	Analytics.custom(thief, "steal", rarity.order, { def.id, if mutation then mutation.id else "" })
+	-- MutationRules.banner: the rarity or the mutation can trigger it; `name` is the mutated name either way.
+	local announce, bannerColor = MutationRules.banner(rarity.announceOnSteal, mutation, "steal")
+	if announce then
 		Announcer.broadcast({
 			text = Format.template(Theme.text.announceSteal, {
 				thief = thief.player.DisplayName,
 				owner = victim.player.DisplayName,
 				rarity = rarity.displayName,
-				creature = def.displayName,
+				creature = name,
 			}),
 			rarity = rarity.id,
+			color = bannerColor,
 			kind = "steal",
 		})
 	end
@@ -313,6 +330,7 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 		podium = podium,
 		uid = record.uid,
 		creatureId = record.id,
+		variant = record.variant,
 		startedAt = t,
 		track = StealRules.newCarryTrack(root.Position.X, root.Position.Y, root.Position.Z, os.clock(), CARRY_LIMITS),
 		model = nil,
@@ -334,7 +352,11 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 			thiefUserId = thief.userId,
 			thiefName = player.DisplayName,
 			creatureId = record.id,
-			text = Format.template(Theme.text.beingStolen, { thief = player.DisplayName, creature = def.displayName }),
+			variant = record.variant,
+			text = Format.template(
+				Theme.text.beingStolen,
+				{ thief = player.DisplayName, creature = GameData.displayName(def, record.variant) }
+			),
 		})
 		Analytics.custom(thief, "steal_started", GameData.catalog.rarities[def.rarity].order)
 	end)
@@ -385,11 +407,11 @@ local function onTag(player: Player, targetArg: unknown)
 	end
 	tagger.tagCooldownUntil = t + CFG.tagCooldownSeconds
 	local carry = thief.carry :: Carry
-	local def = GameData.catalog.creatures[carry.creatureId]
+	local name = GameData.displayName(GameData.catalog.creatures[carry.creatureId], carry.variant)
 	StealService.cancel(thief, "tagged", player.DisplayName)
 	Remotes.notify(
 		player,
-		Format.template(Theme.text.taggedThief, { thief = thief.player.DisplayName, creature = def.displayName }),
+		Format.template(Theme.text.taggedThief, { thief = thief.player.DisplayName, creature = name }),
 		"success"
 	)
 	Remotes.fire(player, "Effect", { kind = "tag", position = thiefRoot.Position })

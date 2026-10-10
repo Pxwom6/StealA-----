@@ -75,6 +75,7 @@ local Theme = {
 		podiumMaxSign = "Max podiums",
 		carryMarker = "THIEF!",
 		collectHint = "Step here to collect",
+		mutatedName = "{mutation} {creature}", -- "Golden Pizza Pup" (names, toasts, announcements)
 
 		-- HUD
 		perSecond = "+{amount}/s",

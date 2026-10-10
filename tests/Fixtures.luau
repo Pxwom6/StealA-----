@@ -36,4 +36,21 @@ function Fixtures.creature(id: string, rarity: string, beltWeight: number, event
 	}
 end
 
+function Fixtures.mutation(id: string, order: number, chance: number, eventId: string?): Types.MutationDef
+	return {
+		id = id,
+		displayName = id,
+		color = "#FFFFFF",
+		order = order,
+		chance = chance,
+		incomeMultiplier = 2,
+		priceMultiplier = 1.5,
+		announceOnSpawn = false,
+		announceOnBuy = false,
+		announceOnSteal = false,
+		look = { material = "Neon" },
+		eventId = eventId,
+	}
+end
+
 return Fixtures

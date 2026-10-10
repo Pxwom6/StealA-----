@@ -1,12 +1,14 @@
 --!strict
 --[[
 	The conveyor. Every `belt.spawnInterval` seconds a creature is rolled (weighted rarity × server luck, event
-	creatures only during their event) and broadcast to clients as {id, creatureId, spawnAt}. Items are not
-	physics objects: position is a pure function of spawn time (Logic/BeltMath), clients render pooled models,
-	and the server validates every purchase against where the item really is.
+	creatures only during their event), then its mutation (Logic/MutationRules: fixed chances, never luck), and it
+	is broadcast to clients as {id, creatureId, spawnAt, variant}. Items are not physics objects: position is a pure
+	function of spawn time (Logic/BeltMath), clients render pooled models, and the server validates every purchase
+	against where the item really is.
 
 	BuyBeltItem(itemId) checks: item exists and is on the belt, buyer is in range of it, buyer has a free podium
-	and enough cash at the SERVER's price. Then the creature "teleports" to the buyer's base.
+	and enough cash at the SERVER's price (mutation included). Then the creature, with its mutation, "teleports" to
+	the buyer's base.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -16,6 +18,7 @@ local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local GameData = require(ReplicatedStorage.Shared.GameData)
 local BeltMath = require(ReplicatedStorage.Shared.Logic.BeltMath)
 local Guard = require(ReplicatedStorage.Shared.Logic.Guard)
+local MutationRules = require(ReplicatedStorage.Shared.Logic.MutationRules)
 local RarityRoll = require(ReplicatedStorage.Shared.Logic.RarityRoll)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local Analytics = require(script.Parent.Analytics)
@@ -59,7 +62,28 @@ local function prune(t: number)
 	end
 end
 
-local function spawnOne(forcedId: string?)
+local function nextRandom(): number
+	return rng:NextNumber()
+end
+
+-- The banner for a belt moment (`kind`: "spawn" or "buy"), or nil: see MutationRules.banner for who triggers it and
+-- its colour. `text` must name the creature with its mutated name (GameData.displayName).
+local function announcement(
+	text: string,
+	rarity: Types.RarityDef,
+	mutation: Types.MutationDef?,
+	kind: string -- "spawn" | "buy"
+): Announcer.Announcement?
+	local byRarity = if kind == "spawn" then rarity.announceOnSpawn else rarity.announceOnBuy
+	local announce, color = MutationRules.banner(byRarity, mutation, kind)
+	if not announce then
+		return nil
+	end
+	return { text = text, rarity = rarity.id, color = color, kind = kind }
+end
+
+-- Spawns one rolled item, or exactly `forcedId` (with `forcedVariant`, nil = plain) for dev commands.
+local function spawnOne(forcedId: string?, forcedVariant: string?)
 	local t = now()
 	prune(t)
 	local count = 0
@@ -70,35 +94,39 @@ local function spawnOne(forcedId: string?)
 		return
 	end
 	local catalog = GameData.catalog
+	local activeEvents = LiveOpsService.activeEventIds()
 	local creatureId = forcedId
 		or RarityRoll.roll(
 			catalog.rarityList,
 			catalog.creatureList,
 			LiveOpsService.luckMultiplier(),
-			LiveOpsService.activeEventIds(),
-			function(): number
-				return rng:NextNumber()
-			end
+			activeEvents,
+			nextRandom
 		)
 	if creatureId == nil or catalog.creatures[creatureId] == nil then
 		return
 	end
-	local item: BeltItem = { id = nextId, creatureId = creatureId, spawnAt = t }
+	local variant = if forcedId
+		then forcedVariant
+		else MutationRules.roll(catalog.mutationList, activeEvents, nextRandom)
+	local item: BeltItem = { id = nextId, creatureId = creatureId, spawnAt = t, variant = variant }
 	nextId += 1
 	items[item.id] = item
 	Remotes.fireAll("BeltSpawn", item)
 
 	local def = catalog.creatures[creatureId]
 	local rarity = catalog.rarities[def.rarity]
-	if rarity.announceOnSpawn then
-		Announcer.broadcast({
-			text = Format.template(
-				Theme.text.announceSpawn,
-				{ rarity = rarity.displayName, creature = def.displayName }
-			),
-			rarity = rarity.id,
-			kind = "spawn",
-		})
+	local banner = announcement(
+		Format.template(
+			Theme.text.announceSpawn,
+			{ rarity = rarity.displayName, creature = GameData.displayName(def, variant) }
+		),
+		rarity,
+		GameData.mutation(variant),
+		"spawn"
+	)
+	if banner then
+		Announcer.broadcast(banner)
 	end
 end
 
@@ -132,20 +160,26 @@ local function onBuy(player: Player, idArg: unknown)
 		return
 	end
 	local def = GameData.catalog.creatures[item.creatureId]
-	if not EconomyService.trySpend(session, def.price, "Shop", def.id) then
+	local mutation = GameData.mutation(item.variant)
+	local price = GameData.price(def, item.variant)
+	if not EconomyService.trySpend(session, price, "Shop", def.id) then
 		Remotes.notify(player, Theme.text.notEnoughCash, "error")
 		return
 	end
 
 	items[id] = nil
-	local record = EconomyService.giveCreature(session, def.id)
+	local record = EconomyService.giveCreature(session, def.id, item.variant)
 	if record == nil then
 		-- Cannot happen (free podium checked above, no yield in between), but never take cash for nothing.
-		EconomyService.addCash(session, def.price)
+		EconomyService.addCash(session, price)
 		return
 	end
 	session.data.stats.beltPurchases += 1
 	Analytics.milestone(session, "FirstBeltPurchase")
+	if mutation then
+		Analytics.mutationBought(session, mutation.id, mutation.order, def.id)
+	end
+	local name = GameData.displayName(def, item.variant)
 
 	local podium = PlotService.podium(session.plot, record.podium)
 	Remotes.fireAll("BeltRemove", {
@@ -153,19 +187,21 @@ local function onBuy(player: Player, idArg: unknown)
 		buyerUserId = session.userId,
 		target = if podium then podium.standCFrame.Position else nil,
 	})
-	Remotes.notify(player, Format.template(Theme.text.boughtCreature, { creature = def.displayName }), "success")
+	Remotes.notify(player, Format.template(Theme.text.boughtCreature, { creature = name }), "success")
 
 	local rarity = GameData.catalog.rarities[def.rarity]
-	if rarity.announceOnBuy then
-		Announcer.broadcast({
-			text = Format.template(Theme.text.announceBuy, {
-				player = player.DisplayName,
-				rarity = rarity.displayName,
-				creature = def.displayName,
-			}),
-			rarity = rarity.id,
-			kind = "buy",
-		})
+	local banner = announcement(
+		Format.template(Theme.text.announceBuy, {
+			player = player.DisplayName,
+			rarity = rarity.displayName,
+			creature = name,
+		}),
+		rarity,
+		mutation,
+		"buy"
+	)
+	if banner then
+		Announcer.broadcast(banner)
 	end
 end
 
@@ -175,9 +211,10 @@ function BeltService.sendSnapshot(player: Player)
 	Remotes.fire(player, "BeltSnapshot", itemList())
 end
 
--- Puts a specific creature on the belt now (Studio dev command / future events).
-function BeltService.spawnCreature(creatureId: string)
-	spawnOne(creatureId)
+-- Puts a specific creature on the belt now, with the given mutation (nil = plain). Studio dev command / future
+-- events; the caller checks the ids exist.
+function BeltService.spawnCreature(creatureId: string, variant: string?)
+	spawnOne(creatureId, variant)
 end
 
 function BeltService.belt(): BeltMath.Belt

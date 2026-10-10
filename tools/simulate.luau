@@ -3,12 +3,14 @@
 	Economy simulation: `lune run tools/simulate.luau`
 
 	Simulates a single player building a base from scratch, using the REAL config (creatures, rarity weights,
-	belt timing, podium prices, rebirth cost) and the same pure logic the game runs (RarityRoll, EconomyMath,
-	RebirthMath). Prints the tables used in BALANCE.md. Re-run after any balance change.
+	mutations, belt timing, podium prices, rebirth cost) and the same pure logic the game runs (RarityRoll,
+	MutationRules, EconomyMath, RebirthMath). Prints the tables used in BALANCE.md. Re-run after any balance change.
 
 	Model (deliberately simple and a little pessimistic):
 	  * the player stands at the belt and collects continuously (real players walk back to collect pads)
 	  * every belt spawn is considered; other players compete, so a wanted item is won with p = CONTEST_WIN
+	  * every spawn rolls its mutation like the server (own RNG stream, so the creature rolls match a run without
+	    mutations); mutated items cost and earn their mutated price and income
 	  * an item is affordable if cash + LOOKAHEAD seconds of income covers it (items take 30s to cross the belt)
 	  * free podium → buy anything affordable; full base → buy only upgrades over the worst Snackling, selling it
 	  * podiums are bought when full and the next one costs at most half of current cash
@@ -16,6 +18,7 @@
 ]]
 
 local Creatures = require("../src/shared/Config/Creatures")
+local Mutations = require("../src/shared/Config/Mutations")
 local Rarities = require("../src/shared/Config/Rarities")
 local Economy = require("../src/shared/Config/Economy")
 local Gameplay = require("../src/shared/Config/Gameplay")
@@ -24,6 +27,7 @@ local Types = require("../src/shared/Types")
 local Catalog = require("../src/shared/Logic/Catalog")
 local EconomyMath = require("../src/shared/Logic/EconomyMath")
 local Format = require("../src/shared/Logic/Format")
+local MutationRules = require("../src/shared/Logic/MutationRules")
 local RarityRoll = require("../src/shared/Logic/RarityRoll")
 local RebirthMath = require("../src/shared/Logic/RebirthMath")
 
@@ -32,9 +36,11 @@ local HOURS = 24
 local CONTEST_WIN = 0.6
 local LOOKAHEAD = 10
 
-local catalog = Catalog.build(Creatures, Rarities)
+local catalog = Catalog.build(Creatures, Rarities, Mutations)
 
 type Scenario = { name: string, multiplier: number, extraPodiums: number }
+-- One Snackling in the simulated base, with its mutated price and income.
+type Owned = { def: Types.CreatureDef, price: number, income: number }
 type RunResult = {
 	firstTier: { [string]: number },
 	rebirthReadyAt: number?,
@@ -70,8 +76,9 @@ end
 
 local function simulate(scenario: Scenario, seed: number): RunResult
 	local rng = seededRandom(seed)
+	local mutationRng = seededRandom(seed + 104729)
 	local cash = Economy.startingCash
-	local owned: { Types.CreatureDef } = {}
+	local owned: { Owned } = {}
 	local upgrades = 0
 	local firstTier: { [string]: number } = {}
 	local rebirthReadyAt: number? = nil
@@ -83,8 +90,8 @@ local function simulate(scenario: Scenario, seed: number): RunResult
 
 	local function income(): number
 		local incomes: { number } = {}
-		for _, def in owned do
-			table.insert(incomes, def.income)
+		for _, entry in owned do
+			table.insert(incomes, entry.income)
 		end
 		return EconomyMath.totalIncome(incomes, scenario.multiplier)
 	end
@@ -111,25 +118,33 @@ local function simulate(scenario: Scenario, seed: number): RunResult
 		end
 
 		local id = RarityRoll.roll(catalog.rarityList, catalog.creatureList, 1, {}, rng)
+		local variant = MutationRules.roll(catalog.mutationList, {}, mutationRng)
 		local def = if id then catalog.creatures[id] else nil
-		if def and rng() < CONTEST_WIN and cash + currentIncome * LOOKAHEAD >= def.price then
+		local item: Owned? = if def
+			then {
+				def = def,
+				price = MutationRules.price(catalog.mutations, def, variant),
+				income = MutationRules.income(catalog.mutations, def, variant),
+			}
+			else nil
+		if item and rng() < CONTEST_WIN and cash + currentIncome * LOOKAHEAD >= item.price then
 			if #owned < capacity() then
-				cash -= def.price
-				table.insert(owned, def)
+				cash -= item.price
+				table.insert(owned, item)
 			else
 				local worstIndex, worstIncome = 0, math.huge
-				for index, ownedDef in owned do
-					if ownedDef.income < worstIncome then
-						worstIndex, worstIncome = index, ownedDef.income
+				for index, entry in owned do
+					if entry.income < worstIncome then
+						worstIndex, worstIncome = index, entry.income
 					end
 				end
-				if def.income > worstIncome then
-					cash += EconomyMath.sellValue(owned[worstIndex].price, Economy.sellRefund) - def.price
-					owned[worstIndex] = def
+				if item.income > worstIncome then
+					cash += EconomyMath.sellValue(owned[worstIndex].price, Economy.sellRefund) - item.price
+					owned[worstIndex] = item
 				end
 			end
-			if firstTier[def.rarity] == nil and table.find(owned, def) then
-				firstTier[def.rarity] = t
+			if firstTier[item.def.rarity] == nil and table.find(owned, item) then
+				firstTier[item.def.rarity] = t
 			end
 			currentIncome = income()
 		end
@@ -233,3 +248,39 @@ for _, checkpoint in CHECKPOINTS do
 	end
 	print(`| {Format.duration(checkpoint)} | {table.concat(cells, " | ")} |`)
 end
+
+print(`\n## Mutations (per belt spawn, any rarity; luck never changes these)\n`)
+local spawnsPerHour = 3600 / Gameplay.belt.spawnInterval
+print("| Mutation | Chance per spawn | Per server-hour | Income | Price | Payback vs plain | Announced |")
+print("| --- | --- | --- | --- | --- | --- | --- |")
+for _, entry in MutationRules.odds(catalog.mutationList, {}) do
+	local mutation = catalog.mutations[entry.id]
+	local announced: { string } = {}
+	if mutation.announceOnSpawn then
+		table.insert(announced, "spawn")
+	end
+	if mutation.announceOnBuy then
+		table.insert(announced, "buy")
+	end
+	if mutation.announceOnSteal then
+		table.insert(announced, "steal")
+	end
+	print(
+		`| {mutation.displayName} | {Format.percent(entry.chance)} | {math.floor(
+			entry.chance * spawnsPerHour * 10 + 0.5
+		) / 10} `
+			.. `| x{mutation.incomeMultiplier} | x{mutation.priceMultiplier} `
+			.. `| x{math.floor(mutation.priceMultiplier / mutation.incomeMultiplier * 100 + 0.5) / 100} `
+			.. `| {if #announced > 0 then table.concat(announced, ", ") else "no"} |`
+	)
+end
+local expectedIncome, expectedPrice = MutationRules.expectedMultipliers(catalog.mutationList, {})
+local anyChance = 0
+for _, entry in MutationRules.odds(catalog.mutationList, {}) do
+	anyChance += entry.chance
+end
+print(
+	`\nAny mutation: {Format.percent(anyChance)} of spawns ({math.floor(anyChance * spawnsPerHour * 10 + 0.5) / 10} per `
+		.. `server-hour). Expected value of one spawn: income x{math.floor(expectedIncome * 10000 + 0.5) / 10000}, `
+		.. `price x{math.floor(expectedPrice * 10000 + 0.5) / 10000}.`
+)
