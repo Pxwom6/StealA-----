@@ -3,7 +3,7 @@
 	Friend & group rewards UI (server: SocialService, rules: Logic/SocialRules).
 
 	  * A tappable pill in the HUD's top stack, under the lock pill, shows the current bonus ("Friends +20%  ·  Group
-	    +10%"), or invites the player to bring friends / join the group while there is none. It is not a fourth round
+	    +10%"), or suggests playing with friends / joining the group while there is none. It is not a fourth round
 	    side button on purpose: three 74px side buttons already fill the left edge between the top bar and the
 	    movement thumbstick on a landscape phone.
 	  * Tapping it opens the Friends & Group panel with big buttons: Invite friends (Roblox's own invite prompt,
@@ -61,7 +61,10 @@ local function pillText(view: Types.SocialView): string
 	if #parts > 0 then
 		return table.concat(parts, "  ·  ")
 	elseif canInvite or not groupEnabled then
-		return Format.template(Theme.text.socialPillInvite, { percent = percent(Social.friends.incomeBonusPerFriend) })
+		return Format.template(
+			Theme.text.socialPillPlayTogether,
+			{ percent = percent(Social.friends.incomeBonusPerFriend) }
+		)
 	end
 	return Format.template(Theme.text.socialPillJoinGroup, { percent = percent(Social.group.incomeBonus) })
 end
@@ -164,7 +167,8 @@ function SocialController.open()
 	local friendsLine = UiKit.label({ LayoutOrder = 1, Size = UDim2.new(1, 0, 0, 34), Parent = lines })
 	local friendsHint = UiKit.label({
 		LayoutOrder = 2,
-		Size = UDim2.new(1, 0, 0, 26),
+		Size = UDim2.new(1, 0, 0, 40),
+		TextWrapped = true,
 		FontFace = UiTheme.bodyFont,
 		TextColor3 = UiTheme.palette("textDim"),
 		Parent = lines,

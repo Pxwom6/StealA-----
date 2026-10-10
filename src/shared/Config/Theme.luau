@@ -90,7 +90,8 @@ local Theme = {
 		luckBanner = "{multiplier}x LUCK {time}",
 		socialPillFriends = "Friends +{percent}%",
 		socialPillGroup = "Group +{percent}%",
-		socialPillInvite = "Invite friends: +{percent}% each",
+		-- The bonus is for friends PLAYING here together, never for sending invites (Roblox policy): keep the wording so.
+		socialPillPlayTogether = "Play with friends: +{percent}% each",
 		socialPillJoinGroup = "Join our group: +{percent}%",
 
 		-- Toasts
@@ -175,7 +176,7 @@ local Theme = {
 		rebirthMax = "Max rebirths reached",
 		socialTitle = "Friends & Group",
 		socialFriendsLine = "Friends playing here: {count}  (+{percent}% income)",
-		socialFriendsHint = "Every Roblox friend in this server: +{per}% income, up to +{max}%.",
+		socialFriendsHint = "Play together: each Roblox friend in this server gives +{per}% income, up to +{max}%.",
 		socialGroupMember = "{group} member: +{percent}% income",
 		socialGroupPitch = "Join {group} for +{percent}% income!",
 		socialGroupPitchGift = "Join {group} for +{percent}% income and a {amount} welcome gift!",
