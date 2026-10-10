@@ -4,9 +4,10 @@
 	shows it, and Skip sends the SkipTutorial intent.
 
 	* Banner in the HUD's top stack, right under the cash (HudController.TOP_ORDER.tutorial, so it can never cover
-	  the cash, the event / luck pills, the lock pill or the social pill, and it is narrower than the gap between the
-	  side buttons and the TAG button on a 667x375 phone): a "1/4" badge, one short line and a small Skip button; the
-	  steal step adds a one-line tip about the new-player shield.
+	  the cash, the event / luck pills, the lock pill or the social pill): a "1/4" badge, one short line and a small
+	  Skip button; the steal step adds a one-line tip about the new-player shield. It is sized every frame so the stack
+	  never reaches the carry banner or the screen bottom (fitBanner): the tip only when it fits, and while carrying
+	  one line or nothing.
 	* 3D guide: a glowing beam from the player's feet to the target with pulses flowing toward it, a bouncing arrow
 	  above the target that shows through walls, and a highlight on the target. Targets (Logic/TutorialRules):
 	  buy → the nearest belt item you can afford (re-picked every frame as items move, sell or fall off); collect →
@@ -35,6 +36,7 @@ local NotificationController = require(script.Parent.NotificationController)
 local PlotController = require(script.Parent.PlotController)
 local SoundPlayer = require(script.Parent.SoundPlayer)
 local StateStore = require(script.Parent.StateStore)
+local StealController = require(script.Parent.StealController)
 
 local TutorialController = {}
 
@@ -42,6 +44,8 @@ local TutorialController = {}
 local BANNER_WIDTH = 420
 local BANNER_HEIGHT = 64
 local TIP_HEIGHT = 24
+local CARRY_BANNER_GAP = 4 -- the stack stays this far above the carry banner
+local SCREEN_BOTTOM_MARGIN = 8 -- and this far above the bottom of the screen
 
 -- Guide look.
 local BEAM_WIDTH = 1.3
@@ -289,19 +293,53 @@ local function setLine(textKey: string)
 	end
 end
 
--- The steal step's tip: how long your own shield lasts, or what the yellow shields are.
-local function updateTip(state: Types.ClientState)
-	local showTip = step == "steal"
-	if showTip then
+-- UI units (reference px) the banner may take in the top stack, its gap included: down to the screen bottom, or to the
+-- carry banner while it shows (bottom centre, StealController), minus what the other pills already use.
+local function spaceForBanner(carrying: boolean): number
+	local scale = UiKit.scaleFor(workspace.CurrentCamera.ViewportSize)
+	local screen = HudController.screen()
+	local stack = HudController.topStack()
+	local layout = stack:FindFirstChildOfClass("UIListLayout")
+	local padding = if layout then layout.Padding.Offset else 0
+	local used = stack.Position.Y.Offset
+	for _, child in stack:GetChildren() do
+		if child ~= banner and child:IsA("GuiObject") and child.Visible then
+			-- Fixed-size pills by their size (a pressed button's UIScale must not count), auto-sized ones as drawn.
+			local height = if child.AutomaticSize == Enum.AutomaticSize.None
+				then child.Size.Y.Offset
+				else child.AbsoluteSize.Y / scale
+			used += height + padding -- each other pill is one list gap away from the banner
+		end
+	end
+	local carryBanner = StealController.carryBanner()
+	local bottom = if carrying
+			and carryBanner
+			and carryBanner.Visible
+		then (carryBanner.AbsolutePosition.Y - screen.AbsolutePosition.Y) / scale - CARRY_BANNER_GAP
+		else screen.AbsoluteSize.Y / scale - SCREEN_BOTTOM_MARGIN
+	return bottom - used
+end
+
+-- Sizes the banner so the top stack never reaches anything below it (DECISIONS.md #21): with the steal step's tip
+-- (how long your shield lasts, or what yellow shields are) when there is room, one line when not, hidden while
+-- carrying if even one line doesn't fit (the carry banner says what to do then).
+local function fitBanner(state: Types.ClientState)
+	local carrying = state.carrying ~= ""
+	local mode = TutorialRules.bannerMode(
+		spaceForBanner(carrying),
+		BANNER_HEIGHT + TIP_HEIGHT,
+		BANNER_HEIGHT,
+		step == "steal" and not carrying
+	)
+	if mode == "full" then
 		local remaining = state.graceUntil - workspace:GetServerTimeNow()
 		tipLabel.Text = if remaining > 0
 			then Format.template(Theme.text.tutorialShieldTip, { time = Format.clock(remaining) })
 			else Theme.text.tutorialShieldOtherTip
 	end
-	if tipLabel.Visible ~= showTip then
-		tipLabel.Visible = showTip
-		banner.Size = UDim2.fromOffset(BANNER_WIDTH, BANNER_HEIGHT + (if showTip then TIP_HEIGHT else 0))
-	end
+	tipLabel.Visible = mode == "full"
+	banner.Size = UDim2.fromOffset(BANNER_WIDTH, BANNER_HEIGHT + (if mode == "full" then TIP_HEIGHT else 0))
+	banner.Visible = mode ~= "hidden"
 end
 
 local function render()
@@ -311,8 +349,9 @@ local function render()
 		hideGuide()
 		return
 	end
-	updateTip(state)
-	local target = if root then currentTarget(root, state) else nil
+	fitBanner(state)
+	-- While carrying a stolen Snackling the carry banner and its beam home take over.
+	local target = if root and state.carrying == "" then currentTarget(root, state) else nil
 	setLine((target and target.textKey) or TutorialRules.TEXT_KEYS[step] or "")
 	if root == nil or target == nil then
 		hideGuide()
@@ -358,7 +397,10 @@ local function setStep(newStep: string, view: Types.TutorialView)
 		if visible then
 			badgeLabel.Text = Format.template(Theme.text.tutorialStepBadge, { index = view.index, count = view.count })
 			setLine(TutorialRules.TEXT_KEYS[newStep] or "")
-			banner.Visible = true
+			local state = StateStore.get()
+			if state then
+				fitBanner(state)
+			end
 			UiKit.popIn(banner)
 		end
 	end

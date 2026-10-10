@@ -274,6 +274,12 @@ local function build()
 	end)
 end
 
+-- The bottom-centre "Run home!" banner, shown while the local player carries a Snackling (the tutorial banner keeps
+-- the HUD's top stack above it).
+function StealController.carryBanner(): Frame?
+	return carryBanner
+end
+
 function StealController.start()
 	build()
 	InteractionController.addForeignPodiumHook(stealHook)

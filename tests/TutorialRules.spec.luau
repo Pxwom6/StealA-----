@@ -273,6 +273,21 @@ T.describe("TutorialRules guide targets", function()
 	end)
 end)
 
+T.describe("TutorialRules banner fit", function()
+	T.it("shows the tip only when asked for and when it fits", function()
+		T.expect(TutorialRules.bannerMode(103, 88, 64, true)).toBe("full") -- iPhone SE, every pill showing
+		T.expect(TutorialRules.bannerMode(88, 88, 64, true)).toBe("full")
+		T.expect(TutorialRules.bannerMode(85, 88, 64, true)).toBe("compact") -- 640x360: the tip is dropped
+		T.expect(TutorialRules.bannerMode(200, 88, 64, false)).toBe("compact") -- e.g. while carrying
+	end)
+	T.it("hides the banner rather than overlap what is below it", function()
+		T.expect(TutorialRules.bannerMode(63, 88, 64, false)).toBe("hidden")
+		T.expect(TutorialRules.bannerMode(1, 88, 64, true)).toBe("hidden") -- carrying with the event + luck pills
+		T.expect(TutorialRules.bannerMode(-40, 88, 64, true)).toBe("hidden")
+		T.expect(TutorialRules.bannerMode(0 / 0, 88, 64, true)).toBe("hidden")
+	end)
+end)
+
 T.describe("Config/Tutorial", function()
 	T.it("passes validation", function()
 		local problems = TutorialRules.validate(Tutorial)

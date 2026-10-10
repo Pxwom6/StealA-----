@@ -218,6 +218,24 @@ function TutorialRules.pickCollectPodium(podiums: { PodiumCandidate }): number?
 	return bestIndex
 end
 
+-- How much of the banner fits in `space` (UI units left for it, gap included): "full" (with the tip line, only when
+-- `wantTip`), "compact" (one line) or "hidden" (it would overlap something below it).
+export type BannerMode = "full" | "compact" | "hidden"
+
+function TutorialRules.bannerMode(
+	space: number,
+	fullHeight: number,
+	compactHeight: number,
+	wantTip: boolean
+): BannerMode
+	if wantTip and space >= fullHeight then
+		return "full"
+	elseif space >= compactHeight then
+		return "compact"
+	end
+	return "hidden" -- also for a NaN space
+end
+
 -- Problems with a tutorial config (empty when valid). Checked by CI so a typo can't ship.
 function TutorialRules.validate(cfg: Config): { string }
 	local problems: { string } = {}

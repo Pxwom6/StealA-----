@@ -305,11 +305,21 @@ new-player shield instead. Completing it pays `Tutorial.reward` ($500) once per 
   before but never bought anything gets the tutorial.
 * **Layout (mobile first):** the banner is a slot in the HUD's top stack right under the cash
   (`HudController.TOP_ORDER`, one table for every pill), so the list layout guarantees it never covers the cash, the
-  event / luck pills, the lock pill or the social pill; they move down while it shows. It is 420 reference px wide:
-  on an iPhone SE in landscape (667×375, UI scale 0.85, so about 785×373 reference px under the top bar) it spans
-  x 182-602, clear of the side buttons (x ≤ 90) and the TAG button area (x ≥ 611); with every pill showing (event,
-  luck, lock, social and the steal step's tip) the stack ends at about y 350 of 373. Skip is small but a full touch
-  target (72×44). The daily reward dialog doesn't auto-open during the tutorial (it opens right after).
+  event / luck pills, the lock pill or the social pill; they move down while it shows. Its height is fitted every
+  frame (`TutorialController.fitBanner`, `TutorialRules.bannerMode`) so the whole stack ends above the screen bottom
+  (8 px margin), and above the bottom-centre carry banner while the player carries a Snackling (4 px gap): with the
+  steal step's tip (88 px) when that fits, else one line (64 px), else, only while carrying, no banner at all (the carry
+  banner's "Run home!" is the instruction then, and the 3D guide hides too). The tip never shows while carrying.
+  Worked out in reference px: the stack starts at y 6; cash 58, cash/sec 26, event pill 48 + luck pill 32 (one
+  slot), lock 34, social 34, each plus a 4 px gap, so every pill but the banner uses at most 262. On an iPhone SE in
+  landscape (667×375, UI scale 0.85, about 785×373 under the top bar) that leaves 373 - 8 - 262 = 103 when not
+  carrying: the banner with its tip fits and the stack ends at 350. While carrying, the carry banner spans
+  y 267-313, so the stack must end by 263: with the event and luck pills (262, or 226 with the event alone) the banner
+  hides; with only the lock and social pills (174) the one-line banner fits (ends at 238). At 640×360 (about 355 high)
+  there are 85 px with every pill, so the tip is dropped and the one-line banner ends at 326. Skip is small but a
+  full touch target (72×44). The daily reward dialog doesn't auto-open during the tutorial (it opens right after).
+  Not covered: the transient toasts and the "X is stealing your Snackling!" alert, which already overlapped the
+  pills before the tutorial.
 * **Analytics:** the onboarding funnel follows the tutorial: 1 Joined, 2 FirstBeltPurchase, 3 FirstCollect,
   4 TutorialLock (the lock step ended, however), 5 TutorialComplete, 6 FirstSteal, 7 FirstRebirth (FirstSteal and
   FirstRebirth were 4 and 5). Roblox counts a logged step as completing every earlier one, so a funnel step must be
