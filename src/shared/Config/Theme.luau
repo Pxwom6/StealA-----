@@ -91,6 +91,7 @@ local Theme = {
 		socialPillFriends = "Friends +{percent}%",
 		socialPillGroup = "Group +{percent}%",
 		socialPillInvite = "Invite friends: +{percent}% each",
+		socialPillJoinGroup = "Join our group: +{percent}%",
 
 		-- Toasts
 		notEnoughCash = "Not enough cash!",
@@ -181,7 +182,6 @@ local Theme = {
 		socialGroupFallbackName = "our group",
 		socialInvite = "Invite friends",
 		socialGroupJoin = "Join group",
-		socialGroupCheck = "Check again",
 		socialInviteMessage = "Come steal Snacklings with me!",
 
 		-- Store
