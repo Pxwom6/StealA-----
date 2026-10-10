@@ -174,7 +174,7 @@ local function buildBoard(part: BasePart, title: string): ({ Row }, TextLabel)
 			TextColor3 = UiTheme.palette("cash"),
 			TextXAlignment = Enum.TextXAlignment.Right,
 			Size = UDim2.new(0.42, -12, 0.72, 0),
-			Position = UDim2.new(0.58, 0, 0.14, 0),
+			Position = UDim2.fromScale(0.58, 0.14),
 			Parent = frame,
 		})
 		table.insert(rows, { frame = frame, rank = rank, name = name, value = value })

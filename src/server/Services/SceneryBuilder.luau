@@ -375,7 +375,7 @@ local function buildBench(spot: SceneryLayout.Spot, parent: Instance)
 	solid({
 		Name = "BenchBack",
 		Size = Vector3.new(4.4, 1.3, 0.3),
-		CFrame = frame * CFrame.new(0, 2.3, 0.65) * CFrame.Angles(math.rad(-10), 0, 0),
+		CFrame = frame * CFrame.new(0, 2.3, 0.65) * CFrame.Angles(math.rad(10), 0, 0), -- leans back
 		Color = world("bench"),
 		Material = Enum.Material.WoodPlanks,
 		Parent = parent,
@@ -619,10 +619,10 @@ local function buildFountain(parent: Instance)
 			LightEmission = 0.4,
 			Size = NumberSequence.new(0.35, 0.12),
 			Transparency = NumberSequence.new(0.1, 0.6),
-			Speed = NumberRange.new(10, 11.5),
+			Speed = NumberRange.new(12, 13), -- arcs about 2 studs high onto the pedestal
 			SpreadAngle = Vector2.new(4, 4),
 			Acceleration = Vector3.new(0, -34, 0),
-			Lifetime = NumberRange.new(0.75, 0.9),
+			Lifetime = NumberRange.new(0.8, 0.95),
 			Rate = 24,
 			EmissionDirection = Enum.NormalId.Top,
 		})
@@ -740,9 +740,9 @@ local function buildPlazaGround(parent: Instance)
 	})
 	for _, side in { -1, 1 } do
 		decor({
-			Name = "PathEdge",
-			Size = Vector3.new(length, 0.3, 0.6),
-			CFrame = CFrame.new(walkwayEnd + length / 2, 0.15, P.z + side * (P.pathWidth / 2 + 0.3)),
+			Name = "PathEdge", -- a low kerb, under the paving's height where they overlap
+			Size = Vector3.new(length, 0.26, 0.6),
+			CFrame = CFrame.new(walkwayEnd + length / 2, 0.13, P.z + side * (P.pathWidth / 2 + 0.3)),
 			Color = world("plazaBorder"),
 			Material = Enum.Material.Slate,
 			CastShadow = false,
