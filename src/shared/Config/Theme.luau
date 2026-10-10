@@ -145,6 +145,7 @@ local Theme = {
 		socialFriendLeft = "Your friend {name} left. Friends bonus +{percent}%",
 		socialFriendLeftNoBonus = "Your friend {name} left.",
 		socialGroupJoined = "Thanks for joining the group! +{percent}% income",
+		socialGroupAlreadyMember = "You're in the group: +{percent}% income!",
 		socialGroupWelcome = "Group welcome gift: {amount}!",
 		socialGroupNotYet = "We can't see you in the group yet - try again in a moment.",
 		socialGroupCheckFailed = "Couldn't check the group right now - try again soon.",

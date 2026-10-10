@@ -34,7 +34,12 @@ type Session = Sessions.Session
 -- One pair of players in the server. `friends` stays nil until Roblox answers (or if it never does): not friends.
 type Friendship = { a: Session, b: Session, friends: boolean? }
 
-type GroupCheck = { checking: boolean, lastCheckAt: number }
+type GroupCheck = {
+	checking: boolean, -- a membership lookup is running
+	checkingManual: boolean, -- ...and it is one the player asked for (it will answer them itself)
+	manualQueued: boolean, -- the player asked while an on-join lookup was running: answer when it finishes
+	lastCheckAt: number, -- os.clock() of the last manual lookup (recheck cooldown)
+}
 
 local SocialService = {}
 
@@ -175,7 +180,11 @@ local function checkGroup(session: Session, manual: boolean, attempt: number)
 	if check == nil or not isCurrent(session) then
 		return
 	end
+	if check.checking and not manual then
+		return -- an on-join retry while the player's own check is running: that one answers
+	end
 	check.checking = true
+	check.checkingManual = manual
 	local groupId = Social.group.groupId
 	local ok, result = pcall(function(): boolean
 		return session.player:IsInGroupAsync(groupId)
@@ -189,8 +198,21 @@ local function checkGroup(session: Session, manual: boolean, attempt: number)
 		end
 	end
 	check.checking = false
+	check.checkingManual = false
 	if groupChecks[session] ~= check or not isCurrent(session) then
 		return -- left while Roblox was answering
+	end
+	if check.manualQueued and not manual then
+		-- The player tapped Join group / asked while this on-join lookup ran. Answer them with this result if it found
+		-- them; otherwise run their own full check now (it also consults the group list).
+		check.manualQueued = false
+		if ok and isMember then
+			manual = true
+		else
+			check.lastCheckAt = os.clock()
+			task.spawn(checkGroup, session, true, 1)
+			return
+		end
 	end
 	if not ok then
 		if manual then
@@ -221,11 +243,25 @@ local function onCheckGroup(player: Player)
 		return
 	end
 	local check = groupChecks[session]
-	if check == nil or check.checking then
+	if check == nil then
+		return
+	end
+	if check.checking then
+		-- Never drop the request: a running manual check will answer; an on-join one answers when it finishes.
+		if not check.checkingManual then
+			check.manualQueued = true
+		end
 		return
 	end
 	if session.social.groupMember then
 		grantGroupWelcome(session) -- nothing to look up; just make sure the welcome reward was paid
+		Remotes.notify(
+			player,
+			Format.template(Theme.text.socialGroupAlreadyMember, {
+				percent = SocialRules.percent(SocialRules.groupBonus(true, Social.group)),
+			}),
+			"success"
+		)
 		return
 	end
 	local now = os.clock()
@@ -248,7 +284,7 @@ end
 
 -- PlayerLifecycle onJoined hook. Never yields: every Roblox call runs in its own thread.
 function SocialService.onJoined(session: Session)
-	groupChecks[session] = { checking = false, lastCheckAt = -math.huge }
+	groupChecks[session] = { checking = false, checkingManual = false, manualQueued = false, lastCheckAt = -math.huge }
 	for _, other in Sessions.all() do
 		if other == session or not SocialRules.canBeFriends(session.userId, other.userId) then
 			continue
