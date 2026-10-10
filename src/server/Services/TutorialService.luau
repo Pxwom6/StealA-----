@@ -11,6 +11,8 @@
 	* Finishing pays `Tutorial.reward` once per account: TutorialRules.finish sets the done flag and returns the
 	  amount, and it is paid right away (no yield in between).
 	* Existing players (progress in their save but no tutorial flags) are marked done on join, without the reward.
+	* `record` and `onJoined` run inside gameplay code (the pad-collect loop, steal delivery, the join), so they are
+	  pcall'd: a tutorial bug can only break the tutorial.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -111,9 +113,16 @@ local function endStep(session: Session, stepId: string, outcome: TutorialRules.
 	sync(session)
 end
 
--- The player did a tutorial action (a step id: "buy", "collect", "lock", "steal"). Called by the gameplay services
--- right after the server applied it. Finishes that step: now if it is the current one, or when it comes up.
-function TutorialService.record(session: Session, action: string)
+-- Runs a tutorial hook that gameplay code calls (the pad-collect loop, steal delivery, joining...) so a tutorial bug
+-- can only ever cost the tutorial, never the caller.
+local function guarded(what: string, fn: (Session, ...any) -> (), session: Session, ...: any)
+	local ok, err = pcall(fn :: (Session, ...any) -> ...any, session, ...)
+	if not ok then
+		warn(`[TutorialService] {what} failed for {session.player.Name}: {err}`)
+	end
+end
+
+local function recordAction(session: Session, action: string)
 	local run = session.tutorial
 	if run == nil then
 		return -- no tutorial running (done, existing player, disabled, or the join isn't finished yet)
@@ -122,8 +131,14 @@ function TutorialService.record(session: Session, action: string)
 	endStep(session, action, outcome)
 end
 
--- Join hook (after the plot is assigned): starts, resumes or retires the tutorial.
-function TutorialService.onJoined(session: Session)
+-- The player did a tutorial action (a step id: "buy", "collect", "lock", "steal"). Called by the gameplay services
+-- right after the server applied it. Finishes that step: now if it is the current one, or when it comes up. Never
+-- throws.
+function TutorialService.record(session: Session, action: string)
+	guarded("record " .. action, recordAction, session, action)
+end
+
+local function startForJoin(session: Session)
 	local status = TutorialRules.joinStatus(session.data, Tutorial)
 	if status == "returning" then
 		TutorialRules.finish(session.data.flags, "returning", Tutorial) -- pays nothing
@@ -131,6 +146,11 @@ function TutorialService.onJoined(session: Session)
 		sync(session)
 	end
 	Analytics.flushMilestones(session) -- e.g. an existing player's steps that waited on the tutorial steps
+end
+
+-- Join hook (after the plot is assigned): starts, resumes or retires the tutorial. Never throws (the join goes on).
+function TutorialService.onJoined(session: Session)
+	guarded("join", startForJoin, session)
 end
 
 function TutorialService.onLeaving(session: Session)
@@ -145,6 +165,7 @@ function TutorialService.restart(session: Session)
 	Replication.markDirty(session)
 end
 
+-- (SkipTutorial runs through Remotes.onIntent, which already pcalls its handler.)
 local function onSkip(player: Player)
 	local session = Sessions.get(player)
 	if session == nil or session.tutorial == nil then
