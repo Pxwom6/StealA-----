@@ -81,8 +81,16 @@ end
 
 -- A friend of `session` arrived: recount and tell them. `isNewcomer`: `session` is the one who just joined.
 local function welcomeFriend(session: Session, friend: Session, isNewcomer: boolean)
-	local _, after = recount(session)
-	local template = if isNewcomer then Theme.text.socialFriendHere else Theme.text.socialFriendJoined
+	local before, after = recount(session)
+	local notice = SocialRules.friendNotice(before, after, Social.friends)
+	local template
+	if notice == "bonus" then
+		template = if isNewcomer then Theme.text.socialFriendHere else Theme.text.socialFriendJoined
+	elseif notice == "maxed" then
+		template = if isNewcomer then Theme.text.socialFriendHereMaxed else Theme.text.socialFriendJoinedMaxed
+	else
+		template = if isNewcomer then Theme.text.socialFriendHerePlain else Theme.text.socialFriendJoinedPlain
+	end
 	Remotes.notify(
 		session.player,
 		Format.template(template, { name = friend.player.DisplayName, percent = friendPercent(after) }),
@@ -274,9 +282,11 @@ function SocialService.onLeaving(session: Session)
 	end
 	for _, friend in friendsLeftBehind do
 		if isCurrent(friend) then
-			local _, after = recount(friend)
+			local before, after = recount(friend)
 			local percent = friendPercent(after)
-			local template = if percent > 0 then Theme.text.socialFriendLeft else Theme.text.socialFriendLeftNoBonus
+			local template = if SocialRules.friendNotice(before, after, Social.friends) == "bonus"
+				then Theme.text.socialFriendLeft
+				else Theme.text.socialFriendLeftNoBonus -- no bonus left, or still at the maximum: just say who left
 			Remotes.notify(
 				friend.player,
 				Format.template(template, { name = session.player.DisplayName, percent = percent }),

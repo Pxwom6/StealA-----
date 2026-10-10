@@ -105,6 +105,16 @@ T.describe("SocialRules friend checks", function()
 		-- a friend who left is simply no longer among the others
 		T.expect(SocialRules.countFriends(1, { 2, 3 }, friendships)).toBe(1)
 	end)
+	T.it("picks the toast for a friend joining or leaving", function()
+		T.expect(SocialRules.friendNotice(0, 1, friends)).toBe("bonus") -- joined: +10%
+		T.expect(SocialRules.friendNotice(2, 3, friends)).toBe("bonus") -- joined: +30%
+		T.expect(SocialRules.friendNotice(3, 4, friends)).toBe("maxed") -- 4th friend: no new bonus to announce
+		T.expect(SocialRules.friendNotice(5, 6, friends)).toBe("maxed")
+		T.expect(SocialRules.friendNotice(3, 2, friends)).toBe("bonus") -- left: now +20%
+		T.expect(SocialRules.friendNotice(1, 0, friends)).toBe("plain") -- left: no bonus any more
+		T.expect(SocialRules.friendNotice(4, 3, friends)).toBe("plain") -- left, but still at the maximum
+		T.expect(SocialRules.friendNotice(2, 2, friends)).toBe("plain") -- already counted
+	end)
 	T.it("describes how a friend joining or leaving changed the bonus", function()
 		T.expect(SocialRules.friendChange(0, 1, friends)).toBe("gained")
 		T.expect(SocialRules.friendChange(3, 4, friends)).toBe("unchanged") -- already at the cap

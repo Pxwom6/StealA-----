@@ -104,6 +104,21 @@ function SocialRules.friendChange(countBefore: number, countAfter: number, cfg: 
 	return "unchanged"
 end
 
+-- What a friend joining / leaving toast should say: "bonus" shows the new friend bonus, "maxed" says the bonus was
+-- already at its maximum (a friend beyond maxFriends arrived), "plain" just names the friend (no bonus left, or a
+-- departure that didn't change it).
+export type FriendNotice = "bonus" | "maxed" | "plain"
+
+function SocialRules.friendNotice(countBefore: number, countAfter: number, cfg: FriendsConfig): FriendNotice
+	local hasBonus = SocialRules.friendBonus(countAfter, cfg) > 0
+	if SocialRules.friendChange(countBefore, countAfter, cfg) ~= "unchanged" then
+		return if hasBonus then "bonus" else "plain"
+	elseif countAfter > countBefore and hasBonus then
+		return "maxed"
+	end
+	return "plain"
+end
+
 -- The one-time group welcome reward is due: the group is on, the reward is configured, the player is a member and
 -- this account was never paid it.
 function SocialRules.canClaimGroupWelcome(flags: { [string]: boolean }, isMember: boolean, cfg: GroupConfig): boolean
