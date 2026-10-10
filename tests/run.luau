@@ -28,5 +28,6 @@ require("./SeasonRules.spec")
 require("./TutorialRules.spec")
 require("./OnboardingFunnel.spec")
 require("./CreatureRecipe.spec")
+require("./IdleMotion.spec")
 
 T.finish()
