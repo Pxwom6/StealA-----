@@ -116,6 +116,7 @@ local function buildDaily(content: Frame): (state: Types.ClientState) -> ()
 	UiKit.new("UIListLayout", {
 		FillDirection = Enum.FillDirection.Horizontal,
 		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		SortOrder = Enum.SortOrder.LayoutOrder,
 		Padding = UDim.new(0, 6),
 		Parent = track,
 	})
@@ -128,7 +129,11 @@ local function buildDaily(content: Frame): (state: Types.ClientState) -> ()
 			BackgroundColor3 = UiTheme.palette("panelLight"),
 			Parent = track,
 		})
-		UiKit.label({ Text = `Day {slot}`, Size = UDim2.fromScale(1, 0.3), Parent = cell })
+		UiKit.label({
+			Text = Format.template(Theme.text.dailyDay, { day = slot }),
+			Size = UDim2.fromScale(1, 0.3),
+			Parent = cell,
+		})
 		local icon = UiKit.label({
 			Text = "🎁",
 			Size = UDim2.fromScale(1, 0.4),

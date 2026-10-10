@@ -227,6 +227,7 @@ local Theme = {
 		rewardsTitle = "Rewards",
 		rewardsTabDaily = "Daily",
 		rewardsTabQuests = "Quests",
+		dailyDay = "Day {day}", -- a cell of the 7-day track
 		-- Daily quests (Config/Quests textKey): {count} = target, {amount} = cash target, {rarity} = minimum rarity
 		questBuy = "Buy {count} Snacklings from the belt",
 		questBuyRare = "Buy a {rarity} or rarer Snackling",
