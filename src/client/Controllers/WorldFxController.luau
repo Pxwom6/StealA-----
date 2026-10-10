@@ -31,8 +31,9 @@ local cogAngle = 0
 local blinkers: { BasePart } = {}
 
 local reduced = false
--- What Reduce effects switched off, to switch back on later (weak keys: destroyed instances drop out).
-local switchedOff: { [Instance]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+-- What Reduce effects switched off, to switch back on later. A plain table: Roblox may drop weak-keyed Instance
+-- entries while the instance still exists, which would leave effects off forever. Destroyed ones remove themselves.
+local switchedOff: { [Instance]: boolean } = {}
 
 local EMITTER_CLASSES = { "ParticleEmitter", "Sparkles", "Smoke", "Fire" }
 
@@ -49,7 +50,12 @@ local function switchOff(instance: Instance)
 	local effect = instance :: any
 	if effect.Enabled then
 		effect.Enabled = false
-		switchedOff[instance] = true
+		if not switchedOff[instance] then
+			switchedOff[instance] = true
+			instance.Destroying:Once(function()
+				switchedOff[instance] = nil
+			end)
+		end
 	end
 end
 

@@ -10,6 +10,7 @@ local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CreatureVisuals = require(ReplicatedStorage.Shared.CreatureVisuals)
+local ClientSettings = require(script.Parent.ClientSettings)
 
 local MutationFxController = {}
 
@@ -18,6 +19,10 @@ local STEP_SECONDS = 0.1
 local PARKED_BELOW_Y = -400
 
 local function step()
+	-- Settings > Reduce effects: Rainbow Snacklings keep their current colour instead of cycling.
+	if ClientSettings.reduceEffects() then
+		return
+	end
 	local t = os.clock()
 	for _, instance in CollectionService:GetTagged(CreatureVisuals.RAINBOW_TAG) do
 		if instance:IsA("BasePart") and instance.Position.Y > PARKED_BELOW_Y then

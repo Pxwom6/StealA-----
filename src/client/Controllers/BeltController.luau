@@ -26,6 +26,7 @@ local CreatureVisuals = require(ReplicatedStorage.Shared.CreatureVisuals)
 local BeltMath = require(ReplicatedStorage.Shared.Logic.BeltMath)
 local IdleMotion = require(ReplicatedStorage.Shared.Logic.IdleMotion)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
+local ClientSettings = require(script.Parent.ClientSettings)
 local NotificationController = require(script.Parent.NotificationController)
 local SoundPlayer = require(script.Parent.SoundPlayer)
 local StateStore = require(script.Parent.StateStore)
@@ -287,7 +288,10 @@ local function onRemove(payload: { id: number, buyerUserId: number?, target: Vec
 	end
 end
 
+local STILL: IdleMotion.Pose = { lift = 0, squash = 0, roll = 0, yaw = 0 }
+
 local function step()
+	local reduced = ClientSettings.reduceEffects()
 	local now = workspace:GetServerTimeNow()
 	local clock = os.clock()
 	local squashNow = clock - lastSquash >= SQUASH_STEP
@@ -303,7 +307,8 @@ local function step()
 			continue
 		end
 		local x, z = BeltMath.position(belt, item.spawnAt, now)
-		local pose = IdleMotion.belt(now - item.spawnAt, entry.phase)
+		-- Settings > Reduce effects: items glide instead of hopping (no squash either).
+		local pose = if reduced then STILL else IdleMotion.belt(now - item.spawnAt, entry.phase)
 		local position = Vector3.new(x, surfaceY + pose.lift, z)
 		local facing = CFrame.lookAt(position, position + Vector3.new(belt.dirX, 0, belt.dirZ))
 		entry.pooled.model:PivotTo(facing * CFrame.Angles(0, pose.yaw, pose.roll))

@@ -63,7 +63,7 @@ T.describe("IdleMotion", function()
 		end
 		local landing = IdleMotion.belt(period * 3 + 0.001, 0)
 		T.expect(landing.lift).toBeLessThan(0.01)
-		T.expect(landing.squash).toBeLessThan(-0.05)
+		T.expect(landing.squash).toBeLessThan(-cfg.squash * 0.6)
 		local top = IdleMotion.belt(period * 3.5, 0)
 		T.expect(top.lift).toBeNear(cfg.height, 1e-6)
 		T.expect(top.squash).toBeGreaterThan(0)

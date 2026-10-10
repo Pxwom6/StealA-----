@@ -24,7 +24,7 @@ local IdleMotion = require(ReplicatedStorage.Shared.Logic.IdleMotion)
 local IdleController = {}
 
 local ACTIVE_RANGE = 120
-local MAX_ACTIVE = 48
+local MAX_ACTIVE = 32 -- phones: ~35 parts each at 30 Hz
 local STEP_SECONDS = 1 / 30
 local PICK_SECONDS = 0.5
 
@@ -76,11 +76,16 @@ local function forget(instance: Instance)
 	end
 end
 
+-- True when the Root is no longer where this client last put it: the server moved or turned the model.
+local function movedElsewhere(current: CFrame, written: CFrame): boolean
+	return (current.Position - written.Position).Magnitude > 0.01 or current.LookVector:Dot(written.LookVector) < 0.9999
+end
+
 -- The server moved the model (or it was just placed): take its new position as the resting one.
 local function syncBase(entry: Entry)
 	local current = entry.root.CFrame
 	local written = entry.written
-	if written == nil or (current.Position - written.Position).Magnitude > 0.01 then
+	if written == nil or movedElsewhere(current, written) then
 		entry.base = current
 		entry.written = nil
 	end
@@ -139,6 +144,9 @@ local function animate()
 		if not entry.active or entry.model.Parent == nil then
 			continue
 		end
+		-- Checked every step (not only when re-picking): otherwise the next write would put a model the server just
+		-- moved straight back where it was, on this client only.
+		syncBase(entry)
 		local pose = IdleMotion.podium(t, entry.phase, entry.height)
 		local cframe = entry.base * CFrame.new(0, pose.lift, 0) * CFrame.Angles(0, pose.yaw, pose.roll)
 		entry.root.CFrame = cframe

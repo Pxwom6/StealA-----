@@ -35,20 +35,23 @@ T.describe("Snackdex config", function()
 		end
 	end)
 
-	T.it("each tier's minimum reward stays well below its cheapest Snackling (no alt-account lending profit)", function()
-		for _, rarity in catalog.rarityList do
-			local cheapest = math.huge
-			for _, creature in Creatures do
-				if creature.rarity == rarity.id and creature.eventId == nil then
-					cheapest = math.min(cheapest, creature.price)
+	T.it(
+		"each tier's minimum reward stays well below its cheapest Snackling (no alt-account lending profit)",
+		function()
+			for _, rarity in catalog.rarityList do
+				local cheapest = math.huge
+				for _, creature in Creatures do
+					if creature.rarity == rarity.id and creature.eventId == nil then
+						cheapest = math.min(cheapest, creature.price)
+					end
+				end
+				local reward = Snackdex.tierRewards[rarity.id]
+				if reward and cheapest < math.huge then
+					T.expect(reward.minimum).toBeAtMost(cheapest * 0.5)
 				end
 			end
-			local reward = Snackdex.tierRewards[rarity.id]
-			if reward and cheapest < math.huge then
-				T.expect(reward.minimum).toBeAtMost(cheapest * 0.5)
-			end
 		end
-	end)
+	)
 
 	T.it("every tier can be completed from the belt, whatever the roster", function()
 		for _, tier in SnackdexRules.tierProgress(SnackdexRules.empty(), Creatures, catalog.rarityList) do

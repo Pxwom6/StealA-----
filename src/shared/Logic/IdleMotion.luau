@@ -31,7 +31,8 @@ IdleMotion.PODIUM = {
 IdleMotion.BELT = {
 	hopsPerSecond = 1.9,
 	height = 0.35, -- studs
-	squash = 0.08,
+	-- Only body parts squash (face and toppings keep their size), so keep it subtle or toppings visibly float.
+	squash = 0.04,
 	roll = 0.07,
 }
 
