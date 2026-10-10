@@ -218,6 +218,43 @@ Uncommon), usually within the first one to two minutes. Skipping it pays nothing
 when it shipped never get it. The simulation above does not include it; it can only bring the first Uncommon forward by
 a minute or so and changes nothing after that.
 
+## Snackdex and daily quests
+
+Both pay in "minutes of steady income" (the cash-pack basis: rebirths, passes and the collection bonus; no LiveOps cash
+event, no friend & group bonus), never below a minimum, so they stay meaningful at every stage without breaking it.
+The simulation above includes neither.
+
+**Snackdex** (`Config/Snackdex`): owning every regular Snackling of a tier (event Snacklings never count) pays once:
+
+| Tier | Reward | Minimum |
+| --- | --- | --- |
+| Common | 3 min of steady income | $250 |
+| Uncommon | 5 min | $1K |
+| Rare | 8 min | $10K |
+| Epic | 10 min | $100K |
+| Legendary | 15 min | $2.5M |
+| Mythic | 20 min | $75M |
+| Secret | 30 min | $2.5B |
+
+Each minimum is about the tier's cheapest Snackling, so even a tier completed early (by stealing) is worth one. All
+seven tiers pay about 91 minutes of income over a player's whole life, less than half of one Snack Truck. Each
+completed tier also adds **+3% income forever** (all seven: +21%, the cap), which counts like rebirths everywhere
+(cash packs, daily and offline rewards, the leaderboard). For scale: one rebirth is ×1.5, so the whole collection is
+worth less than half a rebirth; it rewards collecting without replacing the rebirth chase. A new mutation of a known
+Snackling only fills its pip (no cash).
+
+**Daily quests** (`Config/Quests`): 2 easy + 1 hard a day.
+
+| | Reward | Minimum | Examples |
+| --- | --- | --- | --- |
+| Easy | 3 min of steady income | $250 | buy 5 from the belt, collect 5 min of income from pads (at least $250), sell 2, lock twice |
+| Hard | 10 min | $1K | steal one, buy a Rare or rarer, find something new for the Snackdex, collect 20 min of income (at least $2.5K) |
+| All three done | 5 min | $500 | paid with the last claim |
+
+A full day pays about **21 minutes of steady income** (at least $2K), between the daily streak's day-5 (18 min) and
+day-6 (25 min) rewards, and it takes a session of real play to earn (CI keeps a day under an hour). Collect targets are
+fixed from steady income when the day's quests are rolled, so they always mean a few minutes of normal play.
+
 ## Tuning checklist
 
 * Change one tier at a time and keep the strict ordering (CI enforces it): every tier must be rarer, pricier,

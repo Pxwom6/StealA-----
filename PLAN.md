@@ -54,14 +54,17 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | Rebirth | `RebirthService` | `RebirthController` (trade-off dialog) | `RebirthMath` |
 | Base lock UI | `LockService` | `LockController` (lock button prompt, HUD pill) | `LockRules` |
 | Monetisation | `MonetizationService` (ProcessReceipt, passes) | `StoreController` | `ReceiptLedger`, `EconomyMath.cashPackAmount` |
-| Retention | `RetentionService` (daily streak, offline earnings), `LeaderboardService` | `RewardsController` | `DailyStreak`, `OfflineEarnings` |
+| Retention | `RetentionService` (daily streak, offline earnings), `LeaderboardService` | `RewardsController` (Rewards panel: Daily + Quests tabs) | `DailyStreak`, `OfflineEarnings` |
+| Snackdex | `SnackdexService` (discovery on every Snackling landing in a base, tier rewards claimed automatically, sync) | `SnackdexController` (rarity / Event tabs, 3D preview cards, silhouettes, NEW! toasts) | `SnackdexRules` |
+| Daily quests | `QuestService` (daily roll per UserId + UTC day, progress from gameplay events, ClaimQuest, day reset) | `RewardsController` (Quests tab) | `QuestRules` |
+| Gameplay events | `GameEvents` (buy / acquired / collect / sell / lock / steal / discover, emitted by the services that applied them) | – | – |
 | Social | `Announcer` (server-wide banners), `SocialService` (friends in server, group membership, welcome gift) | `NotificationController`, `ChatTagController`, `SocialController` (bonus pill, invite / join group panel) | `SocialRules` |
 | LiveOps | `LiveOpsService` (scheduled events, luck boosts, admin commands, cross-server, active-event change listeners) | event pill (banner + countdown), luck pill | `LiveOpsRules` |
 | Seasonal events | `SeasonService` (theme decorations + lighting while a themed event runs, restored after) | event pill colour, "EVENT" tag on event Snacklings' billboards | `SeasonRules` |
 | First-time tutorial | `TutorialService` (steps finished by real purchases / collects / locks / steals, timeouts, one-time reward, existing players skipped) | `TutorialController` (banner under the cash, beam + bouncing arrow + highlight on the target, Skip) | `TutorialRules` |
 | Analytics | `Analytics` (onboarding funnel following the tutorial, store funnel, economy events) | sends whitelisted `store_opened` | – |
 | State sync | `Replication` (dirty-flag batching, 5 Hz) | `StateStore` | – |
-| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends`, `/tutorial`); LiveOps `/event <id> [minutes]`, `/event off` (anyone in Studio, local only) | – | – |
+| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends`, `/tutorial`, `/quests reset`, `/dex fill <rarity\|event>`); LiveOps `/event <id> [minutes]`, `/event off` (anyone in Studio, local only) | – | – |
 
 ## 3. Module list
 
@@ -80,6 +83,8 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | `Sounds` | sound asset IDs (**placeholders**) |
 | `Social` | friend bonus (+10% per friend in the server, max 3), group id (**placeholder 0 = off**), group bonus, one-time welcome gift |
 | `Tutorial` | first-time tutorial: on/off, steps in order (buy, collect, lock, steal) with their automatic endings, one-time reward, belt-target tuning |
+| `Snackdex` | collection book rewards: one-time cash per completed rarity tier (steady income, minimum), permanent income bonus per tier and its cap |
+| `Quests` | daily quests: slots per day (2 easy + 1 hard), the quest pool (kind, target or income-sized cash target, minimum rarity, text key), rewards per difficulty, all-done bonus |
 
 ### `src/shared/Logic` (pure, unit-tested)
 
@@ -109,6 +114,8 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `SocialRules` | friend / group income bonus, friend counting per pair, group welcome gift, recheck cooldown, config validation |
 | `OnboardingFunnel` | onboarding funnel steps and their order: a milestone reached early waits until every earlier step is logged |
 | `TutorialRules` | tutorial progress in `flags` (current step, early actions, resume), existing-player detection, automatic step endings, one-time reward, guide targets (belt item, collect pad), config validation |
+| `SnackdexRules` | discovery of Snacklings and (Snackling, mutation) pairs, tier progress over regular Snacklings (Event section apart), claim-once tier rewards, capped collection bonus, client view, config validation |
+| `QuestRules` | deterministic daily roll (UserId + UTC day hash), targets, day reset, progress from events, claim-once with the all-done bonus, rewards, client view, config validation |
 
 ### `src/shared` (Roblox helpers, not unit-tested)
 `Net` (create/get remotes by name), `GameData` (catalogue built once from config; `price` / `income` /
@@ -120,7 +127,8 @@ mutation look), `UiTheme` (hex → Color3, fonts, text templates, rich-text crea
 `init.server.luau` bootstraps in order:
 `Remotes → DataService → MapBuilder → PlotService → Analytics → LiveOpsService → SeasonService → Replication →
 EconomyService → BeltService → LockService → StealService → RebirthService → MonetizationService →
-RetentionService → SocialService → TutorialService → LeaderboardService → DevCommands → PlayerLifecycle`, and wires
+RetentionService → SocialService → TutorialService → SnackdexService → QuestService → LeaderboardService →
+DevCommands → PlayerLifecycle`, and wires
 cross-service join/leave steps through `PlayerLifecycle.hooks()` (keeps services free of circular requires). `Sessions` holds per-player state.
 
 `PlayerLifecycle` owns join/leave ordering: load profile → assign plot → check passes → offline earnings →
@@ -131,7 +139,7 @@ release plot → release profile.
 `init.client.luau` waits for `game:IsLoaded()` then starts controllers:
 `StateStore, HudController, NotificationController, BeltController, PlotController, InteractionController,
 StealController, LockController, RebirthController, StoreController, ChatTagController, RewardsController,
-MutationFxController, SocialController, TutorialController`
+MutationFxController, SocialController, TutorialController, SnackdexController`
 (UI helpers: `UI/UiKit`, `UI/Modal`; audio: `SoundPlayer`).
 
 ## 4. Remotes (all in `ReplicatedStorage.Remotes`, created by the server)
@@ -154,20 +162,22 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `CheckGroup` | – | group feature on, at most once per 10 s, not already checking → re-check membership (`IsInGroupAsync`, then `GetGroupsAsync`) |
 | `InvitePrompted` | – | analytics only (`invite_prompt_opened`); nothing is rewarded for inviting |
 | `SkipTutorial` | – | a tutorial is running → it ends with no reward (steps themselves only finish from gameplay the server saw) |
+| `ClaimQuest` | `slot: int` | today's quest `slot` is finished and not claimed (`QuestRules.claim`; a stale day is paid automatically instead) |
 | `DevGrantProduct` | `key: string` | **Studio only** – runs the real receipt path with a fake receipt |
 
 Server → client:
 
 | Remote | Payload |
 | --- | --- |
-| `StateUpdate` | batched partial player state (cash, cash/sec, rebirths, multiplier, podium cap, lock, passes, carry, social bonus, tutorial step…) |
+| `StateUpdate` | batched partial player state (cash, cash/sec, rebirths, multiplier, podium cap, lock, passes, carry, social bonus, tutorial step, today's quests…) |
 | `BeltSnapshot` / `BeltSpawn` / `BeltRemove` | conveyor items `{id, creatureId, spawnAt, variant?}` (variant = mutation id) |
 | `Notify` | toast `{kind, text}` |
 | `Announce` | server-wide banner `{text, rarity, color?}` (color: a mutation's own banner) |
 | `WelcomeBack` | offline earnings popup `{amount, seconds}` |
 | `DailyInfo` | streak/claimable/reward |
 | `StealAlert` | to victim: `{thiefName, creatureId, variant?}` |
-| `Effect` | one-shot VFX cue `{kind, position, rarity}` (e.g. `tutorialComplete`) |
+| `Effect` | one-shot VFX cue `{kind, position, rarity}` (e.g. `tutorialComplete`, `quest`, `questsAllDone`) |
+| `SnackdexSync` | the whole Snackdex `{dex, discovered?, completed?}` on ready and on every change (a new entry, a tier paid) |
 
 World state the client reads from **attributes** (replicated automatically): plot `OwnerUserId`, `LockedUntil`,
 `GraceUntil`, `PodiumCount`; podium `CreatureId`, `Variant` (mutation id, "" for none), `Stored`, `Income`
@@ -176,7 +186,7 @@ CollectionService tag `MutationRainbow`. LiveOps state is on `workspace`: `LuckM
 luck next changes), `PurchasedLuckEndsAt`, `CashMultiplier`, `ActiveEventIds`, `EventBanner`, `EventBannerId`,
 `EventTitle`, `EventEndsAt`, and `SeasonTheme` (the seasonal theme on, "" for none).
 
-## 5. Data schema (version 2)
+## 5. Data schema (version 3)
 
 ```lua
 type CreatureRecord = { uid: string, id: string, podium: number, acquiredAt: number, stored: number,
@@ -202,6 +212,11 @@ type PlayerData = {   -- exactly Types.PlayerData
     flags: { [string]: boolean },  -- onboarding funnel milestones, one-time rewards (`social_groupWelcome`),
                                    -- tutorial progress (`tutorial_<step>`, `tutorial_done`)
     firstJoin: number, lastSeen: number,
+    snackdex: { creatures: { [string]: boolean },              -- ever owned (v3, backfilled on migration)
+                variants: { [string]: { [string]: boolean } }, -- creature id -> mutation ids owned with it
+                tiers: { [string]: boolean } },                -- rarity tiers whose reward was paid
+    quests: { day: number, list: { { id: string, target: number, progress: number, claimed: boolean } },
+              bonusClaimed: boolean },                         -- today's quests (v3)
 }
 ```
 
@@ -244,3 +259,19 @@ the server applies that action (belt purchase, pad collect, lock, delivered stea
 of the lock being unavailable (or 60 s), the steal step after 90 s. Completing it pays $500 once per account
 (`Config/Tutorial.reward`); Skip pays nothing; players who already had progress when it shipped never see it.
 Progress lives in `data.flags` (no schema bump). Studio: `/tutorial` starts it again.
+
+## 10. Snackdex and daily quests
+
+Two "come back tomorrow" loops (DECISIONS.md #22), both server-authoritative and data-driven:
+
+* **Snackdex** — every Snackling a player ever owns, and every mutation of it, is recorded (`SnackdexService`, on each
+  `acquired` gameplay event: belt purchases, delivered steals, any other way one lands in a base; older saves are
+  backfilled by the v3 migration). Owning every regular Snackling of a rarity tier completes it: a one-time cash reward
+  (steady income, like a cash pack) and +3% permanent income (capped at +21%), claimed automatically with a banner.
+  Event Snacklings have their own section and never block a tier. UI: Snackdex button → rarity tabs with X/Y, 3D
+  preview cards (silhouettes for the undiscovered), NEW! toasts and badge dots.
+* **Daily quests** — three a day (2 easy + 1 hard) from `Config/Quests`, rolled from the UserId and UTC day, counting
+  only what the server saw (buy, collect from pads, sell, lock, steal, discover). Rewards and a bonus for all three are
+  sized from steady income; claimed in the Rewards panel's Quests tab, or paid automatically at the day change.
+* Studio: `/quests reset` re-rolls today's quests; `/dex fill <rarity|event>` discovers all but one Snackling of a
+  section so completion is one purchase away.

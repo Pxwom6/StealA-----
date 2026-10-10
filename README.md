@@ -134,6 +134,17 @@ already had progress when it shipped never see it. Steps finish only when the se
 * **Test it in Studio:** a fresh Studio player (API access off) starts it automatically; `/tutorial` starts it again
   any time.
 
+### Snackdex and daily quests
+
+* **Snackdex** (the 📖 button): every Snackling a player has ever owned, with its mutations. Owning every regular
+  Snackling of a rarity pays a one-time reward (sized from steady income) and +3% income forever (all seven tiers:
+  +21%). Event Snacklings have their own tab and never block a tier. Tune it in `src/shared/Config/Snackdex.luau`; new
+  Snacklings show up by themselves.
+* **Daily quests** (the Rewards button, Quests tab): three a day (2 easy + 1 hard), new at UTC midnight; anything
+  finished but not claimed by then is paid automatically. Add or tune quests in `src/shared/Config/Quests.luau` (texts:
+  `quest*` keys in `Theme.luau`).
+* **Analytics:** custom events `snackdex_tier_completed`, `quest_claimed` and `quests_all_done` (DECISIONS.md #22).
+
 ### Swapping in your own art
 
 * **Creature models:** put a Model named exactly as the creature's `modelName` (see
@@ -147,8 +158,9 @@ already had progress when it shipped never see it. Steps finish only when the se
 ### Studio test commands
 
 `/cash <amount>`, `/spawn <creatureId> [mutationId]` (e.g. `/spawn pizza_pup rainbow`), `/noshield`,
-`/friends <n|off>` and `/tutorial` (start the first-time tutorial again) work in Studio only
-(`src/server/Services/DevCommands.luau`). `/spawn` also puts event Snacklings
+`/friends <n|off>`, `/tutorial` (start the first-time tutorial again), `/quests reset` (re-roll today's quests) and
+`/dex fill <rarity|event>` (discover every Snackling of a tier but one, e.g. `/dex fill common`; the toast names the
+missing one to `/spawn`) work in Studio only (`src/server/Services/DevCommands.luau`). `/spawn` also puts event Snacklings
 and event mutations on the belt when their event isn't running (e.g. `/spawn candy_corn_cat haunted`).
 
 To test a seasonal event in Studio: `/event Halloween2026 5` turns Halloween on for 5 minutes (decorations, dusk
