@@ -42,7 +42,8 @@ checker: Luau tables are invariant, so narrower per-module copies of `CreatureDe
 **Chose:** `MapBuilder` builds ground, belt, 8 plots and boards at server start from `Config/Gameplay.map`;
 `Workspace.StreamingEnabled = false` in the Rojo project.
 **Why:** the repo syncs into an empty Baseplate (no binary place file to merge), geometry is data, and every
-client can rely on the whole (small, ~500 parts before creatures) map existing. Custom builds can later replace parts of it.
+client can rely on the whole map existing (about 1,500 parts before creatures, two thirds of them decoration, #22).
+Custom builds can later replace parts of it.
 **Reversal cost:** medium — switching to a hand-built map means keeping the names/attributes the services read
 (`Plot{n}`, `Podiums/Podium{i}/Base|Pad`, `LockButton`, `UpgradePad`, `Barrier`, `Dome`, `Sign`), or adapting
 `MapBuilder`'s return value. Enabling streaming needs the client controllers to handle plots streaming in/out.
@@ -342,3 +343,44 @@ the game. Flags avoid a save-format change for what is a handful of booleans.
 **Reversal cost:** low — `Tutorial.enabled = false` turns it off for everyone (nothing is saved while it is off);
 steps, timeouts and the reward are data. The flag names must stay (they are in saves), and the funnel step numbers
 must stay once live.
+
+### 22. The world's look: code-built scenery around an unchanged gameplay contract; settings in `flags`
+
+**Chose:**
+* **Looks, not geometry.** MapBuilder keeps every name, attribute and position the services read (#3): plot rects,
+  floor heights, podium / pad / lock button / upgrade pad positions, the entrance and sign (players can stand on the
+  sign, so its size is unchanged), the belt line and buy range. What it adds is decoration: anchored parts with
+  CanCollide / CanTouch / CanQuery off, in each plot's `Decor` folder or next to what they decorate. The plot floor is
+  now an invisible collider under visible tiles at exactly its height; podium collars and pad rings follow the podium's
+  active state (`MapBuilder.setPodiumActive`); the owner sign shows the owner's `rbxthumb://` headshot.
+* **Everything around it is data** (`Config/Scenery`, placed by `Logic/SceneryLayout`, built by `SceneryBuilder`):
+  the afternoon lighting, a spawn plaza past the belt's east end, the Snack Factory and the chute at the belt's ends,
+  trees, a low stone boundary wall with an invisible barrier above it, and terrain (grass, hills, rocks, a lake)
+  outside the wall only. CI checks every prop against the plots (8 studs: ejected visitors land 3 outside a plot), the
+  belt, the walkway, the lobby spawn and every Halloween decoration, keeps the terrain outside the boundary, and keeps
+  the extra parts under `partBudget` (about 1,060 of 1,500). The few solid props are low (benches, flower boxes, the
+  fountain basin) or sheer (pillars, trunks, factory and chute walls): nothing new can be climbed higher than the plot
+  signs, so the carry-height rules (#8) are untouched.
+* **The lobby spawn moved onto the plaza** (`Gameplay.map.lobby`), facing back along the belt. Players stand there for
+  about a second on join, until their base is assigned; nothing else used the old spot. The leaderboards moved to
+  flank the plaza's archway (the factory stands where one of them was).
+* **Lighting is applied before SeasonService starts**, so a seasonal theme snapshots this look and restores it; the
+  world's Atmosphere is a "foreign" one to SeasonService, which restyles and restores it. The seasonal
+  ColorCorrection stacks on the world's mild one (a small extra grade at dusk, on purpose).
+* **No external assets:** parts, terrain, and sounds / particle textures that ship with Roblox (`rbxasset://`). The
+  music player is built, with empty tracks until the owner pastes ids.
+* **Settings live in `flags`** (`settings_<key>`, `Logic/SettingsRules`): no save-format change, and a rollback keeps
+  them (#1), like the tutorial flags (#21). The client applies a change at once and coalesces quick taps into one
+  rate-limited SetSetting intent per setting; the server accepts known keys and booleans only. They come back in
+  `StateUpdate.settings` and are adopted once per join. "Reduce effects" is client-only (particles, belt / factory
+  animation, Bloom, SunRays) and readable by any client code (`ClientSettings.reduceEffects()`).
+* **Top-right corner:** on computers Roblox draws its player list there, above every game UI, and doesn't expose its
+  size. `Logic/ScreenLayout` estimates it (names plus one column per leaderstat); the settings gear sits left of it and
+  the tutorial banner narrows to stay left of it. If even the narrowest banner can't, the tutorial switches the player
+  list off while its banner shows (only then, and back on after), so Skip is always reachable. Phones are unaffected.
+
+**Why:** "polished" for a young audience is mostly the first minute: a place that looks finished, a readable base, a
+belt that visibly moves, sound on every action, and a phone that doesn't stutter. Keeping all of it out of the gameplay
+geometry means none of the steal / lock / collect rules (or their tests) had to change.
+**Reversal cost:** low: scenery, lighting and sounds are data; delete `SceneryBuilder.build` to get the bare map back.
+The `settings_*` flag names must stay (they are in saves).

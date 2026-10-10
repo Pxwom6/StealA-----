@@ -75,7 +75,8 @@ tools               Lune scripts (balance simulation)
 5. **Group rewards:** paste your Roblox group's ID into `groupId` in `src/shared/Config/Social.luau`
    (`TODO(owner)`; the number in the group's URL). While it is `0` the group bonus, welcome gift and Join group button
    are off and hidden; the friends bonus works either way.
-6. Optional: sound IDs in `src/shared/Config/Sounds.luau`, models in `ReplicatedStorage/CreatureModels`.
+6. Optional: music and your own sounds in `src/shared/Config/Sounds.luau` (see "Sounds and music" below), models in
+   `ReplicatedStorage/CreatureModels`.
 
 **Changing the save format:** bump `DataSchema.VERSION` whenever a saved key is added, removed, renamed or changes
 meaning, and never publish a lower VERSION than before. A rollback keeps the current save code (`DataSchema`,
@@ -139,15 +140,53 @@ already had progress when it shipped never see it. Steps finish only when the se
 * **Creature models:** put a Model named exactly as the creature's `modelName` (see
   `src/shared/Config/Creatures.luau`) into `ReplicatedStorage/CreatureModels` in Studio. The game clones it instead
   of building the placeholder. Rojo will not delete instances you add there.
-* **Sounds:** paste asset IDs into `src/shared/Config/Sounds.luau`.
+* **Sounds:** paste asset IDs into `src/shared/Config/Sounds.luau` (see "Sounds and music").
+* **The world's look:** lighting, the spawn plaza, trees, the boundary wall and the terrain outside it are data in
+  `src/shared/Config/Scenery.luau` (colours in `Theme.world`). CI checks every prop stays off the plots, the belt,
+  the walkway, the lobby spawn and the Halloween decorations, and that the extra parts stay under `partBudget`.
 * **Names, colours, UI text:** `src/shared/Config/Theme.luau`, `Creatures.luau`, `Rarities.luau`, `Mutations.luau`.
 * **Mutations on custom models:** a mutation restyles every visible part of the model (material, colour, ...).
   Give a part (e.g. eyes) the attribute `MutationSkip = true` to keep its own look.
 
+### Sounds and music
+
+Every sound effect slot in `src/shared/Config/Sounds.luau` is `{ id, volume, pitch }`. Out of the box they use sounds
+that ship inside the Roblox client, so nothing needs uploading. These are all the files used; each should play in
+Studio's Command Bar (edit mode is fine):
+`local s = Instance.new("Sound") s.SoundId = "rbxasset://sounds/button.wav" game:GetService("SoundService"):PlayLocalSound(s)`
+
+| File | Used for |
+| --- | --- |
+| `rbxasset://sounds/button.wav` | every button click |
+| `rbxasset://sounds/clickfast.wav` | settings switches |
+| `rbxasset://sounds/pageturn.wav` | a dialog opens |
+| `rbxasset://sounds/electronicpingshort.wav` | success toasts, buying from the belt, steal alarm, mutation spawn, Rare / Epic spawn |
+| `rbxasset://sounds/hit.wav` | error toasts, tagging |
+| `rbxasset://sounds/victory.wav` | daily claim, steal success, rebirth, luck, Legendary / Mythic / Secret spawn |
+| `rbxasset://sounds/snap.wav` | collecting cash, lock / unlock, Common / Uncommon |
+| `rbxasset://sounds/swoosh.wav` | selling, starting a steal, announcement banners |
+
+If one of them doesn't exist on your Roblox version, that slot is silent (Studio's Output shows a load warning);
+paste an uploaded sound's `rbxassetid://...` instead. An empty id is always silent.
+
+**Music:** Roblox ships no music, so `music.lobby` (plays everywhere) and `music.halloween` (plays while the
+Halloween theme is on) are empty. Paste an audio asset id (`rbxassetid://...`) and it loops, crossfades when the
+track changes (`musicFadeSeconds`) and follows the player's Music setting. Another seasonal theme gets music by
+adding a slot named after its theme id.
+
+### Settings
+
+The gear button in the top-right corner (left of Roblox's player list on computers) opens Music, Sound effects and
+Reduce effects switches. They apply at once and are saved per player in the save's `flags` map
+(`settings_musicOff`, `settings_sfxOff`, `settings_reduceEffects`; no save-format change). Reduce effects switches off
+particles, the belt / factory animations, Bloom and SunRays on that device; client code can read it with
+`ClientSettings.reduceEffects()` (or the LocalPlayer attribute `ReduceEffects`).
+
 ### Studio test commands
 
 `/cash <amount>`, `/spawn <creatureId> [mutationId]` (e.g. `/spawn pizza_pup rainbow`), `/noshield`,
-`/friends <n|off>` and `/tutorial` (start the first-time tutorial again) work in Studio only
+`/friends <n|off>`, `/tutorial` (start the first-time tutorial again) and `/sky <clockTime>` (preview the lighting at
+another time of day, e.g. `/sky 18`; `/sky 14.6` is the normal afternoon) work in Studio only
 (`src/server/Services/DevCommands.luau`). `/spawn` also puts event Snacklings
 and event mutations on the belt when their event isn't running (e.g. `/spawn candy_corn_cat haunted`).
 

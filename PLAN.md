@@ -61,7 +61,9 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | First-time tutorial | `TutorialService` (steps finished by real purchases / collects / locks / steals, timeouts, one-time reward, existing players skipped) | `TutorialController` (banner under the cash, beam + bouncing arrow + highlight on the target, Skip) | `TutorialRules` |
 | Analytics | `Analytics` (onboarding funnel following the tutorial, store funnel, economy events) | sends whitelisted `store_opened` | – |
 | State sync | `Replication` (dirty-flag batching, 5 Hz) | `StateStore` | – |
-| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends`, `/tutorial`); LiveOps `/event <id> [minutes]`, `/event off` (anyone in Studio, local only) | – | – |
+| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends`, `/tutorial`, `/sky <clockTime>`); LiveOps `/event <id> [minutes]`, `/event off` (anyone in Studio, local only) | – | – |
+| World & scenery | `MapBuilder` (plot decor, belt chevrons, boards, lobby spawn), `SceneryBuilder` (lighting, spawn plaza, Snack Factory, chute, trees, boundary wall, terrain) | `WorldFxController` (belt chevrons, factory cog, blinking lights; Reduce effects) | `SceneryLayout` |
+| Settings & audio | `SettingsService` (SetSetting → `settings_<key>` flags) | `ClientSettings`, `SettingsController` (top-right gear), `SoundPlayer`, `MusicController` (looping, crossfade) | `SettingsRules`, `ScreenLayout` |
 
 ## 3. Module list
 
@@ -77,7 +79,8 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | `Monetization` | game-pass and developer-product IDs (**placeholders, TODO**), perk values, store layout |
 | `LiveOps` | admin user IDs, scheduled events (luck / cash multipliers, banner, countdown title; Halloween 2026 and its luck weekend), luck-boost limits |
 | `Seasons` | seasonal themes keyed by LiveOps event id (`Halloween2026` → `halloween`): lighting mood, decoration counts, colours, part budget |
-| `Sounds` | sound asset IDs (**placeholders**) |
+| `Sounds` | sound effects `{ id, volume, pitch }` (built-in `rbxasset://sounds/` files), music tracks (**empty, TODO**) and the crossfade time |
+| `Scenery` | the world's look: afternoon lighting, boundary wall, terrain (hills, rocks, lake), spawn plaza layout, trees, belt chevron spacing, part budget |
 | `Social` | friend bonus (+10% per friend in the server, max 3), group id (**placeholder 0 = off**), group bonus, one-time welcome gift |
 | `Tutorial` | first-time tutorial: on/off, steps in order (buy, collect, lock, steal) with their automatic endings, one-time reward, belt-target tuning |
 
@@ -109,6 +112,9 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `SocialRules` | friend / group income bonus, friend counting per pair, group welcome gift, recheck cooldown, config validation |
 | `OnboardingFunnel` | onboarding funnel steps and their order: a milestone reached early waits until every earlier step is logged |
 | `TutorialRules` | tutorial progress in `flags` (current step, early actions, resume), existing-player detection, automatic step endings, one-time reward, guide targets (belt item, collect pad), config validation |
+| `SceneryLayout` | where the scenery goes (plaza props, trees, tree line), factory / chute footprints, terrain heights, validation against plots, belt, walkway, lobby spawn and Halloween props, part estimate |
+| `SettingsRules` | player settings as `settings_<key>` flags: keys, read, apply |
+| `ScreenLayout` | HUD placement around Roblox's player list (top-right gear, tutorial banner limit) |
 
 ### `src/shared` (Roblox helpers, not unit-tested)
 `Net` (create/get remotes by name), `GameData` (catalogue built once from config; `price` / `income` /
@@ -120,7 +126,8 @@ mutation look), `UiTheme` (hex → Color3, fonts, text templates, rich-text crea
 `init.server.luau` bootstraps in order:
 `Remotes → DataService → MapBuilder → PlotService → Analytics → LiveOpsService → SeasonService → Replication →
 EconomyService → BeltService → LockService → StealService → RebirthService → MonetizationService →
-RetentionService → SocialService → TutorialService → LeaderboardService → DevCommands → PlayerLifecycle`, and wires
+RetentionService → SocialService → TutorialService → LeaderboardService → SettingsService → DevCommands → PlayerLifecycle`
+(MapBuilder also runs `SceneryBuilder`: lighting first, then the scenery), and wires
 cross-service join/leave steps through `PlayerLifecycle.hooks()` (keeps services free of circular requires). `Sessions` holds per-player state.
 
 `PlayerLifecycle` owns join/leave ordering: load profile → assign plot → check passes → offline earnings →
@@ -131,8 +138,8 @@ release plot → release profile.
 `init.client.luau` waits for `game:IsLoaded()` then starts controllers:
 `StateStore, HudController, NotificationController, BeltController, PlotController, InteractionController,
 StealController, LockController, RebirthController, StoreController, ChatTagController, RewardsController,
-MutationFxController, SocialController, TutorialController`
-(UI helpers: `UI/UiKit`, `UI/Modal`; audio: `SoundPlayer`).
+MutationFxController, SocialController, TutorialController, SettingsController, MusicController, WorldFxController`
+(`ClientSettings` starts right after `StateStore`; UI helpers: `UI/UiKit`, `UI/Modal`; audio: `SoundPlayer`).
 
 ## 4. Remotes (all in `ReplicatedStorage.Remotes`, created by the server)
 
@@ -154,13 +161,14 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `CheckGroup` | – | group feature on, at most once per 10 s, not already checking → re-check membership (`IsInGroupAsync`, then `GetGroupsAsync`) |
 | `InvitePrompted` | – | analytics only (`invite_prompt_opened`); nothing is rewarded for inviting |
 | `SkipTutorial` | – | a tutorial is running → it ends with no reward (steps themselves only finish from gameplay the server saw) |
+| `SetSetting` | `key: string, on: boolean` | key is a known setting (`SettingsRules.KEYS`), value a boolean → `settings_<key>` flag |
 | `DevGrantProduct` | `key: string` | **Studio only** – runs the real receipt path with a fake receipt |
 
 Server → client:
 
 | Remote | Payload |
 | --- | --- |
-| `StateUpdate` | batched partial player state (cash, cash/sec, rebirths, multiplier, podium cap, lock, passes, carry, social bonus, tutorial step…) |
+| `StateUpdate` | batched partial player state (cash, cash/sec, rebirths, multiplier, podium cap, lock, passes, carry, social bonus, tutorial step, settings…) |
 | `BeltSnapshot` / `BeltSpawn` / `BeltRemove` | conveyor items `{id, creatureId, spawnAt, variant?}` (variant = mutation id) |
 | `Notify` | toast `{kind, text}` |
 | `Announce` | server-wide banner `{text, rarity, color?}` (color: a mutation's own banner) |
@@ -200,7 +208,7 @@ type PlayerData = {   -- exactly Types.PlayerData
     stats: { steals: number, timesStolenFrom: number, beltPurchases: number, playTime: number,
              bestCashPerSecond: number, robuxSpent: number, totalEarned: number },
     flags: { [string]: boolean },  -- onboarding funnel milestones, one-time rewards (`social_groupWelcome`),
-                                   -- tutorial progress (`tutorial_<step>`, `tutorial_done`)
+                                   -- tutorial progress (`tutorial_<step>`, `tutorial_done`), settings (`settings_<key>`)
     firstJoin: number, lastSeen: number,
 }
 ```
