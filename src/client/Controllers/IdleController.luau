@@ -18,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local CreatureVisuals = require(ReplicatedStorage.Shared.CreatureVisuals)
+local ClientSettings = require(script.Parent.ClientSettings)
 local IdleMotion = require(ReplicatedStorage.Shared.Logic.IdleMotion)
 
 local IdleController = {}
@@ -162,6 +163,18 @@ function IdleController.start()
 
 	local sinceStep, sincePick = 0, PICK_SECONDS
 	RunService.Heartbeat:Connect(function(dt: number)
+		-- Settings > Reduce effects: put every model back at rest and stop animating until it's switched off.
+		if ClientSettings.reduceEffects() then
+			if #activeList > 0 then
+				for _, entry in activeList do
+					rest(entry)
+					entry.active = false
+				end
+				activeList = {}
+			end
+			sincePick = PICK_SECONDS
+			return
+		end
 		sincePick += dt
 		if sincePick >= PICK_SECONDS then
 			sincePick = 0
