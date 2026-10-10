@@ -3,20 +3,28 @@
 	Builds the 3D model for a Snackling.
 
 	If ReplicatedStorage.CreatureModels contains a Model named exactly `def.modelName`, that model is cloned
-	(drop your own art there; it should face -Z and stand on y = 0 with a PrimaryPart). Otherwise a chunky,
-	toy-like placeholder is built from the `look` recipe in Config/Creatures.
+	(drop your own art there; it should face -Z and stand on y = 0 with a PrimaryPart) and scaled by the rarity's
+	modelScale. Otherwise the creature's recipe in Config/CreatureLooks is built: Logic/CreatureRecipe turns it into
+	a list of parts (already at the rarity's scale) and this module makes them: Ball / Block / Cylinder parts,
+	WedgeParts, and Block parts with a Sphere SpecialMesh for ellipsoids. No asset ids are needed.
 
 	Every model returned has a PrimaryPart called "Root" at its feet, all other parts welded to it, and no
 	collisions, so it can be anchored on a podium, moved along the belt, or welded above a thief's head.
 	Rarity flair (glow, sparkles, aura ring) is added on top of either kind of model, then the mutation look (if
-	any): material, tint, transparency, sparkles, rainbow, glow light. The face (Eye/Pupil/Mouth), the Root and the rarity Aura
-	keep their look; in a custom model, give a part the attribute MutationSkip = true to keep its look too.
+	any): material, tint, transparency, sparkles, rainbow, glow light. Face parts (eyes, pupils, highlights, mouth,
+	cheeks...) carry the attribute MutationSkip = true and keep their look, so a face always reads; so do the Root
+	and the rarity Aura. In a custom model, give a part MutationSkip = true to keep its look too.
 	Rainbow parts are tagged RAINBOW_TAG; the client cycles their hue (MutationFxController).
+
+	Anchored models are tagged IDLE_TAG (unless options.idle == false) and the client's IdleController gives them a
+	gentle bob / squash / sway; the parts the squash resizes carry the attribute SquashAxis (their local up axis).
 ]]
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local CreatureLooks = require("./Config/CreatureLooks")
+local CreatureRecipe = require("./Logic/CreatureRecipe")
 local Types = require("./Types")
 local UiTheme = require("./UiTheme")
 
@@ -25,11 +33,24 @@ local CreatureVisuals = {}
 local PARTICLE_RATE: { [number]: number } = { [4] = 5, [5] = 9, [6] = 16, [7] = 26 }
 local SPARKLE_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds"
 local MUTATION_PARTICLE_RATE = 8
--- Parts a mutation never restyles (the face stays readable; Root is invisible; Aura is the rarity ring).
+-- Parts a mutation never restyles by name (Root is invisible; Aura is the rarity ring). Face parts of recipe models
+-- are skipped through their MutationSkip attribute.
 local MUTATION_SKIP: { [string]: boolean } = { Root = true, Aura = true, Eye = true, Pupil = true, Mouth = true }
 local RAINBOW_SPEED = 0.25 -- hue turns per second
 
 CreatureVisuals.RAINBOW_TAG = "MutationRainbow"
+CreatureVisuals.IDLE_TAG = "SnacklingIdle"
+
+-- A plain round Snackling for a creature whose recipe is missing (a config mistake CI also catches).
+local FALLBACK_LOOK: Types.CreatureLook = {
+	size = 2.6,
+	plan = "blob",
+	feet = true,
+	body = { skin = "round", color = "#F2C27A" },
+	face = { eyes = "round", mouth = "smile", cheeks = "#FF8FA8" },
+	features = {},
+	toppings = {},
+}
 
 local function rainbowSequence(): ColorSequence
 	return ColorSequence.new({
@@ -62,14 +83,6 @@ local function newPart(className: "Part" | "WedgePart", props: { [string]: any }
 	return part
 end
 
-local function ball(size: Vector3, color: Color3, cframe: CFrame): BasePart
-	return newPart("Part", { Size = size, Color = color, CFrame = cframe, Shape = Enum.PartType.Ball })
-end
-
-local function block(size: Vector3, color: Color3, cframe: CFrame): BasePart
-	return newPart("Part", { Size = size, Color = color, CFrame = cframe })
-end
-
 local function disc(diameter: number, thickness: number, color: Color3, cframe: CFrame): BasePart
 	-- Cylinders run along X; rotate so the flat face points up.
 	return newPart("Part", {
@@ -80,146 +93,67 @@ local function disc(diameter: number, thickness: number, color: Color3, cframe: 
 	})
 end
 
-local function buildPlaceholder(look: Types.Look): Model
-	local s = look.size
+local function materialNamed(name: string): Enum.Material?
+	local ok, item = pcall(function(): Enum.Material
+		return (Enum.Material :: any)[name]
+	end)
+	return if ok then item else nil
+end
+
+-- One part from a compiled recipe spec.
+local function makePart(spec: CreatureRecipe.PartSpec): BasePart
+	local size = Vector3.new(spec.size[1], spec.size[2], spec.size[3])
+	local c = spec.cf
+	local cframe = CFrame.new(c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], c[9], c[10], c[11], c[12])
+	local part: BasePart
+	if spec.shape == "Wedge" then
+		part = newPart("WedgePart", { Size = size, CFrame = cframe })
+	elseif spec.shape == "Ball" then
+		part = newPart("Part", { Shape = Enum.PartType.Ball, Size = size, CFrame = cframe })
+	elseif spec.shape == "Cylinder" then
+		part = newPart("Part", { Shape = Enum.PartType.Cylinder, Size = size, CFrame = cframe })
+	else
+		part = newPart("Part", { Size = size, CFrame = cframe })
+		if spec.shape == "Ellipsoid" then
+			local mesh = Instance.new("SpecialMesh")
+			mesh.MeshType = Enum.MeshType.Sphere
+			mesh.Parent = part
+		end
+	end
+	part.Name = spec.name
+	part.Color = UiTheme.color(spec.color)
+	if spec.material then
+		part.Material = materialNamed(spec.material) or Enum.Material.SmoothPlastic
+	end
+	if spec.transparency then
+		part.Transparency = spec.transparency
+	end
+	part.CastShadow = spec.shadow == true
+	if spec.role == "face" then
+		part:SetAttribute("MutationSkip", true)
+	end
+	if spec.squashAxis then
+		part:SetAttribute("SquashAxis", spec.squashAxis)
+	end
+	return part
+end
+
+-- The recipe model at the given scale (the rarity's modelScale), standing on y = 0 and facing -Z.
+local function buildFromRecipe(look: Types.CreatureLook, scale: number): Model
+	local compiled = CreatureRecipe.compile(look, scale)
 	local model = Instance.new("Model")
+	local base = math.max(compiled.base, 0.5)
 	local root = newPart("Part", {
 		Name = "Root",
-		Size = Vector3.new(s, 0.2, s),
+		Size = Vector3.new(base, 0.2, base),
 		CFrame = CFrame.new(0, 0.1, 0),
 		Transparency = 1,
 	})
 	root.Parent = model
 	model.PrimaryPart = root
-
-	local bodyColor = UiTheme.color(look.bodyColor)
-	local accentColor = UiTheme.color(look.accentColor)
-	local centerY = s * 0.5 + 0.2
-	local topY = centerY + s * 0.45
-	local center = CFrame.new(0, centerY, 0)
-
-	local body: BasePart
-	if look.body == "Ball" then
-		body = ball(Vector3.new(s, s, s), bodyColor, center)
-	elseif look.body == "Block" then
-		body = block(Vector3.new(s, s * 0.85, s * 0.9), bodyColor, center)
-		topY = centerY + s * 0.425
-	elseif look.body == "Wedge" then
-		body = newPart("WedgePart", {
-			Size = Vector3.new(s, s * 0.9, s * 1.1),
-			Color = bodyColor,
-			-- slope faces the back so the face is on the tall, flat front
-			CFrame = center * CFrame.Angles(0, math.rad(180), 0),
-		})
-	else
-		body = newPart("Part", {
-			Size = Vector3.new(s * 0.95, s, s),
-			Color = bodyColor,
-			CFrame = center * CFrame.Angles(0, 0, math.rad(90)),
-			Shape = Enum.PartType.Cylinder,
-		})
-		topY = centerY + s * 0.475
+	for _, spec in compiled.parts do
+		makePart(spec).Parent = model
 	end
-	body.Name = "Body"
-	body.Parent = model
-
-	-- Face (front is -Z)
-	local faceZ = -s * 0.47
-	local eyeY = centerY + s * 0.12
-	for _, side in { -1, 1 } do
-		local eye = ball(Vector3.one * s * 0.3, Color3.new(1, 1, 1), CFrame.new(side * s * 0.2, eyeY, faceZ))
-		eye.Name = "Eye"
-		eye.Parent = model
-		local pupil =
-			ball(Vector3.one * s * 0.15, Color3.fromRGB(25, 25, 35), CFrame.new(side * s * 0.2, eyeY, faceZ - s * 0.12))
-		pupil.Name = "Pupil"
-		pupil.Parent = model
-	end
-	local mouth = block(
-		Vector3.new(s * 0.22, s * 0.06, s * 0.06),
-		Color3.fromRGB(60, 25, 25),
-		CFrame.new(0, centerY - s * 0.12, faceZ - 0.02)
-	)
-	mouth.Name = "Mouth"
-	mouth.Parent = model
-
-	local accentParts: { BasePart } = {}
-	local accent = look.accent
-	if accent == "Ears" then
-		for _, side in { -1, 1 } do
-			table.insert(
-				accentParts,
-				block(
-					Vector3.new(s * 0.25, s * 0.35, s * 0.15),
-					accentColor,
-					CFrame.new(side * s * 0.28, topY + s * 0.1, 0) * CFrame.Angles(0, 0, math.rad(-side * 18))
-				)
-			)
-		end
-	elseif accent == "Spots" then
-		for _, offset in { Vector3.new(-0.18, 0, -0.12), Vector3.new(0.2, 0, 0.05), Vector3.new(-0.02, 0, 0.22) } do
-			table.insert(
-				accentParts,
-				disc(s * 0.24, 0.08, accentColor, CFrame.new(offset.X * s, topY - s * 0.02, offset.Z * s))
-			)
-		end
-	elseif accent == "Shell" then
-		table.insert(
-			accentParts,
-			ball(Vector3.new(s * 0.95, s * 0.55, s * 0.95), accentColor, CFrame.new(0, topY - s * 0.05, s * 0.12))
-		)
-	elseif accent == "Wings" then
-		for _, side in { -1, 1 } do
-			local wing = newPart("WedgePart", {
-				Size = Vector3.new(0.15, s * 0.55, s * 0.65),
-				Color = accentColor,
-				CFrame = CFrame.new(side * s * 0.58, centerY + s * 0.15, s * 0.1)
-					* CFrame.Angles(0, 0, math.rad(side * 25)),
-			})
-			table.insert(accentParts, wing)
-		end
-	elseif accent == "Horns" then
-		for _, side in { -1, 1 } do
-			local horn = newPart("WedgePart", {
-				Size = Vector3.new(s * 0.12, s * 0.32, s * 0.18),
-				Color = accentColor,
-				CFrame = CFrame.new(side * s * 0.2, topY + s * 0.13, -s * 0.05),
-			})
-			table.insert(accentParts, horn)
-		end
-	elseif accent == "Crown" then
-		table.insert(accentParts, disc(s * 0.55, 0.12, accentColor, CFrame.new(0, topY + 0.02, 0)))
-		for i = 1, 5 do
-			local angle = (i / 5) * math.pi * 2
-			local spike = block(
-				Vector3.new(s * 0.1, s * 0.2, s * 0.1),
-				accentColor,
-				CFrame.new(math.cos(angle) * s * 0.22, topY + s * 0.12, math.sin(angle) * s * 0.22)
-			)
-			spike.Material = Enum.Material.Neon
-			table.insert(accentParts, spike)
-		end
-	else -- Sprinkles
-		local sprinkleColors =
-			{ accentColor, Color3.fromRGB(255, 120, 190), Color3.fromRGB(110, 200, 255), Color3.fromRGB(255, 225, 90) }
-		for i = 1, 8 do
-			local angle = i * 2.4
-			local radius = s * (0.12 + (i % 3) * 0.08)
-			table.insert(
-				accentParts,
-				block(
-					Vector3.new(s * 0.07, s * 0.07, s * 0.2),
-					sprinkleColors[(i % #sprinkleColors) + 1],
-					CFrame.new(math.cos(angle) * radius, topY, math.sin(angle) * radius) * CFrame.Angles(0, angle, 0)
-				)
-			)
-		end
-	end
-	for _, part in accentParts do
-		part.Name = "Accent"
-		part.Parent = model
-	end
-
 	return model
 end
 
@@ -300,13 +234,6 @@ local function addRarityFlair(model: Model, rarity: Types.RarityDef)
 			aura.Parent = model
 		end
 	end
-end
-
-local function materialNamed(name: string): Enum.Material?
-	local ok, item = pcall(function(): Enum.Material
-		return (Enum.Material :: any)[name]
-	end)
-	return if ok then item else nil
 end
 
 -- The mutation look, on top of the rarity flair (see the header for which parts keep their own look).
@@ -396,22 +323,31 @@ local function weldAndConfigure(model: Model, anchored: boolean)
 end
 
 -- `mutation`: the creature's mutation (GameData.mutation(record.variant)); nil builds the plain look.
-export type BuildOptions = { anchored: boolean, mutation: Types.MutationDef? }
+-- `idle`: anchored models get the client idle animation unless this is false (the belt animates its own models).
+export type BuildOptions = { anchored: boolean, mutation: Types.MutationDef?, idle: boolean? }
 
 -- Builds a ready-to-place model for a creature. Pivot it with model:PivotTo(cframeAtFeet).
 function CreatureVisuals.build(def: Types.CreatureDef, rarity: Types.RarityDef, options: BuildOptions): Model
 	local custom = findCustomModel(def.modelName)
-	local model = if custom then prepareCustom(custom) else buildPlaceholder(def.look)
+	local model: Model
+	if custom then
+		model = prepareCustom(custom)
+		if rarity.modelScale ~= 1 then
+			model:ScaleTo(rarity.modelScale)
+		end
+	else
+		model = buildFromRecipe(CreatureLooks[def.id] or FALLBACK_LOOK, rarity.modelScale)
+	end
 	model.Name = def.id
 	model:SetAttribute("CreatureId", def.id)
-	if rarity.modelScale ~= 1 then
-		model:ScaleTo(rarity.modelScale)
-	end
 	addRarityFlair(model, rarity)
 	if options.mutation then
 		addMutationLook(model, options.mutation)
 	end
 	weldAndConfigure(model, options.anchored)
+	if options.anchored and options.idle ~= false then
+		CollectionService:AddTag(model, CreatureVisuals.IDLE_TAG)
+	end
 	return model
 end
 
@@ -419,6 +355,36 @@ end
 function CreatureVisuals.height(model: Model): number
 	local _, size = model:GetBoundingBox()
 	return size.Y
+end
+
+-- The parts of a model the idle animation squashes, with their resting size and local up axis (1..3).
+export type SquashPart = { part: BasePart, size: Vector3, axis: number }
+
+function CreatureVisuals.squashParts(model: Model): { SquashPart }
+	local list: { SquashPart } = {}
+	for _, descendant in model:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			local axis = descendant:GetAttribute("SquashAxis")
+			if type(axis) == "number" and axis >= 1 and axis <= 3 then
+				table.insert(list, { part = descendant, size = descendant.Size, axis = axis })
+			end
+		end
+	end
+	return list
+end
+
+-- Squash (amount < 0) or stretch (amount > 0) those parts around their own centres, keeping their volume roughly.
+function CreatureVisuals.applySquash(parts: { SquashPart }, amount: number)
+	local up = 1 + amount
+	local side = 1 - amount * 0.5
+	for _, entry in parts do
+		local s = entry.size
+		entry.part.Size = Vector3.new(
+			s.X * (if entry.axis == 1 then up else side),
+			s.Y * (if entry.axis == 2 then up else side),
+			s.Z * (if entry.axis == 3 then up else side)
+		)
+	end
 end
 
 return CreatureVisuals

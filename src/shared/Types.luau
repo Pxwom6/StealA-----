@@ -24,17 +24,7 @@ export type RarityDef = {
 	modelScale: number,
 }
 
-export type BodyShape = "Ball" | "Block" | "Wedge" | "Cylinder"
-export type Accent = "Ears" | "Spots" | "Shell" | "Wings" | "Horns" | "Crown" | "Sprinkles"
-
-export type Look = {
-	body: BodyShape,
-	bodyColor: string,
-	accent: Accent,
-	accentColor: string,
-	size: number,
-}
-
+-- The 3D model of each creature is a recipe in Config/CreatureLooks (keyed by id, see "Snackling model recipes" below).
 export type CreatureDef = {
 	id: string,
 	displayName: string,
@@ -44,8 +34,157 @@ export type CreatureDef = {
 	beltWeight: number,
 	modelName: string,
 	flavor: string,
-	look: Look,
 	eventId: string?,
+}
+
+-- Config: Snackling model recipes (Config/CreatureLooks, turned into parts by Logic/CreatureRecipe) ---------------
+-- Sizes are in units of the recipe's `size` (1 = the creature's size in studs), colours are "#RRGGBB" and materials
+-- are Enum.Material names. Every kind and style is documented in Logic/CreatureRecipe.
+
+-- How body and head are arranged (legs, arms, where the face goes).
+export type LookPlan = "blob" | "biped" | "quadruped" | "swimmer" | "tentacled"
+
+-- The food shape a body or head is made of.
+export type LookSkin =
+	"round"
+	| "lumpy"
+	| "slice"
+	| "roll"
+	| "can"
+	| "stack"
+	| "macaron"
+	| "cup"
+	| "flan"
+	| "ring"
+	| "block"
+	| "bun"
+	| "cone"
+	| "pear"
+	| "bowl"
+
+export type LookVolume = {
+	skin: LookSkin,
+	color: string,
+	color2: string?, -- second colour of the skin (crust, liner, filling, icing...)
+	color3: string?,
+	w: number?, -- width / height / depth in units (each plan has defaults)
+	h: number?,
+	d: number?,
+	n: number?, -- count used by some skins (layers, lumps)
+	style: string?, -- skin variant
+	material: string?,
+}
+
+export type LookEyes = "round" | "big" | "dot" | "happy" | "sleepy" | "stalk"
+export type LookMouth = "smile" | "open" | "tongue" | "fang" | "o" | "cat" | "grin" | "none"
+
+export type LookFace = {
+	eyes: LookEyes?,
+	mouth: LookMouth?,
+	cheeks: string?, -- blush colour
+	brows: string?, -- eyebrow colour
+	nose: string?, -- small nose colour (creatures with a snout get theirs from the snout)
+	pupil: string?, -- pupil colour (default near-black)
+	patches: string?, -- dark patches behind the eyes (pandas)
+	mouthColor: string?, -- default a dark red-brown
+	mouthAt: number?, -- mouth height, -1..1 of the face's half-height (default: half a face below the eyes)
+	spacing: number?, -- eye distance from the centre line, 0..1 of the face's half-width
+	height: number?, -- eye height, -1..1 of the face's half-height
+	scale: number?, -- eye size multiplier
+}
+
+export type LookFeatureKind =
+	"ears"
+	| "horns"
+	| "antennae"
+	| "tail"
+	| "wings"
+	| "shell"
+	| "mane"
+	| "snout"
+	| "whiskers"
+	| "spikes"
+	| "fins"
+	| "tusks"
+	| "claws"
+	| "legs"
+	| "belly"
+	| "mask"
+	| "spots"
+	| "stripes"
+	| "fan"
+	| "crest"
+	| "heads"
+	| "straw"
+	| "bubble"
+	| "flame"
+	| "bow"
+	| "teeth"
+	| "segments"
+	| "sides"
+	| "handle"
+	| "slip"
+
+export type LookFeature = {
+	kind: LookFeatureKind,
+	style: string?,
+	color: string?, -- default: the colour of what it attaches to
+	color2: string?,
+	color3: string?,
+	n: number?,
+	scale: number?,
+	on: string?, -- "body" | "head" (default depends on the kind)
+	material: string?,
+}
+
+export type LookToppingKind =
+	"sprinkles"
+	| "seeds"
+	| "chips"
+	| "discs"
+	| "drips"
+	| "cap"
+	| "swirl"
+	| "cherry"
+	| "leaf"
+	| "band"
+	| "sticks"
+	| "strands"
+	| "balls"
+	| "crumbs"
+	| "egg"
+	| "swirlmark"
+	| "zigzag"
+	| "bits"
+	| "spikes"
+	| "pat"
+
+export type LookTopping = {
+	kind: LookToppingKind,
+	colors: { string }, -- cycled through the pieces
+	n: number?,
+	scale: number?,
+	spread: number?, -- 0..1: how far from the centre pieces are scattered
+	on: string?, -- "body" | "head" | "shell" (default: the head if there is one, else the body)
+	at: number?, -- height on the shape for bands / drips (-1..1)
+	style: string?,
+	material: string?,
+}
+
+export type CreatureLook = {
+	size: number, -- overall size in studs before the rarity's modelScale
+	plan: LookPlan,
+	body: LookVolume,
+	head: LookVolume?, -- biped / quadruped only (default: a round head in the body colour)
+	face: LookFace,
+	limbs: string?, -- legs / feet / arms / tentacles colour (default: body colour)
+	arms: boolean?, -- blob: little arms; biped: arms unless false
+	feet: boolean?, -- blob / tentacled-free plans: little feet
+	legs: number?, -- quadruped / biped leg length in units
+	neck: number?, -- biped / quadruped: lifts the head on a neck this long (units)
+	tentacles: number?, -- tentacled: how many (default 6)
+	features: { LookFeature }, -- may be empty
+	toppings: { LookTopping }, -- may be empty
 }
 
 -- Config: mutations (rare variants of any creature) --------------------------------------------------------------

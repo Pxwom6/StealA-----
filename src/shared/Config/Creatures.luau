@@ -5,10 +5,10 @@
 	price       cash cost on the conveyor (the server always uses THIS value, never a client-sent one)
 	income      base cash per second while on a podium (before rebirth / pass / event multipliers)
 	beltWeight  relative chance within its rarity tier
-	modelName   name of a Model in ReplicatedStorage.CreatureModels to use instead of the placeholder
-	look        recipe for the code-built placeholder model (body shape + colours + one accent)
+	modelName   name of a Model in ReplicatedStorage.CreatureModels to use instead of the code-built model
 	eventId     optional: only spawns while the LiveOps event with this id is active (limited-time creatures)
 
+	How each one looks (its 3D model recipe) lives in Config/CreatureLooks, keyed by id.
 	Balance notes live in BALANCE.md; `lune run tools/simulate.luau` re-runs the numbers after any change here.
 
 	Never remove or rename an `id` once it has shipped: players own them (a save with an unknown id quarantines
@@ -31,7 +31,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 40,
 		modelName = "PizzaPup",
 		flavor = "Extra cheesy. Fetches crusts.",
-		look = { body = "Wedge", bodyColor = "#F6C445", accent = "Spots", accentColor = "#D64933", size = 2.6 },
 	},
 	{
 		id = "pretzel_pal",
@@ -42,7 +41,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 30,
 		modelName = "PretzelPal",
 		flavor = "Gets itself in knots.",
-		look = { body = "Ball", bodyColor = "#A0612B", accent = "Sprinkles", accentColor = "#FFFFFF", size = 2.6 },
 	},
 	{
 		id = "gummy_grub",
@@ -53,7 +51,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 20,
 		modelName = "GummyGrub",
 		flavor = "Wobbles when happy. Always happy.",
-		look = { body = "Cylinder", bodyColor = "#7CDB4C", accent = "Ears", accentColor = "#FF5FA2", size = 2.6 },
 	},
 	{
 		id = "toast_toad",
@@ -64,7 +61,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 10,
 		modelName = "ToastToad",
 		flavor = "Pops up when you least expect it.",
-		look = { body = "Block", bodyColor = "#E3A857", accent = "Shell", accentColor = "#8B4A1C", size = 2.7 },
 	},
 
 	-- Uncommon -------------------------------------------------------------------------------------------
@@ -77,7 +73,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 40,
 		modelName = "SushiSlug",
 		flavor = "Rolls everywhere. Literally.",
-		look = { body = "Cylinder", bodyColor = "#F7F3EE", accent = "Shell", accentColor = "#FF7F50", size = 2.8 },
 	},
 	{
 		id = "nacho_newt",
@@ -88,7 +83,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 35,
 		modelName = "NachoNewt",
 		flavor = "Cheese-powered and proud.",
-		look = { body = "Wedge", bodyColor = "#FFB627", accent = "Spots", accentColor = "#FFF2A8", size = 2.8 },
 	},
 	{
 		id = "waffle_wombat",
@@ -99,7 +93,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 25,
 		modelName = "WaffleWombat",
 		flavor = "Has a pocket for syrup.",
-		look = { body = "Block", bodyColor = "#D9A35B", accent = "Ears", accentColor = "#7B4A1E", size = 2.9 },
 	},
 
 	-- Rare -----------------------------------------------------------------------------------------------
@@ -112,7 +105,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 40,
 		modelName = "TacoTurtle",
 		flavor = "Slow, crunchy, unstoppable.",
-		look = { body = "Ball", bodyColor = "#F2C14E", accent = "Shell", accentColor = "#5BBF3A", size = 3 },
 	},
 	{
 		id = "burrito_bear",
@@ -123,7 +115,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 35,
 		modelName = "BurritoBear",
 		flavor = "Wrapped up and ready for a hug.",
-		look = { body = "Cylinder", bodyColor = "#F3E1B6", accent = "Ears", accentColor = "#8C5A2B", size = 3.1 },
 	},
 	{
 		id = "cupcake_cub",
@@ -134,7 +125,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 25,
 		modelName = "CupcakeCub",
 		flavor = "Frosting first, questions later.",
-		look = { body = "Cylinder", bodyColor = "#FF8FC7", accent = "Sprinkles", accentColor = "#FFFFFF", size = 3.1 },
 	},
 
 	-- Epic -----------------------------------------------------------------------------------------------
@@ -147,7 +137,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 40,
 		modelName = "RamenRaccoon",
 		flavor = "Slurps louder than you'd think.",
-		look = { body = "Ball", bodyColor = "#FFDD99", accent = "Ears", accentColor = "#5A5A66", size = 3.2 },
 	},
 	{
 		id = "popcorn_penguin",
@@ -158,7 +147,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 35,
 		modelName = "PopcornPenguin",
 		flavor = "Pops when excited. Pops a lot.",
-		look = { body = "Ball", bodyColor = "#FFF6D5", accent = "Wings", accentColor = "#2E3A59", size = 3.2 },
 	},
 	{
 		id = "bagel_badger",
@@ -169,7 +157,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 25,
 		modelName = "BagelBadger",
 		flavor = "Everything bagel. Everything attitude.",
-		look = { body = "Cylinder", bodyColor = "#C98A4B", accent = "Horns", accentColor = "#FFFFFF", size = 3.3 },
 	},
 
 	-- Legendary ------------------------------------------------------------------------------------------
@@ -182,7 +169,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 40,
 		modelName = "DonutDragon",
 		flavor = "Breathes powdered sugar.",
-		look = { body = "Ball", bodyColor = "#FF77B7", accent = "Wings", accentColor = "#8E5CFF", size = 3.5 },
 	},
 	{
 		id = "pancake_panda",
@@ -193,7 +179,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 35,
 		modelName = "PancakePanda",
 		flavor = "A tall stack of chill.",
-		look = { body = "Cylinder", bodyColor = "#F4C27A", accent = "Ears", accentColor = "#222222", size = 3.5 },
 	},
 	{
 		id = "churro_cheetah",
@@ -204,7 +189,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 25,
 		modelName = "ChurroCheetah",
 		flavor = "Cinnamon-fast. Sugar-spotted.",
-		look = { body = "Block", bodyColor = "#D98E3F", accent = "Spots", accentColor = "#6B3A12", size = 3.6 },
 	},
 
 	-- Mythic ---------------------------------------------------------------------------------------------
@@ -217,7 +201,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 60,
 		modelName = "LasagnaLion",
 		flavor = "King of the layers.",
-		look = { body = "Block", bodyColor = "#E8743B", accent = "Crown", accentColor = "#FFD700", size = 3.9 },
 	},
 	{
 		id = "dumpling_dino",
@@ -228,7 +211,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 40,
 		modelName = "DumplingDino",
 		flavor = "Steamed. Ancient. Adorable.",
-		look = { body = "Ball", bodyColor = "#F5F0E1", accent = "Horns", accentColor = "#6FCF97", size = 4 },
 	},
 
 	-- Secret ---------------------------------------------------------------------------------------------
@@ -241,7 +223,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 60,
 		modelName = "GelatoGriffin",
 		flavor = "Never melts. Never forgets.",
-		look = { body = "Ball", bodyColor = "#9BE7FF", accent = "Wings", accentColor = "#FFD1F0", size = 4.3 },
 	},
 	{
 		id = "croissant_kraken",
@@ -252,7 +233,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 40,
 		modelName = "CroissantKraken",
 		flavor = "Flaky on the outside. Legendary on the inside.",
-		look = { body = "Wedge", bodyColor = "#E0A84E", accent = "Crown", accentColor = "#B266FF", size = 4.4 },
 	},
 
 	-- Event: Halloween 2026 ------------------------------------------------------------------------------
@@ -268,7 +248,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 30,
 		modelName = "CandyCornCat",
 		flavor = "Nine lives, three stripes, zero chill.",
-		look = { body = "Wedge", bodyColor = "#FF9F1C", accent = "Ears", accentColor = "#FFF4DC", size = 3 },
 		eventId = "Halloween2026",
 	},
 	{
@@ -280,7 +259,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 30,
 		modelName = "PumpkinPieBat",
 		flavor = "Hangs upside down. Never drops a crumb.",
-		look = { body = "Cylinder", bodyColor = "#E07A2E", accent = "Wings", accentColor = "#3B2A4A", size = 3.2 },
 		eventId = "Halloween2026",
 	},
 	{
@@ -292,7 +270,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 30,
 		modelName = "CaramelAppleGhoul",
 		flavor = "Sticky fingers. Stickier grin.",
-		look = { body = "Ball", bodyColor = "#C7792E", accent = "Horns", accentColor = "#7DDB4C", size = 3.5 },
 		eventId = "Halloween2026",
 	},
 	{
@@ -304,7 +281,6 @@ local Creatures: { CreatureDef } = {
 		beltWeight = 40,
 		modelName = "JackOLanternLatte",
 		flavor = "Extra foam, extra boo.",
-		look = { body = "Cylinder", bodyColor = "#F28C28", accent = "Crown", accentColor = "#FFE9C7", size = 3.9 },
 		eventId = "Halloween2026",
 	},
 }
