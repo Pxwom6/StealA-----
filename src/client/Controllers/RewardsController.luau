@@ -112,7 +112,7 @@ local function showWelcome(payload: { amount: number, seconds: number })
 	local modal = Modal.open(Theme.text.welcomeBackTitle, Vector2.new(480, 260), function()
 		welcomeOpen = false
 		local state = StateStore.get()
-		if state and state.daily.canClaim and not autoOpenedDaily then
+		if state and state.daily.canClaim and not autoOpenedDaily and state.tutorial.step == "" then
 			autoOpenedDaily = true
 			RewardsController.openDaily()
 		end
@@ -192,7 +192,7 @@ function RewardsController.start()
 	-- LiveOps pills share one slot in the HUD's top stack: the event banner with its countdown, then server luck.
 	pillStack = UiKit.new("Frame", {
 		Name = "LiveOpsPills",
-		LayoutOrder = 3,
+		LayoutOrder = HudController.TOP_ORDER.liveOps,
 		Size = UDim2.fromOffset(300, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
@@ -239,11 +239,19 @@ function RewardsController.start()
 	Net.get("WelcomeBack").OnClientEvent:Connect(showWelcome)
 	StateStore.onChange(function(state)
 		dailyButton.badge.Visible = state.daily.canClaim
-		if state.daily.canClaim and not autoOpenedDaily and not welcomeOpen then
+		-- Not during the first-time tutorial: a brand-new player's first seconds belong to the loop. The badge still
+		-- shows, and the dialog opens on the first update after the tutorial ends.
+		if state.daily.canClaim and not autoOpenedDaily and not welcomeOpen and state.tutorial.step == "" then
 			-- Give the welcome popup a moment to arrive first.
 			task.delay(2.5, function()
 				local latest = StateStore.get()
-				if latest and latest.daily.canClaim and not autoOpenedDaily and not welcomeOpen then
+				if
+					latest
+					and latest.daily.canClaim
+					and not autoOpenedDaily
+					and not welcomeOpen
+					and latest.tutorial.step == ""
+				then
 					autoOpenedDaily = true
 					RewardsController.openDaily()
 				end

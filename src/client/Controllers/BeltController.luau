@@ -273,6 +273,18 @@ local function step()
 	end
 end
 
+-- What is on the belt right now (for the tutorial guide): each item, its mutation as drawn (nil = plain) and its
+-- model.
+export type ItemView = { item: Types.BeltItem, variant: string?, model: Model }
+
+function BeltController.items(): { ItemView }
+	local list: { ItemView } = {}
+	for _, entry in active do
+		table.insert(list, { item = entry.item, variant = entry.variant, model = entry.pooled.model })
+	end
+	return list
+end
+
 function BeltController.start()
 	folder = Instance.new("Folder")
 	folder.Name = "BeltItems"
