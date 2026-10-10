@@ -8,6 +8,20 @@ local Creatures = require("../src/shared/Config/Creatures")
 local Rarities = require("../src/shared/Config/Rarities")
 local Types = require("../src/shared/Types")
 
+type Band = { price: { number }, income: { number }, payback: { number } }
+
+-- Each tier's price, income and payback (seconds) band, as in BALANCE.md "Rarity tiers". Every Snackling, event ones
+-- included, sits inside its tier's band, so a bigger roster never changes the shape of the chase.
+local TIER_BANDS: { [string]: Band } = {
+	Common = { price = { 25, 200 }, income = { 1, 6 }, payback = { 25, 34 } },
+	Uncommon = { price = { 500, 1500 }, income = { 12, 30 }, payback = { 41, 50 } },
+	Rare = { price = { 4500, 12500 }, income = { 65, 160 }, payback = { 69, 79 } },
+	Epic = { price = { 60000, 150000 }, income = { 400, 950 }, payback = { 150, 158 } },
+	Legendary = { price = { 1400000, 3400000 }, income = { 2800, 6500 }, payback = { 500, 524 } },
+	Mythic = { price = { 50000000, 85000000 }, income = { 35000, 56000 }, payback = { 1428, 1518 } },
+	Secret = { price = { 1800000000, 3200000000 }, income = { 360000, 620000 }, payback = { 5000, 5162 } },
+}
+
 -- Models must fit the bases (Config/Gameplay.map): neighbouring podiums stand podiumRowSpacing = 6.6 studs apart
 -- side to side, and the podium billboard floats 8.5 studs above the podium (a model starts 0.7 above that point).
 local MAX_WIDTH = 6.6
@@ -212,6 +226,79 @@ T.describe("Snackling model recipes", function()
 		T.expect(#kinds.skins).toBe(15)
 		T.expect(#kinds.features).toBe(30)
 		T.expect(#kinds.toppings).toBe(20)
+	end)
+end)
+
+T.describe("Snackling roster", function()
+	local catalog = Catalog.build(Creatures, Rarities)
+
+	T.it("has about 60 permanent Snacklings spread over every tier", function()
+		local total = 0
+		for _, rarity in catalog.rarityList do
+			local regular = 0
+			for _, creature in catalog.byRarity[rarity.id] do
+				if creature.eventId == nil then
+					regular += 1
+				end
+			end
+			T.expect(regular).toBeAtLeast(6)
+			total += regular
+		end
+		T.expect(total).toBeAtLeast(60)
+	end)
+
+	T.it("never repeats an id, a name or a model name", function()
+		local ids, names, models = {}, {}, {}
+		for _, creature in Creatures do
+			T.expect(ids[creature.id]).toBeNil()
+			T.expect(names[creature.displayName]).toBeNil()
+			T.expect(models[creature.modelName]).toBeNil()
+			ids[creature.id], names[creature.displayName], models[creature.modelName] = true, true, true
+			T.expect(#creature.flavor).toBeGreaterThan(0)
+		end
+	end)
+
+	T.it("prices, incomes and paybacks stay inside their tier's band", function()
+		for _, creature in Creatures do
+			local band = TIER_BANDS[creature.rarity]
+			local payback = creature.price / creature.income
+			local function inside(label: string, value: number, range: { number })
+				if value < range[1] or value > range[2] then
+					error(`{creature.id}: {label} {value} is outside {creature.rarity}'s {range[1]}..{range[2]}`)
+				end
+			end
+			inside("price", creature.price, band.price)
+			inside("income", creature.income, band.income)
+			inside("payback", payback, band.payback)
+		end
+	end)
+
+	T.it("pricier Snacklings pay back a little slower within a tier", function()
+		for _, rarity in catalog.rarityList do
+			local regular: { Types.CreatureDef } = {}
+			for _, creature in catalog.byRarity[rarity.id] do
+				if creature.eventId == nil then
+					table.insert(regular, creature)
+				end
+			end
+			table.sort(regular, function(a: Types.CreatureDef, b: Types.CreatureDef): boolean
+				return a.price < b.price
+			end)
+			local cheapest, dearest = regular[1], regular[#regular]
+			T.expect(dearest.price / dearest.income).toBeGreaterThan(cheapest.price / cheapest.income)
+		end
+	end)
+
+	T.it("each tier's regular belt weights add up to 100, so an event Snackling's share is easy to read", function()
+		for _, rarity in catalog.rarityList do
+			local sum = 0
+			for _, creature in catalog.byRarity[rarity.id] do
+				if creature.eventId == nil then
+					sum += creature.beltWeight
+				end
+			end
+			T.expect(sum).toBe(100)
+		end
 	end)
 end)
 

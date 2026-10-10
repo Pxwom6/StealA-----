@@ -121,6 +121,7 @@ function Catalog.validate(creatures: { CreatureInfo }, rarities: { RarityInfo })
 
 	local creatureIds: { [string]: boolean } = {}
 	local modelNames: { [string]: boolean } = {}
+	local displayNames: { [string]: boolean } = {}
 	local perRarity: { [string]: number } = {}
 	for _, creature in creatures do
 		if creatureIds[creature.id] then
@@ -131,6 +132,10 @@ function Catalog.validate(creatures: { CreatureInfo }, rarities: { RarityInfo })
 			problem(`duplicate modelName {creature.modelName}`)
 		end
 		modelNames[creature.modelName] = true
+		if displayNames[creature.displayName] then
+			problem(`duplicate displayName {creature.displayName}`)
+		end
+		displayNames[creature.displayName] = true
 		if not rarityIds[creature.rarity] then
 			problem(`creature {creature.id} has unknown rarity {creature.rarity}`)
 		end
