@@ -12,6 +12,9 @@ export type MultiplierInputs = {
 	vipIncomeBonus: number, -- e.g. 0.1 for +10%
 	eventCashMultiplier: number, -- LiveOps (1 = no event)
 	socialBonus: number, -- friends in the server + group membership (Logic/SocialRules), e.g. 0.3 for +30%
+	-- Snackdex collection bonus (Logic/SnackdexRules.incomeBonus), e.g. 0.06 for +6%. Earned for good, so it is part of
+	-- the permanent multiplier. nil = none.
+	collectionBonus: number?,
 }
 
 export type PodiumUpgradeConfig = { basePrice: number, growth: number, maxPurchased: number }
@@ -40,11 +43,13 @@ function EconomyMath.incomeMultiplier(inputs: MultiplierInputs): number
 	end
 	m *= math.max(0, sane(inputs.eventCashMultiplier, 1))
 	m *= 1 + math.max(0, sane(inputs.socialBonus, 0))
+	m *= 1 + math.max(0, sane(inputs.collectionBonus or 0, 0))
 	return m
 end
 
--- The multiplier without temporary boosts: rebirths and passes only (LiveOps cash events and the social bonus are
--- left out). Cash packs are sized from it (packIncome).
+-- The multiplier without temporary boosts: what the player earned or bought for good (rebirths, passes, the Snackdex
+-- collection bonus); LiveOps cash events and the social bonus are left out. Cash packs, quest and Snackdex rewards are
+-- sized from it (packIncome).
 function EconomyMath.permanentMultiplier(inputs: MultiplierInputs): number
 	local steady = table.clone(inputs)
 	steady.eventCashMultiplier = 1
@@ -53,7 +58,7 @@ function EconomyMath.permanentMultiplier(inputs: MultiplierInputs): number
 end
 
 -- The multiplier time-based rewards and saved stats use (daily streak, offline earnings, best cash/sec): everything
--- but the social bonus. That bonus depends on who is in the server at that moment (and is still being looked up for
+-- but the social bonus (the Snackdex collection bonus counts, like rebirths). That bonus depends on who is in the server at that moment (and is still being looked up for
 -- a moment after joining), so it never inflates a payout or a saved value. A LiveOps cash event still counts here,
 -- as before.
 function EconomyMath.rewardMultiplier(inputs: MultiplierInputs): number

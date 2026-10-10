@@ -27,5 +27,8 @@ require("./SocialRules.spec")
 require("./SeasonRules.spec")
 require("./TutorialRules.spec")
 require("./OnboardingFunnel.spec")
+require("./SnackdexRules.spec")
+require("./QuestRules.spec")
+require("./RetentionConfig.spec")
 
 T.finish()
