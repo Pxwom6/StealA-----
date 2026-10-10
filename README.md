@@ -178,29 +178,36 @@ kind is listed at the top of `src/shared/Logic/CreatureRecipe.luau`.
 
 ### Sounds and music
 
-Every sound effect slot in `src/shared/Config/Sounds.luau` is `{ id, volume, pitch }`. Out of the box they use sounds
-that ship inside the Roblox client, so nothing needs uploading. These are all the files used; each should play in
-Studio's Command Bar (edit mode is fine):
-`local s = Instance.new("Sound") s.SoundId = "rbxasset://sounds/button.wav" game:GetService("SoundService"):PlayLocalSound(s)`
+Every sound effect slot in `src/shared/Config/Sounds.luau` is `{ id, volume, pitch }`. All of them use public
+audio from Roblox's own libraries, so nothing needs uploading and they work in any experience. Each one was checked to
+load in Studio (October 2026):
 
-| File | Used for |
-| --- | --- |
-| `rbxasset://sounds/button.wav` | every button click |
-| `rbxasset://sounds/clickfast.wav` | settings switches |
-| `rbxasset://sounds/pageturn.wav` | a dialog opens |
-| `rbxasset://sounds/electronicpingshort.wav` | success toasts, buying from the belt, steal alarm, mutation spawn, Rare / Epic spawn |
-| `rbxasset://sounds/hit.wav` | error toasts, tagging |
-| `rbxasset://sounds/victory.wav` | daily claim, steal success, rebirth, luck, Legendary / Mythic / Secret spawn |
-| `rbxasset://sounds/snap.wav` | collecting cash, lock / unlock, Common / Uncommon |
-| `rbxasset://sounds/swoosh.wav` | selling, starting a steal, announcement banners |
+| Asset | Library | Used for |
+| --- | --- | --- |
+| `15675032796` Roblox_UI_Small_Click | Roblox | every button click |
+| `15675059323` Roblox_UI_Bright_Click | Roblox | settings switches, Rare spawn |
+| `15675037413` Roblox_UI_Paper_Swipe | Roblox | a dialog opens, selling |
+| `127645268874265` CoinTransfer_01 | Roblox | success toasts, collecting cash |
+| `15675075163` Roblox_UI_Delete | Roblox | error toasts |
+| `15675055424` Roblox_UI_Cute_Pop | Roblox | buying from the belt, Common / Uncommon spawn |
+| `15675085146` Roblox_UI_Indicator | Roblox | locking your base |
+| `15675046931` Roblox_UI_Sweep | Roblox | unlocking |
+| `15675024286` Roblox_UI_Whoosh_01 | Roblox | starting a steal |
+| `15675012262` Roblox_UI_Whoosh_04 | Roblox | announcement banners |
+| `15675043410` Roblox_UI_Tonal_Stinger | Roblox | steal success, Epic spawn |
+| `15675062723` Roblox_UI_Whistle_Low | Roblox | tagging a thief |
+| `15675016548` Roblox_UI_Piano_Hello | Roblox | mutation spawn, Legendary spawn |
+| `9125775930` Police Whistle | ProSoundEffects | the owner's alarm while someone carries their Snackling |
+| `1842030434` The Big Toy Race (sting d) | APM Music | rebirth, Secret spawn |
+| `9038314266` Funfair Fun (sting) | APM Music | luck boosts, Mythic spawn |
+| `9040476631` Early Bird - Mnemonic2 | APM Music | daily reward claim |
 
-If one of them doesn't exist on your Roblox version, that slot is silent (Studio's Output shows a load warning);
-paste an uploaded sound's `rbxassetid://...` instead. An empty id is always silent.
+**Music** (APM Music, loops, crossfades on change, follows the player's Music setting):
+`music.lobby` = `1842203609` "Laugh To Learn" (59 s) everywhere; `music.halloween` = `1848232312` "Hear, The Wind
+Blows" while the Halloween theme is on. Another seasonal theme gets music by adding a slot named after its theme id.
 
-**Music:** Roblox ships no music, so `music.lobby` (plays everywhere) and `music.halloween` (plays while the
-Halloween theme is on) are empty. Paste an audio asset id (`rbxassetid://...`) and it loops, crossfades when the
-track changes (`musicFadeSeconds`) and follows the player's Music setting. Another seasonal theme gets music by
-adding a slot named after its theme id.
+To swap any sound, paste another audio asset id (`rbxassetid://...`); an empty id is silent. Quick check in Studio's
+Command Bar: `local s = Instance.new("Sound") s.SoundId = "rbxassetid://15675032796" game:GetService("SoundService"):PlayLocalSound(s)`
 
 ### Settings
 
