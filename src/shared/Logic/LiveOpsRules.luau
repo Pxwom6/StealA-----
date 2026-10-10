@@ -62,6 +62,34 @@ function LiveOpsRules.luckMultiplier(events: { EventDef }, boosts: { Boost }, no
 	return math.clamp(m, 1, limits.maxLuckMultiplier)
 end
 
+-- When the luck multiplier next changes because something feeding it ends: the earliest end among the active luck
+-- events (luckMultiplier > 1) and unexpired boosts. 0 when nothing raises the luck. The HUD counts down to this, so
+-- a 15-minute bought boost during a two-day luck event shows 15 minutes (then the event's own time), not two days.
+function LiveOpsRules.luckChangesAt(events: { EventDef }, boosts: { Boost }, now: number): number
+	local earliest = math.huge
+	for _, event in LiveOpsRules.activeEvents(events, now) do
+		if (event.luckMultiplier or 1) > 1 then
+			earliest = math.min(earliest, event.endsAt)
+		end
+	end
+	for _, boost in boosts do
+		if now < boost.endsAt and boost.multiplier > 1 then
+			earliest = math.min(earliest, boost.endsAt)
+		end
+	end
+	return if earliest == math.huge then 0 else earliest
+end
+
+-- The event whose banner the HUD shows: the first active event (in list order) that has bannerText, or nil.
+function LiveOpsRules.bannerEvent(events: { EventDef }, now: number): EventDef?
+	for _, event in LiveOpsRules.activeEvents(events, now) do
+		if event.bannerText ~= nil and event.bannerText ~= "" then
+			return event
+		end
+	end
+	return nil
+end
+
 function LiveOpsRules.cashMultiplier(events: { EventDef }, now: number, limits: Limits): number
 	local m = 1
 	for _, event in LiveOpsRules.activeEvents(events, now) do
@@ -207,6 +235,7 @@ function LiveOpsRules.validateEvents(raw: unknown, limits: Limits): ({ EventDef 
 			luckMultiplier = multiplier(entry.luckMultiplier, limits.maxLuckMultiplier),
 			cashMultiplier = multiplier(entry.cashMultiplier, limits.maxCashMultiplier),
 			bannerText = if type(entry.bannerText) == "string" then string.sub(entry.bannerText, 1, 80) else nil,
+			title = if type(entry.title) == "string" and #entry.title > 0 then string.sub(entry.title, 1, 24) else nil,
 			durationSeconds = if type(entry.durationSeconds) == "number"
 					and entry.durationSeconds == entry.durationSeconds
 				then math.clamp(entry.durationSeconds, 60, 7 * 86400)

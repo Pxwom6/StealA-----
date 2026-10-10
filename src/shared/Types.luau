@@ -86,6 +86,7 @@ export type EventDef = {
 	luckMultiplier: number?,
 	cashMultiplier: number?,
 	bannerText: string?,
+	title: string?, -- short name for the HUD countdown ("Halloween ends in 3d 4h")
 	durationSeconds: number?,
 }
 
