@@ -44,7 +44,7 @@ local surfaceY = Gameplay.belt.surfaceY
 local active: { [number]: Active } = {}
 local pools: { [string]: { Pooled } } = {}
 local folder: Folder
-local hidden = CFrame.new(0, -500, 0)
+local hidden = CFrame.new(0, -500, 0) -- parked pooled models (MutationFxController skips anything below y = -400)
 
 -- Share of the billboard height the rows of a plain item fill (the rest is breathing room).
 local ROWS_FILL = 0.82
