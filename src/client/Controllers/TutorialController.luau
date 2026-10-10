@@ -446,7 +446,7 @@ local function buildBanner()
 	local badge = UiKit.new("Frame", {
 		Name = "StepBadge",
 		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, 10, 0, BANNER_HEIGHT / 2),
+		Position = UDim2.fromOffset(10, BANNER_HEIGHT / 2),
 		Size = UDim2.fromOffset(46, 46),
 		BackgroundColor3 = UiTheme.palette("tutorial"),
 		Parent = banner,
