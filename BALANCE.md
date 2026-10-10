@@ -4,11 +4,11 @@ How the economy is shaped, and how long each rarity takes to reach. Every number
 modules in `src/shared/Config/` and is reproduced by:
 
 ```sh
-lune run tools/simulate.luau      # ~40 s, prints the two tables below
+lune run tools/simulate.luau      # ~40 s, prints the tables below
 ```
 
-Re-run it after any change to `Creatures.luau`, `Rarities.luau`, `Economy.luau` or `Gameplay.luau` and paste
-the new tables here.
+Re-run it after any change to `Creatures.luau`, `Rarities.luau`, `Mutations.luau`, `Economy.luau` or
+`Gameplay.luau` and paste the new tables here.
 
 ## Design intent
 
@@ -46,32 +46,61 @@ and Uncommons become less likely. The store shows these exact numbers before pur
 
 Median play time until the player owns their first Snackling of each rarity, over 60 simulated players, with a
 24 h cap. The model is pessimistic: no stealing, no offline earnings, no daily rewards, no luck boosts, and other
-players win 40% of the belt items this player wanted.
+players win 40% of the belt items this player wanted. Belt spawns roll mutations like the server does.
 
 | Rarity | Free player | 2x Cash pass | 2x Cash + VIP + Extra Podiums |
 | --- | --- | --- | --- |
 | Common | 7s | 7s | 7s |
-| Uncommon | 2m 0s | 1m 15s | 1m 10s |
-| Rare | 4m 57s | 2m 47s | 2m 37s |
-| Epic | 11m 37s | 7m 0s | 6m 20s |
-| Legendary | 32m 12s | 19m 52s | 18m 35s |
-| Mythic | 2h 0m | 1h 21m | 1h 8m |
+| Uncommon | 2m 2s | 1m 15s | 1m 7s |
+| Rare | 4m 55s | 2m 45s | 2m 32s |
+| Epic | 11m 37s | 7m 0s | 6m 10s |
+| Legendary | 30m 52s | 19m 15s | 18m 17s |
+| Mythic | 1h 58m | 1h 20m | 1h 8m |
 | Secret | 9h 35m | 5h 58m | 5h 49m |
-| First rebirth affordable | 1h 4m | 39m 30s | 35m 30s |
+| First rebirth affordable | 1h 2m | 37m 45s | 33m 40s |
 
 Median cash/sec after N minutes of play:
 
 | Play time | Free player | 2x Cash pass | 2x Cash + VIP + Extra Podiums |
 | --- | --- | --- | --- |
-| 10m | $925/s | $5.26K/s | $6.99K/s |
-| 30m | $7.96K/s | $31K/s | $37.6K/s |
-| 1h | $27.6K/s | $74.6K/s | $90.4K/s |
-| 3h | $164K/s | $378K/s | $485K/s |
-| 8h | $473K/s | $1.41M/s | $1.73M/s |
-| 24h | $2.2M/s | $5.26M/s | $6.09M/s |
+| 10m | $980/s | $6.09K/s | $7.39K/s |
+| 30m | $8.62K/s | $32.6K/s | $39.3K/s |
+| 1h | $29.9K/s | $81.3K/s | $97.9K/s |
+| 3h | $174K/s | $401K/s | $504K/s |
+| 8h | $560K/s | $1.64M/s | $1.93M/s |
+| 24h | $2.32M/s | $5.29M/s | $6.28M/s |
 
 Reading it: a free player gets a Legendary in their first session, a Mythic within a couple of sessions and a
 Secret over a few days — and can shortcut any of it by stealing. A 2× Cash owner gets there roughly 35–45% sooner.
+
+## Mutations
+
+Every belt spawn, after its creature is rolled, gets at most one mutation (`Config/Mutations.luau`). Chances are
+per spawn, the same for every rarity, and **never changed by luck** (DECISIONS.md #18), so the Server Luck odds in
+the store stay exact.
+
+| Mutation | Chance per spawn | Per server-hour | Income | Price | Payback vs plain | Announced |
+| --- | --- | --- | --- | --- | --- | --- |
+| Golden | 3% | 43.2 | x2 | x1.5 | x0.75 | no |
+| Diamond | 0.8% | 11.5 | x4 | x2.5 | x0.63 | no |
+| Rainbow | 0.15% | 2.2 | x8 | x4 | x0.5 | spawn, buy, steal |
+
+Any mutation: 3.95% of spawns (56.9 per server-hour). Expected value of one spawn: income x1.0645, price x1.0315.
+
+* **A mutation is always a lucky find:** income grows faster than price (CI checks `incomeMultiplier >=
+  priceMultiplier`), so a mutated Snackling pays itself back sooner than the plain one, and sells for the mutated
+  price × the normal refund.
+* **It doesn't move the chase.** Compared with the same simulation without mutations, the time to each rarity
+  changes by at most ~4% (Legendary 32m 12s → 30m 52s free, first rebirth 1h 4m → 1h 2m), because rarity is still
+  gated by the belt and by base prices. Steady income rises by ~5–10% in most cells (the expected x1.06 per spawn), up
+  to ~16–18% in a few (around 8 h), where one lucky Diamond or Rainbow high-tier Snackling is a big share of a base
+  (more variance, not a faster chase).
+* **Rainbow is a server moment** (about twice per server-hour, announced like a Mythic) and a prime steal target;
+  Golden and Diamond are personal surprises.
+* **Event-only mutations** (with an `eventId`) roll only while that LiveOps event runs; keep every chance together,
+  events included, well under 10% (CI requires the total to stay below 1).
+* Want mutations rarer or stronger? Change `chance` (how often) or `incomeMultiplier` (how much) and re-run the
+  simulation; keep `incomeMultiplier >= priceMultiplier`.
 
 ## Other knobs
 
@@ -117,4 +146,5 @@ spams locks, whatever the lock length.
   higher-earning and have a longer payback than the one below.
 * Want the chase longer? Raise high-tier prices (price gate) or lower `beltWeight` (belt gate). Price gates make
   2× Cash more valuable; belt gates affect everyone equally.
-* Events: a `cashMultiplier` event speeds everyone up; a `luckMultiplier` event shortens only the belt gate.
+* Events: a `cashMultiplier` event speeds everyone up; a `luckMultiplier` event shortens only the belt gate (it
+  never changes mutation chances).
