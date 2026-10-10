@@ -142,6 +142,30 @@ T.describe("DataSchema", function()
 		T.expect(DataSchema.sanitise(garbage, 100, rules).quarantine).toEqual({})
 	end)
 
+	T.it("keeps mutation variants as saved, including ids the config doesn't know", function()
+		local saved: any = {
+			creatures = {
+				{ uid = "1", id = "pizza_pup", podium = 1, acquiredAt = 5, stored = 0, variant = "golden" },
+				{ uid = "2", id = "pizza_pup", podium = 2, acquiredAt = 5, stored = 0, variant = "retired_mutation" },
+				{ uid = "3", id = "pizza_pup", podium = 3, acquiredAt = 5, stored = 0, variant = 42 } :: any,
+				{ uid = "4", id = "pizza_pup", podium = 4, acquiredAt = 5, stored = 0, variant = "" },
+				{ uid = "5", id = "pizza_pup", podium = 5, acquiredAt = 5, stored = 0, variant = string.rep("x", 65) } :: any,
+				{ uid = "6", id = "pizza_pup", podium = 6, acquiredAt = 5, stored = 0 } :: any,
+			},
+			quarantine = { { uid = "7", id = "gone_pup", podium = 7, acquiredAt = 5, stored = 0, variant = "rainbow" } },
+		}
+		local clean = DataSchema.sanitise(saved, 100, rules)
+		T.expect(clean.creatures[1].variant).toBe("golden")
+		T.expect(clean.creatures[2].variant).toBe("retired_mutation")
+		T.expect(clean.creatures[3].variant).toBeNil()
+		T.expect(clean.creatures[4].variant).toBeNil()
+		T.expect(clean.creatures[5].variant).toBeNil()
+		T.expect(clean.creatures[6].variant).toBeNil()
+		T.expect(clean.quarantine[1].variant).toBe("rainbow")
+		-- and they survive another load unchanged
+		T.expect((DataSchema.sanitise(clean :: any, 100, rules))).toEqual(clean)
+	end)
+
 	T.it("quarantined creatures come back when their id exists again", function()
 		local saved: any = {
 			nextUid = 20,

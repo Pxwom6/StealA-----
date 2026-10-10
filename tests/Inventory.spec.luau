@@ -38,6 +38,22 @@ T.describe("Inventory", function()
 		T.expect(Inventory.transfer(victim, thief, record.uid, 5, 99)).toBeNil()
 		T.expect(#thief.creatures).toBe(1)
 	end)
+	T.it("stores the mutation variant and keeps it across a transfer", function()
+		local victim: Inventory.Owner = { creatures = {}, nextUid = 1 }
+		local thief: Inventory.Owner = { creatures = {}, nextUid = 1 }
+		local plain = Inventory.add(victim, "pup", 1, 0)
+		local golden = Inventory.add(victim, "pup", 2, 0, "golden")
+		local unknown = Inventory.add(victim, "pup", 3, 0, "not_in_config")
+		T.expect(plain.variant).toBeNil()
+		T.expect(golden.variant).toBe("golden")
+		local moved = Inventory.transfer(victim, thief, golden.uid, 1, 5) :: Inventory.CreatureRecord
+		T.expect(moved.variant).toBe("golden")
+		local movedUnknown = Inventory.transfer(victim, thief, unknown.uid, 2, 5) :: Inventory.CreatureRecord
+		T.expect(movedUnknown.variant).toBe("not_in_config")
+		local movedPlain = Inventory.transfer(victim, thief, plain.uid, 3, 5) :: Inventory.CreatureRecord
+		T.expect(movedPlain.variant).toBeNil()
+		T.expect(#victim.creatures).toBe(0)
+	end)
 end)
 
 T.describe("PlotAssignment", function()

@@ -5,6 +5,8 @@ local Catalog = require("../src/shared/Logic/Catalog")
 local RarityRoll = require("../src/shared/Logic/RarityRoll")
 local Creatures = require("../src/shared/Config/Creatures")
 local Rarities = require("../src/shared/Config/Rarities")
+local Mutations = require("../src/shared/Config/Mutations")
+local MutationRules = require("../src/shared/Logic/MutationRules")
 local Economy = require("../src/shared/Config/Economy")
 local Gameplay = require("../src/shared/Config/Gameplay")
 local Monetization = require("../src/shared/Config/Monetization")
@@ -13,6 +15,7 @@ local Sounds = require("../src/shared/Config/Sounds")
 local LiveOps = require("../src/shared/Config/LiveOps")
 local LiveOpsRules = require("../src/shared/Logic/LiveOpsRules")
 local StealRules = require("../src/shared/Logic/StealRules")
+local Types = require("../src/shared/Types")
 
 -- Every creature id that has shipped. APPEND-ONLY: add new ids when they release, never remove or rename one —
 -- players own them. (A save holding an id missing from config quarantines that creature: it vanishes from the
@@ -38,6 +41,15 @@ local RELEASED_CREATURE_IDS = {
 	"dumpling_dino",
 	"gelato_griffin",
 	"croissant_kraken",
+}
+
+-- Every mutation id that has shipped (saved in players' CreatureRecord.variant). APPEND-ONLY, like creature ids: a
+-- save keeps a variant the config doesn't know, but it earns x1 and looks plain until the id is back. To stop a
+-- mutation appearing, give it an `eventId` that is never active instead.
+local RELEASED_MUTATION_IDS = {
+	"golden",
+	"diamond",
+	"rainbow",
 }
 
 T.describe("Config integrity", function()
@@ -92,6 +104,76 @@ T.describe("Config integrity", function()
 				error(`append "{creature.id}" to RELEASED_CREATURE_IDS in tests/Config.spec.luau so it is protected`)
 			end
 		end
+	end)
+
+	T.it("every mutation id from a past release still exists (never remove or rename one)", function()
+		local byId: { [string]: boolean } = {}
+		for _, mutation in Mutations do
+			byId[mutation.id] = true
+		end
+		for _, id in RELEASED_MUTATION_IDS do
+			if not byId[id] then
+				error(`mutation id "{id}" shipped in a release but is missing from Config/Mutations`)
+			end
+		end
+	end)
+
+	T.it("every mutation in config is on the released list (append new ids when they ship)", function()
+		for _, mutation in Mutations do
+			if table.find(RELEASED_MUTATION_IDS, mutation.id) == nil then
+				error(`append "{mutation.id}" to RELEASED_MUTATION_IDS in tests/Config.spec.luau so it is protected`)
+			end
+		end
+	end)
+
+	T.it("mutation config validates", function()
+		local problems = Catalog.validateMutations(Mutations)
+		if #problems > 0 then
+			print(table.concat(problems, "\n"))
+		end
+		T.expect(#problems).toBe(0)
+	end)
+
+	T.it("mutation ids never clash with creature ids or rarity ids", function()
+		for _, mutation in Mutations do
+			for _, creature in Creatures do
+				T.expect(mutation.id ~= creature.id).toBe(true)
+			end
+			for _, rarity in Rarities do
+				T.expect(mutation.id ~= rarity.id).toBe(true)
+			end
+		end
+	end)
+
+	T.it("rarer mutations pay more, and a mutated creature always earns more than it costs extra", function()
+		local catalog = Catalog.build(Creatures, Rarities, Mutations)
+		local previous: Types.MutationDef? = nil
+		for _, mutation in catalog.mutationList do
+			if previous ~= nil and previous.eventId == nil and mutation.eventId == nil then
+				T.expect(mutation.chance).toBeLessThan(previous.chance)
+				T.expect(mutation.incomeMultiplier).toBeGreaterThan(previous.incomeMultiplier)
+			end
+			-- payback never gets worse than the plain creature's (a mutation is always a lucky find)
+			T.expect(mutation.incomeMultiplier).toBeAtLeast(mutation.priceMultiplier)
+			previous = mutation
+		end
+	end)
+
+	T.it("mutation odds ignore luck: the Server Luck disclosure stays exact", function()
+		-- MutationRules has no luck input at all; this pins that the shipped odds are the configured chances.
+		local odds = MutationRules.odds(Mutations, {})
+		local total = 0
+		for _, entry in odds do
+			total += entry.chance
+		end
+		local configured = 0
+		for _, mutation in Mutations do
+			if mutation.eventId == nil then
+				configured += mutation.chance
+			end
+		end
+		T.expect(total).toBeNear(configured, 1e-12)
+		T.expect(total).toBeLessThan(0.1) -- keeps BALANCE.md's time-to-rarity tables meaningful
 	end)
 
 	T.it("creature and rarity config validates", function()

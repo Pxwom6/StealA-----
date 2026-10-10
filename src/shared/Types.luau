@@ -48,6 +48,35 @@ export type CreatureDef = {
 	eventId: string?,
 }
 
+-- Config: mutations (rare variants of any creature) --------------------------------------------------------------
+
+-- How a mutation changes a model, on top of its rarity flair. Applied to every visible part except the face
+-- (placeholder models) and parts with the attribute MutationSkip = true (custom models).
+export type MutationLook = {
+	material: string, -- Enum.Material item name, e.g. "Foil"
+	tint: string?, -- "#RRGGBB" blended into each part's colour
+	tintStrength: number?, -- 0..1, how far towards `tint` (default 1 = replace the colour)
+	transparency: number?, -- minimum part transparency (glassy looks)
+	reflectance: number?,
+	sparkles: boolean?, -- sparkle particles in the mutation colour
+	rainbow: boolean?, -- hue-cycling colours (animated on the client) and rainbow particles
+}
+
+export type MutationDef = {
+	id: string, -- saved in CreatureRecord.variant: never rename or remove one that has shipped
+	displayName: string,
+	color: string, -- "#RRGGBB", labels and banners
+	order: number, -- display / roll order, rarest last
+	chance: number, -- probability per belt spawn, independent of rarity and luck
+	incomeMultiplier: number,
+	priceMultiplier: number,
+	announceOnSpawn: boolean,
+	announceOnBuy: boolean,
+	announceOnSteal: boolean,
+	look: MutationLook,
+	eventId: string?, -- only rolls while this LiveOps event is active
+}
+
 -- Config: LiveOps ---------------------------------------------------------------------------------------------
 
 export type EventDef = {
@@ -68,7 +97,9 @@ export type CreatureRecord = {
 	podium: number,
 	acquiredAt: number,
 	stored: number, -- uncollected cash sitting on the podium
-	variant: string?, -- reserved for future mutations
+	-- Mutation id (Config/Mutations), nil for a plain creature. An id missing from the config is kept as-is and
+	-- pays x1 until it exists again.
+	variant: string?,
 }
 
 export type PurchaseRecord = {
@@ -167,6 +198,6 @@ export type ClientState = {
 	daily: DailyView,
 }
 
-export type BeltItem = { id: number, creatureId: string, spawnAt: number }
+export type BeltItem = { id: number, creatureId: string, spawnAt: number, variant: string? }
 
 return {}
