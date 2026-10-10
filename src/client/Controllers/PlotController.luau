@@ -1,7 +1,8 @@
 --!strict
 --[[
 	Client-side visuals for the 8 plots, driven entirely by replicated attributes:
-	  * podium billboards: name (rarity colour), cash/sec, uncollected cash, "being stolen!" warning
+	  * podium billboards: name (rarity colour; a mutation such as "Golden" in its own colour), cash/sec,
+	    uncollected cash, "being stolen!" warning
 	  * shield countdown over each entrance (lock or new-player protection)
 	  * a big "YOUR BASE" marker over your own plot so a new player always knows where home is
 	  * your own entrance barrier is made non-collidable locally, so the lock never blocks the owner
@@ -52,7 +53,7 @@ local function setupPodium(podium: Model)
 		HorizontalAlignment = Enum.HorizontalAlignment.Center,
 		Parent = gui,
 	})
-	local nameLabel = UiKit.label({ LayoutOrder = 1, Size = UDim2.fromScale(1, 0.32), Parent = gui })
+	local nameLabel = UiKit.label({ LayoutOrder = 1, Size = UDim2.fromScale(1, 0.32), RichText = true, Parent = gui })
 	local incomeLabel = UiKit.label({
 		LayoutOrder = 2,
 		Size = UDim2.fromScale(1, 0.26),
@@ -76,7 +77,7 @@ local function setupPodium(podium: Model)
 		end
 		gui.Enabled = true
 		if beingStolen then
-			nameLabel.Text = Theme.text.carryMarker
+			nameLabel.Text = UiTheme.escapeRich(Theme.text.carryMarker)
 			nameLabel.TextColor3 = UiTheme.palette("danger")
 			incomeLabel.Text = ""
 			storedLabel.Text = ""
@@ -86,15 +87,14 @@ local function setupPodium(podium: Model)
 			gui.Enabled = false
 			return
 		end
-		local creature = def
-		nameLabel.Text = creature.displayName
-		nameLabel.TextColor3 = UiTheme.rarityColor(creature.rarity)
+		local variant = podium:GetAttribute("Variant")
+		nameLabel.Text = UiTheme.creatureNameRich(def, if type(variant) == "string" then variant else nil)
 		local income = podium:GetAttribute("Income")
 		incomeLabel.Text = UiTheme.perSecond(if type(income) == "number" then income else 0)
 		local stored = podium:GetAttribute("Stored")
 		storedLabel.Text = UiTheme.cash(if type(stored) == "number" then stored else 0)
 	end
-	for _, attribute in { "CreatureId", "Stored", "Income", "BeingStolen" } do
+	for _, attribute in { "CreatureId", "Variant", "Stored", "Income", "BeingStolen" } do
 		podium:GetAttributeChangedSignal(attribute):Connect(update)
 	end
 	update()

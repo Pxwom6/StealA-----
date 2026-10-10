@@ -1,10 +1,11 @@
 --!strict
 --[[
-	Renders the conveyor locally. The server only sends {id, creatureId, spawnAt}; positions come from
+	Renders the conveyor locally. The server only sends {id, creatureId, spawnAt, variant}; positions come from
 	Logic/BeltMath and the shared server clock, so movement costs zero network traffic.
 
-	Models are pooled per creature type (built once, reused forever) and each item gets a local "Buy" prompt that
-	sends the BuyBeltItem intent — the server re-validates price, range and space.
+	Models are pooled per creature type and mutation (built once, reused forever) and each item gets a local "Buy"
+	prompt that sends the BuyBeltItem intent — the server re-validates price, range and space. A mutated item shows
+	the mutation's name in its colour, its mutated name ("Golden Pizza Pup") and its mutated price and income.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -25,14 +26,16 @@ local SoundPlayer = require(script.Parent.SoundPlayer)
 local StateStore = require(script.Parent.StateStore)
 
 type Pooled = {
-	creatureId: string,
+	key: string, -- poolKey(creatureId, variant)
 	model: Model,
 	prompt: ProximityPrompt,
 	priceLabel: TextLabel,
 	height: number,
 }
 
-type Active = { item: Types.BeltItem, pooled: Pooled, connection: RBXScriptConnection }
+type Active = { item: Types.BeltItem, variant: string?, pooled: Pooled, connection: RBXScriptConnection }
+
+type Row = { text: string, color: Color3?, weight: number }
 
 local BeltController = {}
 
@@ -43,12 +46,48 @@ local pools: { [string]: { Pooled } } = {}
 local folder: Folder
 local hidden = CFrame.new(0, -500, 0)
 
-local function makeBillboard(model: Model, def: Types.CreatureDef, rarity: Types.RarityDef, height: number): TextLabel
+-- Share of the billboard height the rows of a plain item fill (the rest is breathing room).
+local ROWS_FILL = 0.82
+
+-- A mutation this client doesn't know (e.g. a newer server mid-update) is drawn and priced as plain, like the
+-- server does for an unknown saved variant.
+local function knownVariant(variant: string?): string?
+	return if GameData.mutation(variant) ~= nil then variant else nil
+end
+
+local function poolKey(creatureId: string, variant: string?): string
+	return creatureId .. "|" .. (variant or "")
+end
+
+local function makeBillboard(
+	model: Model,
+	def: Types.CreatureDef,
+	rarity: Types.RarityDef,
+	variant: string?,
+	height: number
+): TextLabel
 	local root = model.PrimaryPart :: BasePart
 	local big = rarity.order >= 6
+	local mutation = GameData.mutation(variant)
+	local rows: { Row } =
+		{ { text = string.upper(rarity.displayName), color = UiTheme.color(rarity.color), weight = 0.26 } }
+	if mutation then
+		-- One more line, the mutation's name in its colour; the billboard grows so every line keeps its size.
+		table.insert(
+			rows,
+			{ text = string.upper(mutation.displayName), color = UiTheme.color(mutation.color), weight = 0.26 }
+		)
+	end
+	table.insert(rows, { text = GameData.displayName(def, variant), color = nil, weight = 0.3 })
+	table.insert(rows, { text = "", color = UiTheme.palette("cash"), weight = 0.26 }) -- price, filled below
+	local fill = 0
+	for _, row in rows do
+		fill += row.weight
+	end
+	local baseHeight = if big then 96 else 80
 	local gui = UiKit.new("BillboardGui", {
 		Name = "Info",
-		Size = UDim2.fromOffset(if big then 230 else 190, if big then 96 else 80),
+		Size = UDim2.fromOffset(if big then 230 else 190, math.floor(baseHeight * fill / ROWS_FILL + 0.5)),
 		StudsOffsetWorldSpace = Vector3.new(0, height + 2.2, 0),
 		MaxDistance = 90,
 		LightInfluence = 0,
@@ -59,38 +98,33 @@ local function makeBillboard(model: Model, def: Types.CreatureDef, rarity: Types
 		HorizontalAlignment = Enum.HorizontalAlignment.Center,
 		Parent = gui,
 	})
-	UiKit.label({
-		LayoutOrder = 1,
-		Text = string.upper(rarity.displayName),
-		TextColor3 = UiTheme.color(rarity.color),
-		Size = UDim2.fromScale(1, 0.26),
-		Parent = gui,
-	})
-	UiKit.label({
-		LayoutOrder = 2,
-		Text = def.displayName,
-		Size = UDim2.fromScale(1, 0.3),
-		Parent = gui,
-	})
-	local price = UiKit.label({
-		LayoutOrder = 3,
-		Text = `{UiTheme.cash(def.price)}  {UiTheme.perSecond(def.income)}`,
-		TextColor3 = UiTheme.palette("cash"),
-		Size = UDim2.fromScale(1, 0.26),
-		Parent = gui,
-	})
+	local last: TextLabel? = nil
+	for index, row in rows do
+		local props: UiKit.Props = {
+			LayoutOrder = index,
+			Text = row.text,
+			Size = UDim2.fromScale(1, row.weight * ROWS_FILL / fill),
+			Parent = gui,
+		}
+		if row.color then
+			props.TextColor3 = row.color
+		end
+		last = UiKit.label(props)
+	end
+	local price = last :: TextLabel
+	price.Text = `{UiTheme.cash(GameData.price(def, variant))}  {UiTheme.perSecond(GameData.income(def, variant))}`
 	return price
 end
 
-local function build(creatureId: string): Pooled
+local function build(creatureId: string, variant: string?): Pooled
 	local def = GameData.catalog.creatures[creatureId]
 	local rarity = GameData.catalog.rarities[def.rarity]
-	local model = CreatureVisuals.build(def, rarity, { anchored = true })
+	local model = CreatureVisuals.build(def, rarity, { anchored = true, mutation = GameData.mutation(variant) })
 	local height = CreatureVisuals.height(model)
-	local priceLabel = makeBillboard(model, def, rarity, height)
+	local priceLabel = makeBillboard(model, def, rarity, variant, height)
 	local prompt = UiKit.new("ProximityPrompt", {
 		ActionText = Theme.text.buyAction,
-		ObjectText = `{def.displayName} - {UiTheme.cash(def.price)}`,
+		ObjectText = `{GameData.displayName(def, variant)} - {UiTheme.cash(GameData.price(def, variant))}`,
 		HoldDuration = 0,
 		MaxActivationDistance = Gameplay.belt.buyRange - 2,
 		RequiresLineOfSight = false,
@@ -98,26 +132,32 @@ local function build(creatureId: string): Pooled
 		Parent = model.PrimaryPart,
 	}) :: ProximityPrompt
 	model.Parent = folder
-	return { creatureId = creatureId, model = model, prompt = prompt, priceLabel = priceLabel, height = height }
+	return {
+		key = poolKey(creatureId, variant),
+		model = model,
+		prompt = prompt,
+		priceLabel = priceLabel,
+		height = height,
+	}
 end
 
-local function acquire(creatureId: string): Pooled
-	local pool = pools[creatureId]
+local function acquire(creatureId: string, variant: string?): Pooled
+	local pool = pools[poolKey(creatureId, variant)]
 	if pool and #pool > 0 then
 		local pooled = table.remove(pool) :: Pooled
 		pooled.prompt.Enabled = true
 		return pooled
 	end
-	return build(creatureId)
+	return build(creatureId, variant)
 end
 
 local function release(pooled: Pooled)
 	pooled.prompt.Enabled = false
 	pooled.model:PivotTo(hidden)
-	local pool = pools[pooled.creatureId]
+	local pool = pools[pooled.key]
 	if pool == nil then
 		pool = {}
-		pools[pooled.creatureId] = pool
+		pools[pooled.key] = pool
 	end
 	table.insert(pool, pooled)
 end
@@ -125,7 +165,7 @@ end
 local function refreshAffordability(cash: number)
 	for _, entry in active do
 		local def = GameData.catalog.creatures[entry.item.creatureId]
-		entry.pooled.priceLabel.TextColor3 = if cash >= def.price
+		entry.pooled.priceLabel.TextColor3 = if cash >= GameData.price(def, entry.variant)
 			then UiTheme.palette("cash")
 			else UiTheme.palette("danger")
 	end
@@ -135,11 +175,12 @@ local function add(item: Types.BeltItem)
 	if active[item.id] or GameData.catalog.creatures[item.creatureId] == nil then
 		return
 	end
-	local pooled = acquire(item.creatureId)
+	local variant = knownVariant(item.variant)
+	local pooled = acquire(item.creatureId, variant)
 	local connection = pooled.prompt.Triggered:Connect(function()
 		Net.get("BuyBeltItem"):FireServer(item.id)
 	end)
-	active[item.id] = { item = item, pooled = pooled, connection = connection }
+	active[item.id] = { item = item, variant = variant, pooled = pooled, connection = connection }
 	local state = StateStore.get()
 	if state then
 		refreshAffordability(state.cash)
@@ -148,6 +189,8 @@ local function add(item: Types.BeltItem)
 	local rarity = GameData.catalog.rarities[def.rarity]
 	if rarity.order >= 5 then
 		SoundPlayer.rarity(rarity.id)
+	elseif variant then
+		SoundPlayer.world("mutation")
 	end
 end
 
@@ -203,7 +246,9 @@ local function onRemove(payload: { id: number, buyerUserId: number?, target: Vec
 	local removed = remove(payload.id)
 	if removed and position and payload.target then
 		local def = GameData.catalog.creatures[removed.item.creatureId]
-		flyHome(position, payload.target, UiTheme.rarityColor(def.rarity))
+		local mutation = GameData.mutation(removed.variant)
+		local color = if mutation then UiTheme.color(mutation.color) else UiTheme.rarityColor(def.rarity)
+		flyHome(position, payload.target, color)
 		SoundPlayer.world("buy")
 	end
 end

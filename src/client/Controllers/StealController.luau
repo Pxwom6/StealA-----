@@ -99,7 +99,7 @@ local function stealHook(podium: Model, plot: Model, prompt: ProximityPrompt): b
 	end
 	prompt:SetAttribute("Role", "Steal")
 	prompt.ActionText = Theme.text.stealAction
-	prompt.ObjectText = def.displayName
+	prompt.ObjectText = GameData.displayName(def, InteractionController.variantOf(podium))
 	prompt.HoldDuration = CFG.holdSeconds
 	prompt.MaxActivationDistance = CFG.grabRange - 2
 	prompt.Enabled = not isProtected(plot)

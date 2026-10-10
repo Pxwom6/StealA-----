@@ -26,6 +26,7 @@ local Sounds = {
 		rebirth = "",
 		announce = "",
 		luck = "",
+		mutation = "", -- a mutated Snackling (Golden, Diamond...) appears on the belt
 	},
 	-- Played when a creature of this rarity appears on the belt near you / lands in your base.
 	rarity = {
