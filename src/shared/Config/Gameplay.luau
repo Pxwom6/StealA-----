@@ -127,7 +127,9 @@ local Gameplay = {
 		Rebirth = { burst = 2, perSecond = 0.2 },
 		ClaimDaily = { burst = 2, perSecond = 0.2 },
 		ClientEvent = { burst = 6, perSecond = 0.5 },
-		CheckGroup = { burst = 1, perSecond = 0.1 }, -- "check my group membership again": once per 10 s
+		-- "Check my group membership again". SocialService also allows one real check per
+		-- Social.group.recheckCooldownSeconds and tells the player to wait, so this only stops spam.
+		CheckGroup = { burst = 2, perSecond = 0.2 },
 		InvitePrompted = { burst = 2, perSecond = 0.2 }, -- analytics only
 		DevGrantProduct = { burst = 3, perSecond = 1 },
 	} :: { [string]: RateLimit },
