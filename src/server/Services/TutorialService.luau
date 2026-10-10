@@ -4,9 +4,9 @@
 
 	* Progress is saved in `data.flags` (one flag per finished step, `tutorial_done` at the end; no schema change).
 	  The step the player is on lives in `session.tutorial` and reaches their client in StateUpdate (`tutorial`).
-	* Steps finish from real gameplay the server saw: the services call `record` after a belt purchase, a collect
-	  from a pad, a lock and a delivered steal. No client message can finish a step; the only tutorial intent is
-	  SkipTutorial, which ends it without the reward.
+	* Steps finish from real gameplay the server saw: `record` runs on the GameEvents the services emit after a belt
+	  purchase, a collect from a pad, a lock and a delivered steal. No client message can finish a step; the only
+	  tutorial intent is SkipTutorial, which ends it without the reward.
 	* A 1 Hz pass ends steps that can't wait forever (the lock recharging for 20 s, the steal step after 90 s).
 	* Finishing pays `Tutorial.reward` once per account: TutorialRules.finish sets the done flag and returns the
 	  amount, and it is paid right away (no yield in between).
@@ -25,6 +25,7 @@ local LockRules = require(ReplicatedStorage.Shared.Logic.LockRules)
 local TutorialRules = require(ReplicatedStorage.Shared.Logic.TutorialRules)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local Analytics = require(script.Parent.Analytics)
+local GameEvents = require(script.Parent.GameEvents)
 local Remotes = require(script.Parent.Remotes)
 local Replication = require(script.Parent.Replication)
 local Sessions = require(script.Parent.Sessions)
@@ -36,6 +37,14 @@ type Session = Sessions.Session
 export type PayCash = (session: Session, amount: number, transactionType: string?, sku: string?) -> ()
 
 local TICK_SECONDS = 1
+
+-- The tutorial step each gameplay event finishes (GameEvents kinds -> TutorialStepId).
+local STEP_FOR_EVENT: { [string]: string } = {
+	beltPurchase = "buy",
+	collect = "collect", -- only a pad collect is this event (not selling, not leaving)
+	lock = "lock",
+	steal = "steal",
+}
 
 local TutorialService = {}
 
@@ -131,9 +140,8 @@ local function recordAction(session: Session, action: string)
 	endStep(session, action, outcome)
 end
 
--- The player did a tutorial action (a step id: "buy", "collect", "lock", "steal"). Called by the gameplay services
--- right after the server applied it. Finishes that step: now if it is the current one, or when it comes up. Never
--- throws.
+-- The player did a tutorial action (a step id: "buy", "collect", "lock", "steal"), right after the server applied it
+-- (GameEvents). Finishes that step: now if it is the current one, or when it comes up. Never throws.
 function TutorialService.record(session: Session, action: string)
 	guarded("record " .. action, recordAction, session, action)
 end
@@ -199,6 +207,14 @@ end
 function TutorialService.start(pay: PayCash)
 	payCash = pay
 	Remotes.onIntent("SkipTutorial", onSkip)
+	-- Subscribed first by the bootstrap: a delivered steal finishes the steal step before StealService logs the
+	-- FirstSteal milestone (the funnel logs TutorialComplete first).
+	GameEvents.on("TutorialService", function(session: Session, event: GameEvents.Event)
+		local stepId = STEP_FOR_EVENT[event.kind]
+		if stepId then
+			TutorialService.record(session, stepId)
+		end
+	end)
 	task.spawn(function()
 		while true do
 			task.wait(TICK_SECONDS)

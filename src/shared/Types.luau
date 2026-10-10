@@ -427,6 +427,7 @@ export type ClientState = {
 	daily: DailyView,
 	social: SocialView,
 	tutorial: TutorialView,
+	quests: QuestsView,
 }
 
 export type BeltItem = { id: number, creatureId: string, spawnAt: number, variant: string? }
