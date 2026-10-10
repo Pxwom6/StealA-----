@@ -316,7 +316,10 @@ new-player shield instead. Completing it pays `Tutorial.reward` ($500) once per 
   carrying: the banner with its tip fits and the stack ends at 350. While carrying, the carry banner spans
   y 267-313, so the stack must end by 263: with the event and luck pills (262, or 226 with the event alone) the banner
   hides; with only the lock and social pills (174) the one-line banner fits (ends at 238). At 640×360 (about 355 high)
-  there are 85 px with every pill, so the tip is dropped and the one-line banner ends at 326. Skip is small but a
+  there are 85 px with every pill, so the tip is dropped and the one-line banner ends at 326. Across, the banner is
+  420 wide, centred, and narrowed so its right edge stays 6 px left of the TAG button area (`TutorialRules.bannerWidth`,
+  never below the stack's 300): at 667×375 (785 wide) it spans x 182-602, clear of the side buttons (x ≤ 90) and the
+  action area (x ≥ 611); at 640×360 (753 wide, action area x ≥ 579) it is 393 wide, x 180-573. Skip is small but a
   full touch target (72×44). The daily reward dialog doesn't auto-open during the tutorial (it opens right after).
   Not covered: the transient toasts and the "X is stealing your Snackling!" alert, which already overlapped the
   pills before the tutorial.

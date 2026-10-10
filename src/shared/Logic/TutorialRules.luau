@@ -236,6 +236,22 @@ function TutorialRules.bannerMode(
 	return "hidden" -- also for a NaN space
 end
 
+-- Width of the centred banner: `preferred`, narrowed so its right edge stays `gap` left of `rightLimit` (the TAG
+-- button area), but never below `minWidth`. All in UI units.
+function TutorialRules.bannerWidth(
+	preferred: number,
+	centerX: number,
+	rightLimit: number,
+	gap: number,
+	minWidth: number
+): number
+	local fits = 2 * (rightLimit - gap - centerX)
+	if fits ~= fits then
+		return preferred -- NaN (no layout yet)
+	end
+	return math.max(minWidth, math.min(preferred, fits))
+end
+
 -- Problems with a tutorial config (empty when valid). Checked by CI so a typo can't ship.
 function TutorialRules.validate(cfg: Config): { string }
 	local problems: { string } = {}

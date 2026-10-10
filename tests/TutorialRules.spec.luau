@@ -280,6 +280,17 @@ T.describe("TutorialRules banner fit", function()
 		T.expect(TutorialRules.bannerMode(85, 88, 64, true)).toBe("compact") -- 640x360: the tip is dropped
 		T.expect(TutorialRules.bannerMode(200, 88, 64, false)).toBe("compact") -- e.g. while carrying
 	end)
+	T.it("narrows the banner to keep it clear of the TAG button area", function()
+		-- 667x375 (785 wide at UI scale 0.85): the action area starts at 611, the full 420 fits (right edge 602)
+		T.expect(TutorialRules.bannerWidth(420, 392.5, 611, 6, 300)).toBe(420)
+		-- 640x360 (753 wide): the action area starts at 579
+		local width = TutorialRules.bannerWidth(420, 376.5, 579, 6, 300)
+		T.expect(376.5 + width / 2).toBeAtMost(573)
+		T.expect(width).toBeGreaterThan(390)
+		-- never thinner than the minimum, and a missing layout keeps the preferred width
+		T.expect(TutorialRules.bannerWidth(420, 300, 400, 6, 300)).toBe(300)
+		T.expect(TutorialRules.bannerWidth(420, 0 / 0, 400, 6, 300)).toBe(420)
+	end)
 	T.it("hides the banner rather than overlap what is below it", function()
 		T.expect(TutorialRules.bannerMode(63, 88, 64, false)).toBe("hidden")
 		T.expect(TutorialRules.bannerMode(1, 88, 64, true)).toBe("hidden") -- carrying with the event + luck pills

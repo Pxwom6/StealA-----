@@ -46,6 +46,8 @@ local BANNER_HEIGHT = 64
 local TIP_HEIGHT = 24
 local CARRY_BANNER_GAP = 4 -- the stack stays this far above the carry banner
 local SCREEN_BOTTOM_MARGIN = 8 -- and this far above the bottom of the screen
+local ACTION_AREA_GAP = 6 -- the banner's right edge stays this far left of the TAG button area
+local MIN_BANNER_WIDTH = 300 -- as wide as the top stack
 
 -- Guide look.
 local BEAM_WIDTH = 1.3
@@ -338,7 +340,18 @@ local function fitBanner(state: Types.ClientState)
 			else Theme.text.tutorialShieldOtherTip
 	end
 	tipLabel.Visible = mode == "full"
-	banner.Size = UDim2.fromOffset(BANNER_WIDTH, BANNER_HEIGHT + (if mode == "full" then TIP_HEIGHT else 0))
+	-- Centred on the screen like the whole stack; narrowed on small phones (e.g. 640x360) to clear the TAG button.
+	local scale = UiKit.scaleFor(workspace.CurrentCamera.ViewportSize)
+	local screen = HudController.screen()
+	local actionArea = HudController.actionArea()
+	local width = TutorialRules.bannerWidth(
+		BANNER_WIDTH,
+		screen.AbsoluteSize.X / 2 / scale,
+		(actionArea.AbsolutePosition.X - screen.AbsolutePosition.X) / scale,
+		ACTION_AREA_GAP,
+		MIN_BANNER_WIDTH
+	)
+	banner.Size = UDim2.fromOffset(width, BANNER_HEIGHT + (if mode == "full" then TIP_HEIGHT else 0))
 	banner.Visible = mode ~= "hidden"
 end
 
