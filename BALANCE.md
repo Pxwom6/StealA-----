@@ -94,8 +94,8 @@ The first rebirth lands around the first-Legendary stage (~1 h free); later ones
 rebirths become a multi-session goal. The multiplier is saved when earned, so later tuning never lowers it.
 
 **Cash packs** (`Economy.cashPacks`) pay N seconds of the buyer's steady income (creatures on active podiums that
-are not being stolen, at the rebirth and pass multipliers, without LiveOps cash events), rounded down to 2 significant
-digits, with a floor so they are worth something on day one: Snack Pack 15 min (min $2.5K), Snack Crate 1 h
+are not being stolen, at the rebirth and pass multipliers, without LiveOps cash events or the friend & group bonus),
+rounded down to 2 significant digits, with a floor so they are worth something on day one: Snack Pack 15 min (min $2.5K), Snack Crate 1 h
 (min $15K), Snack Truck 6 h (min $120K). They therefore stay meaningful at every stage instead of becoming
 worthless (fixed amounts) or game-breaking (huge fixed amounts).
 
@@ -103,6 +103,14 @@ worthless (fixed amounts) or game-breaking (huge fixed amounts).
 
 **Daily streak** (`Economy.daily`): 7-day cycle, reward = max(minimum, N minutes of income), from 3 minutes on
 day 1 to 45 minutes on day 7. Missing a day resets the streak.
+
+**Friends & group** (`Config/Social`): +10% income per Roblox friend playing in the same server (at most 3 counted,
++30%) and +10% for members of the owner's group (once `groupId` is set): at most **+40%**, multiplied on top of
+everything else. It only raises live income: cash packs, daily rewards, offline earnings and the best cash/sec stat
+(leaderboard) are all computed without it (DECISIONS.md #18), so it can't be farmed into a pack or a saved value. For
+scale: one rebirth is ×1.5 and 2× Cash is ×2, so the social bonus is a nice extra for playing together, not a gate.
+Group members also get a one-time welcome gift of 10 minutes of steady income (at least $1K). The simulation above
+assumes no social bonus.
 
 **Base lock** (`Gameplay.lock`): 60 s lock (up to 150 s with the max rebirth bonus and the Longer Lock pass), 90 s
 recharge after it ends; nobody can re-lock within 30 s — or half the lock's length, if longer (75 s for a 150 s

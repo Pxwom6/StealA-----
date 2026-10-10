@@ -54,8 +54,10 @@ CI (`.github/workflows/ci.yml`) runs all of the above on every pull request.
 ### Layout
 
 ```
-src/shared/Config   plain data: names, colours, prices, timers, product IDs, LiveOps events  (re-theme = edit these)
-src/shared/Logic    pure game rules (economy, rarity rolls, rebirth, offline earnings, receipts, steal/lock rules)
+src/shared/Config   plain data: names, colours, prices, timers, product IDs, LiveOps events, social rewards
+                    (re-theme = edit these)
+src/shared/Logic    pure game rules (economy, rarity rolls, rebirth, offline earnings, receipts, steal/lock rules,
+                    friend & group bonus)
 src/shared          small Roblox helpers shared by server & client (remotes, creature visuals, UI theme)
 src/server          server bootstrap + services (authoritative)
 src/client          client bootstrap + controllers (UI, rendering, intents)
@@ -70,7 +72,10 @@ tools               Lune scripts (balance simulation)
 3. Create the 4 game passes and 5 developer products on the Creator Hub and paste their IDs into
    `src/shared/Config/Monetization.luau` (every placeholder is marked `TODO(owner)`).
 4. Add your UserId to `adminUserIds` in `src/shared/Config/LiveOps.luau`.
-5. Optional: sound IDs in `src/shared/Config/Sounds.luau`, models in `ReplicatedStorage/CreatureModels`.
+5. **Group rewards:** paste your Roblox group's ID into `groupId` in `src/shared/Config/Social.luau`
+   (`TODO(owner)`; the number in the group's URL). While it is `0` the group bonus, welcome gift and Join group button
+   are off and hidden; the friends bonus works either way.
+6. Optional: sound IDs in `src/shared/Config/Sounds.luau`, models in `ReplicatedStorage/CreatureModels`.
 
 **Changing the save format:** bump `DataSchema.VERSION` whenever a saved key is added, removed, renamed or changes
 meaning, and never publish a lower VERSION than before. A rollback keeps the current save code (`DataSchema`,
