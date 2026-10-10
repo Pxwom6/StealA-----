@@ -190,7 +190,10 @@ function HudController.start()
 			pulse(cashPill, if state.cash > lastCash then UiTheme.palette("cash") else UiTheme.palette("danger"))
 		end
 		if lastCash == nil then
+			-- First update: show the real balance straight away. Without this the label kept its "$0" placeholder
+			-- until cash first changed, because displayed and target cash start out equal.
 			displayedCash = state.cash
+			cashLabel.Text = UiTheme.cash(math.floor(state.cash))
 		end
 		lastCash = state.cash
 	end)
