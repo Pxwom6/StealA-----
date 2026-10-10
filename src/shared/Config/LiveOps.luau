@@ -9,7 +9,8 @@
 	  3. Admin chat command in any live server — broadcast to every server via MessagingService (in Studio anyone
 	     can use them, and they only affect that Studio session):
 	       /luck <multiplier> <minutes>      e.g. /luck 2 30
-	       /event <eventId> [minutes]        start a configured event now (its durationSeconds, or `minutes`)
+	       /event <eventId> [minutes]        start a configured event now (its durationSeconds, or `minutes`); an
+	                                         event that is already running is only extended, never doubled
 	       /event off [eventId]              end events started with /event (all of them, or just that one)
 	       /announce <text>
 

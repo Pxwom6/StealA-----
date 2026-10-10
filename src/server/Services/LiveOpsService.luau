@@ -92,13 +92,21 @@ function LiveOpsService.setBoosts(list: { LiveOpsRules.Boost })
 	boosts = list
 end
 
--- Starts a configured (or ad-hoc) event right now for `seconds`. Starting the same event again restarts it (the
--- new window replaces the old one instead of running alongside it).
+-- Starts a configured (or ad-hoc) event right now for `seconds`. If that event id is already running (scheduled,
+-- remote config, or started earlier), this only extends it: it ends at the later of its current end and now +
+-- `seconds`, never sooner, and never runs twice (the rules count each event id once, LiveOpsRules.distinctActiveEvents).
+-- Use `/event off` first to shorten an event started this way.
 function LiveOpsService.startEventNow(event: Types.EventDef, seconds: number)
-	local now = os.time()
+	local now = LiveOpsService.now()
+	local endsAt = now + seconds
+	for _, running in LiveOpsRules.activeEvents(LiveOpsService.events(), now) do
+		if running.id == event.id then
+			endsAt = math.max(endsAt, running.endsAt)
+		end
+	end
 	local copy = table.clone(event)
 	copy.startsAt = now
-	copy.endsAt = now + seconds
+	copy.endsAt = endsAt
 	local kept: { Types.EventDef } = {}
 	for _, running in adminEvents do
 		if running.id ~= event.id then
@@ -241,7 +249,7 @@ local function applyCommand(command: Command)
 				then math.clamp(math.floor(command.minutes), 1, MAX_EVENT_MINUTES) * 60
 				else event.durationSeconds or 1800
 			LiveOpsService.startEventNow(event, seconds)
-			print(`[LiveOps] /event: {event.id} started for {seconds // 60} min`)
+			print(`[LiveOps] /event: {event.id} running for at least {seconds // 60} min`)
 			if event.bannerText then
 				Announcer.broadcast({ text = event.bannerText, rarity = "Mythic", kind = "admin" })
 			end

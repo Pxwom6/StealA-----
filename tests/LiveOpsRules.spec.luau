@@ -37,6 +37,34 @@ T.describe("LiveOpsRules events", function()
 		T.expect(LiveOpsRules.cashMultiplier(events, 250, limits)).toBe(2)
 		T.expect(LiveOpsRules.cashMultiplier(events, 50, limits)).toBe(1)
 	end)
+	T.it("counts an event listed twice only once (scheduled + /event, or re-listed by remote config)", function()
+		local luckA: LiveOpsRules.EventDef = { id = "Luck", startsAt = 0, endsAt = 200, luckMultiplier = 2 }
+		local luckB: LiveOpsRules.EventDef = { id = "Luck", startsAt = 50, endsAt = 400, luckMultiplier = 2 }
+		local cashA: LiveOpsRules.EventDef = { id = "Cash", startsAt = 0, endsAt = 200, cashMultiplier = 2 }
+		local cashB: LiveOpsRules.EventDef = { id = "Cash", startsAt = 0, endsAt = 300, cashMultiplier = 2 }
+		local list = { luckA, cashA, luckB, cashB }
+		T.expect(LiveOpsRules.luckMultiplier(list, {}, 100, limits)).toBe(2)
+		T.expect(LiveOpsRules.cashMultiplier(list, 100, limits)).toBe(2)
+		-- the copy that ends last wins, so the event keeps running after the first copy ends
+		T.expect(LiveOpsRules.luckMultiplier(list, {}, 250, limits)).toBe(2)
+		T.expect(LiveOpsRules.cashMultiplier(list, 250, limits)).toBe(2)
+		T.expect(LiveOpsRules.luckMultiplier(list, {}, 400, limits)).toBe(1)
+		T.expect(LiveOpsRules.cashMultiplier(list, 300, limits)).toBe(1)
+		-- with a boost on top, the event still counts once
+		local boosts = { { multiplier = 2, endsAt = 500, source = "purchase" } }
+		T.expect(LiveOpsRules.luckMultiplier(list, boosts, 100, limits)).toBe(4)
+		-- one entry per id, in first-appearance order, keeping the latest end
+		local distinct = LiveOpsRules.distinctActiveEvents(list, 100)
+		T.expect(#distinct).toBe(2)
+		T.expect(distinct[1]).toBe(luckB)
+		T.expect(distinct[2]).toBe(cashB)
+		T.expect(LiveOpsRules.luckChangesAt(list, {}, 100)).toBe(400)
+		local banner = {
+			{ id = "B", startsAt = 0, endsAt = 100, bannerText = "Hi" },
+			{ id = "B", startsAt = 0, endsAt = 900, bannerText = "Hi" },
+		}
+		T.expect((LiveOpsRules.bannerEvent(banner, 50) :: LiveOpsRules.EventDef).endsAt).toBe(900)
+	end)
 	T.it("counts the luck down to its next change, not its last", function()
 		local boosts = { { multiplier = 2, endsAt = 180, source = "purchase" } }
 		T.expect(LiveOpsRules.luckChangesAt(events, {}, 50)).toBe(0) -- nothing raises the luck
@@ -184,6 +212,17 @@ T.describe("LiveOpsRules Server Luck preview", function()
 			events = { strongEvent },
 			boosts = { { multiplier = 1.25, endsAt = 5000, source = "admin" } },
 		},
+		{
+			-- the scheduled luck event also started with /event: it must count once, before and after buying
+			name = "luck event listed twice",
+			events = { luckEvent, { id = "Luck", startsAt = 900, endsAt = 4000, luckMultiplier = 2 } },
+			boosts = {},
+		},
+		{
+			name = "luck event listed twice + purchase running",
+			events = { luckEvent, { id = "Luck", startsAt = 900, endsAt = 20000, luckMultiplier = 2 } },
+			boosts = { { multiplier = perks.serverLuckMultiplier, endsAt = 1500, source = "purchase" } },
+		},
 	}
 
 	T.it("the store's odds preview equals the odds the server applies, exactly", function()
@@ -233,27 +272,36 @@ T.describe("LiveOpsRules Server Luck preview", function()
 				{ multiplier = perks.serverLuckMultiplier, endsAt = now + 60, source = "purchase" },
 			},
 		}
-		local eventIds = LiveOpsRules.activeEventIds(all, now)
-		T.expect(eventIds.HalloweenLuck2026).toBe(true)
-		for _, boosts in cases do
-			local shownLuck = LiveOpsRules.luckMultiplier(all, boosts, now, realLimits)
-			T.expect(shownLuck).toBeAtLeast(2) -- the event's luck is part of what the store shows as "now"
-			local running = LiveOpsRules.boostEndsAt(boosts, "purchase", now) > now
-			local preview = LiveOpsRules.previewBoost(shownLuck, running, perks.serverLuckMultiplier, realLimits)
-			local applied = LiveOpsRules.addBoost(
-				boosts,
-				now,
-				perks.serverLuckSeconds,
-				perks.serverLuckMultiplier,
-				"purchase",
-				receiptLimits
-			)
-			local serverLuck = LiveOpsRules.luckMultiplier(all, applied, now, realLimits)
-			T.expect(preview.after).toBe(serverLuck)
-			T.expect(RarityRoll.odds(catalog.rarityList, catalog.creatureList, preview.before, eventIds))
-				.toEqual(RarityRoll.odds(catalog.rarityList, catalog.creatureList, shownLuck, eventIds))
-			T.expect(RarityRoll.odds(catalog.rarityList, catalog.creatureList, preview.after, eventIds))
-				.toEqual(RarityRoll.odds(catalog.rarityList, catalog.creatureList, serverLuck, eventIds))
+		-- An admin also runs `/event HalloweenLuck2026` during the scheduled weekend: an admin copy of the same id.
+		local adminCopy = table.clone(weekend :: LiveOpsRules.EventDef)
+		adminCopy.startsAt = now - 10
+		adminCopy.endsAt = now + 1800
+		local withAdminCopy = table.clone(all)
+		table.insert(withAdminCopy, adminCopy)
+		for _, list in { all, withAdminCopy } do
+			local eventIds = LiveOpsRules.activeEventIds(list, now)
+			T.expect(eventIds.HalloweenLuck2026).toBe(true)
+			T.expect(LiveOpsRules.luckMultiplier(list, {}, now, realLimits)).toBe(2) -- never 2 x 2
+			for _, boosts in cases do
+				local shownLuck = LiveOpsRules.luckMultiplier(list, boosts, now, realLimits)
+				T.expect(shownLuck).toBeAtLeast(2) -- the event's luck is part of what the store shows as "now"
+				local running = LiveOpsRules.boostEndsAt(boosts, "purchase", now) > now
+				local preview = LiveOpsRules.previewBoost(shownLuck, running, perks.serverLuckMultiplier, realLimits)
+				local applied = LiveOpsRules.addBoost(
+					boosts,
+					now,
+					perks.serverLuckSeconds,
+					perks.serverLuckMultiplier,
+					"purchase",
+					receiptLimits
+				)
+				local serverLuck = LiveOpsRules.luckMultiplier(list, applied, now, realLimits)
+				T.expect(preview.after).toBe(serverLuck)
+				T.expect(RarityRoll.odds(catalog.rarityList, catalog.creatureList, preview.before, eventIds))
+					.toEqual(RarityRoll.odds(catalog.rarityList, catalog.creatureList, shownLuck, eventIds))
+				T.expect(RarityRoll.odds(catalog.rarityList, catalog.creatureList, preview.after, eventIds))
+					.toEqual(RarityRoll.odds(catalog.rarityList, catalog.creatureList, serverLuck, eventIds))
+			end
 		end
 		-- With nothing else running, the weekend's 2x and a bought 2x multiply: 2 -> 4.
 		local plain = LiveOpsRules.previewBoost(2, false, perks.serverLuckMultiplier, realLimits)

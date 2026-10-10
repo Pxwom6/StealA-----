@@ -48,10 +48,28 @@ function LiveOpsRules.activeEventIds(events: { EventDef }, now: number): { [stri
 	return ids
 end
 
--- Product of every active event's luck and every unexpired boost, clamped to [1, max].
+-- The active events with each id counted once: the same event can be listed more than once (scheduled in config,
+-- re-listed by remote config, started again with /event), and must never stack with itself. Keeps the order in which
+-- each id first appears, and of its active copies the one that ends last.
+function LiveOpsRules.distinctActiveEvents(events: { EventDef }, now: number): { EventDef }
+	local distinct: { EventDef } = {}
+	local indexById: { [string]: number } = {}
+	for _, event in LiveOpsRules.activeEvents(events, now) do
+		local index = indexById[event.id]
+		if index == nil then
+			table.insert(distinct, event)
+			indexById[event.id] = #distinct
+		elseif event.endsAt > distinct[index].endsAt then
+			distinct[index] = event
+		end
+	end
+	return distinct
+end
+
+-- Product of every active event's luck (each event id once) and every unexpired boost, clamped to [1, max].
 function LiveOpsRules.luckMultiplier(events: { EventDef }, boosts: { Boost }, now: number, limits: Limits): number
 	local m = 1
-	for _, event in LiveOpsRules.activeEvents(events, now) do
+	for _, event in LiveOpsRules.distinctActiveEvents(events, now) do
 		m *= math.max(1, event.luckMultiplier or 1)
 	end
 	for _, boost in boosts do
@@ -67,7 +85,7 @@ end
 -- a 15-minute bought boost during a two-day luck event shows 15 minutes (then the event's own time), not two days.
 function LiveOpsRules.luckChangesAt(events: { EventDef }, boosts: { Boost }, now: number): number
 	local earliest = math.huge
-	for _, event in LiveOpsRules.activeEvents(events, now) do
+	for _, event in LiveOpsRules.distinctActiveEvents(events, now) do
 		if (event.luckMultiplier or 1) > 1 then
 			earliest = math.min(earliest, event.endsAt)
 		end
@@ -80,9 +98,10 @@ function LiveOpsRules.luckChangesAt(events: { EventDef }, boosts: { Boost }, now
 	return if earliest == math.huge then 0 else earliest
 end
 
--- The event whose banner the HUD shows: the first active event (in list order) that has bannerText, or nil.
+-- The event whose banner the HUD shows: the first active event (in list order) that has bannerText, or nil. A
+-- listed-twice event counts down to its latest end.
 function LiveOpsRules.bannerEvent(events: { EventDef }, now: number): EventDef?
-	for _, event in LiveOpsRules.activeEvents(events, now) do
+	for _, event in LiveOpsRules.distinctActiveEvents(events, now) do
 		if event.bannerText ~= nil and event.bannerText ~= "" then
 			return event
 		end
@@ -90,9 +109,10 @@ function LiveOpsRules.bannerEvent(events: { EventDef }, now: number): EventDef?
 	return nil
 end
 
+-- Product of every active event's cash multiplier (each event id once), clamped to [1, max].
 function LiveOpsRules.cashMultiplier(events: { EventDef }, now: number, limits: Limits): number
 	local m = 1
-	for _, event in LiveOpsRules.activeEvents(events, now) do
+	for _, event in LiveOpsRules.distinctActiveEvents(events, now) do
 		m *= math.max(1, event.cashMultiplier or 1)
 	end
 	return math.clamp(m, 1, limits.maxCashMultiplier)
