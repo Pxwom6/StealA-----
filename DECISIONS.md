@@ -274,3 +274,71 @@ product's odds stay honest during events, and decorations can't change how the g
 file), like the map (#3).
 **Reversal cost:** low — themes and event dates are free to change or delete; event creature and mutation ids are
 permanent (retire them with a never-active `eventId`).
+
+### 21. First-time tutorial: server-run steps, saved in `flags`, finished only by real gameplay
+
+**Chose:** a brand-new player is walked through the loop in four steps (`Config/Tutorial`): buy a Snackling from the
+belt → collect cash from its pad → lock the base → steal from another base. Each step is one short banner line under
+the cash plus a 3D guide (a pulsing beam from the player's feet, a bouncing arrow above the target that shows through
+walls, a highlight on it); the steal step has no guide (any unshielded base will do) and a one-line tip about the
+new-player shield instead. Completing it pays `Tutorial.reward` ($500) once per account.
+* **Server-authoritative.** `TutorialService.record` is called by the services right after they apply the action: a
+  belt purchase (BeltService), a collect from a pad (EconomyService's pad check only, not the collect when selling),
+  a lock (LockService, Instant Lock included) and a delivered steal (StealService). No client message can finish a
+  step; the client's only tutorial intent is `SkipTutorial` (rate-limited), which ends it with no reward. The step
+  reaches the owning client in `StateUpdate.tutorial`, like every other HUD state.
+* **Saved in the existing `flags` map, no schema bump:** `tutorial_<step>` per finished step and `tutorial_done` at the
+  end. `sanitise` already keeps any `true` flag, and a rollback keeps them (#1). The current step is derived (the first
+  step without a flag), so a rejoin resumes where the player left off and an action done early (e.g. locking during
+  the collect step) skips its step when it comes up. The step's start time is runtime only (a rejoin restarts it).
+* **Steps that could stall end on their own** (`Logic/TutorialRules.autoOutcome`): the lock step once the lock has been
+  unavailable 20 s in a row (recharging, already locked) **or after 60 s** (added to the brief: a player who ignores it
+  isn't nagged forever), the steal step after 90 s with "You're ready!" and the reward (an empty server, or bases that
+  are all shielded or locked, must not block it). Buy and collect never time out: they are the loop, and the guide
+  always has a target (with nothing to collect it points back to the belt: "Buy a Snackling from the belt!").
+* **Reward once:** `TutorialRules.finish` sets `tutorial_done` and only then returns the amount, which is paid at once
+  through `EconomyService.addCash` (analytics source "Onboarding" / "TutorialReward") with no yield in between. A
+  skip or an existing player sets the same flag and is paid nothing. Only the Studio `/tutorial` command clears the
+  flags (so in Studio a second run pays again, on purpose for testing).
+* **Existing players never see it:** a save with no tutorial flags but any progress (Snacklings, quarantined
+  Snacklings, rebirths, belt purchases or steals) is marked done on join, without the reward. A player who joined
+  before but never bought anything gets the tutorial.
+* **Layout (mobile first):** the banner is a slot in the HUD's top stack right under the cash
+  (`HudController.TOP_ORDER`, one table for every pill), so the list layout guarantees it never covers the cash, the
+  event / luck pills, the lock pill or the social pill; they move down while it shows. Its height is fitted every
+  frame (`TutorialController.fitBanner`, `TutorialRules.bannerMode`) so the whole stack ends above the screen bottom
+  (8 px margin), and above the bottom-centre carry banner while the player carries a Snackling (4 px gap): with the
+  steal step's tip (88 px) when that fits, else one line (64 px), else, only while carrying, no banner at all (the carry
+  banner's "Run home!" is the instruction then, and the 3D guide hides too). The tip never shows while carrying.
+  Worked out in reference px: the stack starts at y 6; cash 58, cash/sec 26, event pill 48 + luck pill 32 (one
+  slot), lock 34, social 34, each plus a 4 px gap, so every pill but the banner uses at most 262. On an iPhone SE in
+  landscape (667×375, UI scale 0.85, about 785×373 under the top bar) that leaves 373 - 8 - 262 = 103 when not
+  carrying: the banner with its tip fits and the stack ends at 350. While carrying, the carry banner spans
+  y 267-313, so the stack must end by 263: with the event and luck pills (262, or 226 with the event alone) the banner
+  hides; with only the lock and social pills (174) the one-line banner fits (ends at 238). At 640×360 (about 355 high)
+  there are 85 px with every pill, so the tip is dropped and the one-line banner ends at 326. Across, the banner is
+  420 wide, centred, and narrowed so its right edge stays 6 px left of the TAG button area (`TutorialRules.bannerWidth`,
+  never below the stack's 300): at 667×375 (785 wide) it spans x 182-602, clear of the side buttons (x ≤ 90) and the
+  action area (x ≥ 611); at 640×360 (753 wide, action area x ≥ 579) it is 393 wide, x 180-573. Skip is small but a
+  full touch target (72×44). The daily reward dialog doesn't auto-open during the tutorial (it opens right after).
+  Not covered: the transient toasts and the "X is stealing your Snackling!" alert, which already overlapped the
+  pills before the tutorial.
+* **Analytics:** the onboarding funnel follows the tutorial: 1 Joined, 2 FirstBeltPurchase, 3 FirstCollect,
+  4 TutorialLock (the tutorial moved past its lock step, however it ended), 5 TutorialComplete, 6 FirstSteal,
+  7 FirstRebirth (FirstSteal and FirstRebirth were 4 and 5). Roblox counts a logged step as completing every earlier
+  one, so steps are only ever logged in increasing order (`Logic/OnboardingFunnel`): a milestone reached early (a
+  lock or a steal during the collect step, a steal or rebirth while the tutorial runs) is remembered in the save
+  (`obr_<step>`) and logged once every earlier step is (`ob_<step>`, the flag the funnel always used). Steps 4-5 stop
+  holding the later ones back once the tutorial is over without them (skipped, existing player, switched off); they
+  are then never logged, so for such a player Roblox shows them as completed once a later step logs. Skipping is the
+  custom event `tutorial_skipped` (field 01 = step id), and `tutorial_step` (value = seconds on the step, fields: step
+  id, outcome) gives exact per-step timings and how each step ended. Renumbering was safe because the game is not live
+  yet; once it is, never renumber a step (Roblox matches steps by number): append, or start a new funnel.
+
+**Why:** day-1 retention drives Roblox discovery, and the design rule is "the loop must be understood in 10 seconds":
+one short line and an arrow per step, no text walls, no dialog in the way. Finishing steps from what the server saw
+keeps it exploit-proof (the reward can't be claimed by a fake message) and means the tutorial can never disagree with
+the game. Flags avoid a save-format change for what is a handful of booleans.
+**Reversal cost:** low — `Tutorial.enabled = false` turns it off for everyone (nothing is saved while it is off);
+steps, timeouts and the reward are data. The flag names must stay (they are in saves), and the funnel step numbers
+must stay once live.

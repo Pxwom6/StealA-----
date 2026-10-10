@@ -143,6 +143,7 @@ local function onPlayerAdded(player: Player)
 		lockDuration = Gameplay.lock.durationSeconds,
 		pendingWelcome = nil,
 		social = { friends = 0, groupMember = false },
+		tutorial = nil,
 	}
 	Sessions.add(session)
 

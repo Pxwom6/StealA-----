@@ -47,6 +47,9 @@ local pools: { [string]: { Pooled } } = {}
 local folder: Folder
 local hidden = CFrame.new(0, -500, 0) -- parked pooled models (MutationFxController skips anything below y = -400)
 
+-- Studs between the top of an item's model and the centre of its name / price billboard.
+local LABEL_GAP = 2.2
+
 -- Share of the billboard height the rows of a plain item fill (the rest is breathing room).
 local ROWS_FILL = 0.82
 
@@ -93,7 +96,7 @@ local function makeBillboard(
 	local gui = UiKit.new("BillboardGui", {
 		Name = "Info",
 		Size = UDim2.fromOffset(if big then 230 else 190, math.floor(baseHeight * fill / ROWS_FILL + 0.5)),
-		StudsOffsetWorldSpace = Vector3.new(0, height + 2.2, 0),
+		StudsOffsetWorldSpace = Vector3.new(0, height + LABEL_GAP, 0),
 		MaxDistance = 90,
 		LightInfluence = 0,
 		Parent = root,
@@ -271,6 +274,23 @@ local function step()
 		local position = Vector3.new(x, surfaceY + bob, z)
 		entry.pooled.model:PivotTo(CFrame.lookAt(position, position + Vector3.new(belt.dirX, 0, belt.dirZ)))
 	end
+end
+
+-- What is on the belt right now (for the tutorial guide): each item, its mutation as drawn (nil = plain), its model
+-- and how far above the model's pivot its name / price billboard is centred.
+export type ItemView = { item: Types.BeltItem, variant: string?, model: Model, labelHeight: number }
+
+function BeltController.items(): { ItemView }
+	local list: { ItemView } = {}
+	for _, entry in active do
+		table.insert(list, {
+			item = entry.item,
+			variant = entry.variant,
+			model = entry.pooled.model,
+			labelHeight = entry.pooled.height + LABEL_GAP,
+		})
+	end
+	return list
 end
 
 function BeltController.start()

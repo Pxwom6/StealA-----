@@ -55,9 +55,9 @@ CI (`.github/workflows/ci.yml`) runs all of the above on every pull request.
 
 ```
 src/shared/Config   plain data: names, colours, prices, timers, product IDs, LiveOps events, seasonal themes,
-                    social rewards (re-theme = edit these)
+                    social rewards, the first-time tutorial (re-theme = edit these)
 src/shared/Logic    pure game rules (economy, rarity rolls, rebirth, offline earnings, receipts, steal/lock rules,
-                    friend & group bonus, seasonal themes)
+                    friend & group bonus, seasonal themes, tutorial progress)
 src/shared          small Roblox helpers shared by server & client (remotes, creature visuals, UI theme)
 src/server          server bootstrap + services (authoritative)
 src/client          client bootstrap + controllers (UI, rendering, intents)
@@ -119,6 +119,21 @@ change:
 * New creature / mutation ids must be appended to the released lists in `tests/Config.spec.luau`, and the
   simulation's `EVENT_ID` (`tools/simulate.luau`) shows the event's balance effect (see BALANCE.md "Halloween").
 
+### First-time tutorial
+
+New players get a four-step tutorial (buy → collect → lock → steal): one short line under the cash, a glowing beam
+and a bouncing arrow to what to do next, and $500 when they finish (once per account; Skip pays nothing). Players who
+already had progress when it shipped never see it. Steps finish only when the server sees the real action.
+
+* **Tune it:** `src/shared/Config/Tutorial.luau` (reward, steps, when the lock / steal steps move on by themselves);
+  the lines are `tutorial*` in `src/shared/Config/Theme.luau`. `enabled = false` turns it off.
+* **Analytics:** Creator Hub → Analytics → Funnels → Onboarding follows it (Joined → FirstBeltPurchase → FirstCollect →
+  TutorialLock → TutorialComplete → FirstSteal → FirstRebirth); the custom events `tutorial_step` (seconds per step,
+  and how it ended) and `tutorial_skipped` (which step) give exact rates. Never renumber those steps once the game is
+  live (DECISIONS.md #21).
+* **Test it in Studio:** a fresh Studio player (API access off) starts it automatically; `/tutorial` starts it again
+  any time.
+
 ### Swapping in your own art
 
 * **Creature models:** put a Model named exactly as the creature's `modelName` (see
@@ -131,8 +146,9 @@ change:
 
 ### Studio test commands
 
-`/cash <amount>`, `/spawn <creatureId> [mutationId]` (e.g. `/spawn pizza_pup rainbow`), `/noshield` and
-`/friends <n|off>` work in Studio only (`src/server/Services/DevCommands.luau`). `/spawn` also puts event Snacklings
+`/cash <amount>`, `/spawn <creatureId> [mutationId]` (e.g. `/spawn pizza_pup rainbow`), `/noshield`,
+`/friends <n|off>` and `/tutorial` (start the first-time tutorial again) work in Studio only
+(`src/server/Services/DevCommands.luau`). `/spawn` also puts event Snacklings
 and event mutations on the belt when their event isn't running (e.g. `/spawn candy_corn_cat haunted`).
 
 To test a seasonal event in Studio: `/event Halloween2026 5` turns Halloween on for 5 minutes (decorations, dusk

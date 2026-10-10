@@ -36,6 +36,7 @@ local Theme = {
 		luck = "#7CFF4D",
 		social = "#FF6FB5",
 		event = "#FF8C1A", -- event pill / "EVENT" tag when the event has no seasonal theme colour (Config/Seasons)
+		tutorial = "#FFD23F", -- tutorial banner trim, step badge, guide beam and arrow
 	},
 
 	world = {
@@ -98,6 +99,19 @@ local Theme = {
 		-- The bonus is for friends PLAYING here together, never for sending invites (Roblox policy): keep the wording so.
 		socialPillPlayTogether = "Play with friends: +{percent}% each",
 		socialPillJoinGroup = "Join our group: +{percent}%",
+
+		-- First-time tutorial (Config/Tutorial): one short line per step, keep them short (they share the banner with
+		-- a step badge and the Skip button)
+		tutorialBuy = "Buy a Snackling from the belt!",
+		tutorialCollect = "Step on the glowing pad to collect your cash!",
+		tutorialLock = "Lock your base to keep thieves out!",
+		tutorialSteal = "Sneak into another base and steal a Snackling!",
+		tutorialShieldTip = "Your base is shielded for {time} - stealing ends it early",
+		tutorialShieldOtherTip = "Yellow shield = new player: no stealing there yet",
+		tutorialStepBadge = "{index}/{count}",
+		tutorialSkip = "Skip",
+		tutorialComplete = "You're ready! +{amount}",
+		tutorialCompleteNoReward = "You're ready!",
 
 		-- Toasts
 		notEnoughCash = "Not enough cash!",

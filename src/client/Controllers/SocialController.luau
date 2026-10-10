@@ -253,7 +253,7 @@ end
 function SocialController.start()
 	pill = UiKit.button({
 		Name = "SocialPill",
-		LayoutOrder = 5,
+		LayoutOrder = HudController.TOP_ORDER.social,
 		Size = UDim2.fromOffset(260, 34),
 		BackgroundColor3 = UiTheme.palette("social"),
 		Visible = false,

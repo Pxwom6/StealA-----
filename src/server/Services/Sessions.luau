@@ -50,6 +50,14 @@ export type Social = {
 	groupMember: boolean, -- member of Config/Social.group.groupId (false while the group feature is off)
 }
 
+-- The tutorial step a player is on (TutorialService; progress itself is saved in data.flags). nil when no tutorial is
+-- running.
+export type TutorialRun = {
+	stepId: Types.TutorialStepId,
+	startedAt: number, -- server time the step started (step timeouts)
+	unavailableSince: number?, -- since when the step's action has been unavailable without a break
+}
+
 -- A Steal button press (StealBegin): when the server-timed hold started, or why it didn't (StealRules.canBeginHold).
 export type Hold = { plot: number, podium: number, startedAt: number?, refusal: string? }
 
@@ -84,6 +92,7 @@ export type Session = {
 	lockDuration: number,
 	pendingWelcome: { amount: number, seconds: number }?,
 	social: Social, -- written by SocialService, read by EconomyService and Replication
+	tutorial: TutorialRun?, -- written by TutorialService, read by Replication
 }
 
 local Sessions = {}

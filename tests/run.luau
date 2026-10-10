@@ -25,5 +25,7 @@ require("./Inventory.spec")
 require("./MutationRules.spec")
 require("./SocialRules.spec")
 require("./SeasonRules.spec")
+require("./TutorialRules.spec")
+require("./OnboardingFunnel.spec")
 
 T.finish()
