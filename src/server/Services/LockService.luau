@@ -4,8 +4,9 @@
 
 	* LockBase intent (owner, standing near their lock button) → Logic/LockRules decides; Instant Lock tokens are
 	  spent automatically only when the free lock is recharging, and never inside the mandatory open window.
-	* While a base is locked, any non-owner inside it is moved back outside the entrance (4×/s). Character
-	  physics is client-owned, so the visible barrier alone would not stop an exploiter — this does.
+	* While a base is locked, any non-owner inside it is moved back outside the entrance (4×/s; a carrying thief
+	  just outside the nearest side). Character physics is client-owned, so the visible barrier alone would not
+	  stop an exploiter — this does.
 	* A 1 Hz pass keeps each plot's force field (blue = locked, yellow = new-player shield) and attributes in sync.
 	* The cooldown and open window are saved (`data.lockTimers`, wall-clock seconds) when a lock starts and on every
 	  save (on the final save a lock still running counts as ending then), and restored on join, so leaving and
@@ -123,28 +124,41 @@ local function syncShield(session: Session)
 end
 
 -- Moves every non-owner standing inside a locked plot back outside its entrance.
-local function ejectVisitors(owner: Session)
+-- `lockStarting` is true for the pass that runs as the lock turns on (see the carry push below).
+local function ejectVisitors(owner: Session, lockStarting: boolean)
 	local refs = PlotService.refs(owner.plot)
 	for _, visitor in Sessions.all() do
 		if visitor == owner then
 			continue
 		end
 		local root = Sessions.rootPart(visitor)
-		if root and PlotService.isInside(owner.plot, root.Position) then
+		-- Right after an ejection the client may still report a position inside for a moment: the server already
+		-- moved them, so that stale position is not ejected again (it is once the settle window has passed).
+		if
+			root
+			and PlotService.isInside(owner.plot, root.Position)
+			and not PositionTracker.isSettling(visitor, root.Position)
+		then
 			local character = visitor.player.Character
 			if character then
 				-- Judge how they got in first (a teleport into a locked base is still a teleport), then move them.
 				PositionTracker.record(visitor, root.Position)
 				if visitor.carry and beforeEject then
-					beforeEject(visitor) -- may cancel the carry
+					beforeEject(visitor) -- steps the carry to here; may cancel it
 				end
 				local target = refs.exitPosition + Vector3.new(math.random(-4, 4), 0, 0)
-				if visitor.carry then
-					-- A carrying thief goes just outside the nearest side instead, and their carry budget pays for
-					-- the move at the next check, so being ejected is never a shortcut home.
+				local carry = visitor.carry
+				if carry then
+					-- A carrying thief goes just outside the nearest side instead (the entrance could be a shortcut
+					-- home). If they were inside when the lock started, the push costs them nothing: no budget, no
+					-- progress toward the straight-line cap. Anyone found inside later got past the locked barrier
+					-- and walls (no-clip, teleport), so their budget pays for the push at the next carry check.
 					local x, z =
 						StealRules.nearestOutside(root.Position.X, root.Position.Z, PlotService.rect(owner.plot), 3)
 					target = Vector3.new(x, refs.exitPosition.Y, z)
+					if lockStarting then
+						StealRules.shiftCarryTrack(carry.track, target.X, target.Y, target.Z)
+					end
 				end
 				character:PivotTo(CFrame.new(target))
 				PositionTracker.reset(visitor, target) -- a server move, not a teleport exploit
@@ -181,7 +195,7 @@ function LockService.tryLock(session: Session): (boolean, string?)
 	if lockListener then
 		lockListener(session)
 	end
-	ejectVisitors(session)
+	ejectVisitors(session, true)
 	Replication.markDirty(session)
 	Remotes.notify(
 		session.player,
@@ -242,7 +256,7 @@ function LockService.start()
 			for _, session in Sessions.all() do
 				if session.plot ~= 0 and LockRules.isLocked(session.lock, t) then
 					-- One failing base must not stop the loop (every locked base would stop ejecting).
-					local ok, err = pcall(ejectVisitors :: (Session) -> ...any, session)
+					local ok, err = pcall(ejectVisitors :: (Session, boolean) -> ...any, session, false)
 					if not ok then
 						warn(`[LockService] ejecting from {session.player.Name}'s base failed: {err}`)
 					end

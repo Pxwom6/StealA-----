@@ -83,24 +83,35 @@ transactions in DataStores), mitigated by saving both immediately.
 **Chose:** while locked, the server teleports non-owners out of the plot 4×/s; the entrance barrier is collidable
 for visuals/honest clients, and the owner's client turns its collision off locally. The yellow new-player shield
 is visual only (stealing is refused server-side), so claiming a plot can never trap a visitor inside. Grabbing
-also requires the thief to stand inside the victim's plot at floor level (no reaching through walls, no grabbing
-from the air), delivery requires floor level inside the thief's own plot, a carrying thief's root must stay between
-`Gameplay.steal.minCarryHeight` and `maxCarryHeight` above the ground (no flying up, no sinking under the map),
+also requires the thief to be inside the victim's plot (no reaching through walls) and no higher than a jump above
+its walls (`Gameplay.steal.grabJumpAllowance`, so a jump while holding Steal isn't refused; the Steal prompt hangs
+2 studs above the floor so it stays in range through a jump made within about 5.7 studs of the podium; the 3D grab
+range keeps grabs from high in the air out), delivery requires floor level inside the thief's own plot, a carrying thief's root
+must stay between `Gameplay.steal.minCarryHeight` and `maxCarryHeight` above the ground (no flying up, no sinking
+under the map),
 and tag reach is horizontal range plus a vertical allowance larger than that cap — so gaining height never escapes
 a tag. A tagger's client-reported position is only trusted when it matches the
 server's own 4 Hz position samples (`PositionTracker`, a walking movement budget in which jumps and short lag stalls
 are free): a tag is refused if the tagger overran that budget in the last 2 s, was caught teleporting (24+ studs
 beyond it) at any point since just before that carry started, or could not have walked from the latest sample to
 where they claim to be in the time since (the stored budget doesn't pay for that last step, so no blink-tagging).
-Starting and finishing a steal hold need the same, plus no overrun at all since just before the thief was first
-seen in that plot, so teleporting onto a podium (and waiting) doesn't work; the hold must also start at the podium.
+After the server moves a character (spawn at the base, respawn, ejection), samples more than 5 studs from where it
+put them are ignored for 1 s (`StealRules.settleSample`, `Gameplay.tracking.settleSeconds`; a sample near the
+target, which may be the server's own write, doesn't end that early), so a client position that is stale for up to
+that second never reads as a teleport.
+Starting and finishing a steal hold need a position walkable from the latest sample and a few seconds of normal
+movement since the last overrun (3 s; 10 s since a teleport, `StealRules.stealTrustSince`), so one lag spike never
+locks a thief out of a base; such a refusal says "Connection hiccup — try again in a moment". The hold must also
+start at the podium.
 A carrying thief's movement is checked every tick against a distance budget (`StealRules.stepCarryTrack`): it
 refills at 1.6× carry speed, holds at most 3 s of refill and pays for every stud moved horizontally and every stud
 of new height (jumping again to a height already paid for is free, falling is free), so a lag spike's catch-up jump
 is covered while a sustained speed hack runs it dry; the straight-line distance from the grab point is also capped
 at carry speed × elapsed + 12 studs, which stops a teleport home. Before a lock ejects a carrying visitor, their
-move into that base is checked first, and they are put just outside its nearest side (not at its entrance) with
-their budget paying for that move, so being ejected is never a shortcut.
+move into that base is checked first, and they are put just outside its nearest side (not at its entrance, which
+could be a shortcut home). If they were inside when the lock started, that push is the server's, so it costs no
+budget and the grab point moves with them (`StealRules.shiftCarryTrack`); anyone found inside later got past the
+locked barrier and walls, so their budget pays for it. Their movement checks wait out the settle window.
 **Why:** character physics is client-owned, so a collidable wall alone stops nobody who no-clips. A thief still
 inside when the owner locks drops the creature.
 

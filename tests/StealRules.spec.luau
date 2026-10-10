@@ -19,7 +19,9 @@ local function grab(overrides: { [string]: any }?): StealRules.GrabContext
 		thiefInsideBase = true,
 		thiefHeightAboveFloor = 3, -- a character standing on the floor
 		wallHeight = 7,
+		grabJumpAllowance = 5,
 		thiefHasFreePodium = true,
+		thiefTrusted = true,
 		holdStartedAt = 98,
 		holdSeconds = 1.5,
 		holdTolerance = 0.8,
@@ -63,10 +65,22 @@ T.describe("StealRules.canGrab", function()
 	end)
 	T.it("refuses grabs from above the base (flying / hovering over the walls)", function()
 		T.expect(reason(grab({ thiefHeightAboveFloor = 25 }))).toBe("height")
-		T.expect(reason(grab({ thiefHeightAboveFloor = 7.5 }))).toBe("height")
+		T.expect(reason(grab({ thiefHeightAboveFloor = 12.5 }))).toBe("height") -- above a jump's reach
 		T.expect(reason(grab({ thiefHeightAboveFloor = -5 }))).toBe("height")
 		T.expect((StealRules.canGrab(grab({ thiefHeightAboveFloor = 4.4 })))).toBe(true) -- standing on a podium
 		T.expect(StealRules.messageKey("height")).toBe("stealOnFloor")
+	end)
+	T.it("a thief who jumps while holding Steal still grabs (root ~10 studs up at the apex)", function()
+		T.expect((StealRules.canGrab(grab({ thiefHeightAboveFloor = 3 + 7.2 })))).toBe(true) -- jump from the floor
+		T.expect((StealRules.canGrab(grab({ thiefHeightAboveFloor = 4.4 + 7.2 })))).toBe(true) -- from a podium
+		T.expect(StealRules.isAtGrabHeight(12, 7, 5)).toBe(true)
+		T.expect(StealRules.isAtGrabHeight(12.1, 7, 5)).toBe(false)
+		T.expect(StealRules.isAtGrabHeight(0 / 0, 7, 5)).toBe(false)
+		-- the real config allows a jump from a podium top
+		local steal = Gameplay.steal
+		T.expect(StealRules.isAtGrabHeight(4.4 + 7.2, Gameplay.map.wallHeight, steal.grabJumpAllowance)).toBe(true)
+		-- delivery keeps the strict floor level: no delivering from mid-jump above your own walls
+		T.expect(StealRules.canDeliver(true, 3 + 7.2, Gameplay.map.wallHeight)).toBe(false)
 	end)
 	T.it("a locked base beats everything after ownership checks", function()
 		T.expect(reason(grab({ baseLocked = true, distance = 999 }))).toBe("locked")
@@ -91,14 +105,130 @@ T.describe("StealRules.canBeginHold", function()
 	end
 
 	T.it("starts the hold timer only at the podium, with a trusted position", function()
-		T.expect(StealRules.canBeginHold(hold())).toBe(true)
-		T.expect(StealRules.canBeginHold(hold({ distance = 15 }))).toBe(true) -- running in, a little past the prompt
+		T.expect((StealRules.canBeginHold(hold()))).toBe(true)
+		T.expect((StealRules.canBeginHold(hold({ distance = 15 })))).toBe(true) -- running in, a little past the prompt
 		-- Starting the hold from far away (then teleporting in to confirm instantly) is refused.
-		T.expect(StealRules.canBeginHold(hold({ distance = 200 }))).toBe(false)
-		T.expect(StealRules.canBeginHold(hold({ distance = 0 / 0 }))).toBe(false)
-		T.expect(StealRules.canBeginHold(hold({ thiefInsideBase = false }))).toBe(false)
+		T.expect((StealRules.canBeginHold(hold({ distance = 200 })))).toBe(false)
+		T.expect((StealRules.canBeginHold(hold({ distance = 0 / 0 })))).toBe(false)
+		T.expect((StealRules.canBeginHold(hold({ thiefInsideBase = false })))).toBe(false)
 		-- ...and so is starting it right after teleporting next to the podium.
-		T.expect(StealRules.canBeginHold(hold({ thiefTrusted = false }))).toBe(false)
+		T.expect((StealRules.canBeginHold(hold({ thiefTrusted = false })))).toBe(false)
+	end)
+
+	T.it("says why a hold didn't start, so the grab can explain it", function()
+		T.expect(select(2, StealRules.canBeginHold(hold()))).toBeNil()
+		T.expect(select(2, StealRules.canBeginHold(hold({ distance = 200 })))).toBe("far")
+		T.expect(select(2, StealRules.canBeginHold(hold({ thiefInsideBase = false })))).toBe("outside")
+		T.expect(select(2, StealRules.canBeginHold(hold({ thiefTrusted = false })))).toBe("untrusted")
+	end)
+end)
+
+T.describe("StealRules after a server move", function()
+	local walk: StealRules.WalkLimits = { maxSpeed = 16, tolerance = 1.5, budgetSeconds = 1.5, leeway = 12 }
+
+	T.it("ignores stale samples from before the move for ~1 s, and judges ones at the target", function()
+		local settle: StealRules.Settle = { x = 100, y = 3, z = 0, untilT = 11 } -- moved to (100, 3, 0) at t = 10
+		T.expect(StealRules.isSettling(settle, 0, 3, 0, 10.2, 5)).toBe(true) -- still reported where it was: ignore
+		T.expect(StealRules.isSettling(settle, 0 / 0, 3, 0, 10.2, 5)).toBe(true)
+		T.expect(StealRules.isSettling(settle, 102, 3, 0, 10.3, 5)).toBe(false) -- at the target: judged
+		T.expect(StealRules.isSettling(settle, 0, 3, 0, 11.1, 5)).toBe(false) -- window over: judge again
+		T.expect(StealRules.isSettling(nil, 0, 3, 0, 10.2, 5)).toBe(false)
+	end)
+
+	T.it("an honest player ejected from a locked base is not flagged as a teleporter", function()
+		-- The server moves them 60 studs to (60, 3, 0); their client's next two updates still say (0, 3, 0).
+		local track = StealRules.newWalkTrack(60, 3, 0, 10, walk)
+		local settle: StealRules.Settle = { x = 60, y = 3, z = 0, untilT = 11 }
+		local flagged = false
+		for _, sample in { { 0, 10.25 }, { 0, 10.5 }, { 61, 10.75 }, { 64, 11 }, { 68, 11.25 } } do
+			local x, t = sample[1], sample[2]
+			if not StealRules.isSettling(settle, x, 3, 0, t, 5) then
+				flagged = flagged or not StealRules.stepWalkTrack(track, x, 3, 0, t, walk)
+			end
+		end
+		T.expect(flagged).toBe(false)
+
+		-- Without the settle window, the same stale update looked like a 60-stud teleport.
+		local naive = StealRules.newWalkTrack(60, 3, 0, 10, walk)
+		StealRules.stepWalkTrack(naive, 0, 3, 0, 10.25, walk)
+		T.expect(StealRules.walkStepVerdict(naive, 24)).toBe("teleport")
+	end)
+
+	T.it("the server's own write at the target doesn't end the window before the stale updates arrive", function()
+		-- Moved to (60, 3, 0) at t = 10. The sampler first reads the server's own write (the target), then the
+		-- client's updates sent before it saw the move, then where the client really is.
+		local track = StealRules.newWalkTrack(60, 3, 0, 10, walk)
+		local settle: StealRules.Settle? = { x = 60, y = 3, z = 0, untilT = 11 }
+		local flagged = false
+		for _, sample in { { 60, 10.01 }, { 0, 10.26 }, { 0, 10.51 }, { 62, 10.76 }, { 66, 11.01 } } do
+			local x, t = sample[1], sample[2]
+			local ignore
+			ignore, settle = StealRules.settleSample(settle, x, 3, 0, t, 5)
+			if not ignore then
+				flagged = flagged or not StealRules.stepWalkTrack(track, x, 3, 0, t, walk)
+			end
+		end
+		T.expect(flagged).toBe(false)
+		T.expect(settle).toBe(nil) -- the window is over at 11
+		-- far samples are still judged once it ends, and nothing is ignored without a server move
+		T.expect((StealRules.settleSample({ x = 60, y = 3, z = 0, untilT = 11 }, 250, 3, 0, 11.25, 5))).toBe(false)
+		T.expect((StealRules.settleSample(nil, 250, 3, 0, 10.5, 5))).toBe(false)
+	end)
+	T.it("a real teleport right after a server move is still caught once the window ends", function()
+		local track = StealRules.newWalkTrack(60, 3, 0, 10, walk)
+		local settle: StealRules.Settle = { x = 60, y = 3, z = 0, untilT = 11 }
+		T.expect(StealRules.isSettling(settle, 250, 3, 0, 10.5, 5)).toBe(true) -- ignored for now...
+		T.expect(StealRules.isSettling(settle, 250, 3, 0, 11.25, 5)).toBe(false) -- ...then judged
+		T.expect(StealRules.stepWalkTrack(track, 250, 3, 0, 11.25, walk)).toBe(false)
+	end)
+end)
+
+T.describe("StealRules steal trust after a lag spike", function()
+	local walk: StealRules.WalkLimits = { maxSpeed = 16, tolerance = 1.5, budgetSeconds = 1.5, leeway = 12 }
+	local windows: StealRules.StealTrustWindows = { overrunSeconds = 3, teleportSeconds = 10 }
+
+	-- A thief standing at a podium (sampled 0.1 s ago) whose last flags are `flaggedAt` / `teleportedAt`.
+	local function trustedAt(t: number, flaggedAt: number, teleportedAt: number): boolean
+		local flagSince, teleportSince = StealRules.stealTrustSince(t, windows)
+		return StealRules.isPositionTrusted({
+			track = StealRules.newWalkTrack(0, 3, 0, t - 0.1, walk),
+			flaggedAt = flaggedAt,
+			teleportedAt = teleportedAt,
+			flagSince = flagSince,
+			teleportSince = teleportSince,
+			x = 0,
+			z = 0,
+			t = t,
+			stepSlack = 4,
+		}, walk)
+	end
+
+	T.it("a lag spike blocks steals only until a few seconds of normal movement have passed", function()
+		local never = -math.huge
+		T.expect(trustedAt(11, 10, never)).toBe(false) -- 1 s after the overrun
+		T.expect(trustedAt(12.9, 10, never)).toBe(false)
+		T.expect(trustedAt(13.1, 10, never)).toBe(true) -- 3 s of normal movement later: fine, still in the base
+		T.expect(trustedAt(30, 10, never)).toBe(true)
+	end)
+
+	T.it("a real teleport (onto a podium) takes longer to clear", function()
+		T.expect(trustedAt(14, 10, 10)).toBe(false)
+		T.expect(trustedAt(19.9, 10, 10)).toBe(false)
+		T.expect(trustedAt(20.1, 10, 10)).toBe(true)
+	end)
+
+	T.it("a refused steal says it was a connection hiccup, not 'hold next to the Snackling'", function()
+		T.expect(reason(grab({ thiefTrusted = false }))).toBe("untrusted")
+		-- the hold was refused at its start for this reason: the grab says so too
+		local refusedHold = grab({ holdRefusal = "untrusted" })
+		refusedHold.holdStartedAt = nil
+		T.expect(reason(refusedHold)).toBe("untrusted")
+		-- a hold that never started for another reason (pressed from too far) keeps the hold message
+		local farHold = grab({ holdRefusal = "far" })
+		farHold.holdStartedAt = nil
+		T.expect(reason(farHold)).toBe("hold")
+		T.expect(StealRules.messageKey("untrusted")).toBe("stealConnectionHiccup")
+		T.expect(StealRules.messageKey("untrusted") ~= StealRules.messageKey("hold")).toBe(true)
 	end)
 end)
 
@@ -373,6 +503,64 @@ T.describe("StealRules movement and timing", function()
 		T.expect({ StealRules.nearestOutside(28, 12, rect, 3) }).toEqual({ 28, 7 }) -- near the front
 		T.expect({ StealRules.nearestOutside(28, 85, rect, 3) }).toEqual({ 28, 91 }) -- near the back
 	end)
+	T.it("carry budget: being pushed out of a third player's locked base costs the thief nothing", function()
+		local steal = Gameplay.steal -- the real config
+		local limits = {
+			maxSpeed = Gameplay.walkSpeed * steal.carrySpeedMultiplier,
+			tolerance = steal.speedCheckTolerance,
+			budgetSeconds = steal.speedBudgetSeconds,
+			leeway = steal.speedCheckLeeway,
+		}
+		-- from the middle of a 56-stud-wide plot to 3 studs past its nearest side is at most 31 studs
+		for _, push in { 5, 20, 31 } do
+			local track = StealRules.newCarryTrack(0, 3, 0, 0, limits)
+			local t, x = 0, 0
+			for _ = 1, 15 do -- 3 s at full carry speed through someone else's base
+				t += 0.2
+				x += limits.maxSpeed * 0.2
+				T.expect((StealRules.stepCarryTrack(track, x, 3, 0, t, limits))).toBe(true)
+			end
+			-- the base locks and the server pushes them toward home; charging the push cancelled all but short ones
+			local charged = table.clone(track)
+			T.expect((StealRules.stepCarryTrack(charged, x + push, 3, 0, t + 0.2, limits))).toBe(push < 20)
+			local budget = track.budget
+			StealRules.shiftCarryTrack(track, x + push, 3, 0)
+			T.expect(track.budget).toBe(budget)
+			x += push
+			for _ = 1, 50 do -- then 10 s more at full carry speed, jumping off the ejection point first
+				t += 0.2
+				x += limits.maxSpeed * 0.2
+				local y = if t < 3.6 then 9 else 3
+				T.expect((StealRules.stepCarryTrack(track, x, y, 0, t, limits))).toBe(true)
+			end
+		end
+	end)
+	T.it("carry budget: an ejection gives a thief only the push itself", function()
+		local limits = { maxSpeed = 10, tolerance = 1.6, budgetSeconds = 3, leeway = 6 }
+		local track = StealRules.newCarryTrack(0, 3, 0, 0, limits)
+		T.expect((StealRules.stepCarryTrack(track, 20, 3, 0, 2, limits))).toBe(true)
+		StealRules.shiftCarryTrack(track, 50, 3, 0)
+		T.expect(track.grabX).toBe(30)
+		-- teleporting on from where the server put them is still caught by the straight-line cap
+		track.budget = 1000
+		local ok, why = StealRules.stepCarryTrack(track, 90, 3, 0, 2.5, limits)
+		T.expect(ok).toBe(false)
+		T.expect(why).toBe("distance")
+		-- and so is a speed hack after the push
+		local hack = StealRules.newCarryTrack(0, 3, 0, 0, limits)
+		T.expect((StealRules.stepCarryTrack(hack, 20, 3, 0, 2, limits))).toBe(true)
+		StealRules.shiftCarryTrack(hack, 50, 3, 0)
+		local t, x, caught = 2, 50, false
+		for _ = 1, 50 do
+			t += 0.2
+			x += 10 * 2.2 * 0.2
+			if not StealRules.stepCarryTrack(hack, x, 3, 0, t, limits) then
+				caught = true
+				break
+			end
+		end
+		T.expect(caught).toBe(true)
+	end)
 	T.it("caps a carrying thief's height above the ground", function()
 		T.expect(StealRules.isCarryHeightAllowed(12, 0, 22)).toBe(true) -- jumping off a podium
 		T.expect(StealRules.isCarryHeightAllowed(22.5, 0, 22)).toBe(false)
@@ -406,6 +594,24 @@ T.describe("StealRules movement and timing", function()
 		T.expect(StealRules.messageKey("locked")).toBe("cantStealLocked")
 		T.expect(StealRules.messageKey("outside")).toBe("stealFromInside")
 		T.expect(StealRules.messageKey("hold")).toBe("stealHoldNear")
+	end)
+	T.it("a cancelled carry tells the thief its own reason (flying and speed are not 'Too slow!')", function()
+		T.expect(StealRules.cancelMessageKey("timeout")).toBe("stealFailedTimeout")
+		T.expect(StealRules.cancelMessageKey("speed")).toBe("stealFailedSpeed")
+		T.expect(StealRules.cancelMessageKey("flying")).toBe("stealFailedFlying")
+		T.expect(StealRules.cancelMessageKey("left")).toBe(nil) -- the thief is gone
+		local seen: { [string]: string } = {}
+		for _, why in StealRules.CANCEL_REASONS do
+			local key = StealRules.cancelMessageKey(why)
+			if why ~= "left" then
+				if key == nil then
+					error(`cancel reason "{why}" has no message`)
+				elseif seen[key] then
+					error(`cancel reasons "{why}" and "{seen[key]}" share the message {key}`)
+				end
+				seen[key] = why
+			end
+		end
 	end)
 end)
 

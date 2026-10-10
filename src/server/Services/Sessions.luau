@@ -43,7 +43,8 @@ export type Carry = {
 	marker: BillboardGui?,
 }
 
-export type Hold = { plot: number, podium: number, startedAt: number }
+-- A Steal button press (StealBegin): when the server-timed hold started, or why it didn't (StealRules.canBeginHold).
+export type Hold = { plot: number, podium: number, startedAt: number?, refusal: string? }
 
 export type Session = {
 	player: Player,
@@ -61,8 +62,7 @@ export type Session = {
 	walk: StealRules.WalkTrack?, -- server-observed movement (PositionTracker); nil until the first sample
 	flaggedAt: number, -- server time of the last step the walk budget couldn't pay for (-inf: never)
 	teleportedAt: number, -- server time of the last gross overrun, i.e. a teleport (-inf: never)
-	samplePlot: number, -- plot of the latest position sample (0 = none, -1 = not sampled yet)
-	enteredPlotAt: number, -- server time that plot was first sampled
+	settle: StealRules.Settle?, -- a server move whose stale samples are still being ignored (PositionTracker)
 	joinedAt: number,
 	lastSeenAtJoin: number, -- the save's lastSeen when it was loaded (offline earnings)
 	playClock: number, -- os.clock() of the last play-time accrual

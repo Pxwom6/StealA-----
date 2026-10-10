@@ -45,13 +45,23 @@ end
 
 local function setupPodium(podium: Model, plot: Model)
 	local base = podium:WaitForChild("Base") :: BasePart
+	-- The prompt hangs 2 studs above the floor (1.3 above the Base's centre, where the server measures grab range
+	-- from): as high as it can go while the server's checks still pass wherever it shows (at most 11.3 studs from the
+	-- centre, grabRange 12; at most 12 above the floor, wall + grabJumpAllowance). It stays in range at the top of a
+	-- jump from the podium top or from the floor within about 5.7 studs; a thief who jumps from farther out still
+	-- leaves its range and the hold resets.
+	local anchor = UiKit.new("Attachment", {
+		Name = "PromptAnchor",
+		Position = Vector3.new(0, 1.3, 0),
+		Parent = base,
+	})
 	local prompt = UiKit.new("ProximityPrompt", {
 		Name = "PodiumPrompt",
 		RequiresLineOfSight = false,
 		MaxActivationDistance = 10,
 		KeyboardKeyCode = Enum.KeyCode.E,
 		Enabled = false,
-		Parent = base,
+		Parent = anchor,
 	}) :: ProximityPrompt
 	prompt:SetAttribute("Role", "")
 

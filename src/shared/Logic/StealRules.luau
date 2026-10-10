@@ -17,10 +17,13 @@ export type GrabContext = {
 	distance: number,
 	grabRange: number,
 	thiefInsideBase: boolean, -- no grabbing through walls: the thief must be inside the victim's plot
-	thiefHeightAboveFloor: number, -- thief's root Y minus the plot's floor Y (no grabbing from mid-air)
+	thiefHeightAboveFloor: number, -- thief's root Y minus the plot's floor Y (no grabbing from above the base)
 	wallHeight: number,
+	grabJumpAllowance: number, -- studs above the walls a grab still counts (jumping while holding Steal)
 	thiefHasFreePodium: boolean,
+	thiefTrusted: boolean, -- the thief's position fits what the server observed (see stealTrustSince)
 	holdStartedAt: number?, -- when the thief began holding the prompt (server time), nil if never
+	holdRefusal: string?, -- why canBeginHold refused that hold, if it did
 	holdSeconds: number,
 	holdTolerance: number,
 }
@@ -73,6 +76,16 @@ export type CarryLimits = WalkLimits
 
 export type Rect = { minX: number, maxX: number, minZ: number, maxZ: number }
 
+-- A server move that is still settling (see isSettling): where the server put the character, and until when (server
+-- time) stale samples are ignored.
+export type Settle = { x: number, y: number, z: number, untilT: number }
+
+-- How long a flag keeps a thief from starting or finishing a steal (see stealTrustSince).
+export type StealTrustWindows = {
+	overrunSeconds: number, -- after an overrun (a lag stall, a server hitch, a fling)
+	teleportSeconds: number, -- after a gross overrun (a teleport)
+}
+
 -- Where the thief is when they start holding Steal (see canBeginHold).
 export type HoldContext = {
 	distance: number, -- thief root to podium
@@ -116,13 +129,19 @@ function StealRules.canGrab(ctx: GrabContext): (boolean, string?)
 	if not ctx.thiefInsideBase then
 		return false, "outside"
 	end
-	if not StealRules.isAtFloorLevel(ctx.thiefHeightAboveFloor, ctx.wallHeight) then
+	if not StealRules.isAtGrabHeight(ctx.thiefHeightAboveFloor, ctx.wallHeight, ctx.grabJumpAllowance) then
 		return false, "height"
 	end
 	if not ctx.thiefHasFreePodium then
 		return false, "full"
 	end
+	if not ctx.thiefTrusted then
+		return false, "untrusted"
+	end
 	local started = ctx.holdStartedAt
+	if started == nil and ctx.holdRefusal == "untrusted" then
+		return false, "untrusted" -- the hold never started because of a connection hiccup: say that, not "hold"
+	end
 	if started == nil or ctx.now - started < ctx.holdSeconds * ctx.holdTolerance then
 		return false, "hold"
 	end
@@ -131,10 +150,18 @@ end
 
 -- A hold (StealBegin) only starts when the thief is already at the podium: within grab range (plus a little slack),
 -- inside the base, and their position trusted (not teleported in). Otherwise the hold timer could run while they
--- are far away and they could teleport in and confirm instantly. Floor level is NOT required here: pressing
--- mid-jump is normal, and canGrab checks floor level when the hold completes.
-function StealRules.canBeginHold(ctx: HoldContext): boolean
-	return ctx.thiefTrusted and ctx.thiefInsideBase and ctx.distance <= ctx.grabRange + ctx.rangeSlack
+-- are far away and they could teleport in and confirm instantly. Height is NOT checked here: pressing mid-jump is
+-- normal, and canGrab checks the grab height when the hold completes.
+-- Returns ok, and a reason ("far" | "outside" | "untrusted") when not ok.
+function StealRules.canBeginHold(ctx: HoldContext): (boolean, string?)
+	if not (ctx.distance <= ctx.grabRange + ctx.rangeSlack) then
+		return false, "far"
+	elseif not ctx.thiefInsideBase then
+		return false, "outside"
+	elseif not ctx.thiefTrusted then
+		return false, "untrusted"
+	end
+	return true, nil
 end
 
 function StealRules.canTag(ctx: TagContext): (boolean, string?)
@@ -175,9 +202,16 @@ function StealRules.withinTagReach(
 end
 
 -- True when a root part is near floor height: not below the floor, and not higher than the plot's walls.
--- Used for grabbing and delivering, so neither can be done from the air above a base.
+-- Delivery uses it, so a creature can't be delivered from the air above a base.
 function StealRules.isAtFloorLevel(heightAboveFloor: number, wallHeight: number): boolean
 	return heightAboveFloor >= -2 and heightAboveFloor <= wallHeight
+end
+
+-- True when a thief's root is low enough to grab: floor level, plus `jumpAllowance` studs above the walls so that
+-- jumping while holding Steal still works (a jump lifts the root ~7 studs). The 3D grab range to the podium
+-- already stops grabs from high in the air.
+function StealRules.isAtGrabHeight(heightAboveFloor: number, wallHeight: number, jumpAllowance: number): boolean
+	return StealRules.isAtFloorLevel(heightAboveFloor, wallHeight + math.max(0, jumpAllowance))
 end
 
 -- A carried creature is delivered only when the thief stands inside their own plot at floor level.
@@ -261,6 +295,44 @@ function StealRules.isPositionTrusted(ctx: TrustContext, limits: WalkLimits): bo
 	return step <= limits.maxSpeed * limits.tolerance * dt + ctx.stepSlack -- false for NaN
 end
 
+-- After the SERVER moves a character (spawning, respawning, ejecting from a locked base), its client can keep
+-- reporting where it was before the move for a moment (a stale position). Until `untilT` passes, a sample more than
+-- `radius` studs from the target is ignored instead of judged, so that stale position never looks like a teleport;
+-- samples near the target are judged. Returns true when the sample at (x, y, z) should be ignored.
+function StealRules.isSettling(settle: Settle?, x: number, y: number, z: number, t: number, radius: number): boolean
+	if settle == nil or t >= settle.untilT then
+		return false
+	end
+	local distance = math.sqrt((x - settle.x) ^ 2 + (y - settle.y) ^ 2 + (z - settle.z) ^ 2)
+	return not (distance <= radius) -- NaN counts as not arrived
+end
+
+-- One position sample while a server move may be settling: whether to ignore it (see isSettling), and the settle to
+-- keep. A sample near the target does not end the window early: right after the move the server reads its own write
+-- (the target) until the client's updates from before the move arrive, and those must still be ignored. Only
+-- `untilT` ends it.
+function StealRules.settleSample(
+	settle: Settle?,
+	x: number,
+	y: number,
+	z: number,
+	t: number,
+	radius: number
+): (boolean, Settle?)
+	if settle == nil or t >= settle.untilT then
+		return false, nil
+	end
+	return StealRules.isSettling(settle, x, y, z, t, radius), settle
+end
+
+-- The `flagSince` / `teleportSince` times (see TrustContext) for starting or finishing a steal at time `t`: a flag
+-- only counts while it is recent, so after a lag spike the thief can steal again once they have moved normally for
+-- a few seconds (any new flag restarts that clock), without walking out of the base and back in. A teleport (onto a
+-- podium, say) takes longer to clear.
+function StealRules.stealTrustSince(t: number, windows: StealTrustWindows): (number, number)
+	return t - windows.overrunSeconds, t - windows.teleportSeconds
+end
+
 -- Starts tracking a carry at the grab position.
 function StealRules.newCarryTrack(x: number, y: number, z: number, t: number, limits: CarryLimits): CarryTrack
 	return {
@@ -301,9 +373,9 @@ function StealRules.stepCarryTrack(
 	return true, nil
 end
 
--- The nearest point `margin` studs outside `rect` from a point inside it. A carrying thief ejected from a locked base
--- is put there, and their carry budget pays for that short move like any other: the server's move is never a
--- shortcut (sending them to the entrance could carry them far toward home for free).
+-- The nearest point `margin` studs outside `rect` from a point inside it. A carrying thief ejected from a third
+-- player's locked base is put there (not at its entrance, which could carry them far toward home); if they were
+-- inside when it locked, shiftCarryTrack keeps that short push off their carry budget.
 function StealRules.nearestOutside(x: number, z: number, rect: Rect, margin: number): (number, number)
 	local toMinX, toMaxX, toMinZ, toMaxZ = x - rect.minX, rect.maxX - x, z - rect.minZ, rect.maxZ - z
 	local nearest = math.min(toMinX, toMaxX, toMinZ, toMaxZ)
@@ -315,6 +387,18 @@ function StealRules.nearestOutside(x: number, z: number, rect: Rect, margin: num
 		return x, rect.minZ - margin
 	end
 	return x, rect.maxZ + margin
+end
+
+-- The SERVER moved a carrying thief to (x, y, z) (ejecting them from a third player's base as it locks): the push is
+-- not theirs, so it costs no budget and doesn't count toward the straight-line cap (the grab point moves with them).
+-- Call after stepping the track to where the push started; elapsed time and the stored budget carry on unchanged.
+-- Mutates `track`.
+function StealRules.shiftCarryTrack(track: CarryTrack, x: number, y: number, z: number)
+	local dx, dy, dz = x - track.lastX, y - track.lastY, z - track.lastZ
+	track.grabX += dx
+	track.grabZ += dz
+	track.climbY += dy -- the height already paid for moves with them too
+	track.lastX, track.lastY, track.lastZ = x, y, z
 end
 
 function StealRules.isCarryExpired(startedAt: number, now: number, timeoutSeconds: number): boolean
@@ -334,6 +418,58 @@ function StealRules.graceUntil(now: number, playTimeSeconds: number, graceSecond
 	return now + remaining
 end
 
+-- Why a carry ended without a delivery (see StealService.cancel). "left" / "rebirth": the thief left or rebirthed;
+-- "ownerLeft" / "ownerRebirth": the owner did.
+export type CancelReason =
+	"tagged"
+	| "timeout"
+	| "died"
+	| "left"
+	| "ownerLeft"
+	| "locked"
+	| "speed"
+	| "flying"
+	| "full"
+	| "rebirth"
+	| "ownerRebirth"
+	| "error"
+
+-- Every CancelReason, for checks over all of them.
+local CANCEL_REASONS: { CancelReason } = {
+	"tagged",
+	"timeout",
+	"died",
+	"left",
+	"ownerLeft",
+	"locked",
+	"speed",
+	"flying",
+	"full",
+	"rebirth",
+	"ownerRebirth",
+	"error",
+}
+StealRules.CANCEL_REASONS = table.freeze(CANCEL_REASONS)
+
+-- Message key (in Config/Theme.text) telling the thief why their carry ended, one per reason; nil only for "left"
+-- (the thief is gone).
+function StealRules.cancelMessageKey(reason: string): string?
+	local map: { [string]: string } = {
+		tagged = "gotTagged",
+		timeout = "stealFailedTimeout",
+		died = "stealFailedDied",
+		ownerLeft = "ownerLeftDuringSteal",
+		locked = "stealFailedLocked",
+		speed = "stealFailedSpeed",
+		flying = "stealFailedFlying",
+		full = "baseFull",
+		rebirth = "stealFailedRebirth",
+		ownerRebirth = "ownerRebirthedDuringSteal",
+		error = "stealFailedError",
+	}
+	return map[reason]
+end
+
 -- Friendly message key for a refusal reason (keys are in Config/Theme.text).
 function StealRules.messageKey(reason: string): string?
 	local map: { [string]: string } = {
@@ -346,6 +482,7 @@ function StealRules.messageKey(reason: string): string?
 		outside = "stealFromInside",
 		height = "stealOnFloor",
 		hold = "stealHoldNear",
+		untrusted = "stealConnectionHiccup",
 		full = "baseFull",
 	}
 	return map[reason]

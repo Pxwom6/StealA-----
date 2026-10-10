@@ -10,20 +10,21 @@
 	flagged in the last couple of seconds, wasn't caught teleporting since just before that carry started, and their
 	current position is walkable from the latest sample (Logic/StealRules.isPositionTrusted).
 
-	isTrustedForSteal(session, position) gates starting and finishing a steal hold: the thief must not have been
-	flagged at all since just before they were first seen in the plot they are in, so teleporting onto a podium
-	(even then waiting) doesn't work; walking out and back in on foot clears it.
+	isTrustedForSteal(session, position) gates starting and finishing a steal hold: the thief must have moved
+	normally for a few seconds since their last overrun (a lag spike), and for longer since their last teleport, so
+	one hiccup never locks a thief out of a base but teleporting onto a podium still costs time.
 
 	Whenever the SERVER moves a character (spawning at the base, ejecting from a locked base) call reset(), so the
-	jump is not mistaken for a teleport exploit. A reset never clears the flags: record() the position before a
-	server move, so a teleport into a locked base is still caught.
+	jump is not mistaken for a teleport exploit. For about a second after that, samples far from where the server put
+	the character are ignored (its client may still report the old position; Logic/StealRules.settleSample). A reset
+	never clears the flags: record() the position before a server move, so a teleport into a locked base is still
+	caught.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
 local StealRules = require(ReplicatedStorage.Shared.Logic.StealRules)
-local PlotService = require(script.Parent.PlotService)
 local Sessions = require(script.Parent.Sessions)
 
 type Session = Sessions.Session
@@ -39,16 +40,27 @@ local WALK_LIMITS: StealRules.WalkLimits = {
 	leeway = CFG.walkLeeway,
 }
 
+local STEAL_TRUST: StealRules.StealTrustWindows = {
+	overrunSeconds = CFG.stealOverrunSeconds,
+	teleportSeconds = CFG.stealTeleportSeconds,
+}
+
 local function now(): number
 	return workspace:GetServerTimeNow()
 end
 
+-- True while a server move is settling and `position` is a stale one from before it (see StealRules.isSettling).
+function PositionTracker.isSettling(session: Session, position: Vector3): boolean
+	return StealRules.isSettling(session.settle, position.X, position.Y, position.Z, now(), CFG.settleRadius)
+end
+
 function PositionTracker.record(session: Session, position: Vector3)
 	local t = now()
-	local plot = PlotService.plotAt(position) or 0
-	if plot ~= session.samplePlot then
-		session.samplePlot = plot
-		session.enteredPlotAt = t
+	local ignore, settle =
+		StealRules.settleSample(session.settle, position.X, position.Y, position.Z, t, CFG.settleRadius)
+	session.settle = settle
+	if ignore then
+		return -- a stale position from before a server move: not evidence of anything
 	end
 	local track = session.walk
 	if track == nil then
@@ -62,11 +74,17 @@ function PositionTracker.record(session: Session, position: Vector3)
 	end
 end
 
--- Restarts tracking after a server-side move (or death). `position`, when given, becomes the first sample.
+-- Restarts tracking after a server-side move (or death). `position`, when given, is where the server put the
+-- character: it becomes the first sample, and stale samples far from it are ignored for settleSeconds.
 function PositionTracker.reset(session: Session, position: Vector3?)
-	session.walk = if position
-		then StealRules.newWalkTrack(position.X, position.Y, position.Z, now(), WALK_LIMITS)
-		else nil
+	local t = now()
+	if position then
+		session.walk = StealRules.newWalkTrack(position.X, position.Y, position.Z, t, WALK_LIMITS)
+		session.settle = { x = position.X, y = position.Y, z = position.Z, untilT = t + CFG.settleSeconds }
+	else
+		session.walk = nil
+		session.settle = nil
+	end
 end
 
 -- True when `position` (the player's current root position) is consistent with what the server observed: not
@@ -87,17 +105,17 @@ function PositionTracker.isTrusted(session: Session, position: Vector3, carrySta
 	}, WALK_LIMITS)
 end
 
--- True when a thief's `position` can be trusted for starting or finishing a steal: as isTrusted, and not flagged at
--- all since just before they were first seen in the plot they are in now.
+-- True when a thief's `position` can be trusted for starting or finishing a steal: walkable from the latest sample,
+-- and a few seconds of normal movement since the last overrun (longer since the last teleport).
 function PositionTracker.isTrustedForSteal(session: Session, position: Vector3): boolean
 	local t = now()
-	local since = math.min(t, session.enteredPlotAt) - CFG.teleportPenaltySeconds
+	local flagSince, teleportSince = StealRules.stealTrustSince(t, STEAL_TRUST)
 	return StealRules.isPositionTrusted({
 		track = session.walk,
 		flaggedAt = session.flaggedAt,
 		teleportedAt = session.teleportedAt,
-		flagSince = since,
-		teleportSince = since,
+		flagSince = flagSince,
+		teleportSince = teleportSince,
 		x = position.X,
 		z = position.Z,
 		t = t,
