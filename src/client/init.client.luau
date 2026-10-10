@@ -28,6 +28,7 @@ local RewardsController = require(Controllers.RewardsController)
 local MutationFxController = require(Controllers.MutationFxController)
 local SocialController = require(Controllers.SocialController)
 local TutorialController = require(Controllers.TutorialController)
+local SnackdexController = require(Controllers.SnackdexController)
 
 StateStore.start()
 HudController.start()
@@ -44,5 +45,6 @@ RewardsController.start()
 MutationFxController.start()
 SocialController.start()
 TutorialController.start()
+SnackdexController.start() -- after RewardsController: its side button is the 4th
 
 Net.get("ClientReady"):FireServer()

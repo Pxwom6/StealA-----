@@ -37,6 +37,7 @@ local Theme = {
 		social = "#FF6FB5",
 		event = "#FF8C1A", -- event pill / "EVENT" tag when the event has no seasonal theme colour (Config/Seasons)
 		tutorial = "#FFD23F", -- tutorial banner trim, step badge, guide beam and arrow
+		snackdex = "#9B6BFF", -- Snackdex side button
 	},
 
 	world = {
@@ -238,7 +239,7 @@ local Theme = {
 		questEasy = "EASY",
 		questHard = "HARD",
 		questClaimed = "Claimed",
-		questBonus = "Finish all 3: {amount} bonus  ({done}/{count})",
+		questBonus = "Finish all {count}: {amount} bonus ({done}/{count})",
 		questBonusClaimed = "All quests done - bonus paid!",
 		questResetsIn = "New quests in {time}",
 		questComplete = "Quest done! Claim {amount} in Rewards",
