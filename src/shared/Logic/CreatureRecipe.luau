@@ -127,6 +127,15 @@ local function vnorm(a: V): V
 	return vmul(a, 1 / l)
 end
 -- a + (b - a) * t
+-- m * v
+local function mv(m: M, a: V): V
+	return v3(
+		m[1] * a.x + m[2] * a.y + m[3] * a.z,
+		m[4] * a.x + m[5] * a.y + m[6] * a.z,
+		m[7] * a.x + m[8] * a.y + m[9] * a.z
+	)
+end
+
 local function vlerp(a: V, b: V, t: number): V
 	return v3(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t)
 end
@@ -887,8 +896,9 @@ SKINS.ring = function(ctx, b, vol, primary)
 			addSolid(hull, "ellipsoid", icing, vmul(size, 0.5))
 			top = icing.y + size.y / 2
 		end
-		local holeHeight = (top - b.cy) * 2 + eps(b) * 2
-		cylinder(ctx, "Shape", holeHeight, holeDia, boxCenter(b), VERTICAL, hole, "detail")
+		-- a flat dark (or creamy) dollop hugging the top, so it never pokes out of the curved dough
+		local dollop = v3(holeDia, b.h * 0.14, holeDia)
+		ellipsoid(ctx, "Shape", dollop, v3(b.cx, top - dollop.y * 0.3, b.cz), IDENT, hole, "detail")
 	else
 		if vol.color2 then
 			local icing = v3(b.cx, b.cy, b.cz - b.d * 0.25)
@@ -1694,25 +1704,14 @@ FEATURES.horns = function(ctx, rig, f)
 			local dir = vnorm(v3(side * 0.9, 1, 0.1))
 			local endPoint = vadd(p, vmul(dir, 0.55 * a * sc))
 			segment(ctx, "Feature", vsub(p, vmul(dir, 0.05 * a)), endPoint, 0.17 * a * sc, color, "body", fx(f))
-			local palm = vadd(endPoint, v3(side * 0.22 * a * sc, 0.18 * a * sc, 0))
-			ellipsoid(
-				ctx,
-				"Feature",
-				v3(0.95 * a * sc, 0.6 * a * sc, 0.16 * a * sc),
-				palm,
-				rz(-side * 0.45),
-				color,
-				"body",
-				fx(f)
-			)
-			ball(
-				ctx,
-				"Feature",
-				0.22 * a * sc,
-				vadd(palm, v3(side * 0.3 * a * sc, 0.3 * a * sc, 0)),
-				f.color2 or color,
-				"body"
-			)
+			-- a broad, upright palm with two points on its upper edge
+			local palm = vadd(endPoint, v3(side * 0.2 * a * sc, 0.24 * a * sc, 0))
+			local tilt = rz(-side * 0.8)
+			ellipsoid(ctx, "Feature", v3(0.95 * a * sc, 0.62 * a * sc, 0.16 * a * sc), palm, tilt, color, "body", fx(f))
+			for _, along in { 0.05, 0.4 } do
+				local point = vadd(palm, mv(tilt, v3(side * along * a * sc, 0.3 * a * sc, 0)))
+				ball(ctx, "Feature", 0.22 * a * sc, point, f.color2 or color, "body")
+			end
 		elseif style == "curved" then
 			local d1 = vnorm(v3(side * 0.55, 1, 0.25))
 			local c1 = vadd(p, vmul(d1, 0.16 * a * sc))

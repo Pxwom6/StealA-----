@@ -320,7 +320,7 @@ local CreatureLooks: { [string]: CreatureLook } = {
 			{ kind = "horns", style = "antlers", color = "#E8C28A" },
 		},
 		toppings = {
-			{ kind = "balls", on = "body", colors = { "#3A3A8F", "#4A4AA8" }, n = 4 },
+			{ kind = "balls", on = "body", colors = { "#3A3A8F", "#4A4AA8" }, n = 3 },
 		},
 	},
 	waffle_wombat = {
@@ -367,7 +367,7 @@ local CreatureLooks: { [string]: CreatureLook } = {
 			{ kind = "shell", style = "spiral", color = "#D9A15B", color2 = "#8A4A1E" },
 		},
 		toppings = {
-			{ kind = "drips", on = "shell", colors = { "#FFF8EE" }, n = 5, at = 0.5 },
+			{ kind = "drips", on = "shell", colors = { "#FFF8EE" }, n = 4, at = 0.55, scale = 0.6 },
 		},
 	},
 	macaron_macaw = {
