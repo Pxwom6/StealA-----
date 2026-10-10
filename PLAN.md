@@ -58,9 +58,10 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | Social | `Announcer` (server-wide banners), `SocialService` (friends in server, group membership, welcome gift) | `NotificationController`, `ChatTagController`, `SocialController` (bonus pill, invite / join group panel) | `SocialRules` |
 | LiveOps | `LiveOpsService` (scheduled events, luck boosts, admin commands, cross-server, active-event change listeners) | event pill (banner + countdown), luck pill | `LiveOpsRules` |
 | Seasonal events | `SeasonService` (theme decorations + lighting while a themed event runs, restored after) | event pill colour, "EVENT" tag on event Snacklings' billboards | `SeasonRules` |
-| Analytics | `Analytics` (funnel + economy events) | sends whitelisted `store_opened` | – |
+| First-time tutorial | `TutorialService` (steps finished by real purchases / collects / locks / steals, timeouts, one-time reward, existing players skipped) | `TutorialController` (banner under the cash, beam + bouncing arrow + highlight on the target, Skip) | `TutorialRules` |
+| Analytics | `Analytics` (onboarding funnel following the tutorial, store funnel, economy events) | sends whitelisted `store_opened` | – |
 | State sync | `Replication` (dirty-flag batching, 5 Hz) | `StateStore` | – |
-| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends`); LiveOps `/event <id> [minutes]`, `/event off` (anyone in Studio, local only) | – | – |
+| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends`, `/tutorial`); LiveOps `/event <id> [minutes]`, `/event off` (anyone in Studio, local only) | – | – |
 
 ## 3. Module list
 
@@ -78,6 +79,7 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | `Seasons` | seasonal themes keyed by LiveOps event id (`Halloween2026` → `halloween`): lighting mood, decoration counts, colours, part budget |
 | `Sounds` | sound asset IDs (**placeholders**) |
 | `Social` | friend bonus (+10% per friend in the server, max 3), group id (**placeholder 0 = off**), group bonus, one-time welcome gift |
+| `Tutorial` | first-time tutorial: on/off, steps in order (buy, collect, lock, steal) with their automatic endings, one-time reward, belt-target tuning |
 
 ### `src/shared/Logic` (pure, unit-tested)
 
@@ -105,6 +107,7 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `Inventory` | podium slot operations on the save table (free slot, place, remove, find by uid) |
 | `PlotAssignment` | pick a free plot, release |
 | `SocialRules` | friend / group income bonus, friend counting per pair, group welcome gift, recheck cooldown, config validation |
+| `TutorialRules` | tutorial progress in `flags` (current step, early actions, resume), existing-player detection, automatic step endings, one-time reward, guide targets (belt item, collect pad), config validation |
 
 ### `src/shared` (Roblox helpers, not unit-tested)
 `Net` (create/get remotes by name), `GameData` (catalogue built once from config; `price` / `income` /
@@ -116,8 +119,8 @@ mutation look), `UiTheme` (hex → Color3, fonts, text templates, rich-text crea
 `init.server.luau` bootstraps in order:
 `Remotes → DataService → MapBuilder → PlotService → Analytics → LiveOpsService → SeasonService → Replication →
 EconomyService → BeltService → LockService → StealService → RebirthService → MonetizationService →
-RetentionService → SocialService → LeaderboardService → DevCommands → PlayerLifecycle`, and wires cross-service join/leave steps
-through `PlayerLifecycle.hooks()` (keeps services free of circular requires). `Sessions` holds per-player state.
+RetentionService → SocialService → TutorialService → LeaderboardService → DevCommands → PlayerLifecycle`, and wires
+cross-service join/leave steps through `PlayerLifecycle.hooks()` (keeps services free of circular requires). `Sessions` holds per-player state.
 
 `PlayerLifecycle` owns join/leave ordering: load profile → assign plot → check passes → offline earnings →
 spawn creatures → send initial state; on leave: cancel steals involving the player → auto-collect stored cash →
@@ -127,7 +130,7 @@ release plot → release profile.
 `init.client.luau` waits for `game:IsLoaded()` then starts controllers:
 `StateStore, HudController, NotificationController, BeltController, PlotController, InteractionController,
 StealController, LockController, RebirthController, StoreController, ChatTagController, RewardsController,
-MutationFxController, SocialController`
+MutationFxController, SocialController, TutorialController`
 (UI helpers: `UI/UiKit`, `UI/Modal`; audio: `SoundPlayer`).
 
 ## 4. Remotes (all in `ReplicatedStorage.Remotes`, created by the server)
@@ -149,20 +152,21 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `ClientEvent` | `name: string` | whitelist (`store_opened`, `store_product_clicked`) → analytics |
 | `CheckGroup` | – | group feature on, at most once per 10 s, not already checking → re-check membership (`IsInGroupAsync`, then `GetGroupsAsync`) |
 | `InvitePrompted` | – | analytics only (`invite_prompt_opened`); nothing is rewarded for inviting |
+| `SkipTutorial` | – | a tutorial is running → it ends with no reward (steps themselves only finish from gameplay the server saw) |
 | `DevGrantProduct` | `key: string` | **Studio only** – runs the real receipt path with a fake receipt |
 
 Server → client:
 
 | Remote | Payload |
 | --- | --- |
-| `StateUpdate` | batched partial player state (cash, cash/sec, rebirths, multiplier, podium cap, lock, passes, carry, social bonus…) |
+| `StateUpdate` | batched partial player state (cash, cash/sec, rebirths, multiplier, podium cap, lock, passes, carry, social bonus, tutorial step…) |
 | `BeltSnapshot` / `BeltSpawn` / `BeltRemove` | conveyor items `{id, creatureId, spawnAt, variant?}` (variant = mutation id) |
 | `Notify` | toast `{kind, text}` |
 | `Announce` | server-wide banner `{text, rarity, color?}` (color: a mutation's own banner) |
 | `WelcomeBack` | offline earnings popup `{amount, seconds}` |
 | `DailyInfo` | streak/claimable/reward |
 | `StealAlert` | to victim: `{thiefName, creatureId, variant?}` |
-| `Effect` | one-shot VFX cue `{kind, position, rarity}` |
+| `Effect` | one-shot VFX cue `{kind, position, rarity}` (e.g. `tutorialComplete`) |
 
 World state the client reads from **attributes** (replicated automatically): plot `OwnerUserId`, `LockedUntil`,
 `GraceUntil`, `PodiumCount`; podium `CreatureId`, `Variant` (mutation id, "" for none), `Stored`, `Income`
@@ -194,7 +198,8 @@ type PlayerData = {   -- exactly Types.PlayerData
     daily: { streak: number, lastClaimDay: number },
     stats: { steals: number, timesStolenFrom: number, beltPurchases: number, playTime: number,
              bestCashPerSecond: number, robuxSpent: number, totalEarned: number },
-    flags: { [string]: boolean },  -- onboarding funnel milestones, one-time rewards (`social_groupWelcome`)
+    flags: { [string]: boolean },  -- onboarding funnel milestones, one-time rewards (`social_groupWelcome`),
+                                   -- tutorial progress (`tutorial_<step>`, `tutorial_done`)
     firstJoin: number, lastSeen: number,
 }
 ```
@@ -226,3 +231,15 @@ weekend. `LiveOpsService` re-evaluates active events every second and tells `Sea
 `SeasonService` builds or removes the theme's decorations (`Logic/SeasonRules.layout`) and fades the lighting in or
 back. The HUD shows the banner with "Halloween ends in 3d 4h" and event Snacklings carry an "EVENT" tag. Balance:
 BALANCE.md "Halloween". Studio: `/event Halloween2026 [minutes]`, `/event off`, `/spawn <eventCreature> haunted`.
+
+## 9. First-time tutorial
+
+A brand-new player learns the loop in about a minute (DECISIONS.md #21): **buy** a Snackling from the belt → **collect**
+its cash from the glowing pad → **lock** the base → **steal** from another base. Each step is one short line in a
+banner right under the cash (step badge "1/4", Skip button) and a 3D guide: a pulsing beam from the player's feet, a
+bouncing arrow over the target and a highlight on it (nearest affordable belt item, the pad with the most cash, the
+lock button; the steal step only shows a tip about the new-player shield). `TutorialService` finishes a step only when
+the server applies that action (belt purchase, pad collect, lock, delivered steal); the lock step moves on after 20 s
+of the lock being unavailable (or 60 s), the steal step after 90 s. Completing it pays $500 once per account
+(`Config/Tutorial.reward`); Skip pays nothing; players who already had progress when it shipped never see it.
+Progress lives in `data.flags` (no schema bump). Studio: `/tutorial` starts it again.

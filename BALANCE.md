@@ -213,6 +213,11 @@ spams locks, whatever the lock length.
 
 **New-player shield** (`Gameplay.grace`): the first 4 minutes of total play time; stealing ends it early.
 
+**First-time tutorial** (`Config/Tutorial`): finishing it pays a one-time **$500** (the price of the cheapest
+Uncommon), usually within the first one to two minutes. Skipping it pays nothing, and players who already had progress
+when it shipped never get it. The simulation above does not include it; it can only bring the first Uncommon forward by
+a minute or so and changes nothing after that.
+
 ## Tuning checklist
 
 * Change one tier at a time and keep the strict ordering (CI enforces it): every tier must be rarer, pricier,
