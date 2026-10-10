@@ -28,6 +28,11 @@
 				}
 			}
 		},
+		"TextChatService": {
+			"$properties": {
+				"ChatVersion": "TextChatService"
+			}
+		},
 		"Workspace": {
 			"$properties": {
 				"StreamingEnabled": false

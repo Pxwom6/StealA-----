@@ -8,9 +8,13 @@
 
 	Every model returned has a PrimaryPart called "Root" at its feet, all other parts welded to it, and no
 	collisions, so it can be anchored on a podium, moved along the belt, or welded above a thief's head.
-	Rarity flair (glow, sparkles, aura ring) is added on top of either kind of model.
+	Rarity flair (glow, sparkles, aura ring) is added on top of either kind of model, then the mutation look (if
+	any): material, tint, transparency, sparkles, rainbow, glow light. The face (Eye/Pupil/Mouth), the Root and the rarity Aura
+	keep their look; in a custom model, give a part the attribute MutationSkip = true to keep its look too.
+	Rainbow parts are tagged RAINBOW_TAG; the client cycles their hue (MutationFxController).
 ]]
 
+local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types = require("./Types")
@@ -20,6 +24,26 @@ local CreatureVisuals = {}
 
 local PARTICLE_RATE: { [number]: number } = { [4] = 5, [5] = 9, [6] = 16, [7] = 26 }
 local SPARKLE_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds"
+local MUTATION_PARTICLE_RATE = 8
+-- Parts a mutation never restyles (the face stays readable; Root is invisible; Aura is the rarity ring).
+local MUTATION_SKIP: { [string]: boolean } = { Root = true, Aura = true, Eye = true, Pupil = true, Mouth = true }
+local RAINBOW_SPEED = 0.25 -- hue turns per second
+
+CreatureVisuals.RAINBOW_TAG = "MutationRainbow"
+
+local function rainbowSequence(): ColorSequence
+	return ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 90, 90)),
+		ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 230, 90)),
+		ColorSequenceKeypoint.new(0.66, Color3.fromRGB(90, 255, 200)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(170, 110, 255)),
+	})
+end
+
+-- Colour of a rainbow part at clock time `t`; `offset` (0..1) staggers the parts of one model.
+function CreatureVisuals.rainbowColor(offset: number, t: number): Color3
+	return Color3.fromHSV((offset + t * RAINBOW_SPEED) % 1, 0.7, 1)
+end
 
 local function newPart(className: "Part" | "WedgePart", props: { [string]: any }): BasePart
 	local part = Instance.new(className) :: BasePart
@@ -255,12 +279,7 @@ local function addRarityFlair(model: Model, rarity: Types.RarityDef)
 			NumberSequenceKeypoint.new(1, 0),
 		})
 		if rarity.order >= 7 then
-			emitter.Color = ColorSequence.new({
-				ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 90, 90)),
-				ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 230, 90)),
-				ColorSequenceKeypoint.new(0.66, Color3.fromRGB(90, 255, 200)),
-				ColorSequenceKeypoint.new(1, Color3.fromRGB(170, 110, 255)),
-			})
+			emitter.Color = rainbowSequence()
 		else
 			emitter.Color = ColorSequence.new(color)
 		end
@@ -283,6 +302,79 @@ local function addRarityFlair(model: Model, rarity: Types.RarityDef)
 	end
 end
 
+local function materialNamed(name: string): Enum.Material?
+	local ok, item = pcall(function(): Enum.Material
+		return (Enum.Material :: any)[name]
+	end)
+	return if ok then item else nil
+end
+
+-- The mutation look, on top of the rarity flair (see the header for which parts keep their own look).
+local function addMutationLook(model: Model, mutation: Types.MutationDef)
+	local look = mutation.look
+	local material = materialNamed(look.material)
+	local tint = if look.tint then UiTheme.color(look.tint) else nil
+	local strength = math.clamp(look.tintStrength or 1, 0, 1)
+	local count = 0
+	for _, descendant in model:GetDescendants() do
+		if
+			not descendant:IsA("BasePart")
+			or MUTATION_SKIP[descendant.Name]
+			or descendant.Transparency >= 1
+			or descendant:GetAttribute("MutationSkip") == true
+		then
+			continue
+		end
+		count += 1
+		if material then
+			descendant.Material = material
+		end
+		if tint then
+			descendant.Color = descendant.Color:Lerp(tint, strength)
+		end
+		if look.transparency then
+			descendant.Transparency = math.max(descendant.Transparency, look.transparency)
+		end
+		if look.reflectance then
+			descendant.Reflectance = look.reflectance
+		end
+		if look.rainbow then
+			local offset = (count * 0.13) % 1
+			descendant:SetAttribute("HueOffset", offset)
+			descendant.Color = CreatureVisuals.rainbowColor(offset, 0)
+			CollectionService:AddTag(descendant, CreatureVisuals.RAINBOW_TAG)
+		end
+	end
+
+	local body = model:FindFirstChild("Body") or model.PrimaryPart
+	if (look.sparkles or look.rainbow) and body ~= nil and body:IsA("BasePart") then
+		local emitter = Instance.new("ParticleEmitter")
+		emitter.Name = "MutationSparkles"
+		emitter.Texture = SPARKLE_TEXTURE
+		emitter.Rate = MUTATION_PARTICLE_RATE
+		emitter.Lifetime = NumberRange.new(0.6, 1.4)
+		emitter.Speed = NumberRange.new(0.5, 2)
+		emitter.SpreadAngle = Vector2.new(180, 180)
+		emitter.LightEmission = 1
+		emitter.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.45),
+			NumberSequenceKeypoint.new(1, 0),
+		})
+		emitter.Color = if look.rainbow then rainbowSequence() else ColorSequence.new(UiTheme.color(mutation.color))
+		emitter.Parent = body
+	end
+	if look.glow and body ~= nil and body:IsA("BasePart") then
+		local light = Instance.new("PointLight")
+		light.Name = "MutationGlow"
+		light.Color = UiTheme.color(look.glow)
+		light.Range = 10
+		light.Brightness = 1.6
+		light.Shadows = false
+		light.Parent = body
+	end
+	model:SetAttribute("Variant", mutation.id)
+end
+
 local function weldAndConfigure(model: Model, anchored: boolean)
 	local root = model.PrimaryPart :: BasePart
 	for _, descendant in model:GetDescendants() do
@@ -303,7 +395,8 @@ local function weldAndConfigure(model: Model, anchored: boolean)
 	root.Anchored = anchored
 end
 
-export type BuildOptions = { anchored: boolean }
+-- `mutation`: the creature's mutation (GameData.mutation(record.variant)); nil builds the plain look.
+export type BuildOptions = { anchored: boolean, mutation: Types.MutationDef? }
 
 -- Builds a ready-to-place model for a creature. Pivot it with model:PivotTo(cframeAtFeet).
 function CreatureVisuals.build(def: Types.CreatureDef, rarity: Types.RarityDef, options: BuildOptions): Model
@@ -315,6 +408,9 @@ function CreatureVisuals.build(def: Types.CreatureDef, rarity: Types.RarityDef, 
 		model:ScaleTo(rarity.modelScale)
 	end
 	addRarityFlair(model, rarity)
+	if options.mutation then
+		addMutationLook(model, options.mutation)
+	end
 	weldAndConfigure(model, options.anchored)
 	return model
 end

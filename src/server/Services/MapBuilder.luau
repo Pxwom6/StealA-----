@@ -53,10 +53,12 @@ export type World = {
 	leaderboards: { cash: BasePart, steals: BasePart },
 	lobbySpawn: CFrame,
 	groundY: number, -- world Y of the top of the ground
+	walkwayY: number, -- world Y of the top of the walkway between the plots and the belt
 }
 
 local MAP = Gameplay.map
 local FLOOR_TOP = 0.4
+local WALKWAY_TOP = 0.2
 local PODIUM_HEIGHT = 1.4
 
 local MapBuilder = {}
@@ -431,8 +433,8 @@ function MapBuilder.build(): World
 	local walkwaySpan = MAP.plotsPerSide * MAP.plotWidth + (MAP.plotsPerSide - 1) * MAP.plotGap + 60
 	part({
 		Name = "Walkway",
-		Size = Vector3.new(walkwaySpan, 0.2, MAP.walkwayWidth * 2),
-		CFrame = CFrame.new(0, 0.1, 0),
+		Size = Vector3.new(walkwaySpan, WALKWAY_TOP, MAP.walkwayWidth * 2),
+		CFrame = CFrame.new(0, WALKWAY_TOP / 2, 0),
 		Color = UiTheme.world("walkway"),
 		Parent = map,
 	})
@@ -480,6 +482,7 @@ function MapBuilder.build(): World
 		leaderboards = { cash = cashBoard, steals = stealsBoard },
 		lobbySpawn = spawn.CFrame + Vector3.new(0, 3, 0),
 		groundY = 0,
+		walkwayY = WALKWAY_TOP,
 	}
 end
 

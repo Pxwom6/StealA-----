@@ -3,7 +3,8 @@
 	Cash in, cash out.
 
 	* Income tick (every Gameplay.incomeTickSeconds): each creature adds income × multiplier to its podium's
-	  `stored` cash (saved, so it survives rejoining).
+	  `stored` cash (saved, so it survives rejoining). "Income" and "price" always mean the creature's mutated
+	  values (GameData.income / GameData.price with the record's variant).
 	* Collecting: 4×/s the server checks whether each owner's character stands on one of their collect pads and
 	  moves that podium's stored cash into their wallet. Purely position-based: no client remote can collect.
 	* Intents: BuyPodium, SellCreature.
@@ -15,12 +16,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
 local Monetization = require(ReplicatedStorage.Shared.Config.Monetization)
+local Social = require(ReplicatedStorage.Shared.Config.Social)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local GameData = require(ReplicatedStorage.Shared.GameData)
 local Types = require(ReplicatedStorage.Shared.Types)
 local EconomyMath = require(ReplicatedStorage.Shared.Logic.EconomyMath)
 local Inventory = require(ReplicatedStorage.Shared.Logic.Inventory)
 local Guard = require(ReplicatedStorage.Shared.Logic.Guard)
+local SocialRules = require(ReplicatedStorage.Shared.Logic.SocialRules)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local Analytics = require(script.Parent.Analytics)
@@ -29,6 +32,7 @@ local PlotService = require(script.Parent.PlotService)
 local Remotes = require(script.Parent.Remotes)
 local Replication = require(script.Parent.Replication)
 local Sessions = require(script.Parent.Sessions)
+local TutorialService = require(script.Parent.TutorialService)
 
 type Session = Sessions.Session
 
@@ -47,11 +51,8 @@ local function multiplierInputs(session: Session): EconomyMath.MultiplierInputs
 		isVip = session.passes.VIP,
 		vipIncomeBonus = perks.vipIncomeBonus,
 		eventCashMultiplier = LiveOpsService.cashMultiplier(),
+		socialBonus = SocialRules.totalBonus(session.social.friends, session.social.groupMember, Social),
 	}
-end
-
-function EconomyService.multiplier(session: Session): number
-	return EconomyMath.incomeMultiplier(multiplierInputs(session))
 end
 
 -- What a cash pack pays right now (see EconomyMath.packIncome for what counts).
@@ -71,29 +72,31 @@ end
 
 -- Recomputes cached income / multiplier / capacity and pushes them to the world and the HUD.
 function EconomyService.refresh(session: Session)
-	session.multiplier = EconomyService.multiplier(session)
+	local inputs = multiplierInputs(session)
+	-- The live multiplier includes temporary bonuses (LiveOps events, friends & group): it drives income ticks and the
+	-- HUD only. Anything paid out or saved uses rewardIncome or packIncome below.
+	session.multiplier = EconomyMath.incomeMultiplier(inputs)
 	session.capacity = EconomyService.capacity(session)
 	local incomes: { number } = {}
 	local packSources: { EconomyMath.PackSource } = {}
 	for _, record in session.data.creatures do
 		local def = GameData.catalog.creatures[record.id]
 		if def then
-			table.insert(incomes, def.income)
+			local baseIncome = GameData.income(def, record.variant)
+			table.insert(incomes, baseIncome)
 			table.insert(packSources, {
-				baseIncome = def.income,
+				baseIncome = baseIncome,
 				podium = record.podium,
 				inTransit = session.plot ~= 0 and PlotService.isBusy(session.plot, record.podium),
 			})
 		end
 	end
 	session.incomePerSecond = EconomyMath.totalIncome(incomes, session.multiplier)
-	session.packIncome = EconomyMath.packIncome(
-		packSources,
-		session.capacity,
-		EconomyMath.permanentMultiplier(multiplierInputs(session))
-	)
+	session.rewardIncome = EconomyMath.totalIncome(incomes, EconomyMath.rewardMultiplier(inputs))
+	session.packIncome = EconomyMath.packIncome(packSources, session.capacity, EconomyMath.permanentMultiplier(inputs))
 	local stats = session.data.stats
-	stats.bestCashPerSecond = math.max(stats.bestCashPerSecond, session.incomePerSecond)
+	-- Saved (and on the global leaderboard): never inflated by the temporary social bonus.
+	stats.bestCashPerSecond = math.max(stats.bestCashPerSecond, session.rewardIncome)
 	if session.plot ~= 0 then
 		PlotService.syncPodiums(session)
 		PlotService.setNextPodiumCost(
@@ -130,13 +133,14 @@ function EconomyService.freePodium(session: Session): number?
 	return Inventory.findFreePodium(session.data.creatures, session.capacity)
 end
 
--- Places a new creature on the lowest free podium. Returns the record, or nil if the base is full.
-function EconomyService.giveCreature(session: Session, creatureId: string): Types.CreatureRecord?
+-- Places a new creature (with its mutation id, nil for a plain one) on the lowest free podium. Returns the record, or
+-- nil if the base is full.
+function EconomyService.giveCreature(session: Session, creatureId: string, variant: string?): Types.CreatureRecord?
 	local podium = EconomyService.freePodium(session)
 	if podium == nil or GameData.catalog.creatures[creatureId] == nil then
 		return nil
 	end
-	local record = Inventory.add(session.data, creatureId, podium, os.time())
+	local record = Inventory.add(session.data, creatureId, podium, os.time(), variant)
 	EconomyService.refresh(session)
 	return record
 end
@@ -172,7 +176,7 @@ local function incomeTick(dt: number)
 			end
 			local def = GameData.catalog.creatures[record.id]
 			if def then
-				record.stored += EconomyMath.creatureIncome(def.income, multiplier) * dt
+				record.stored += EconomyMath.creatureIncome(GameData.income(def, record.variant), multiplier) * dt
 				PlotService.setStored(session.plot, record.podium, record.stored)
 			end
 		end
@@ -216,6 +220,7 @@ local function padCheck()
 					amount = amount,
 					position = nearest.padPosition,
 				})
+				TutorialService.record(session, "collect") -- only a pad collect counts (not selling, not leaving)
 			end
 		end
 	end
@@ -269,12 +274,15 @@ local function onSellCreature(player: Player, podiumArg: unknown)
 	local def = GameData.catalog.creatures[record.id]
 	EconomyService.collect(session, podium)
 	Inventory.removeByUid(session.data.creatures, record.uid)
-	local value = EconomyMath.sellValue(def.price, Economy.sellRefund)
+	local value = EconomyMath.sellValue(GameData.price(def, record.variant), Economy.sellRefund)
 	EconomyService.addCash(session, value, "Gameplay", "Sell")
 	EconomyService.refresh(session)
 	Remotes.notify(
 		player,
-		Format.template(Theme.text.soldCreature, { creature = def.displayName, amount = UiTheme.cash(value) }),
+		Format.template(
+			Theme.text.soldCreature,
+			{ creature = GameData.displayName(def, record.variant), amount = UiTheme.cash(value) }
+		),
 		"success"
 	)
 end

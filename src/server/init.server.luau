@@ -24,7 +24,10 @@ local RebirthService = require(Services.RebirthService)
 local Remotes = require(Services.Remotes)
 local Replication = require(Services.Replication)
 local RetentionService = require(Services.RetentionService)
+local SeasonService = require(Services.SeasonService)
+local SocialService = require(Services.SocialService)
 local StealService = require(Services.StealService)
+local TutorialService = require(Services.TutorialService)
 
 Remotes.start()
 DataService.start()
@@ -34,6 +37,7 @@ PlotService.start(world)
 
 Analytics.start()
 LiveOpsService.start()
+SeasonService.start(world) -- seasonal decorations + lighting follow the active LiveOps events
 Replication.start()
 PositionTracker.start()
 EconomyService.start()
@@ -43,6 +47,8 @@ StealService.start()
 RebirthService.start()
 MonetizationService.start()
 RetentionService.start()
+SocialService.start()
+TutorialService.start(EconomyService.addCash) -- pays the one-time completion reward
 LeaderboardService.start(world)
 DevCommands.start() -- Studio only
 
@@ -51,11 +57,15 @@ hooks.checkPasses = MonetizationService.checkPasses
 table.insert(hooks.onJoined, LockService.refresh)
 table.insert(hooks.onJoined, LockService.restore)
 table.insert(hooks.onJoined, RetentionService.payOfflineEarnings)
+table.insert(hooks.onJoined, SocialService.onJoined)
+table.insert(hooks.onJoined, TutorialService.onJoined) -- after the lock timers are restored
 table.insert(hooks.onReady, RetentionService.sendWelcome)
 table.insert(hooks.onLeaving, function(session)
 	StealService.releaseAll(session, "left")
 end)
 table.insert(hooks.onLeaving, LockService.onLeaving)
+table.insert(hooks.onLeaving, SocialService.onLeaving)
+table.insert(hooks.onLeaving, TutorialService.onLeaving)
 table.insert(hooks.onLeaving, function(session)
 	task.spawn(LeaderboardService.writePlayer, session)
 end)

@@ -39,6 +39,12 @@ function InteractionController.refreshAll()
 	end
 end
 
+-- The mutation id of the creature on a podium (its "Variant" attribute), nil for a plain one.
+function InteractionController.variantOf(podium: Model): string?
+	local variant = podium:GetAttribute("Variant")
+	return if type(variant) == "string" and variant ~= "" then variant else nil
+end
+
 local function isMine(plot: Model): boolean
 	return plot:GetAttribute("OwnerUserId") == localPlayer.UserId
 end
@@ -73,10 +79,12 @@ local function setupPodium(podium: Model, plot: Model)
 			return
 		end
 		if isMine(plot) then
+			-- Same value as the server's sell (mutated price × refund rate).
+			local variant = InteractionController.variantOf(podium)
+			local value = EconomyMath.sellValue(GameData.price(def, variant), Economy.sellRefund)
 			prompt:SetAttribute("Role", "Sell")
-			prompt.ActionText =
-				`{Theme.text.sellAction} {UiTheme.cash(EconomyMath.sellValue(def.price, Economy.sellRefund))}`
-			prompt.ObjectText = def.displayName
+			prompt.ActionText = `{Theme.text.sellAction} {UiTheme.cash(value)}`
+			prompt.ObjectText = GameData.displayName(def, variant)
 			prompt.HoldDuration = 0.8
 			prompt.Enabled = true
 			return
@@ -95,7 +103,7 @@ local function setupPodium(podium: Model, plot: Model)
 			Net.get("SellCreature"):FireServer(index)
 		end
 	end)
-	for _, attribute in { "CreatureId", "BeingStolen" } do
+	for _, attribute in { "CreatureId", "Variant", "BeingStolen" } do
 		podium:GetAttributeChangedSignal(attribute):Connect(refresh)
 	end
 	plot:GetAttributeChangedSignal("OwnerUserId"):Connect(refresh)

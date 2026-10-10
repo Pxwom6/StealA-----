@@ -2,7 +2,8 @@
 --[[
 	The always-on HUD, laid out for thumbs on a landscape phone:
 
-	  top centre    cash (animated count-up) + cash/sec, then status pills (luck, lock) stacked below
+	  top centre    cash (animated count-up) + cash/sec, then the tutorial banner and status pills (event + luck, lock,
+	                social) stacked below in TOP_ORDER, so nothing in the stack can overlap
 	  left middle   round feature buttons (Shop, Rebirth, Daily...) — other controllers add them
 	  right, above the jump button   contextual action area (e.g. the big TAG! button)
 
@@ -35,7 +36,17 @@ function HudController.screen(): ScreenGui
 	return screen
 end
 
--- Container below the cash readout for status pills (luck, lock...). Children sort by LayoutOrder.
+-- Slots in the top stack, top to bottom (LayoutOrder). Each controller adds its pill at its own slot.
+HudController.TOP_ORDER = table.freeze({
+	cash = 1,
+	income = 2,
+	tutorial = 3, -- right under the cash: where a new player looks first
+	liveOps = 4, -- event banner + countdown, server luck
+	lock = 5,
+	social = 6,
+})
+
+-- Container below the cash readout for status pills (luck, lock...). Children sort by LayoutOrder (TOP_ORDER).
 function HudController.topStack(): Frame
 	return topStack
 end
@@ -109,7 +120,7 @@ local function build()
 		Name = "TopStack",
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, 6),
-		Size = UDim2.fromOffset(300, 220),
+		Size = UDim2.fromOffset(300, 280),
 		BackgroundTransparency = 1,
 		Parent = screen,
 	}) :: Frame
@@ -122,7 +133,7 @@ local function build()
 
 	cashPill = UiKit.panel({
 		Name = "Cash",
-		LayoutOrder = 1,
+		LayoutOrder = HudController.TOP_ORDER.cash,
 		Size = UDim2.fromOffset(250, 58),
 		BackgroundColor3 = UiTheme.palette("panel"),
 		Parent = topStack,
@@ -136,7 +147,7 @@ local function build()
 	})
 	incomeLabel = UiKit.label({
 		Name = "Income",
-		LayoutOrder = 2,
+		LayoutOrder = HudController.TOP_ORDER.income,
 		Size = UDim2.fromOffset(250, 26),
 		TextColor3 = UiTheme.palette("cash"),
 		Text = UiTheme.perSecond(0),
@@ -179,7 +190,10 @@ function HudController.start()
 			pulse(cashPill, if state.cash > lastCash then UiTheme.palette("cash") else UiTheme.palette("danger"))
 		end
 		if lastCash == nil then
+			-- First update: show the real balance straight away. Without this the label kept its "$0" placeholder
+			-- until cash first changed, because displayed and target cash start out equal.
 			displayedCash = state.cash
+			cashLabel.Text = UiTheme.cash(math.floor(state.cash))
 		end
 		lastCash = state.cash
 	end)

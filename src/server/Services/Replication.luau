@@ -9,9 +9,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
+local Social = require(ReplicatedStorage.Shared.Config.Social)
 local DailyStreak = require(ReplicatedStorage.Shared.Logic.DailyStreak)
 local EconomyMath = require(ReplicatedStorage.Shared.Logic.EconomyMath)
 local RebirthMath = require(ReplicatedStorage.Shared.Logic.RebirthMath)
+local SocialRules = require(ReplicatedStorage.Shared.Logic.SocialRules)
+local TutorialRules = require(ReplicatedStorage.Shared.Logic.TutorialRules)
+local Tutorial = require(ReplicatedStorage.Shared.Config.Tutorial)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local Types = require(ReplicatedStorage.Shared.Types)
@@ -31,6 +35,10 @@ function Replication.snapshot(session: Session): Types.ClientState
 	local daily = DailyStreak.status(data.daily, os.time())
 	local slot = Economy.daily[DailyStreak.slot(daily.nextStreak, #Economy.daily)]
 	local carry = session.carry
+	local social = session.social
+	local friendBonus = SocialRules.friendBonus(social.friends, Social.friends)
+	local groupBonus = SocialRules.groupBonus(social.groupMember, Social.group)
+	local tutorial = session.tutorial
 	return {
 		cash = data.cash,
 		income = session.incomePerSecond,
@@ -59,7 +67,21 @@ function Replication.snapshot(session: Session): Types.ClientState
 			streak = data.daily.streak,
 			nextStreak = daily.nextStreak,
 			secondsUntilNext = daily.secondsUntilNext,
-			reward = DailyStreak.rewardAmount(slot, session.incomePerSecond),
+			reward = DailyStreak.rewardAmount(slot, session.rewardIncome), -- as RetentionService pays it
+		},
+		social = {
+			friends = social.friends,
+			friendBonus = friendBonus,
+			groupMember = social.groupMember,
+			groupBonus = groupBonus,
+			bonus = friendBonus + groupBonus,
+			groupRewardClaimed = data.flags[SocialRules.GROUP_WELCOME_FLAG] == true,
+		},
+		tutorial = {
+			step = if tutorial then tutorial.stepId else "",
+			index = if tutorial then TutorialRules.stepIndex(tutorial.stepId, Tutorial) else 0,
+			count = #Tutorial.steps,
+			stepStartedAt = if tutorial then tutorial.startedAt else 0,
 		},
 	}
 end

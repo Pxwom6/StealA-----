@@ -1,7 +1,8 @@
 --!strict
 --[[
 	Client-side visuals for the 8 plots, driven entirely by replicated attributes:
-	  * podium billboards: name (rarity colour), cash/sec, uncollected cash, "being stolen!" warning
+	  * podium billboards: name (rarity colour; a mutation such as "Golden" in its own colour), cash/sec,
+	    uncollected cash, "being stolen!" warning, and an "EVENT" tag over limited-time Snacklings
 	  * shield countdown over each entrance (lock or new-player protection)
 	  * a big "YOUR BASE" marker over your own plot so a new player always knows where home is
 	  * your own entrance barrier is made non-collidable locally, so the lock never blocks the owner
@@ -36,11 +37,16 @@ local function isMine(plot: Model): boolean
 	return plot:GetAttribute("OwnerUserId") == localPlayer.UserId
 end
 
+-- Podium billboard rows in pixels; the "EVENT" tag row only shows (and the billboard only grows) for event Snacklings.
+local PODIUM_GUI_WIDTH = 170
+local PODIUM_GUI_HEIGHT = 78
+local EVENT_TAG_HEIGHT = 16
+
 local function setupPodium(podium: Model)
 	local base = podium:WaitForChild("Base") :: BasePart
 	local gui = UiKit.new("BillboardGui", {
 		Name = "PodiumInfo",
-		Size = UDim2.fromOffset(170, 78),
+		Size = UDim2.fromOffset(PODIUM_GUI_WIDTH, PODIUM_GUI_HEIGHT),
 		StudsOffsetWorldSpace = Vector3.new(0, 8.5, 0),
 		MaxDistance = 55,
 		LightInfluence = 0,
@@ -52,19 +58,33 @@ local function setupPodium(podium: Model)
 		HorizontalAlignment = Enum.HorizontalAlignment.Center,
 		Parent = gui,
 	})
-	local nameLabel = UiKit.label({ LayoutOrder = 1, Size = UDim2.fromScale(1, 0.32), Parent = gui })
+	local eventLabel = UiKit.label({
+		LayoutOrder = 0,
+		Size = UDim2.new(1, 0, 0, EVENT_TAG_HEIGHT),
+		Text = Theme.text.eventTag,
+		Visible = false,
+		Parent = gui,
+	})
+	local nameLabel = UiKit.label({ LayoutOrder = 1, Size = UDim2.new(1, 0, 0, 25), RichText = true, Parent = gui })
 	local incomeLabel = UiKit.label({
 		LayoutOrder = 2,
-		Size = UDim2.fromScale(1, 0.26),
+		Size = UDim2.new(1, 0, 0, 20),
 		TextColor3 = UiTheme.palette("cash"),
 		Parent = gui,
 	})
 	local storedLabel = UiKit.label({
 		LayoutOrder = 3,
-		Size = UDim2.fromScale(1, 0.36),
+		Size = UDim2.new(1, 0, 0, 28),
 		TextColor3 = UiTheme.palette("gold"),
 		Parent = gui,
 	})
+	local function showEventTag(eventId: string?)
+		eventLabel.Visible = eventId ~= nil
+		if eventId then
+			eventLabel.TextColor3 = UiTheme.eventColor(eventId)
+		end
+		gui.Size = UDim2.fromOffset(PODIUM_GUI_WIDTH, PODIUM_GUI_HEIGHT + (if eventId then EVENT_TAG_HEIGHT else 0))
+	end
 
 	local function update()
 		local creatureId = podium:GetAttribute("CreatureId")
@@ -76,7 +96,8 @@ local function setupPodium(podium: Model)
 		end
 		gui.Enabled = true
 		if beingStolen then
-			nameLabel.Text = Theme.text.carryMarker
+			showEventTag(nil)
+			nameLabel.Text = UiTheme.escapeRich(Theme.text.carryMarker)
 			nameLabel.TextColor3 = UiTheme.palette("danger")
 			incomeLabel.Text = ""
 			storedLabel.Text = ""
@@ -86,15 +107,16 @@ local function setupPodium(podium: Model)
 			gui.Enabled = false
 			return
 		end
-		local creature = def
-		nameLabel.Text = creature.displayName
-		nameLabel.TextColor3 = UiTheme.rarityColor(creature.rarity)
+		showEventTag(def.eventId)
+		local variant = podium:GetAttribute("Variant")
+		nameLabel.Text = UiTheme.creatureNameRich(def, if type(variant) == "string" then variant else nil)
+		nameLabel.TextColor3 = UiTheme.palette("text") -- the rich text colours each word
 		local income = podium:GetAttribute("Income")
 		incomeLabel.Text = UiTheme.perSecond(if type(income) == "number" then income else 0)
 		local stored = podium:GetAttribute("Stored")
 		storedLabel.Text = UiTheme.cash(if type(stored) == "number" then stored else 0)
 	end
-	for _, attribute in { "CreatureId", "Stored", "Income", "BeingStolen" } do
+	for _, attribute in { "CreatureId", "Variant", "Stored", "Income", "BeingStolen" } do
 		podium:GetAttributeChangedSignal(attribute):Connect(update)
 	end
 	update()

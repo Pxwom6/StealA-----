@@ -28,6 +28,7 @@ local PositionTracker = require(script.Parent.PositionTracker)
 local Remotes = require(script.Parent.Remotes)
 local Replication = require(script.Parent.Replication)
 local Sessions = require(script.Parent.Sessions)
+local TutorialService = require(script.Parent.TutorialService)
 
 type Session = Sessions.Session
 
@@ -206,6 +207,7 @@ function LockService.tryLock(session: Session): (boolean, string?)
 		kind = "lock",
 		position = PlotService.refs(session.plot).lockButton.Position,
 	})
+	TutorialService.record(session, "lock")
 	return true, nil
 end
 

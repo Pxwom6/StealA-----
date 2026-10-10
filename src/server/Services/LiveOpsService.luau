@@ -2,11 +2,14 @@
 --[[
 	Server-wide modifiers: scheduled events (Config/LiveOps), purchased / admin luck boosts, and the cash
 	multiplier from events. Current values are mirrored to workspace attributes (LuckMultiplier, LuckEndsAt,
-	EventBanner, CashMultiplier, ActiveEventIds) so every client can show them without extra remotes.
+	PurchasedLuckEndsAt, EventBanner, EventBannerId, EventTitle, EventEndsAt, CashMultiplier, ActiveEventIds) so
+	every client can show them without extra remotes. Listeners hear when the set of active events changes
+	(onActiveEventsChanged; SeasonService switches seasonal themes with it).
 
 	Runtime control without publishing:
 	  * remote config: event list JSON in a DataStore entry, re-read every few minutes
-	  * admin chat commands (/luck, /event, /announce), broadcast to every server with MessagingService
+	  * admin chat commands (/luck, /event <id> [minutes], /event off [id], /announce), broadcast to every server
+	    with MessagingService. In Studio anyone may use them and they apply to that Studio session only.
 ]]
 
 local DataStoreService = game:GetService("DataStoreService")
@@ -30,6 +33,8 @@ local adminEvents: { Types.EventDef } = {}
 local boosts: { LiveOpsRules.Boost } = {}
 local cashListeners: { () -> () } = {}
 local lastCashMultiplier = 1
+local activeEventListeners: { (ids: { [string]: boolean }) -> () } = {}
+local lastActiveIds = ""
 
 function LiveOpsService.now(): number
 	return workspace:GetServerTimeNow()
@@ -87,14 +92,45 @@ function LiveOpsService.setBoosts(list: { LiveOpsRules.Boost })
 	boosts = list
 end
 
--- Starts a configured (or ad-hoc) event right now for `seconds`.
+-- Starts a configured (or ad-hoc) event right now for `seconds`. If that event id is already running (scheduled,
+-- remote config, or started earlier), this only extends it: it ends at the later of its current end and now +
+-- `seconds`, never sooner, and never runs twice (the rules count each event id once, LiveOpsRules.distinctActiveEvents).
+-- Use `/event off` first to shorten an event started this way.
 function LiveOpsService.startEventNow(event: Types.EventDef, seconds: number)
-	local now = os.time()
+	local now = LiveOpsService.now()
+	local endsAt = now + seconds
+	for _, running in LiveOpsRules.activeEvents(LiveOpsService.events(), now) do
+		if running.id == event.id then
+			endsAt = math.max(endsAt, running.endsAt)
+		end
+	end
 	local copy = table.clone(event)
 	copy.startsAt = now
-	copy.endsAt = now + seconds
-	table.insert(adminEvents, copy)
+	copy.endsAt = endsAt
+	local kept: { Types.EventDef } = {}
+	for _, running in adminEvents do
+		if running.id ~= event.id then
+			table.insert(kept, running)
+		end
+	end
+	table.insert(kept, copy)
+	adminEvents = kept
 	LiveOpsService.publishAttributes()
+end
+
+-- Ends events started with /event (startEventNow): every one, or only those with `id`. Scheduled (config and
+-- remote-config) events are not affected: change their dates to end them. Returns how many were ended.
+function LiveOpsService.endStartedEvents(id: string?): number
+	local kept: { Types.EventDef } = {}
+	for _, event in adminEvents do
+		if id ~= nil and event.id ~= id then
+			table.insert(kept, event)
+		end
+	end
+	local ended = #adminEvents - #kept
+	adminEvents = kept
+	LiveOpsService.publishAttributes()
+	return ended
 end
 
 function LiveOpsService.setRemoteEvents(events: { Types.EventDef })
@@ -120,33 +156,44 @@ function LiveOpsService.onCashMultiplierChanged(listener: () -> ())
 	table.insert(cashListeners, listener)
 end
 
+-- Calls `listener` with the active event ids whenever that set changes: an event starts or ends by its dates (checked
+-- every second), arrives with remote config, or is started / ended by an admin command. Listeners should also read
+-- activeEventIds() once when they start, for the events already running.
+function LiveOpsService.onActiveEventsChanged(listener: (ids: { [string]: boolean }) -> ())
+	table.insert(activeEventListeners, listener)
+end
+
 function LiveOpsService.publishAttributes()
 	local now = LiveOpsService.now()
 	boosts = LiveOpsRules.pruneBoosts(boosts, now)
+	local events = LiveOpsService.events()
 	local luck = LiveOpsService.luckMultiplier()
-	local luckEndsAt = 0
-	for _, boost in boosts do
-		luckEndsAt = math.max(luckEndsAt, boost.endsAt)
-	end
-	local banner = ""
-	for _, event in LiveOpsRules.activeEvents(LiveOpsService.events(), now) do
-		if (event.luckMultiplier or 1) > 1 then
-			luckEndsAt = math.max(luckEndsAt, event.endsAt)
-		end
-		if banner == "" and event.bannerText then
-			banner = event.bannerText
-		end
-	end
 	workspace:SetAttribute("PurchasedLuckEndsAt", LiveOpsRules.boostEndsAt(boosts, "purchase", now))
 	workspace:SetAttribute("LuckMultiplier", luck)
-	workspace:SetAttribute("LuckEndsAt", if luck > 1 then luckEndsAt else 0)
-	workspace:SetAttribute("EventBanner", banner)
+	-- When the luck shown next changes (a boost or luck event ends), not when the last one ends.
+	workspace:SetAttribute(
+		"LuckEndsAt",
+		if luck > 1 then LiveOpsRules.luckChangesAt(events, boosts, now, LiveOps.limits) else 0
+	)
+	-- The HUD event pill: banner text, which event it belongs to (theme colour), its title and end for the countdown.
+	local bannerEvent = LiveOpsRules.bannerEvent(events, now)
+	workspace:SetAttribute("EventBanner", if bannerEvent then bannerEvent.bannerText else "")
+	workspace:SetAttribute("EventBannerId", if bannerEvent then bannerEvent.id else "")
+	workspace:SetAttribute("EventTitle", if bannerEvent then bannerEvent.title or "" else "")
+	workspace:SetAttribute("EventEndsAt", if bannerEvent then bannerEvent.endsAt else 0)
 	local activeIds: { string } = {}
 	for id in LiveOpsService.activeEventIds() do
 		table.insert(activeIds, id)
 	end
 	table.sort(activeIds)
-	workspace:SetAttribute("ActiveEventIds", table.concat(activeIds, ","))
+	local activeKey = table.concat(activeIds, ",")
+	workspace:SetAttribute("ActiveEventIds", activeKey)
+	if activeKey ~= lastActiveIds then
+		lastActiveIds = activeKey
+		for _, listener in activeEventListeners do
+			task.spawn(listener, LiveOpsService.activeEventIds())
+		end
+	end
 
 	local cash = LiveOpsService.cashMultiplier()
 	workspace:SetAttribute("CashMultiplier", cash)
@@ -190,6 +237,8 @@ end
 
 type Command = { kind: string, multiplier: number?, minutes: number?, eventId: string?, text: string? }
 
+local MAX_EVENT_MINUTES = 7 * 24 * 60
+
 local function applyCommand(command: Command)
 	if command.kind == "luck" then
 		local multiplier = math.clamp(command.multiplier or 2, 1, LiveOps.limits.maxLuckMultiplier)
@@ -199,18 +248,33 @@ local function applyCommand(command: Command)
 	elseif command.kind == "event" and command.eventId then
 		local event = LiveOpsService.findConfiguredEvent(command.eventId)
 		if event then
-			LiveOpsService.startEventNow(event, event.durationSeconds or 1800)
+			local seconds = if type(command.minutes) == "number" and command.minutes == command.minutes
+				then math.clamp(math.floor(command.minutes), 1, MAX_EVENT_MINUTES) * 60
+				else event.durationSeconds or 1800
+			LiveOpsService.startEventNow(event, seconds)
+			print(`[LiveOps] /event: {event.id} running for at least {seconds // 60} min`)
 			if event.bannerText then
 				Announcer.broadcast({ text = event.bannerText, rarity = "Mythic", kind = "admin" })
 			end
+		else
+			warn(`[LiveOps] /event: no configured event "{command.eventId}"`)
 		end
+	elseif command.kind == "eventOff" then
+		local ended = LiveOpsService.endStartedEvents(command.eventId)
+		print(`[LiveOps] /event off: ended {ended} started event(s)`)
 	elseif command.kind == "announce" and command.text then
 		Announcer.broadcast({ text = command.text, kind = "admin" })
 	end
 end
 
--- Publishes to every server (including this one); falls back to applying locally (e.g. in Studio).
+-- Publishes to every server (including this one); falls back to applying locally if publishing fails. In Studio a
+-- command only ever applies to the Studio session: anyone may use the commands there (isAdmin), and with Studio API
+-- access on, publishing would reach every live server.
 local function broadcastCommand(command: Command)
+	if RunService:IsStudio() then
+		applyCommand(command)
+		return
+	end
 	local ok = pcall(function()
 		MessagingService:PublishAsync(LiveOps.messagingTopic, HttpService:JSONEncode(command))
 	end)
@@ -285,9 +349,21 @@ local function startAdminTools()
 	addCommand("luck", function(_userId: number, args: { string })
 		broadcastCommand({ kind = "luck", multiplier = tonumber(args[1]), minutes = tonumber(args[2]) })
 	end)
+	-- /event <eventId> [minutes]   start a configured event now (for its durationSeconds, or `minutes`)
+	-- /event off [eventId]         end the events started this way (all of them, or just that one)
 	addCommand("event", function(_userId: number, args: { string })
-		if args[1] then
-			broadcastCommand({ kind = "event", eventId = args[1] })
+		local first = args[1]
+		if first == nil or #first > 64 then
+			return
+		end
+		if string.lower(first) == "off" then
+			local id = args[2]
+			if id and #id > 64 then
+				return
+			end
+			broadcastCommand({ kind = "eventOff", eventId = id })
+		else
+			broadcastCommand({ kind = "event", eventId = first, minutes = tonumber(args[2]) })
 		end
 	end)
 	addCommand("announce", function(userId: number, _args: { string }, rawArgs: string)

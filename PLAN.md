@@ -46,7 +46,8 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | Data / persistence | `DataService` (ProfileStore, session-locked, autosave, BindToClose) | – | `DataSchema` (template, migrate, sanitise) |
 | Plots | `PlotService` (assign / release / reset, podium attributes) | `PlotController` (billboards, owner barrier pass-through) | `PlotAssignment`, `Inventory` |
 | Map | `MapBuilder` | – | – |
-| Conveyor | `BeltService` (weighted spawns, buy validation) | `BeltController` (pooled models, local prompts) | `BeltMath`, `RarityRoll`, `Catalog` |
+| Conveyor | `BeltService` (weighted spawns, mutation rolls, buy validation) | `BeltController` (models pooled per creature + mutation, local prompts) | `BeltMath`, `RarityRoll`, `MutationRules`, `Catalog` |
+| Mutations | `BeltService` rolls, `EconomyService` / `PlotService` / `StealService` price, pay and show them | `MutationFxController` (rainbow hue cycling), labels in the belt / plot / interaction controllers | `MutationRules` |
 | Economy | `EconomyService` (1 s income tick, collect pads checked server-side from the owner's position, podium upgrades, sell) | `HudController` | `EconomyMath` |
 | Stealing | `StealService` (grab, carry, deliver, tag, timeout, speed sanity) | `StealController` (TAG button, alerts) | `StealRules` |
 | Base lock | `LockService` | lock pill + barrier | `LockRules` |
@@ -54,11 +55,13 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | Base lock UI | `LockService` | `LockController` (lock button prompt, HUD pill) | `LockRules` |
 | Monetisation | `MonetizationService` (ProcessReceipt, passes) | `StoreController` | `ReceiptLedger`, `EconomyMath.cashPackAmount` |
 | Retention | `RetentionService` (daily streak, offline earnings), `LeaderboardService` | `RewardsController` | `DailyStreak`, `OfflineEarnings` |
-| Social | `Announcer` (server-wide banners) | `NotificationController`, `ChatTagController` | – |
-| LiveOps | `LiveOpsService` (scheduled events, luck boosts, admin commands, cross-server) | luck banner | `LiveOpsRules` |
-| Analytics | `Analytics` (funnel + economy events) | sends whitelisted `store_opened` | – |
+| Social | `Announcer` (server-wide banners), `SocialService` (friends in server, group membership, welcome gift) | `NotificationController`, `ChatTagController`, `SocialController` (bonus pill, invite / join group panel) | `SocialRules` |
+| LiveOps | `LiveOpsService` (scheduled events, luck boosts, admin commands, cross-server, active-event change listeners) | event pill (banner + countdown), luck pill | `LiveOpsRules` |
+| Seasonal events | `SeasonService` (theme decorations + lighting while a themed event runs, restored after) | event pill colour, "EVENT" tag on event Snacklings' billboards | `SeasonRules` |
+| First-time tutorial | `TutorialService` (steps finished by real purchases / collects / locks / steals, timeouts, one-time reward, existing players skipped) | `TutorialController` (banner under the cash, beam + bouncing arrow + highlight on the target, Skip) | `TutorialRules` |
+| Analytics | `Analytics` (onboarding funnel following the tutorial, store funnel, economy events) | sends whitelisted `store_opened` | – |
 | State sync | `Replication` (dirty-flag batching, 5 Hz) | `StateStore` | – |
-| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn`, `/noshield`) | – | – |
+| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends`, `/tutorial`); LiveOps `/event <id> [minutes]`, `/event off` (anyone in Studio, local only) | – | – |
 
 ## 3. Module list
 
@@ -68,11 +71,15 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | `Theme` | game title, currency symbol, every UI string & template, UI palette (hex), fonts, plot colours |
 | `Rarities` | 7 tiers: order, display name, colour, belt weight, luck-affected flag, glow/particles/announce flags |
 | `Creatures` | the Snackling catalogue: id, name, rarity, price, income, belt weight, model name, colours, shape recipe, optional `eventId` |
+| `Mutations` | rare variants of any creature (Golden, Diamond, Rainbow; event-only Haunted): id, name, colour, chance per spawn, income / price multipliers, announce flags, look (material, tint, sparkles, rainbow, glow light), optional `eventId` |
 | `Economy` | start cash, podium upgrade curve, sell refund, offline earnings, rebirth curve, cash packs, daily rewards |
 | `Gameplay` | belt timing, plot geometry, steal/tag ranges, carry speed, lock/grace timers, rate limits |
 | `Monetization` | game-pass and developer-product IDs (**placeholders, TODO**), perk values, store layout |
-| `LiveOps` | admin user IDs, scheduled events (luck / cash multipliers, featured creatures), luck-boost limits |
+| `LiveOps` | admin user IDs, scheduled events (luck / cash multipliers, banner, countdown title; Halloween 2026 and its luck weekend), luck-boost limits |
+| `Seasons` | seasonal themes keyed by LiveOps event id (`Halloween2026` → `halloween`): lighting mood, decoration counts, colours, part budget |
 | `Sounds` | sound asset IDs (**placeholders**) |
+| `Social` | friend bonus (+10% per friend in the server, max 3), group id (**placeholder 0 = off**), group bonus, one-time welcome gift |
+| `Tutorial` | first-time tutorial: on/off, steps in order (buy, collect, lock, steal) with their automatic endings, one-time reward, belt-target tuning |
 
 ### `src/shared/Logic` (pure, unit-tested)
 
@@ -83,8 +90,9 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `Format` | `1.25K`, `3.4M`, `1e33` suffixes; `mm:ss`, `1h 5m` durations |
 | `Guard` | remote-argument validators (finite integer in range, short string, enum member, no NaN/inf) |
 | `RateLimiter` | token bucket keyed by (player, remote) with injected clock |
-| `Catalog` | indexes `Creatures`/`Rarities` config, validation of config integrity |
+| `Catalog` | indexes `Creatures`/`Rarities`/`Mutations` config, validation of config integrity |
 | `RarityRoll` | weighted rarity → creature roll with luck multiplier; exact odds table for display |
+| `MutationRules` | mutation roll per spawn (fixed chances, no luck, event-only mutations), mutated price / income / name (unknown variant = x1) |
 | `EconomyMath` | income with multipliers, totals, podium upgrade cost, sell value, cash-pack amounts |
 | `RebirthMath` | rebirth cost, multiplier, lock bonus, preview (what you lose / gain) |
 | `OfflineEarnings` | capped offline earnings with clock-skew protection |
@@ -94,21 +102,26 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `DailyStreak` | UTC-day streak maths and reward lookup |
 | `DataSchema` | save template, `migrate` (versioned), `sanitise` (clamp garbage) |
 | `BeltMath` | belt item position & lifetime from spawn time |
-| `LiveOpsRules` | active events at time *t*, combined luck/cash multipliers, boost stacking, remote-config validation |
+| `LiveOpsRules` | active events at time *t*, combined luck/cash multipliers, boost stacking, Server Luck preview, banner event, when the luck next changes, remote-config validation |
+| `SeasonRules` | active seasonal theme from the active event ids, decoration layout on the map (outside plots, off the belt), part count, `Config/Seasons` validation |
 | `Inventory` | podium slot operations on the save table (free slot, place, remove, find by uid) |
 | `PlotAssignment` | pick a free plot, release |
+| `SocialRules` | friend / group income bonus, friend counting per pair, group welcome gift, recheck cooldown, config validation |
+| `OnboardingFunnel` | onboarding funnel steps and their order: a milestone reached early waits until every earlier step is logged |
+| `TutorialRules` | tutorial progress in `flags` (current step, early actions, resume), existing-player detection, automatic step endings, one-time reward, guide targets (belt item, collect pad), config validation |
 
 ### `src/shared` (Roblox helpers, not unit-tested)
-`Net` (create/get remotes by name), `GameData` (catalogue built once from config), `CreatureVisuals` (build
-placeholder model or clone from `ReplicatedStorage.CreatureModels`, apply rarity glow / particles / aura),
-`UiTheme` (hex → Color3, fonts, text templates).
+`Net` (create/get remotes by name), `GameData` (catalogue built once from config; `price` / `income` /
+`displayName` of a creature + variant, used for every belt item and owned creature), `CreatureVisuals` (build
+placeholder model or clone from `ReplicatedStorage.CreatureModels`, apply rarity glow / particles / aura, then the
+mutation look), `UiTheme` (hex → Color3, fonts, text templates, rich-text creature names).
 
 ### `src/server`
 `init.server.luau` bootstraps in order:
-`Remotes → DataService → MapBuilder → PlotService → Analytics → LiveOpsService → Replication →
+`Remotes → DataService → MapBuilder → PlotService → Analytics → LiveOpsService → SeasonService → Replication →
 EconomyService → BeltService → LockService → StealService → RebirthService → MonetizationService →
-RetentionService → LeaderboardService → DevCommands → PlayerLifecycle`, and wires cross-service join/leave steps
-through `PlayerLifecycle.hooks()` (keeps services free of circular requires). `Sessions` holds per-player state.
+RetentionService → SocialService → TutorialService → LeaderboardService → DevCommands → PlayerLifecycle`, and wires
+cross-service join/leave steps through `PlayerLifecycle.hooks()` (keeps services free of circular requires). `Sessions` holds per-player state.
 
 `PlayerLifecycle` owns join/leave ordering: load profile → assign plot → check passes → offline earnings →
 spawn creatures → send initial state; on leave: cancel steals involving the player → auto-collect stored cash →
@@ -117,7 +130,8 @@ release plot → release profile.
 ### `src/client`
 `init.client.luau` waits for `game:IsLoaded()` then starts controllers:
 `StateStore, HudController, NotificationController, BeltController, PlotController, InteractionController,
-StealController, LockController, RebirthController, StoreController, ChatTagController, RewardsController`
+StealController, LockController, RebirthController, StoreController, ChatTagController, RewardsController,
+MutationFxController, SocialController, TutorialController`
 (UI helpers: `UI/UiKit`, `UI/Modal`; audio: `SoundPlayer`).
 
 ## 4. Remotes (all in `ReplicatedStorage.Remotes`, created by the server)
@@ -137,29 +151,36 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `Rebirth` | – | `RebirthMath.canRebirth` |
 | `ClaimDaily` | – | `DailyStreak.canClaim` |
 | `ClientEvent` | `name: string` | whitelist (`store_opened`, `store_product_clicked`) → analytics |
+| `CheckGroup` | – | group feature on, at most once per 10 s, not already checking → re-check membership (`IsInGroupAsync`, then `GetGroupsAsync`) |
+| `InvitePrompted` | – | analytics only (`invite_prompt_opened`); nothing is rewarded for inviting |
+| `SkipTutorial` | – | a tutorial is running → it ends with no reward (steps themselves only finish from gameplay the server saw) |
 | `DevGrantProduct` | `key: string` | **Studio only** – runs the real receipt path with a fake receipt |
 
 Server → client:
 
 | Remote | Payload |
 | --- | --- |
-| `StateUpdate` | batched partial player state (cash, cash/sec, rebirths, multiplier, podium cap, lock, passes, carry…) |
-| `BeltSnapshot` / `BeltSpawn` / `BeltRemove` | conveyor items `{id, creatureId, spawnAt}` |
+| `StateUpdate` | batched partial player state (cash, cash/sec, rebirths, multiplier, podium cap, lock, passes, carry, social bonus, tutorial step…) |
+| `BeltSnapshot` / `BeltSpawn` / `BeltRemove` | conveyor items `{id, creatureId, spawnAt, variant?}` (variant = mutation id) |
 | `Notify` | toast `{kind, text}` |
-| `Announce` | server-wide banner `{text, rarity}` |
+| `Announce` | server-wide banner `{text, rarity, color?}` (color: a mutation's own banner) |
 | `WelcomeBack` | offline earnings popup `{amount, seconds}` |
 | `DailyInfo` | streak/claimable/reward |
-| `StealAlert` | to victim: `{thiefName, creatureId}` |
-| `Effect` | one-shot VFX cue `{kind, position, rarity}` |
+| `StealAlert` | to victim: `{thiefName, creatureId, variant?}` |
+| `Effect` | one-shot VFX cue `{kind, position, rarity}` (e.g. `tutorialComplete`) |
 
 World state the client reads from **attributes** (replicated automatically): plot `OwnerUserId`, `LockedUntil`,
-`GraceUntil`, `PodiumCount`; podium `CreatureId`, `Stored`, `Income`, `BeingStolen`; player `Carrying`,
-`VIP`.
+`GraceUntil`, `PodiumCount`; podium `CreatureId`, `Variant` (mutation id, "" for none), `Stored`, `Income`
+(mutation and multipliers included), `BeingStolen`; player `Carrying`, `VIP`. Rainbow parts carry the
+CollectionService tag `MutationRainbow`. LiveOps state is on `workspace`: `LuckMultiplier`, `LuckEndsAt` (when the
+luck next changes), `PurchasedLuckEndsAt`, `CashMultiplier`, `ActiveEventIds`, `EventBanner`, `EventBannerId`,
+`EventTitle`, `EventEndsAt`, and `SeasonTheme` (the seasonal theme on, "" for none).
 
 ## 5. Data schema (version 2)
 
 ```lua
-type CreatureRecord = { uid: string, id: string, podium: number, acquiredAt: number, stored: number, variant: string? }
+type CreatureRecord = { uid: string, id: string, podium: number, acquiredAt: number, stored: number,
+                        variant: string? } -- variant = mutation id (Config/Mutations), nil = plain
 type PurchaseRecord = { purchaseId: string, productId: number, key: string, robux: number, at: number }
 type PlayerData = {   -- exactly Types.PlayerData
     version: number,             -- schema version for migrate()
@@ -178,7 +199,8 @@ type PlayerData = {   -- exactly Types.PlayerData
     daily: { streak: number, lastClaimDay: number },
     stats: { steals: number, timesStolenFrom: number, beltPurchases: number, playTime: number,
              bestCashPerSecond: number, robuxSpent: number, totalEarned: number },
-    flags: { [string]: boolean },  -- onboarding funnel milestones
+    flags: { [string]: boolean },  -- onboarding funnel milestones, one-time rewards (`social_groupWelcome`),
+                                   -- tutorial progress (`tutorial_<step>`, `tutorial_done`)
     firstJoin: number, lastSeen: number,
 }
 ```
@@ -197,7 +219,28 @@ type PlayerData = {   -- exactly Types.PlayerData
 
 ## 7. Out of scope this round (but not blocked)
 
-Trading (creatures have stable `uid`s and live in one list → a trade is two `Inventory` moves), event creatures
-(`eventId` field + `LiveOps.events` already gate spawns), mutations (`variant` field reserved in the save),
-battle pass, friend/group rewards, private servers, extra maps (plot geometry is data), custom models/sounds
-(`CreatureModels` folder + `Config/Sounds`).
+Trading (creatures have stable `uid`s and live in one list → a trade is two `Inventory` moves), battle pass,
+private servers, extra maps (plot geometry is data), custom models/sounds (`CreatureModels` folder + `Config/Sounds`),
+animated seasonal props (decorations are static anchored parts; a client controller could bob the bats / ghosts).
+
+## 8. Seasonal events (Halloween 2026)
+
+One LiveOps event id drives everything (DECISIONS.md #20): `Halloween2026` in `Config/LiveOps` (dates, banner,
+countdown title) gates four event Snacklings (`eventId` in `Config/Creatures`), the Haunted mutation (`eventId` in
+`Config/Mutations`) and the `halloween` seasonal theme (`Config/Seasons`), and `HalloweenLuck2026` adds a 2× luck
+weekend. `LiveOpsService` re-evaluates active events every second and tells `SeasonService` when the set changes;
+`SeasonService` builds or removes the theme's decorations (`Logic/SeasonRules.layout`) and fades the lighting in or
+back. The HUD shows the banner with "Halloween ends in 3d 4h" and event Snacklings carry an "EVENT" tag. Balance:
+BALANCE.md "Halloween". Studio: `/event Halloween2026 [minutes]`, `/event off`, `/spawn <eventCreature> haunted`.
+
+## 9. First-time tutorial
+
+A brand-new player learns the loop in about a minute (DECISIONS.md #21): **buy** a Snackling from the belt → **collect**
+its cash from the glowing pad → **lock** the base → **steal** from another base. Each step is one short line in a
+banner right under the cash (step badge "1/4", Skip button) and a 3D guide: a pulsing beam from the player's feet, a
+bouncing arrow over the target and a highlight on it (nearest affordable belt item, the pad with the most cash, the
+lock button; the steal step only shows a tip about the new-player shield). `TutorialService` finishes a step only when
+the server applies that action (belt purchase, pad collect, lock, delivered steal); the lock step moves on after 20 s
+of the lock being unavailable (or 60 s), the steal step after 90 s. Completing it pays $500 once per account
+(`Config/Tutorial.reward`); Skip pays nothing; players who already had progress when it shipped never see it.
+Progress lives in `data.flags` (no schema bump). Studio: `/tutorial` starts it again.

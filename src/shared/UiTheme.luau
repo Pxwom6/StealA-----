@@ -4,8 +4,11 @@
 ]]
 
 local Theme = require("./Config/Theme")
+local Seasons = require("./Config/Seasons")
 local Format = require("./Logic/Format")
+local SeasonRules = require("./Logic/SeasonRules")
 local GameData = require("./GameData")
+local Types = require("./Types")
 
 local UiTheme = {}
 
@@ -37,6 +40,13 @@ function UiTheme.rarityColor(rarityId: string): Color3
 	return UiTheme.color(if rarity then rarity.color else "#FFFFFF")
 end
 
+-- Colour of a LiveOps event in the UI (event pill, "EVENT" tag): its seasonal theme's accent (Config/Seasons), or the
+-- palette's event colour.
+function UiTheme.eventColor(eventId: string?): Color3
+	local theme = SeasonRules.themeForEvent(Seasons, eventId)
+	return if theme then UiTheme.color(theme.accentColor) else UiTheme.palette("event")
+end
+
 function UiTheme.plotColor(plotIndex: number): Color3
 	local colors = Theme.plotColors
 	return UiTheme.color(colors[((plotIndex - 1) % #colors) + 1])
@@ -60,6 +70,37 @@ function UiTheme.text(key: string, vars: { [string]: any }?): string
 		return key
 	end
 	return Format.template(template, vars)
+end
+
+-- Escapes text for a RichText label.
+function UiTheme.escapeRich(text: string): string
+	local escaped = string.gsub(text, "[&<>\"']", {
+		["&"] = "&amp;",
+		["<"] = "&lt;",
+		[">"] = "&gt;",
+		['"'] = "&quot;",
+		["'"] = "&apos;",
+	})
+	return escaped
+end
+
+local function richColor(text: string, hex: string): string
+	return `<font color="{hex}">{UiTheme.escapeRich(text)}</font>`
+end
+
+-- A creature's name for a RichText label: the creature in its rarity colour, a mutation ("Golden") in the mutation's
+-- colour, in the order of Theme.text.mutatedName.
+function UiTheme.creatureNameRich(def: Types.CreatureDef, variant: string?): string
+	local rarity = GameData.catalog.rarities[def.rarity]
+	local creature = richColor(def.displayName, if rarity then rarity.color else "#FFFFFF")
+	local mutation = GameData.mutation(variant)
+	if mutation == nil then
+		return creature
+	end
+	return Format.template(
+		Theme.text.mutatedName,
+		{ mutation = richColor(mutation.displayName, mutation.color), creature = creature }
+	)
 end
 
 function UiTheme.cash(amount: number): string

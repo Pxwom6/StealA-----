@@ -42,15 +42,16 @@ function Inventory.findByUid(creatures: { CreatureRecord }, uid: string): (Creat
 	return nil, nil
 end
 
--- Places a new creature on `podium` (caller has checked it is free). Returns the new record.
-function Inventory.add(owner: Owner, creatureId: string, podium: number, now: number): CreatureRecord
+-- Places a new creature on `podium` (caller has checked it is free), with its mutation id (`variant`, nil for a
+-- plain one). Returns the new record.
+function Inventory.add(owner: Owner, creatureId: string, podium: number, now: number, variant: string?): CreatureRecord
 	local record: CreatureRecord = {
 		uid = tostring(owner.nextUid),
 		id = creatureId,
 		podium = podium,
 		acquiredAt = now,
 		stored = 0,
-		variant = nil,
+		variant = variant,
 	}
 	owner.nextUid += 1
 	table.insert(owner.creatures, record)
@@ -66,15 +67,14 @@ function Inventory.removeByUid(creatures: { CreatureRecord }, uid: string): Crea
 end
 
 -- Moves a creature from one owner to another (a completed steal; later: trades). The receiver gets a fresh uid
--- and the creature lands on `podium`. Returns the new record, or nil if the uid was not found.
+-- and the creature lands on `podium` with its mutation (variant). Returns the new record, or nil if the uid was not
+-- found.
 function Inventory.transfer(from: Owner, to: Owner, uid: string, podium: number, now: number): CreatureRecord?
 	local record = Inventory.removeByUid(from.creatures, uid)
 	if record == nil then
 		return nil
 	end
-	local moved = Inventory.add(to, record.id, podium, now)
-	moved.variant = record.variant
-	return moved
+	return Inventory.add(to, record.id, podium, now, record.variant)
 end
 
 return Inventory

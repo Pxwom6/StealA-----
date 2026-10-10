@@ -3,8 +3,9 @@
 	Owns the 8 base plots: who owns which, and making the world match each owner's saved data.
 
 	The save (`session.data.creatures`) is the single source of truth; `syncPodiums` makes podium models and
-	replicated attributes match it. Clients read those attributes (CreatureId, Stored, Income, BeingStolen,
-	OwnerUserId, LockedUntil, ...) to draw billboards and build their own interaction prompts.
+	replicated attributes match it. Clients read those attributes (CreatureId, Variant, Stored, Income, BeingStolen,
+	OwnerUserId, LockedUntil, ...) to draw billboards and build their own interaction prompts. `Variant` is the
+	creature's mutation id ("" for none); `Income` already includes the mutation and the owner's multiplier.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -22,7 +23,7 @@ local Sessions = require(script.Parent.Sessions)
 
 type Session = Sessions.Session
 
-type PlacedCreature = { uid: string, creatureId: string, model: Model }
+type PlacedCreature = { uid: string, creatureId: string, variant: string?, model: Model }
 
 export type ShieldMode = "None" | "Locked" | "Grace"
 
@@ -104,6 +105,7 @@ function PlotService.release(session: Session)
 	table.clear(busy[plot])
 	for _, podium in refs.podiums do
 		podium.model:SetAttribute("Active", false)
+		podium.model:SetAttribute("Variant", "")
 		podium.model:SetAttribute("CreatureId", "")
 		podium.model:SetAttribute("Uid", "")
 		podium.model:SetAttribute("Stored", 0)
@@ -154,25 +156,29 @@ function PlotService.syncPodiums(session: Session)
 				current.model:Destroy()
 				placed[plot][i] = nil
 			end
-		elseif current == nil or current.uid ~= record.uid then
+		elseif current == nil or current.uid ~= record.uid or current.variant ~= record.variant then
 			if current then
 				current.model:Destroy()
 			end
 			local def = GameData.catalog.creatures[record.id]
 			local rarity = GameData.catalog.rarities[def.rarity]
-			local model = CreatureVisuals.build(def, rarity, { anchored = true })
+			local model =
+				CreatureVisuals.build(def, rarity, { anchored = true, mutation = GameData.mutation(record.variant) })
 			model:PivotTo(podium.standCFrame)
 			model.Parent = podium.model
-			placed[plot][i] = { uid = record.uid, creatureId = record.id, model = model }
+			placed[plot][i] = { uid = record.uid, creatureId = record.id, variant = record.variant, model = model }
 		end
 
 		if record then
 			local def = GameData.catalog.creatures[record.id]
+			-- Variant before CreatureId: clients redraw on CreatureId and must already see the new variant.
+			podium.model:SetAttribute("Variant", record.variant or "")
 			podium.model:SetAttribute("CreatureId", record.id)
 			podium.model:SetAttribute("Uid", record.uid)
-			podium.model:SetAttribute("Income", def.income * session.multiplier)
+			podium.model:SetAttribute("Income", GameData.income(def, record.variant) * session.multiplier)
 			podium.model:SetAttribute("Stored", math.floor(record.stored))
 		else
+			podium.model:SetAttribute("Variant", "")
 			podium.model:SetAttribute("CreatureId", "")
 			podium.model:SetAttribute("Uid", "")
 			podium.model:SetAttribute("Income", 0)

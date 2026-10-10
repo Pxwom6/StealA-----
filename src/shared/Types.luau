@@ -48,6 +48,36 @@ export type CreatureDef = {
 	eventId: string?,
 }
 
+-- Config: mutations (rare variants of any creature) --------------------------------------------------------------
+
+-- How a mutation changes a model, on top of its rarity flair. Applied to every visible part except the face
+-- (placeholder models) and parts with the attribute MutationSkip = true (custom models).
+export type MutationLook = {
+	material: string, -- Enum.Material item name, e.g. "Foil"
+	tint: string?, -- "#RRGGBB" blended into each part's colour
+	tintStrength: number?, -- 0..1, how far towards `tint` (default 1 = replace the colour)
+	transparency: number?, -- minimum part transparency (glassy looks)
+	reflectance: number?,
+	sparkles: boolean?, -- sparkle particles in the mutation colour
+	rainbow: boolean?, -- hue-cycling colours (animated on the client) and rainbow particles
+	glow: string?, -- "#RRGGBB": a soft point light in this colour (ghostly / glowing looks)
+}
+
+export type MutationDef = {
+	id: string, -- saved in CreatureRecord.variant: never rename or remove one that has shipped
+	displayName: string,
+	color: string, -- "#RRGGBB", labels and banners
+	order: number, -- display / roll order, rarest last
+	chance: number, -- probability per belt spawn, independent of rarity and luck
+	incomeMultiplier: number,
+	priceMultiplier: number,
+	announceOnSpawn: boolean,
+	announceOnBuy: boolean,
+	announceOnSteal: boolean,
+	look: MutationLook,
+	eventId: string?, -- only rolls while this LiveOps event is active
+}
+
 -- Config: LiveOps ---------------------------------------------------------------------------------------------
 
 export type EventDef = {
@@ -57,7 +87,124 @@ export type EventDef = {
 	luckMultiplier: number?,
 	cashMultiplier: number?,
 	bannerText: string?,
+	title: string?, -- short name for the HUD countdown ("Halloween ends in 3d 4h")
 	durationSeconds: number?,
+}
+
+-- Config: seasonal themes (Config/Seasons) --------------------------------------------------------------------
+
+-- Lighting while a theme is on. Colours are "#RRGGBB"; the server puts the original values back when it ends.
+export type SeasonAtmosphere = {
+	density: number, -- 0..1 (fog)
+	offset: number, -- 0..1
+	color: string,
+	decay: string,
+	glare: number, -- 0..10
+	haze: number, -- 0..10
+}
+
+export type SeasonColorCorrection = {
+	tint: string,
+	brightness: number, -- -1..1
+	contrast: number, -- -1..1
+	saturation: number, -- -1..1
+}
+
+export type SeasonLighting = {
+	clockTime: number, -- 0..24 (17.8 = dusk)
+	brightness: number,
+	ambient: string,
+	outdoorAmbient: string,
+	colorShiftTop: string,
+	atmosphere: SeasonAtmosphere,
+	colorCorrection: SeasonColorCorrection,
+}
+
+-- How many of each code-built prop the server places (0 / nil = none). Positions come from the map layout.
+export type SeasonDecorations = {
+	pumpkinsPerPlot: number?, -- glowing jack-o'-lanterns beside each plot entrance
+	beltPumpkinsPerSide: number?, -- smaller ones along both belt rails
+	bulbsPerPlot: number?, -- string-light bulbs along each plot's front wall
+	lampsBetweenPlots: boolean?, -- lamp posts in the gaps between plots
+	bats: number?, -- floating above the walkway
+	ghosts: number?, -- near the leaderboards at the belt ends
+}
+
+export type SeasonPalette = {
+	pumpkin: string,
+	pumpkinFace: string, -- glowing eyes / mouth (and their light)
+	stem: string,
+	bulbs: { string }, -- string lights cycle through these
+	lampPost: string,
+	lampLight: string,
+	bat: string,
+	ghost: string,
+}
+
+export type SeasonTheme = {
+	displayName: string,
+	accentColor: string, -- HUD event pill and the "EVENT" tag on this event's Snacklings
+	priority: number, -- when several themed events overlap, the highest priority wins
+	lighting: SeasonLighting?,
+	decorations: SeasonDecorations,
+	palette: SeasonPalette,
+}
+
+export type SeasonsConfig = {
+	eventThemes: { [string]: string }, -- LiveOps event id -> theme id
+	themes: { [string]: SeasonTheme },
+	maxParts: number, -- decoration part budget (CI checks every theme's estimate against it)
+	transitionSeconds: number, -- lighting fades in / out over this long
+}
+
+-- Config: friend & group rewards (Config/Social) ---------------------------------------------------------------
+
+export type FriendsConfig = {
+	incomeBonusPerFriend: number, -- e.g. 0.1 for +10% per friend
+	maxFriends: number, -- friends counted at most
+	checkAttempts: number,
+	retrySeconds: number,
+}
+
+-- Same shape as Economy's CashPack: N seconds of steady income, never below the minimum.
+export type GroupWelcomeReward = { incomeSeconds: number, minimum: number }
+
+export type GroupConfig = {
+	groupId: number, -- 0 = no group: the group feature is off
+	incomeBonus: number,
+	welcomeReward: GroupWelcomeReward?,
+	recheckCooldownSeconds: number,
+	checkAttempts: number,
+	retrySeconds: number,
+}
+
+export type SocialConfig = { friends: FriendsConfig, group: GroupConfig }
+
+-- Config: first-time player tutorial (Config/Tutorial) ----------------------------------------------------------
+
+-- Each step is finished by doing its gameplay action, which the server observes (never a client message).
+export type TutorialStepId = "buy" | "collect" | "lock" | "steal"
+
+export type TutorialStepDef = {
+	id: TutorialStepId,
+	-- The step also finishes on its own after this many seconds on it (nil: only by doing it).
+	timeoutSeconds: number?,
+	-- The step also finishes on its own once its action has been unavailable this many seconds in a row (e.g. the
+	-- base lock recharging). nil: never.
+	unavailableSeconds: number?,
+}
+
+-- Which belt item the "buy" guide points at (Logic/TutorialRules.pickBeltItem).
+export type TutorialBeltConfig = {
+	minSecondsLeft: number, -- skip items about to fall off the belt end
+	switchMargin: number, -- keep the current item unless another one is this many studs closer
+}
+
+export type TutorialConfig = {
+	enabled: boolean, -- false: nobody sees the tutorial (and nothing is saved)
+	reward: number, -- cash paid once per account when the tutorial is completed (not skipped)
+	steps: { TutorialStepDef },
+	belt: TutorialBeltConfig,
 }
 
 -- Save data ---------------------------------------------------------------------------------------------------
@@ -68,7 +215,9 @@ export type CreatureRecord = {
 	podium: number,
 	acquiredAt: number,
 	stored: number, -- uncollected cash sitting on the podium
-	variant: string?, -- reserved for future mutations
+	-- Mutation id (Config/Mutations), nil for a plain creature. An id missing from the config is kept as-is and
+	-- pays x1 until it exists again.
+	variant: string?,
 }
 
 export type PurchaseRecord = {
@@ -139,6 +288,24 @@ export type DailyView = {
 	reward: number,
 }
 
+-- The player's friend & group bonus (Logic/SocialRules), as the HUD shows it. Bonuses are fractions (0.2 = +20%).
+export type SocialView = {
+	friends: number, -- Roblox friends playing in this server (before the maxFriends cap)
+	friendBonus: number,
+	groupMember: boolean,
+	groupBonus: number,
+	bonus: number, -- friendBonus + groupBonus
+	groupRewardClaimed: boolean, -- the one-time group welcome reward was already paid to this account
+}
+
+-- The player's tutorial progress (server-owned, Logic/TutorialRules).
+export type TutorialView = {
+	step: string, -- current step id (TutorialStepId), "" when no tutorial is running
+	index: number, -- 1-based position of `step` in Config/Tutorial.steps, 0 when none
+	count: number, -- number of steps
+	stepStartedAt: number, -- server time the current step started
+}
+
 -- What the server sends the owning client in StateUpdate (see server/Services/Replication.luau).
 -- Costs of -1 mean "not available" (max reached).
 export type ClientState = {
@@ -165,8 +332,10 @@ export type ClientState = {
 	stealCooldownUntil: number,
 	steals: number,
 	daily: DailyView,
+	social: SocialView,
+	tutorial: TutorialView,
 }
 
-export type BeltItem = { id: number, creatureId: string, spawnAt: number }
+export type BeltItem = { id: number, creatureId: string, spawnAt: number, variant: string? }
 
 return {}

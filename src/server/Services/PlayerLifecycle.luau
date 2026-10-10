@@ -136,11 +136,14 @@ local function onPlayerAdded(player: Player)
 		ready = false,
 		dirty = true,
 		incomePerSecond = 0,
+		rewardIncome = 0,
 		packIncome = 0,
 		multiplier = 1,
 		capacity = 0,
 		lockDuration = Gameplay.lock.durationSeconds,
 		pendingWelcome = nil,
+		social = { friends = 0, groupMember = false },
+		tutorial = nil,
 	}
 	Sessions.add(session)
 

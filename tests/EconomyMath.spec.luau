@@ -10,6 +10,7 @@ local function inputs(overrides: { [string]: any }?): EconomyMath.MultiplierInpu
 		isVip = false,
 		vipIncomeBonus = 0.1,
 		eventCashMultiplier = 1,
+		socialBonus = 0,
 	}
 	if overrides then
 		for k, v in overrides do

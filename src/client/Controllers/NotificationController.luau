@@ -22,7 +22,9 @@ local BANNER_SECONDS = 4.5
 
 local screen: ScreenGui
 local toastList: Frame
-local bannerQueue: { { text: string, rarity: string? } } = {}
+type Banner = { text: string, rarity: string?, color: string? }
+
+local bannerQueue: { Banner } = {}
 local bannerBusy = false
 local toastCounter = 0
 
@@ -144,8 +146,11 @@ local function showNextBanner()
 		return
 	end
 	bannerBusy = true
-	local entry = table.remove(bannerQueue, 1) :: { text: string, rarity: string? }
-	local color = if entry.rarity then UiTheme.rarityColor(entry.rarity) else UiTheme.palette("primary")
+	local entry = table.remove(bannerQueue, 1) :: Banner
+	local color = if entry.color
+		then UiTheme.color(entry.color)
+		elseif entry.rarity then UiTheme.rarityColor(entry.rarity)
+		else UiTheme.palette("primary")
 	local banner = UiKit.panel({
 		Name = "Announcement",
 		AnchorPoint = Vector2.new(0.5, 0),
@@ -181,8 +186,9 @@ local function showNextBanner()
 	end)
 end
 
-function NotificationController.announce(text: string, rarity: string?)
-	table.insert(bannerQueue, { text = text, rarity = rarity })
+-- `color` ("#RRGGBB") overrides the rarity colour (e.g. a mutation's own announcement).
+function NotificationController.announce(text: string, rarity: string?, color: string?)
+	table.insert(bannerQueue, { text = text, rarity = rarity, color = color })
 	systemChat(text)
 	showNextBanner()
 end
@@ -211,8 +217,11 @@ function NotificationController.start()
 			SoundPlayer.ui("purchase")
 		end
 	end)
-	Net.get("Announce").OnClientEvent:Connect(function(payload: { text: string, rarity: string? })
-		NotificationController.announce(payload.text, payload.rarity)
+	Net.get("Announce").OnClientEvent:Connect(function(payload: Banner)
+		local color = if type(payload.color) == "string" and string.match(payload.color, "^#%x%x%x%x%x%x$")
+			then payload.color
+			else nil
+		NotificationController.announce(payload.text, payload.rarity, color)
 	end)
 	Net.get("Effect").OnClientEvent:Connect(function(payload: { kind: string, amount: number?, position: Vector3? })
 		local position = payload.position

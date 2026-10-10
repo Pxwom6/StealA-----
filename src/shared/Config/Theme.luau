@@ -34,6 +34,9 @@ local Theme = {
 		lock = "#4DA8FF",
 		vip = "#FFD700",
 		luck = "#7CFF4D",
+		social = "#FF6FB5",
+		event = "#FF8C1A", -- event pill / "EVENT" tag when the event has no seasonal theme colour (Config/Seasons)
+		tutorial = "#FFD23F", -- tutorial banner trim, step badge, guide beam and arrow
 	},
 
 	world = {
@@ -75,6 +78,7 @@ local Theme = {
 		podiumMaxSign = "Max podiums",
 		carryMarker = "THIEF!",
 		collectHint = "Step here to collect",
+		mutatedName = "{mutation} {creature}", -- "Golden Pizza Pup" (names, toasts, announcements)
 
 		-- HUD
 		perSecond = "+{amount}/s",
@@ -87,6 +91,27 @@ local Theme = {
 		lockPillCooldown = "Lock in {time}",
 		lockPillToken = "Instant lock x{count}",
 		luckBanner = "{multiplier}x LUCK {time}",
+		eventEndsIn = "{event} ends in {time}", -- under the event banner: "Halloween ends in 3d 4h"
+		eventFallbackTitle = "Event", -- {event} for an event without a `title`
+		eventTag = "EVENT", -- on the billboards of limited-time (event) Snacklings
+		socialPillFriends = "Friends +{percent}%",
+		socialPillGroup = "Group +{percent}%",
+		-- The bonus is for friends PLAYING here together, never for sending invites (Roblox policy): keep the wording so.
+		socialPillPlayTogether = "Play with friends: +{percent}% each",
+		socialPillJoinGroup = "Join our group: +{percent}%",
+
+		-- First-time tutorial (Config/Tutorial): one short line per step, keep them short (they share the banner with
+		-- a step badge and the Skip button)
+		tutorialBuy = "Buy a Snackling from the belt!",
+		tutorialCollect = "Step on the glowing pad to collect your cash!",
+		tutorialLock = "Lock your base to keep thieves out!",
+		tutorialSteal = "Sneak into another base and steal a Snackling!",
+		tutorialShieldTip = "Your base is shielded for {time} - stealing ends it early",
+		tutorialShieldOtherTip = "Yellow shield = new player: no stealing there yet",
+		tutorialStepBadge = "{index}/{count}",
+		tutorialSkip = "Skip",
+		tutorialComplete = "You're ready! +{amount}",
+		tutorialCompleteNoReward = "You're ready!",
 
 		-- Toasts
 		notEnoughCash = "Not enough cash!",
@@ -130,6 +155,23 @@ local Theme = {
 		passGranted = "{pass} unlocked!",
 		lockTokenReady = "Instant Lock ready! Tap the lock button.",
 		lockTokenLater = "Instant Lock saved! You can use it in {time}.",
+		socialFriendJoined = "Your friend {name} joined! Friends bonus +{percent}%",
+		socialFriendHere = "Your friend {name} is here! Friends bonus +{percent}%",
+		socialFriendJoinedMaxed = "Your friend {name} joined! Friends bonus already at max (+{percent}%)",
+		socialFriendHereMaxed = "Your friend {name} is here! Friends bonus already at max (+{percent}%)",
+		socialFriendJoinedPlain = "Your friend {name} joined!",
+		socialFriendHerePlain = "Your friend {name} is here!",
+		socialFriendLeft = "Your friend {name} left. Friends bonus +{percent}%",
+		socialFriendLeftNoBonus = "Your friend {name} left.",
+		socialGroupJoined = "Thanks for joining the group! +{percent}% income",
+		socialGroupAlreadyMember = "You're in the group: +{percent}% income!",
+		socialGroupWelcome = "Group welcome gift: {amount}!",
+		socialGroupNotYet = "We can't see you in the group yet - try again in a moment.",
+		socialGroupCheckFailed = "Couldn't check the group right now - try again soon.",
+		socialGroupCheckWait = "Give it a few seconds before checking again.",
+		socialGroupPending = "Join request sent! The bonus starts once you're accepted.",
+		socialGroupPromptFailed = "Couldn't open the join prompt. Search for {group} on Roblox!",
+		socialInviteUnavailable = "Invites aren't available right now.",
 
 		-- Announcements (server-wide banners)
 		announceSpawn = "A {rarity} {creature} appeared on the belt!",
@@ -156,6 +198,16 @@ local Theme = {
 		rebirthNeed = "Need {amount} to rebirth",
 		rebirthConfirm = "Rebirth!",
 		rebirthMax = "Max rebirths reached",
+		socialTitle = "Friends & Group",
+		socialFriendsLine = "Friends playing here: {count}  (+{percent}% income)",
+		socialFriendsHint = "Play together: each Roblox friend in this server gives +{per}% income, up to +{max}%.",
+		socialGroupMember = "{group} member: +{percent}% income",
+		socialGroupPitch = "Join {group} for +{percent}% income!",
+		socialGroupPitchGift = "Join {group} for +{percent}% income and a {amount} welcome gift!",
+		socialGroupFallbackName = "our group",
+		socialInvite = "Invite friends",
+		socialGroupJoin = "Join group",
+		socialInviteMessage = "Come steal Snacklings with me!",
 
 		-- Store
 		storeTitle = "Snack Shop",

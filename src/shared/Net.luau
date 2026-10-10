@@ -23,6 +23,9 @@ export type ClientToServer =
 	| "Rebirth"
 	| "ClaimDaily"
 	| "ClientEvent"
+	| "CheckGroup"
+	| "InvitePrompted"
+	| "SkipTutorial"
 	| "DevGrantProduct"
 
 export type ServerToClient =
@@ -50,6 +53,9 @@ local CLIENT_TO_SERVER: { ClientToServer } = {
 	"Rebirth",
 	"ClaimDaily",
 	"ClientEvent",
+	"CheckGroup",
+	"InvitePrompted",
+	"SkipTutorial",
 	"DevGrantProduct",
 }
 

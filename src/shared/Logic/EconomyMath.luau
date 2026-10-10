@@ -11,6 +11,7 @@ export type MultiplierInputs = {
 	isVip: boolean,
 	vipIncomeBonus: number, -- e.g. 0.1 for +10%
 	eventCashMultiplier: number, -- LiveOps (1 = no event)
+	socialBonus: number, -- friends in the server + group membership (Logic/SocialRules), e.g. 0.3 for +30%
 }
 
 export type PodiumUpgradeConfig = { basePrice: number, growth: number, maxPurchased: number }
@@ -38,14 +39,27 @@ function EconomyMath.incomeMultiplier(inputs: MultiplierInputs): number
 		m *= 1 + math.max(0, inputs.vipIncomeBonus)
 	end
 	m *= math.max(0, sane(inputs.eventCashMultiplier, 1))
+	m *= 1 + math.max(0, sane(inputs.socialBonus, 0))
 	return m
 end
 
--- The multiplier without temporary boosts: rebirths and passes only (LiveOps cash events are left out).
+-- The multiplier without temporary boosts: rebirths and passes only (LiveOps cash events and the social bonus are
+-- left out). Cash packs are sized from it (packIncome).
 function EconomyMath.permanentMultiplier(inputs: MultiplierInputs): number
 	local steady = table.clone(inputs)
 	steady.eventCashMultiplier = 1
+	steady.socialBonus = 0
 	return EconomyMath.incomeMultiplier(steady)
+end
+
+-- The multiplier time-based rewards and saved stats use (daily streak, offline earnings, best cash/sec): everything
+-- but the social bonus. That bonus depends on who is in the server at that moment (and is still being looked up for
+-- a moment after joining), so it never inflates a payout or a saved value. A LiveOps cash event still counts here,
+-- as before.
+function EconomyMath.rewardMultiplier(inputs: MultiplierInputs): number
+	local withoutSocial = table.clone(inputs)
+	withoutSocial.socialBonus = 0
+	return EconomyMath.incomeMultiplier(withoutSocial)
 end
 
 -- Cash per second for one creature (kept fractional; accumulation is fractional and collection floors it).

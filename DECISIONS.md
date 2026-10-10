@@ -134,7 +134,7 @@ inside when the owner locks drops the creature.
   15 minutes — a purchase never takes Robux without an effect.
 * Cash packs scale with income (always "about N minutes of your income"), so they never trivialise the game. The
   basis is the steady income (`EconomyMath.packIncome`: active podiums only, nothing mid-steal, no LiveOps cash
-  event). A pack's amount is fixed the first time its receipt reaches the player's session (`data.cashPackQuotes`),
+  event, no friend & group bonus). A pack's amount is fixed the first time its receipt reaches the player's session (`data.cashPackQuotes`),
   so a retry after a failed grant pays that amount even if the player rebirthed meanwhile; a receipt that arrives
   while the player's save is still loading waits for the load, so it is sized before they can play.
 * Stealing ends your own new-player protection.
@@ -176,8 +176,8 @@ paid-for podiums avoids a feel-bad. One config flag flips it.
 ### 15. Studio-only test hooks
 
 **Chose:** the `DevGrantProduct` remote (simulated purchases through the real receipt path) is only created, and
-its handler only connected, when `RunService:IsStudio()`; LiveOps admin commands accept anyone in Studio. Live servers only accept
-`LiveOps.adminUserIds`.
+its handler only connected, when `RunService:IsStudio()`; LiveOps admin commands accept anyone in Studio and apply to
+that Studio session only (never published to live servers, #20). Live servers only accept `LiveOps.adminUserIds`.
 
 ### 16. Strict typing targets the new Luau type solver
 
@@ -188,4 +188,157 @@ it (e.g. `pcall(fn :: () -> ...any)`, explicit pass accessors instead of indexin
 
 Cash is a Luau number (exact to 2^53 ≈ 9 quadrillion, approximate above, displayed with suffixes to 1e33).
 OrderedDataStore values are floored and clamped to 2^53. A maxed base of Secrets with every multiplier earns
-around $10^8/s, far below that.
+around $10^8/s, far below that (a Rainbow Secret earns 8× a plain one: still around $10^9/s at most).
+
+### 18. Mutations: a fixed-chance roll per spawn, saved as `CreatureRecord.variant`
+
+**Chose:**
+* Every belt spawn rolls its creature first (rarity weights × luck), then at most one mutation with each
+  mutation's fixed `chance` (`Logic/MutationRules.roll`: one random number per spawn, mutations in `order`).
+* **Luck never changes mutation chances.** Server Luck and luck events only scale rarity weights, so the store's
+  exact before/after odds disclosure for the paid boost stays true (#9) without listing mutations, and buying luck
+  can't stack two multipliers on the same rare moment.
+* A mutation is a creature's permanent property: saved as `CreatureRecord.variant` (the field reserved since the
+  first save version; `DataSchema.sanitise` already kept it, so no `DataSchema.VERSION` bump and a code rollback
+  keeps it too), carried by `Inventory.transfer` on a steal, priced into sell value.
+* Mutation ids are permanent like creature ids (CI list `RELEASED_MUTATION_IDS`). A save holding a variant the
+  config doesn't know keeps it untouched but earns, sells and looks like a plain creature (x1), so restoring the
+  config restores it. Retire a mutation with a never-active `eventId`.
+* Mutated price = round(price × priceMultiplier), never below the base price; income = income × incomeMultiplier,
+  with `incomeMultiplier >= priceMultiplier` so a mutation is always a good find. Every read of price or income for
+  a belt item or owned creature goes through `GameData.price` / `GameData.income`.
+* Event-only mutations (`eventId`) roll only while their LiveOps event is active; CI requires all chances together,
+  event ones included, to stay below 1.
+
+**Why:** fixed per-spawn odds are easy to explain and to disclose, keep the paid luck product's numbers exact, and
+leave the rarity chase in BALANCE.md almost unchanged (≤ ~4%).
+**Reversal cost:** medium — ids and the meaning of `variant` are in players' saves; chances and multipliers are
+free to re-tune (existing creatures simply earn the new multiplier).
+
+### 19. Friend & group rewards raise live income only
+
+**Chose:** Roblox friends playing in the same server give +10% income each (at most 3 counted, +30%), and members of
+the owner's Roblox group get +10% more (`Config/Social`, `Logic/SocialRules`, `SocialService`): at most +40%, applied
+as one more multiplier, `×(1 + bonus)`. The bonus is left out of everything sized from income and paid or saved for
+later: cash packs (`EconomyMath.permanentMultiplier`, which also drops LiveOps events), and daily rewards, offline
+earnings and the saved best cash/sec stat that feeds the global leaderboard (`EconomyMath.rewardMultiplier` →
+`session.rewardIncome`; a running LiveOps cash event still counts there, as before). Group members get a one-time
+welcome gift (10 minutes of steady income, at least $1,000), remembered in `data.flags.social_groupWelcome`, so leaving
+and rejoining the group never pays it twice; no schema bump was needed (`flags` already exists and `sanitise` keeps any
+`true` flag).
+**Why:** these are proven growth levers on Roblox and allowed by its rules: we reward friends who are actually playing
+together and group membership, never sending invites (the Invite button only opens Roblox's own prompt; opening it is
+logged for analytics). Keeping the bonus out of packs, rewards and saved stats means a paid pack, a daily claim or a
+leaderboard entry can't be inflated by who happened to be in the server, and offline earnings don't depend on the
+friend checks still running at join. +40% is less than one rebirth's ×1.5 and far less than 2× Cash, so it is a nice
+extra, not a must-have.
+**How it is checked:** `Player:IsFriendsWithAsync` per pair of players when the second one's session starts (pcall'd,
+retried up to 3 times, cached while both stay, answers that arrive after either left are dropped; Studio test players
+with UserIds ≤ 0 are never asked about), and `Player:IsInGroupAsync` on join (retried) and again when the client says
+it just joined in-game (`CheckGroup`, at most once per 10 s, which also consults `GroupService:GetGroupsAsync` in case
+the server cached the old answer). Nothing in the join flow waits for these web calls. While `groupId` is 0 the group
+part is off and hidden. In Studio, `/friends <n>` pretends n friends are present.
+**Reversal cost:** low — set `incomeBonusPerFriend` / `incomeBonus` to 0. The welcome-gift flag name must stay.
+
+### 20. Seasonal events are LiveOps events plus data-only themes
+
+**Chose:** a limited-time event (Halloween 2026 is the first) is one LiveOps event id that everything keys off, so it
+starts and ends by its dates with no code change, and the next one is a config change:
+* `Config/LiveOps` `events`: the window (Unix seconds, UTC), the HUD banner and its countdown `title`, optional luck.
+  Halloween runs Fri 23 Oct 17:00 UTC → Mon 2 Nov 08:00 UTC; its luck weekend is a separate event (`HalloweenLuck2026`,
+  2×), so the luck can be moved or dropped without touching the rest.
+* Event Snacklings and event mutations carry that `eventId` (#1 and #18 already gated spawns and rolls on it). Event
+  Snacklings **share their tier's belt weight** instead of adding tier weight: the tier odds, and so the Server Luck
+  odds disclosure (#9), are the same during the event, and an event can't make high tiers more common by accident.
+  They are listed after every regular creature (and event mutations roll after the permanent ones), so outside the
+  event every belt roll is exactly what it was (CI replays rolls with and without them). Price and payback stay inside
+  the tier's regular range (CI). Ids are permanent like any other: after the event they stop spawning, owned ones keep
+  working; no save-format change.
+* `Config/Seasons` maps event ids to reusable themes (`Halloween2026 = "halloween"`; next year one more line). A theme
+  is data: lighting mood, decoration counts and colours. `Logic/SeasonRules` picks the theme from the active event ids
+  (highest priority, then event id, so every server agrees) and lays the props out on the map shape (tested: outside
+  every plot, off the belt and the lobby spawn, under the 240-part budget). `SeasonService` builds them as anchored
+  parts with CanCollide / CanTouch / CanQuery off (gameplay, steals, tags and plot bounds never see them), saves the
+  Lighting values it changes, fades to the theme and back, and removes the Atmosphere / ColorCorrection it created.
+  `LiveOpsService.onActiveEventsChanged` drives it, so a start or end while the server runs (dates, remote config,
+  `/event`) applies within a second.
+* Event luck stacks with Server Luck multiplicatively and is clamped by `maxLuckMultiplier` (2 × 2 = 4 of 6). The
+  store's "now" already includes the event's luck (`LuckMultiplier`), and `previewBoost` stays exact (tested with the
+  shipped luck weekend). The HUD luck countdown shows when the luck next changes (`LiveOpsRules.luckChangesAt`), not
+  when the last boost ends.
+* In Studio the LiveOps admin commands (open to anyone there, #15) apply to the Studio session only; they are never
+  published to live servers. `/event <id> [minutes]` and `/event off [id]` make a theme testable on demand.
+
+**Why:** dates and content live in data the owner can edit (no code to touch before each holiday), the paid luck
+product's odds stay honest during events, and decorations can't change how the game plays. Built in code (no place
+file), like the map (#3).
+**Reversal cost:** low — themes and event dates are free to change or delete; event creature and mutation ids are
+permanent (retire them with a never-active `eventId`).
+
+### 21. First-time tutorial: server-run steps, saved in `flags`, finished only by real gameplay
+
+**Chose:** a brand-new player is walked through the loop in four steps (`Config/Tutorial`): buy a Snackling from the
+belt → collect cash from its pad → lock the base → steal from another base. Each step is one short banner line under
+the cash plus a 3D guide (a pulsing beam from the player's feet, a bouncing arrow above the target that shows through
+walls, a highlight on it); the steal step has no guide (any unshielded base will do) and a one-line tip about the
+new-player shield instead. Completing it pays `Tutorial.reward` ($500) once per account.
+* **Server-authoritative.** `TutorialService.record` is called by the services right after they apply the action: a
+  belt purchase (BeltService), a collect from a pad (EconomyService's pad check only, not the collect when selling),
+  a lock (LockService, Instant Lock included) and a delivered steal (StealService). No client message can finish a
+  step; the client's only tutorial intent is `SkipTutorial` (rate-limited), which ends it with no reward. The step
+  reaches the owning client in `StateUpdate.tutorial`, like every other HUD state.
+* **Saved in the existing `flags` map, no schema bump:** `tutorial_<step>` per finished step and `tutorial_done` at the
+  end. `sanitise` already keeps any `true` flag, and a rollback keeps them (#1). The current step is derived (the first
+  step without a flag), so a rejoin resumes where the player left off and an action done early (e.g. locking during
+  the collect step) skips its step when it comes up. The step's start time is runtime only (a rejoin restarts it).
+* **Steps that could stall end on their own** (`Logic/TutorialRules.autoOutcome`): the lock step once the lock has been
+  unavailable 20 s in a row (recharging, already locked) **or after 60 s** (added to the brief: a player who ignores it
+  isn't nagged forever), the steal step after 90 s with "You're ready!" and the reward (an empty server, or bases that
+  are all shielded or locked, must not block it). Buy and collect never time out: they are the loop, and the guide
+  always has a target (with nothing to collect it points back to the belt: "Buy a Snackling from the belt!").
+* **Reward once:** `TutorialRules.finish` sets `tutorial_done` and only then returns the amount, which is paid at once
+  through `EconomyService.addCash` (analytics source "Onboarding" / "TutorialReward") with no yield in between. A
+  skip or an existing player sets the same flag and is paid nothing. Only the Studio `/tutorial` command clears the
+  flags (so in Studio a second run pays again, on purpose for testing).
+* **Existing players never see it:** a save with no tutorial flags but any progress (Snacklings, quarantined
+  Snacklings, rebirths, belt purchases or steals) is marked done on join, without the reward. A player who joined
+  before but never bought anything gets the tutorial.
+* **Layout (mobile first):** the banner is a slot in the HUD's top stack right under the cash
+  (`HudController.TOP_ORDER`, one table for every pill), so the list layout guarantees it never covers the cash, the
+  event / luck pills, the lock pill or the social pill; they move down while it shows. Its height is fitted every
+  frame (`TutorialController.fitBanner`, `TutorialRules.bannerMode`) so the whole stack ends above the screen bottom
+  (8 px margin), and above the bottom-centre carry banner while the player carries a Snackling (4 px gap): with the
+  steal step's tip (88 px) when that fits, else one line (64 px), else, only while carrying, no banner at all (the carry
+  banner's "Run home!" is the instruction then, and the 3D guide hides too). The tip never shows while carrying.
+  Worked out in reference px: the stack starts at y 6; cash 58, cash/sec 26, event pill 48 + luck pill 32 (one
+  slot), lock 34, social 34, each plus a 4 px gap, so every pill but the banner uses at most 262. On an iPhone SE in
+  landscape (667×375, UI scale 0.85, about 785×373 under the top bar) that leaves 373 - 8 - 262 = 103 when not
+  carrying: the banner with its tip fits and the stack ends at 350. While carrying, the carry banner spans
+  y 267-313, so the stack must end by 263: with the event and luck pills (262, or 226 with the event alone) the banner
+  hides; with only the lock and social pills (174) the one-line banner fits (ends at 238). At 640×360 (about 355 high)
+  there are 85 px with every pill, so the tip is dropped and the one-line banner ends at 326. Across, the banner is
+  420 wide, centred, and narrowed so its right edge stays 6 px left of the TAG button area (`TutorialRules.bannerWidth`,
+  never below the stack's 300): at 667×375 (785 wide) it spans x 182-602, clear of the side buttons (x ≤ 90) and the
+  action area (x ≥ 611); at 640×360 (753 wide, action area x ≥ 579) it is 393 wide, x 180-573. Skip is small but a
+  full touch target (72×44). The daily reward dialog doesn't auto-open during the tutorial (it opens right after).
+  Not covered: the transient toasts and the "X is stealing your Snackling!" alert, which already overlapped the
+  pills before the tutorial.
+* **Analytics:** the onboarding funnel follows the tutorial: 1 Joined, 2 FirstBeltPurchase, 3 FirstCollect,
+  4 TutorialLock (the tutorial moved past its lock step, however it ended), 5 TutorialComplete, 6 FirstSteal,
+  7 FirstRebirth (FirstSteal and FirstRebirth were 4 and 5). Roblox counts a logged step as completing every earlier
+  one, so steps are only ever logged in increasing order (`Logic/OnboardingFunnel`): a milestone reached early (a
+  lock or a steal during the collect step, a steal or rebirth while the tutorial runs) is remembered in the save
+  (`obr_<step>`) and logged once every earlier step is (`ob_<step>`, the flag the funnel always used). Steps 4-5 stop
+  holding the later ones back once the tutorial is over without them (skipped, existing player, switched off); they
+  are then never logged, so for such a player Roblox shows them as completed once a later step logs. Skipping is the
+  custom event `tutorial_skipped` (field 01 = step id), and `tutorial_step` (value = seconds on the step, fields: step
+  id, outcome) gives exact per-step timings and how each step ended. Renumbering was safe because the game is not live
+  yet; once it is, never renumber a step (Roblox matches steps by number): append, or start a new funnel.
+
+**Why:** day-1 retention drives Roblox discovery, and the design rule is "the loop must be understood in 10 seconds":
+one short line and an arrow per step, no text walls, no dialog in the way. Finishing steps from what the server saw
+keeps it exploit-proof (the reward can't be claimed by a fake message) and means the tutorial can never disagree with
+the game. Flags avoid a save-format change for what is a handful of booleans.
+**Reversal cost:** low — `Tutorial.enabled = false` turns it off for everyone (nothing is saved while it is off);
+steps, timeouts and the reward are data. The flag names must stay (they are in saves), and the funnel step numbers
+must stay once live.

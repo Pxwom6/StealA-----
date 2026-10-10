@@ -37,10 +37,25 @@ export type Carry = {
 	podium: number,
 	uid: string,
 	creatureId: string,
+	variant: string?, -- the carried creature's mutation (it stays in the victim's save until delivery)
 	startedAt: number,
 	track: StealRules.CarryTrack, -- movement budget, timed with os.clock()
 	model: Model?,
 	marker: BillboardGui?,
+}
+
+-- Friend & group state behind the social income bonus (Logic/SocialRules).
+export type Social = {
+	friends: number, -- Roblox friends with a session in this server
+	groupMember: boolean, -- member of Config/Social.group.groupId (false while the group feature is off)
+}
+
+-- The tutorial step a player is on (TutorialService; progress itself is saved in data.flags). nil when no tutorial is
+-- running.
+export type TutorialRun = {
+	stepId: Types.TutorialStepId,
+	startedAt: number, -- server time the step started (step timeouts)
+	unavailableSince: number?, -- since when the step's action has been unavailable without a break
 }
 
 -- A Steal button press (StealBegin): when the server-timed hold started, or why it didn't (StealRules.canBeginHold).
@@ -70,11 +85,14 @@ export type Session = {
 	dirty: boolean, -- state changed since the last StateUpdate
 	-- caches maintained by the services that own them
 	incomePerSecond: number,
+	rewardIncome: number, -- income without the social bonus: daily/offline rewards, best cash/sec (rewardMultiplier)
 	packIncome: number, -- steady income cash packs are sized from (EconomyMath.packIncome)
 	multiplier: number,
 	capacity: number,
 	lockDuration: number,
 	pendingWelcome: { amount: number, seconds: number }?,
+	social: Social, -- written by SocialService, read by EconomyService and Replication
+	tutorial: TutorialRun?, -- written by TutorialService, read by Replication
 }
 
 local Sessions = {}

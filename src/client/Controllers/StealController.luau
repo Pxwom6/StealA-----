@@ -99,7 +99,7 @@ local function stealHook(podium: Model, plot: Model, prompt: ProximityPrompt): b
 	end
 	prompt:SetAttribute("Role", "Steal")
 	prompt.ActionText = Theme.text.stealAction
-	prompt.ObjectText = def.displayName
+	prompt.ObjectText = GameData.displayName(def, InteractionController.variantOf(podium))
 	prompt.HoldDuration = CFG.holdSeconds
 	prompt.MaxActivationDistance = CFG.grabRange - 2
 	prompt.Enabled = not isProtected(plot)
@@ -272,6 +272,12 @@ local function build()
 			end
 		end
 	end)
+end
+
+-- The bottom-centre "Run home!" banner, shown while the local player carries a Snackling (the tutorial banner keeps
+-- the HUD's top stack above it).
+function StealController.carryBanner(): Frame?
+	return carryBanner
 end
 
 function StealController.start()

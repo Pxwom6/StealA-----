@@ -4,7 +4,8 @@
 	  * "Welcome back — you earned X" popup after offline earnings
 	  * Daily streak: side button with a badge, a 7-day track, one-tap claim; opens itself once per session when
 	    a reward is waiting (after the welcome popup)
-	  * HUD pill for server luck boosts and live events, with countdown
+	  * HUD pills for live events (banner + "Halloween ends in 3d 4h", in the event's theme colour) and server luck
+	    (multiplier + time until it next changes), from LiveOpsService's workspace attributes
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -25,8 +26,12 @@ local StateStore = require(script.Parent.StateStore)
 local RewardsController = {}
 
 local dailyButton: HudController.SideButton
+local pillStack: Frame
 local luckPill: Frame
 local luckLabel: TextLabel
+local eventPill: Frame
+local eventLabel: TextLabel
+local eventCountdown: TextLabel
 local autoOpenedDaily = false
 local welcomeOpen = false
 
@@ -107,7 +112,7 @@ local function showWelcome(payload: { amount: number, seconds: number })
 	local modal = Modal.open(Theme.text.welcomeBackTitle, Vector2.new(480, 260), function()
 		welcomeOpen = false
 		local state = StateStore.get()
-		if state and state.daily.canClaim and not autoOpenedDaily then
+		if state and state.daily.canClaim and not autoOpenedDaily and state.tutorial.step == "" then
 			autoOpenedDaily = true
 			RewardsController.openDaily()
 		end
@@ -140,23 +145,42 @@ local function showWelcome(payload: { amount: number, seconds: number })
 	SoundPlayer.ui("claim")
 end
 
-local function updateLuckPill()
-	local multiplier = workspace:GetAttribute("LuckMultiplier")
-	local endsAt = workspace:GetAttribute("LuckEndsAt")
-	local banner = workspace:GetAttribute("EventBanner")
+-- "12:34" under an hour, "1d 6h" / "2h 15m" for long events.
+local function countdown(seconds: number): string
+	return if seconds < 3600 then Format.clock(seconds) else Format.duration(seconds)
+end
+
+local function updateLiveOpsPills()
 	local now = workspace:GetServerTimeNow()
+
+	local multiplier = workspace:GetAttribute("LuckMultiplier")
+	local luckEndsAt = workspace:GetAttribute("LuckEndsAt")
 	local hasLuck = type(multiplier) == "number" and multiplier > 1
-	local hasBanner = type(banner) == "string" and banner ~= ""
-	luckPill.Visible = hasLuck or hasBanner
+	luckPill.Visible = hasLuck
 	if hasLuck then
-		local remaining = if type(endsAt) == "number" then math.max(0, endsAt - now) else 0
+		local remaining = if type(luckEndsAt) == "number" then math.max(0, luckEndsAt - now) else 0
 		luckLabel.Text = Format.template(Theme.text.luckBanner, {
 			multiplier = Format.number(multiplier :: number),
-			time = Format.clock(remaining),
+			time = countdown(remaining),
 		})
-	elseif hasBanner then
-		luckLabel.Text = banner :: string
 	end
+
+	local banner = workspace:GetAttribute("EventBanner")
+	local hasBanner = type(banner) == "string" and banner ~= ""
+	eventPill.Visible = hasBanner
+	if hasBanner then
+		local bannerId = workspace:GetAttribute("EventBannerId")
+		local title = workspace:GetAttribute("EventTitle")
+		local endsAt = workspace:GetAttribute("EventEndsAt")
+		eventLabel.Text = banner :: string
+		eventPill.BackgroundColor3 = UiTheme.eventColor(if type(bannerId) == "string" then bannerId else nil)
+		local remaining = if type(endsAt) == "number" then math.max(0, endsAt - now) else 0
+		eventCountdown.Text = Format.template(Theme.text.eventEndsIn, {
+			event = if type(title) == "string" and title ~= "" then title else Theme.text.eventFallbackTitle,
+			time = Format.duration(remaining),
+		})
+	end
+	pillStack.Visible = hasLuck or hasBanner
 end
 
 function RewardsController.start()
@@ -165,24 +189,69 @@ function RewardsController.start()
 		RewardsController.openDaily()
 	end)
 
+	-- LiveOps pills share one slot in the HUD's top stack: the event banner with its countdown, then server luck.
+	pillStack = UiKit.new("Frame", {
+		Name = "LiveOpsPills",
+		LayoutOrder = HudController.TOP_ORDER.liveOps,
+		Size = UDim2.fromOffset(300, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundTransparency = 1,
+		Visible = false,
+		Parent = HudController.topStack(),
+	}) :: Frame
+	UiKit.new("UIListLayout", {
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		Padding = UDim.new(0, 4),
+		Parent = pillStack,
+	})
+	eventPill = UiKit.panel({
+		Name = "EventPill",
+		LayoutOrder = 1,
+		Size = UDim2.fromOffset(290, 48),
+		BackgroundColor3 = UiTheme.palette("event"),
+		Visible = false,
+		Parent = pillStack,
+	})
+	eventLabel = UiKit.label({
+		Name = "Banner",
+		Size = UDim2.new(1, -16, 0, 24),
+		Position = UDim2.fromOffset(8, 3),
+		Parent = eventPill,
+	})
+	eventCountdown = UiKit.label({
+		Name = "Countdown",
+		FontFace = UiTheme.bodyFont,
+		Size = UDim2.new(1, -16, 0, 17),
+		Position = UDim2.fromOffset(8, 27),
+		Parent = eventPill,
+	})
 	luckPill = UiKit.panel({
 		Name = "LuckPill",
-		LayoutOrder = 3,
+		LayoutOrder = 2,
 		Size = UDim2.fromOffset(230, 32),
 		BackgroundColor3 = UiTheme.palette("luck"),
 		Visible = false,
-		Parent = HudController.topStack(),
+		Parent = pillStack,
 	})
 	luckLabel = UiKit.label({ Size = UDim2.new(1, -12, 1, -6), Position = UDim2.fromOffset(6, 3), Parent = luckPill })
 
 	Net.get("WelcomeBack").OnClientEvent:Connect(showWelcome)
 	StateStore.onChange(function(state)
 		dailyButton.badge.Visible = state.daily.canClaim
-		if state.daily.canClaim and not autoOpenedDaily and not welcomeOpen then
+		-- Not during the first-time tutorial: a brand-new player's first seconds belong to the loop. The badge still
+		-- shows, and the dialog opens on the first update after the tutorial ends.
+		if state.daily.canClaim and not autoOpenedDaily and not welcomeOpen and state.tutorial.step == "" then
 			-- Give the welcome popup a moment to arrive first.
 			task.delay(2.5, function()
 				local latest = StateStore.get()
-				if latest and latest.daily.canClaim and not autoOpenedDaily and not welcomeOpen then
+				if
+					latest
+					and latest.daily.canClaim
+					and not autoOpenedDaily
+					and not welcomeOpen
+					and latest.tutorial.step == ""
+				then
 					autoOpenedDaily = true
 					RewardsController.openDaily()
 				end
@@ -196,7 +265,7 @@ function RewardsController.start()
 	end)
 	task.spawn(function()
 		while true do
-			updateLuckPill()
+			updateLiveOpsPills()
 			task.wait(0.5)
 		end
 	end)

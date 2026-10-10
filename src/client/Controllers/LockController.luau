@@ -116,7 +116,7 @@ end
 function LockController.start()
 	pill = UiKit.button({
 		Name = "LockPill",
-		LayoutOrder = 4,
+		LayoutOrder = HudController.TOP_ORDER.lock,
 		Size = UDim2.fromOffset(210, 34),
 		BackgroundColor3 = UiTheme.palette("success"),
 		Parent = HudController.topStack(),
