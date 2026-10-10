@@ -89,6 +89,29 @@ export type EventDef = {
 	durationSeconds: number?,
 }
 
+-- Config: friend & group rewards (Config/Social) ---------------------------------------------------------------
+
+export type FriendsConfig = {
+	incomeBonusPerFriend: number, -- e.g. 0.1 for +10% per friend
+	maxFriends: number, -- friends counted at most
+	checkAttempts: number,
+	retrySeconds: number,
+}
+
+-- Same shape as Economy's CashPack: N seconds of steady income, never below the minimum.
+export type GroupWelcomeReward = { incomeSeconds: number, minimum: number }
+
+export type GroupConfig = {
+	groupId: number, -- 0 = no group: the group feature is off
+	incomeBonus: number,
+	welcomeReward: GroupWelcomeReward?,
+	recheckCooldownSeconds: number,
+	checkAttempts: number,
+	retrySeconds: number,
+}
+
+export type SocialConfig = { friends: FriendsConfig, group: GroupConfig }
+
 -- Save data ---------------------------------------------------------------------------------------------------
 
 export type CreatureRecord = {
@@ -170,6 +193,16 @@ export type DailyView = {
 	reward: number,
 }
 
+-- The player's friend & group bonus (Logic/SocialRules), as the HUD shows it. Bonuses are fractions (0.2 = +20%).
+export type SocialView = {
+	friends: number, -- Roblox friends playing in this server (before the maxFriends cap)
+	friendBonus: number,
+	groupMember: boolean,
+	groupBonus: number,
+	bonus: number, -- friendBonus + groupBonus
+	groupRewardClaimed: boolean, -- the one-time group welcome reward was already paid to this account
+}
+
 -- What the server sends the owning client in StateUpdate (see server/Services/Replication.luau).
 -- Costs of -1 mean "not available" (max reached).
 export type ClientState = {
@@ -196,6 +229,7 @@ export type ClientState = {
 	stealCooldownUntil: number,
 	steals: number,
 	daily: DailyView,
+	social: SocialView,
 }
 
 export type BeltItem = { id: number, creatureId: string, spawnAt: number, variant: string? }

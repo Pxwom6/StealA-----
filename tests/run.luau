@@ -23,5 +23,6 @@ require("./BeltMath.spec")
 require("./LiveOpsRules.spec")
 require("./Inventory.spec")
 require("./MutationRules.spec")
+require("./SocialRules.spec")
 
 T.finish()

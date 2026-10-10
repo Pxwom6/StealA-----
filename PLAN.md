@@ -55,7 +55,7 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | Base lock UI | `LockService` | `LockController` (lock button prompt, HUD pill) | `LockRules` |
 | Monetisation | `MonetizationService` (ProcessReceipt, passes) | `StoreController` | `ReceiptLedger`, `EconomyMath.cashPackAmount` |
 | Retention | `RetentionService` (daily streak, offline earnings), `LeaderboardService` | `RewardsController` | `DailyStreak`, `OfflineEarnings` |
-| Social | `Announcer` (server-wide banners) | `NotificationController`, `ChatTagController` | – |
+| Social | `Announcer` (server-wide banners), `SocialService` (friends in server, group membership, welcome gift) | `NotificationController`, `ChatTagController`, `SocialController` (bonus pill, invite / join group panel) | `SocialRules` |
 | LiveOps | `LiveOpsService` (scheduled events, luck boosts, admin commands, cross-server) | luck banner | `LiveOpsRules` |
 | Analytics | `Analytics` (funnel + economy events) | sends whitelisted `store_opened` | – |
 | State sync | `Replication` (dirty-flag batching, 5 Hz) | `StateStore` | – |
@@ -75,6 +75,7 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | `Monetization` | game-pass and developer-product IDs (**placeholders, TODO**), perk values, store layout |
 | `LiveOps` | admin user IDs, scheduled events (luck / cash multipliers, featured creatures), luck-boost limits |
 | `Sounds` | sound asset IDs (**placeholders**) |
+| `Social` | friend bonus (+10% per friend in the server, max 3), group id (**placeholder 0 = off**), group bonus, one-time welcome gift |
 
 ### `src/shared/Logic` (pure, unit-tested)
 
@@ -100,6 +101,7 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `LiveOpsRules` | active events at time *t*, combined luck/cash multipliers, boost stacking, remote-config validation |
 | `Inventory` | podium slot operations on the save table (free slot, place, remove, find by uid) |
 | `PlotAssignment` | pick a free plot, release |
+| `SocialRules` | friend / group income bonus, friend counting per pair, group welcome gift, recheck cooldown, config validation |
 
 ### `src/shared` (Roblox helpers, not unit-tested)
 `Net` (create/get remotes by name), `GameData` (catalogue built once from config; `price` / `income` /
@@ -111,7 +113,7 @@ mutation look), `UiTheme` (hex → Color3, fonts, text templates, rich-text crea
 `init.server.luau` bootstraps in order:
 `Remotes → DataService → MapBuilder → PlotService → Analytics → LiveOpsService → Replication →
 EconomyService → BeltService → LockService → StealService → RebirthService → MonetizationService →
-RetentionService → LeaderboardService → DevCommands → PlayerLifecycle`, and wires cross-service join/leave steps
+RetentionService → SocialService → LeaderboardService → DevCommands → PlayerLifecycle`, and wires cross-service join/leave steps
 through `PlayerLifecycle.hooks()` (keeps services free of circular requires). `Sessions` holds per-player state.
 
 `PlayerLifecycle` owns join/leave ordering: load profile → assign plot → check passes → offline earnings →
@@ -122,7 +124,7 @@ release plot → release profile.
 `init.client.luau` waits for `game:IsLoaded()` then starts controllers:
 `StateStore, HudController, NotificationController, BeltController, PlotController, InteractionController,
 StealController, LockController, RebirthController, StoreController, ChatTagController, RewardsController,
-MutationFxController`
+MutationFxController, SocialController`
 (UI helpers: `UI/UiKit`, `UI/Modal`; audio: `SoundPlayer`).
 
 ## 4. Remotes (all in `ReplicatedStorage.Remotes`, created by the server)
@@ -142,13 +144,15 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `Rebirth` | – | `RebirthMath.canRebirth` |
 | `ClaimDaily` | – | `DailyStreak.canClaim` |
 | `ClientEvent` | `name: string` | whitelist (`store_opened`, `store_product_clicked`) → analytics |
+| `CheckGroup` | – | group feature on, at most once per 10 s, not already checking → re-check membership (`IsInGroupAsync`, then `GetGroupsAsync`) |
+| `InvitePrompted` | – | analytics only (`invite_prompt_opened`); nothing is rewarded for inviting |
 | `DevGrantProduct` | `key: string` | **Studio only** – runs the real receipt path with a fake receipt |
 
 Server → client:
 
 | Remote | Payload |
 | --- | --- |
-| `StateUpdate` | batched partial player state (cash, cash/sec, rebirths, multiplier, podium cap, lock, passes, carry…) |
+| `StateUpdate` | batched partial player state (cash, cash/sec, rebirths, multiplier, podium cap, lock, passes, carry, social bonus…) |
 | `BeltSnapshot` / `BeltSpawn` / `BeltRemove` | conveyor items `{id, creatureId, spawnAt, variant?}` (variant = mutation id) |
 | `Notify` | toast `{kind, text}` |
 | `Announce` | server-wide banner `{text, rarity, color?}` (color: a mutation's own banner) |
@@ -185,7 +189,7 @@ type PlayerData = {   -- exactly Types.PlayerData
     daily: { streak: number, lastClaimDay: number },
     stats: { steals: number, timesStolenFrom: number, beltPurchases: number, playTime: number,
              bestCashPerSecond: number, robuxSpent: number, totalEarned: number },
-    flags: { [string]: boolean },  -- onboarding funnel milestones
+    flags: { [string]: boolean },  -- onboarding funnel milestones, one-time rewards (`social_groupWelcome`)
     firstJoin: number, lastSeen: number,
 }
 ```
@@ -206,5 +210,5 @@ type PlayerData = {   -- exactly Types.PlayerData
 
 Trading (creatures have stable `uid`s and live in one list → a trade is two `Inventory` moves), event creatures
 (`eventId` field + `LiveOps.events` already gate spawns), event-only mutations (a mutation with an `eventId`, e.g. a
-Halloween "Haunted"; the roll already supports it), battle pass, friend/group rewards, private servers, extra maps (plot geometry is data), custom models/sounds
+Halloween "Haunted"; the roll already supports it), battle pass, private servers, extra maps (plot geometry is data), custom models/sounds
 (`CreatureModels` folder + `Config/Sounds`).

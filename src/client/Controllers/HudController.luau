@@ -2,7 +2,7 @@
 --[[
 	The always-on HUD, laid out for thumbs on a landscape phone:
 
-	  top centre    cash (animated count-up) + cash/sec, then status pills (luck, lock) stacked below
+	  top centre    cash (animated count-up) + cash/sec, then status pills (luck, lock, social) stacked below
 	  left middle   round feature buttons (Shop, Rebirth, Daily...) — other controllers add them
 	  right, above the jump button   contextual action area (e.g. the big TAG! button)
 
