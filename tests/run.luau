@@ -29,5 +29,7 @@ require("./TutorialRules.spec")
 require("./OnboardingFunnel.spec")
 require("./CreatureRecipe.spec")
 require("./IdleMotion.spec")
+require("./SceneryLayout.spec")
+require("./SettingsRules.spec")
 
 T.finish()

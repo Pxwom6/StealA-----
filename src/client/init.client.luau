@@ -29,8 +29,13 @@ local MutationFxController = require(Controllers.MutationFxController)
 local SocialController = require(Controllers.SocialController)
 local TutorialController = require(Controllers.TutorialController)
 local IdleController = require(Controllers.IdleController)
+local ClientSettings = require(Controllers.ClientSettings)
+local SettingsController = require(Controllers.SettingsController)
+local MusicController = require(Controllers.MusicController)
+local WorldFxController = require(Controllers.WorldFxController)
 
 StateStore.start()
+ClientSettings.start() -- saved settings (music, sound effects, reduce effects) arrive with the first state
 HudController.start()
 NotificationController.start()
 BeltController.start()
@@ -46,5 +51,8 @@ MutationFxController.start()
 SocialController.start()
 TutorialController.start()
 IdleController.start()
+SettingsController.start() -- the gear, top right
+MusicController.start()
+WorldFxController.start() -- belt chevrons, factory cog; Reduce effects
 
 Net.get("ClientReady"):FireServer()

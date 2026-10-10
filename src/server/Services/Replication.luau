@@ -13,6 +13,7 @@ local Social = require(ReplicatedStorage.Shared.Config.Social)
 local DailyStreak = require(ReplicatedStorage.Shared.Logic.DailyStreak)
 local EconomyMath = require(ReplicatedStorage.Shared.Logic.EconomyMath)
 local RebirthMath = require(ReplicatedStorage.Shared.Logic.RebirthMath)
+local SettingsRules = require(ReplicatedStorage.Shared.Logic.SettingsRules)
 local SocialRules = require(ReplicatedStorage.Shared.Logic.SocialRules)
 local TutorialRules = require(ReplicatedStorage.Shared.Logic.TutorialRules)
 local Tutorial = require(ReplicatedStorage.Shared.Config.Tutorial)
@@ -83,6 +84,7 @@ function Replication.snapshot(session: Session): Types.ClientState
 			count = #Tutorial.steps,
 			stepStartedAt = if tutorial then tutorial.startedAt else 0,
 		},
+		settings = SettingsRules.fromFlags(data.flags),
 	}
 end
 

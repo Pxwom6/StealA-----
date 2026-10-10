@@ -13,12 +13,15 @@
 	                        again when completed, Studio only)
 	  /gallery [mutationId] every Snackling in labelled rows behind the north bases (and you, in front of them), to
 	                        check and screenshot the models, e.g. /gallery, /gallery golden; /gallery off removes it
+	  /sky <clockTime>      preview the lighting at another time of day, e.g. /sky 18 (dusk), /sky 14.6 (back to
+	                        Config/Scenery's afternoon); everyone in the session sees it
 
 	The LiveOps admin commands (LiveOpsService) also work for anyone in Studio, only in that session:
 	  /event <eventId> [minutes], /event off [eventId], /luck <multiplier> <minutes>, /announce <text>
 	  e.g. /event Halloween2026 2  (Halloween theme, event Snacklings and Haunted for 2 minutes, then it ends itself)
 ]]
 
+local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -145,9 +148,18 @@ function DevCommands.start()
 		end
 		Remotes.notify(player, `[Studio] gallery: {count} Snacklings{if variant then ` ({variant})` else ""}`, "info")
 	end)
+	add("sky", function(player: Player, args: { string })
+		local clockTime = tonumber(args[1])
+		if clockTime and clockTime >= 0 and clockTime <= 24 then
+			Lighting.ClockTime = clockTime
+			Remotes.notify(player, `[Studio] ClockTime {clockTime}`, "info")
+		else
+			Remotes.notify(player, "[Studio] /sky <0-24>", "error")
+		end
+	end)
 	print(
 		"[DevCommands] Studio commands enabled: /cash <n>, /spawn <creatureId> [mutationId], /noshield, /friends <n|off>,"
-			.. " /tutorial, /gallery [mutationId|off]"
+			.. " /tutorial, /gallery [mutationId|off], /sky <clockTime>"
 			.. " (LiveOps: /event <id> [minutes], /event off, /luck <x> <min>)"
 	)
 end

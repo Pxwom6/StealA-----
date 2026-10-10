@@ -26,6 +26,7 @@ export type ClientToServer =
 	| "CheckGroup"
 	| "InvitePrompted"
 	| "SkipTutorial"
+	| "SetSetting"
 	| "DevGrantProduct"
 
 export type ServerToClient =
@@ -56,6 +57,7 @@ local CLIENT_TO_SERVER: { ClientToServer } = {
 	"CheckGroup",
 	"InvitePrompted",
 	"SkipTutorial",
+	"SetSetting",
 	"DevGrantProduct",
 }
 
