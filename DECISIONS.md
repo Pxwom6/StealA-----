@@ -283,9 +283,10 @@ belt → collect cash from its pad → lock the base → steal from another base
 the cash plus a 3D guide (a pulsing beam from the player's feet, a bouncing arrow above the target that shows through
 walls, a highlight on it); the steal step has no guide (any unshielded base will do) and a one-line tip about the
 new-player shield instead. Completing it pays `Tutorial.reward` ($500) once per account.
-* **Server-authoritative.** `TutorialService.record` is called by the services right after they apply the action: a
-  belt purchase (BeltService), a collect from a pad (EconomyService's pad check only, not the collect when selling),
-  a lock (LockService, Instant Lock included) and a delivered steal (StealService). No client message can finish a
+* **Server-authoritative.** `TutorialService.record` runs on the gameplay events the services emit right after they
+  apply the action (`GameEvents`, #22): a belt purchase (BeltService), a collect from a pad (EconomyService's pad check
+  only, not the collect when selling), a lock (LockService, Instant Lock included) and a delivered steal
+  (StealService). No client message can finish a
   step; the client's only tutorial intent is `SkipTutorial` (rate-limited), which ends it with no reward. The step
   reaches the owning client in `StateUpdate.tutorial`, like every other HUD state.
 * **Saved in the existing `flags` map, no schema bump:** `tutorial_<step>` per finished step and `tutorial_done` at the
@@ -409,3 +410,62 @@ belt that visibly moves, sound on every action, and a phone that doesn't stutter
 geometry means none of the steal / lock / collect rules (or their tests) had to change.
 **Reversal cost:** low: scenery, lighting and sounds are data; delete `SceneryBuilder.build` to get the bare map back.
 The `settings_*` flag names must stay (they are in saves).
+### 24. Snackdex and daily quests: save format v3, server-seen events, earned bonus counts as permanent
+
+**Chose:**
+* **Save format v3** (`DataSchema.VERSION` 2 → 3, following #1): `data.snackdex` = `creatures` (ids ever owned),
+  `variants` (creature id → mutation ids ever owned with it) and `tiers` (rarity ids whose reward was paid), all sets
+  of ids mapped to `true`; `data.quests` = `day` (UTC day index), `list` (`{id, target, progress, claimed}`) and
+  `bonusClaimed`. The v2 → v3 step backfills the Snackdex from every Snackling the save holds (podiums and quarantine,
+  with mutations). ProfileStore's `Reconcile` runs before `migrate` and already adds the template's empty tables, so
+  the step merges into what is there instead of only filling missing keys (tested). `sanitise` keeps ids the config
+  doesn't know (like quarantined creatures: they may come back) and bounds every list (1024 Snacklings, 32 mutations
+  each, 64 tiers, 8 quests; past a bound the alphabetically last ids go). A rollback keeps `DataSchema` and
+  `Types.PlayerData` whole, as #1 says; the sanitise code is inside `DataSchema` so nothing else has to stay.
+* **One server hook for "what the player did"** (`GameEvents`): the services emit `beltPurchase`, `acquired` (any
+  way a Snackling lands in a base: `EconomyService.giveCreature`, which belt purchases use, and steal delivery),
+  `collect` (pads only), `sell`, `lock`, `steal` and `discover` right after applying the action, exactly where they
+  used to call `TutorialService.record`. The tutorial, the Snackdex and quests subscribe; each listener runs in its
+  own pcall, in subscription order (the tutorial first, so a delivered steal still finishes its step before
+  `FirstSteal` is logged, #21). No client message can emit one.
+* **Snackdex tiers** count regular Snacklings only (`eventId == nil`); event Snacklings have their own "Event"
+  section and never block a tier. Everything is read from `Config/Creatures`, so roster changes need no code. A tier
+  pays once per account: `SnackdexRules.claimTier` sets the flag before the reward is paid (no yield in between),
+  automatically on the discovery that completes it (or on join for a backfilled save). Adding Snacklings to a
+  completed tier later re-opens its count but keeps its reward and bonus; it does not pay again.
+* **The collection bonus is permanent income** (+3% per completed tier, capped at +21% = all seven tiers):
+  `EconomyMath.MultiplierInputs.collectionBonus` is kept by `permanentMultiplier` (cash packs, quest and Snackdex
+  rewards) and by `rewardMultiplier` (daily, offline earnings, best cash/sec and the leaderboard), like rebirths and
+  passes, unlike LiveOps cash events and the friend & group bonus. It is earned for good, so a pack or reward sized
+  from it is still "N minutes of your steady income". It is derived from the saved tier flags × config (not stored as
+  a number like `rebirthMultiplier`, #12): raising `incomeBonusPerTier` helps everyone; never lower it once live.
+  The whole collection (+21%) stays below one rebirth (×1.5); CI checks that.
+* **No cash for new mutation pairs.** A new (Snackling, mutation) pair gets the "NEW!" toast, a filled pip and counts
+  for the "discover" quest, but pays nothing: the economy stays as BALANCE.md describes and nothing rewards farming
+  mutations.
+* **Daily quests are rolled from a hash of the UserId and the UTC day** (`QuestRules.seed`: MurmurHash3's finaliser
+  over 32-bit words, exact in Luau doubles), 2 easy + 1 hard, no repeated kind while another is left, and the list is
+  saved: rejoining or hopping servers never re-rolls, and a config change mid-day doesn't reshuffle anyone's day. A
+  "collect" target is fixed at roll time from steady income; rewards are sized at claim time (like the daily reward).
+  The day changes at UTC midnight (DailyStreak's day maths); finished-but-unclaimed quests are then paid
+  automatically, so a quest done at 23:59 is never lost. A saved day later than the server's (another server's clock
+  ahead) is kept, never rolled back. `ClaimQuest(slot)` is rate-limited and `QuestRules.claim` marks the quest (and the
+  all-done bonus with the last one) claimed before paying, so nothing pays twice.
+* **The all-done bonus is cash** (5 minutes of steady income, at least $500), not a free Instant Lock: lock tokens stay
+  a store item and the lock fairness rules (#9) stay untouched. A full day of quests pays about 21 minutes of steady
+  income (less than the day-7 daily reward), CI keeps it under an hour.
+* **HUD:** the left column is Shop, Rebirth, Rewards, Snackdex: four 76×58 buttons with 6 px gaps (250 reference
+  px), the footprint of the three 74 px buttons before, so the layout notes in #21 still hold (x ≤ 86, badges
+  included).
+  Daily login rewards and quests share the Rewards panel (two tabs) instead of a fifth button; it still opens itself
+  on Daily once per session, never during the tutorial. The top-right corner and the bottom-right action area are
+  untouched.
+* **Analytics:** `snackdex_tier_completed` (value = rarity order, field = rarity id), `quest_claimed` (quest id,
+  difficulty, "claim" | "auto") and `quests_all_done` ("claim" | "auto").
+
+**Why:** a collection book and daily goals are the two proven "come back tomorrow" loops of the genre; both are
+server-authoritative (only what the server saw counts, claims are idempotent) and data-driven (another Snackling or
+quest is a config line).
+**Reversal cost:** medium — the saved keys and the meaning of the tier flags are permanent (bump the version for any
+change). Rewards, bonus per tier, quest pool and targets are free to re-tune (keep `incomeBonusPerTier` from going
+down). Quest ids are saved for one day only: retiring one costs nothing after that day.

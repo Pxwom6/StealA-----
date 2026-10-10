@@ -31,5 +31,8 @@ require("./CreatureRecipe.spec")
 require("./IdleMotion.spec")
 require("./SceneryLayout.spec")
 require("./SettingsRules.spec")
+require("./SnackdexRules.spec")
+require("./QuestRules.spec")
+require("./RetentionConfig.spec")
 
 T.finish()

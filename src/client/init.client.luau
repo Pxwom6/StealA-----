@@ -33,6 +33,7 @@ local ClientSettings = require(Controllers.ClientSettings)
 local SettingsController = require(Controllers.SettingsController)
 local MusicController = require(Controllers.MusicController)
 local WorldFxController = require(Controllers.WorldFxController)
+local SnackdexController = require(Controllers.SnackdexController)
 
 StateStore.start()
 ClientSettings.start() -- saved settings (music, sound effects, reduce effects) arrive with the first state
@@ -54,5 +55,6 @@ IdleController.start()
 SettingsController.start() -- the gear, top right
 MusicController.start()
 WorldFxController.start() -- belt chevrons, factory cog; Reduce effects
+SnackdexController.start() -- side button LayoutOrder 4, under Rewards
 
 Net.get("ClientReady"):FireServer()

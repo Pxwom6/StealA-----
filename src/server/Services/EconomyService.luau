@@ -16,6 +16,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
 local Monetization = require(ReplicatedStorage.Shared.Config.Monetization)
+local Snackdex = require(ReplicatedStorage.Shared.Config.Snackdex)
 local Social = require(ReplicatedStorage.Shared.Config.Social)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local GameData = require(ReplicatedStorage.Shared.GameData)
@@ -23,16 +24,17 @@ local Types = require(ReplicatedStorage.Shared.Types)
 local EconomyMath = require(ReplicatedStorage.Shared.Logic.EconomyMath)
 local Inventory = require(ReplicatedStorage.Shared.Logic.Inventory)
 local Guard = require(ReplicatedStorage.Shared.Logic.Guard)
+local SnackdexRules = require(ReplicatedStorage.Shared.Logic.SnackdexRules)
 local SocialRules = require(ReplicatedStorage.Shared.Logic.SocialRules)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local Analytics = require(script.Parent.Analytics)
+local GameEvents = require(script.Parent.GameEvents)
 local LiveOpsService = require(script.Parent.LiveOpsService)
 local PlotService = require(script.Parent.PlotService)
 local Remotes = require(script.Parent.Remotes)
 local Replication = require(script.Parent.Replication)
 local Sessions = require(script.Parent.Sessions)
-local TutorialService = require(script.Parent.TutorialService)
 
 type Session = Sessions.Session
 
@@ -52,6 +54,8 @@ local function multiplierInputs(session: Session): EconomyMath.MultiplierInputs
 		vipIncomeBonus = perks.vipIncomeBonus,
 		eventCashMultiplier = LiveOpsService.cashMultiplier(),
 		socialBonus = SocialRules.totalBonus(session.social.friends, session.social.groupMember, Social),
+		-- Earned for good (completed Snackdex tiers): part of the steady income packs and rewards are sized from.
+		collectionBonus = SnackdexRules.incomeBonus(session.data.snackdex, Snackdex),
 	}
 end
 
@@ -134,7 +138,8 @@ function EconomyService.freePodium(session: Session): number?
 end
 
 -- Places a new creature (with its mutation id, nil for a plain one) on the lowest free podium. Returns the record, or
--- nil if the base is full.
+-- nil if the base is full. Every way a new creature lands in a base goes through here (a steal moves one with
+-- Inventory.transfer instead, and emits the same "acquired" event), so the Snackdex sees them all.
 function EconomyService.giveCreature(session: Session, creatureId: string, variant: string?): Types.CreatureRecord?
 	local podium = EconomyService.freePodium(session)
 	if podium == nil or GameData.catalog.creatures[creatureId] == nil then
@@ -142,6 +147,7 @@ function EconomyService.giveCreature(session: Session, creatureId: string, varia
 	end
 	local record = Inventory.add(session.data, creatureId, podium, os.time(), variant)
 	EconomyService.refresh(session)
+	GameEvents.emit(session, { kind = "acquired", creatureId = creatureId, variant = variant })
 	return record
 end
 
@@ -220,7 +226,8 @@ local function padCheck()
 					amount = amount,
 					position = nearest.padPosition,
 				})
-				TutorialService.record(session, "collect") -- only a pad collect counts (not selling, not leaving)
+				-- Only a pad collect is this event (not selling, not leaving): tutorial, quests.
+				GameEvents.emit(session, { kind = "collect", amount = amount })
 			end
 		end
 	end
@@ -277,6 +284,7 @@ local function onSellCreature(player: Player, podiumArg: unknown)
 	local value = EconomyMath.sellValue(GameData.price(def, record.variant), Economy.sellRefund)
 	EconomyService.addCash(session, value, "Gameplay", "Sell")
 	EconomyService.refresh(session)
+	GameEvents.emit(session, { kind = "sell", creatureId = record.id, variant = record.variant }) -- quests
 	Remotes.notify(
 		player,
 		Format.template(

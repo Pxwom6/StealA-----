@@ -37,6 +37,7 @@ local Theme = {
 		social = "#FF6FB5",
 		event = "#FF8C1A", -- event pill / "EVENT" tag when the event has no seasonal theme colour (Config/Seasons)
 		tutorial = "#FFD23F", -- tutorial banner trim, step badge, guide beam and arrow
+		snackdex = "#9B6BFF", -- Snackdex side button
 	},
 
 	world = {
@@ -294,6 +295,48 @@ local Theme = {
 		settingsReduceFxHint = "Fewer particles & animations (smoother on older phones)",
 		settingsOn = "ON",
 		settingsOff = "OFF",
+		-- Rewards panel (daily login + daily quests) and its side button
+		rewardsButton = "Rewards",
+		rewardsTitle = "Rewards",
+		rewardsTabDaily = "Daily",
+		rewardsTabQuests = "Quests",
+		dailyDay = "Day {day}", -- a cell of the 7-day track
+		-- Daily quests (Config/Quests textKey): {count} = target, {amount} = cash target, {rarity} = minimum rarity
+		questBuy = "Buy {count} Snacklings from the belt",
+		questBuyRare = "Buy a {rarity} or rarer Snackling",
+		questCollect = "Collect {amount} from your pads",
+		questSell = "Sell {count} Snacklings",
+		questLock = "Lock your base {count} times",
+		questSteal = "Steal a Snackling and get it home",
+		questDiscover = "Find something new for your Snackdex",
+		questUnknown = "Old quest",
+		questEasy = "EASY",
+		questHard = "HARD",
+		questClaimed = "Claimed",
+		questBonus = "Finish all {count}: {amount} bonus ({done}/{count})",
+		questBonusClaimed = "All quests done - bonus paid!",
+		questResetsIn = "New quests in {time}",
+		questComplete = "Quest done! Claim {amount} in Rewards",
+		questReward = "Quest reward: {amount}!",
+		questAllDone = "All daily quests done! Bonus {amount}!",
+		questAutoClaimed = "Yesterday's quest rewards: {amount}",
+		questsNew = "New daily quests are here!",
+
+		-- Snackdex (collection book)
+		snackdexButton = "Snackdex",
+		snackdexTitle = "Snackdex",
+		snackdexEventTab = "Event",
+		snackdexUnknown = "???",
+		snackdexTabCount = "{found}/{total}",
+		snackdexTierReward = "Collect all {total}: {amount} + {percent}% income forever",
+		snackdexTierDone = "Complete! +{percent}% income forever",
+		snackdexTierDoneMore = "Reward claimed (+{percent}% income) - new ones to find!",
+		snackdexEventNote = "Limited-time Snacklings - they never block a tier",
+		snackdexBonus = "Collection bonus +{percent}%",
+		snackdexPage = "{page}/{pages}",
+		snackdexNewTag = "NEW",
+		snackdexNew = "NEW! {creature} joined your Snackdex",
+		snackdexTierComplete = "{rarity} Snackdex complete! +{amount} and +{percent}% income forever!",
 	},
 
 	-- Store copy per item key (see Config/Monetization). Available placeholders: {vipBonus} {extraPodiums}

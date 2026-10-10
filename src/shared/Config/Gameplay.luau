@@ -137,6 +137,7 @@ local Gameplay = {
 		SkipTutorial = { burst = 2, perSecond = 0.2 }, -- once per account in practice (TutorialService)
 		SetSetting = { burst = 8, perSecond = 2 }, -- settings toggles (the client also coalesces quick changes)
 		DevGrantProduct = { burst = 3, perSecond = 1 },
+		ClaimQuest = { burst = 4, perSecond = 1 }, -- three quests a day; each claim pays once (QuestRules.claim)
 	} :: { [string]: RateLimit },
 }
 

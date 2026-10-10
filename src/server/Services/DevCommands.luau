@@ -15,6 +15,10 @@
 	                        check and screenshot the models, e.g. /gallery, /gallery golden; /gallery off removes it
 	  /sky <clockTime>      preview the lighting at another time of day, e.g. /sky 18 (dusk), /sky 14.6 (back to
 	                        Config/Scenery's afternoon); everyone in the session sees it
+	  /quests reset         re-roll today's daily quests (new picks, progress and claims start over)
+	  /dex fill <rarity>    mark every Snackling of a tier discovered except one, and clear that tier's reward, so
+	                        buying the missing one (the toast names it; /spawn it) tests completion; e.g. /dex fill
+	                        common. "event" fills the Event section the same way (it has no reward)
 
 	The LiveOps admin commands (LiveOpsService) also work for anyone in Studio, only in that session:
 	  /event <eventId> [minutes], /event off [eventId], /luck <multiplier> <minutes>, /announce <text>
@@ -28,13 +32,16 @@ local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
 
 local GameData = require(ReplicatedStorage.Shared.GameData)
+local SnackdexRules = require(ReplicatedStorage.Shared.Logic.SnackdexRules)
 
 local BeltService = require(script.Parent.BeltService)
 local DevGallery = require(script.Parent.DevGallery)
 local EconomyService = require(script.Parent.EconomyService)
 local LockService = require(script.Parent.LockService)
+local QuestService = require(script.Parent.QuestService)
 local Remotes = require(script.Parent.Remotes)
 local Sessions = require(script.Parent.Sessions)
+local SnackdexService = require(script.Parent.SnackdexService)
 local SocialService = require(script.Parent.SocialService)
 local TutorialService = require(script.Parent.TutorialService)
 
@@ -157,9 +164,52 @@ function DevCommands.start()
 			Remotes.notify(player, "[Studio] /sky <0-24>", "error")
 		end
 	end)
+	add("quests", function(player: Player, args: { string })
+		local session = Sessions.get(player)
+		if session == nil then
+			return
+		end
+		if args[1] ~= "reset" then
+			Remotes.notify(player, "[Studio] usage: /quests reset", "error")
+			return
+		end
+		QuestService.devReset(session)
+		Remotes.notify(player, "[Studio] today's quests re-rolled", "info")
+	end)
+	add("dex", function(player: Player, args: { string })
+		local session = Sessions.get(player)
+		if session == nil then
+			return
+		end
+		-- The section by rarity id or name, any case ("common", "secret"), or "event".
+		local wanted = string.lower(args[2] or "")
+		local sectionId: string? = if wanted == string.lower(SnackdexRules.EVENT_SECTION)
+			then SnackdexRules.EVENT_SECTION
+			else nil
+		for _, rarity in GameData.catalog.rarityList do
+			if string.lower(rarity.id) == wanted or string.lower(rarity.displayName) == wanted then
+				sectionId = rarity.id
+			end
+		end
+		if args[1] ~= "fill" or sectionId == nil then
+			Remotes.notify(player, "[Studio] usage: /dex fill <rarity|event>", "error")
+			return
+		end
+		local leftOut = SnackdexService.devFill(session, sectionId)
+		if leftOut then
+			Remotes.notify(
+				player,
+				`[Studio] {sectionId}: all but {leftOut.displayName} found. /spawn {leftOut.id}`,
+				"info"
+			)
+		else
+			Remotes.notify(player, `[Studio] {sectionId} has no Snacklings`, "error")
+		end
+	end)
 	print(
 		"[DevCommands] Studio commands enabled: /cash <n>, /spawn <creatureId> [mutationId], /noshield, /friends <n|off>,"
-			.. " /tutorial, /gallery [mutationId|off], /sky <clockTime>"
+			.. " /tutorial, /gallery [mutationId|off], /sky <clockTime>,"
+			.. " /quests reset, /dex fill <rarity|event>"
 			.. " (LiveOps: /event <id> [minutes], /event off, /luck <x> <min>)"
 	)
 end

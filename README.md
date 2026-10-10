@@ -150,6 +150,16 @@ kind is listed at the top of `src/shared/Logic/CreatureRecipe.luau`.
   Haunted).
 * **They feel alive:** Snacklings near your camera bob, squash and sway on their podiums, and hop along the belt
   (client-only, `IdleController` / `BeltController`).
+### Snackdex and daily quests
+
+* **Snackdex** (the 📖 button): every Snackling a player has ever owned, with its mutations. Owning every regular
+  Snackling of a rarity pays a one-time reward (sized from steady income) and +3% income forever (all seven tiers:
+  +21%). Event Snacklings have their own tab and never block a tier. Tune it in `src/shared/Config/Snackdex.luau`; new
+  Snacklings show up by themselves.
+* **Daily quests** (the Rewards button, Quests tab): three a day (2 easy + 1 hard), new at UTC midnight; anything
+  finished but not claimed by then is paid automatically. Add or tune quests in `src/shared/Config/Quests.luau` (texts:
+  `quest*` keys in `Theme.luau`).
+* **Analytics:** custom events `snackdex_tier_completed`, `quest_claimed` and `quests_all_done` (DECISIONS.md #24).
 
 ### Swapping in your own art
 
@@ -208,6 +218,9 @@ labelled rows behind the north bases, e.g. `/gallery golden`; `/gallery off` rem
 `/friends <n|off>`, `/tutorial` (start the first-time tutorial again) and `/sky <clockTime>` (preview the lighting at
 another time of day, e.g. `/sky 18`; `/sky 14.6` is the normal afternoon) work in Studio only
 (`src/server/Services/DevCommands.luau`). `/spawn` also puts event Snacklings
+`/friends <n|off>`, `/tutorial` (start the first-time tutorial again), `/quests reset` (re-roll today's quests) and
+`/dex fill <rarity|event>` (discover every Snackling of a tier but one, e.g. `/dex fill common`; the toast names the
+missing one to `/spawn`) work in Studio only (`src/server/Services/DevCommands.luau`). `/spawn` also puts event Snacklings
 and event mutations on the belt when their event isn't running (e.g. `/spawn candy_corn_cat haunted`).
 
 To test a seasonal event in Studio: `/event Halloween2026 5` turns Halloween on for 5 minutes (decorations, dusk

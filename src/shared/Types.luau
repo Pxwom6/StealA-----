@@ -440,6 +440,48 @@ export type TutorialConfig = {
 	belt: TutorialBeltConfig,
 }
 
+-- Config: Snackdex and daily quests (Config/Snackdex, Config/Quests) ---------------------------------------------
+
+-- Cash sized like a cash pack: N seconds of the player's steady income (EconomyMath.packIncome: rebirths, passes and
+-- the Snackdex bonus; no LiveOps cash event, no friend & group bonus), never below the minimum.
+export type IncomeReward = { incomeSeconds: number, minimum: number }
+
+export type SnackdexConfig = {
+	-- Permanent income bonus per rarity tier completed (0.03 = +3%), and the cap on all of them together.
+	incomeBonusPerTier: number,
+	maxIncomeBonus: number,
+	-- One-time cash for owning every regular (non-event) Snackling of a tier, by rarity id.
+	tierRewards: { [string]: IncomeReward },
+	defaultTierReward: IncomeReward, -- a rarity missing from tierRewards
+}
+
+-- What a daily quest counts (Logic/QuestRules): belt purchases, cash collected from pads, Snacklings sold, base locks,
+-- delivered steals, new Snackdex entries (a new Snackling or a new mutation of one).
+export type QuestKind = "beltPurchase" | "collect" | "sell" | "lock" | "steal" | "discover"
+export type QuestDifficulty = "easy" | "hard"
+
+export type QuestDef = {
+	id: string, -- saved in the day's quest list: never reuse an id for a different quest
+	kind: QuestKind,
+	difficulty: QuestDifficulty,
+	textKey: string, -- Theme.text key: {count} = the target, {amount} = a cash target, {rarity} = minRarity's name
+	target: number?, -- how many (every kind but "collect")
+	-- "collect": the target is this many seconds of steady income when the day's quests are rolled, at least `minimum`
+	incomeSeconds: number?,
+	minimum: number?,
+	minRarity: string?, -- "beltPurchase": only Snacklings of this rarity id or rarer count
+}
+
+export type QuestsConfig = {
+	slots: { QuestDifficulty }, -- one quest per entry every UTC day, in display order (e.g. easy, easy, hard)
+	pool: { QuestDef },
+	rewards: { [string]: IncomeReward }, -- by difficulty
+	allDoneBonus: IncomeReward, -- paid once a day, with the claim that finishes the last quest
+}
+
+-- A gameplay event as daily quests see it (QuestService builds it from GameEvents).
+export type QuestEvent = { kind: string, amount: number?, rarityOrder: number? }
+
 -- Save data ---------------------------------------------------------------------------------------------------
 
 export type CreatureRecord = {
@@ -479,6 +521,23 @@ export type DailyState = { streak: number, lastClaimDay: number }
 -- Base-lock timers carried between sessions, in wall-clock (os.time) seconds; 0 = not running.
 export type LockTimers = { cooldownUntil: number, vulnerableUntil: number }
 
+-- The collection book (v3): everything the player has ever owned. It never shrinks (a rebirth keeps it), and ids the
+-- config no longer knows are kept, like quarantined creatures.
+export type Snackdex = {
+	creatures: { [string]: boolean }, -- creature id -> true once owned
+	variants: { [string]: { [string]: boolean } }, -- creature id -> mutation ids it has been owned with
+	tiers: { [string]: boolean }, -- rarity ids whose completion reward was paid (each gives the permanent bonus)
+}
+
+-- One of the day's quests (v3). `target` is fixed when the day's quests are rolled.
+export type QuestSlot = { id: string, target: number, progress: number, claimed: boolean }
+
+export type QuestState = {
+	day: number, -- UTC day index (DailyStreak.dayIndex) the list belongs to; -1 before the first roll
+	list: { QuestSlot },
+	bonusClaimed: boolean, -- the all-done bonus for `day` was paid
+}
+
 export type PlayerData = {
 	version: number,
 	cash: number,
@@ -502,6 +561,8 @@ export type PlayerData = {
 	flags: { [string]: boolean },
 	firstJoin: number,
 	lastSeen: number,
+	snackdex: Snackdex, -- v3
+	quests: QuestState, -- v3
 }
 
 -- Runtime / network ---------------------------------------------------------------------------------------------
@@ -546,6 +607,38 @@ export type SettingsView = {
 	reduceEffects: boolean, -- fewer particles / animated flair (low-end phones)
 }
 
+-- One of today's quests as the Rewards panel shows it. `reward` is what claiming pays right now.
+export type QuestSlotView = { id: string, progress: number, target: number, claimed: boolean, reward: number }
+
+export type QuestsView = {
+	list: { QuestSlotView },
+	bonus: number, -- the all-done bonus right now
+	bonusClaimed: boolean,
+	resetsAt: number, -- Unix time of the next UTC midnight (new quests)
+	claimable: number, -- quests finished and not claimed yet
+}
+
+-- The Snackdex as its client sees it (SnackdexSync).
+export type SnackdexView = {
+	creatures: { string }, -- creature ids ever owned (sorted)
+	variants: { [string]: { string } }, -- creature id -> mutation ids ever owned with it (sorted)
+	tiers: { string }, -- rarity ids completed (reward paid)
+	incomeBonus: number, -- the permanent collection bonus (0.06 = +6%)
+}
+
+-- A new Snackdex entry: a Snackling never owned before, or a mutation of it never owned before (`variant`).
+export type SnackdexDiscovery = { creatureId: string, variant: string?, newCreature: boolean }
+
+-- A rarity tier just completed: the cash it paid and the income bonus it added.
+export type SnackdexTierPaid = { rarity: string, amount: number, bonus: number }
+
+-- Server -> client SnackdexSync: the whole (small) Snackdex, plus what just happened.
+export type SnackdexSync = {
+	dex: SnackdexView,
+	discovered: SnackdexDiscovery?,
+	completed: { SnackdexTierPaid }?,
+}
+
 -- What the server sends the owning client in StateUpdate (see server/Services/Replication.luau).
 -- Costs of -1 mean "not available" (max reached).
 export type ClientState = {
@@ -575,6 +668,7 @@ export type ClientState = {
 	social: SocialView,
 	tutorial: TutorialView,
 	settings: SettingsView,
+	quests: QuestsView,
 }
 
 export type BeltItem = { id: number, creatureId: string, spawnAt: number, variant: string? }
