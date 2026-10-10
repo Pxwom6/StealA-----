@@ -99,143 +99,144 @@ end
 
 -- Each builder makes exactly SeasonRules.PARTS_PER[kind] parts. `base` stands on the prop's position, front (-Z)
 -- towards its face direction.
-local builders: { [string]: (base: CFrame, prop: SeasonRules.Prop, palette: Types.SeasonPalette, parent: Instance) -> () } =
-	{
-		pumpkin = function(base, prop, palette, parent)
-			local s = 2.8 * prop.scale
-			local face = UiTheme.color(palette.pumpkinFace)
-			local body = part({
-				Name = "Pumpkin",
-				Shape = Enum.PartType.Ball,
-				Size = Vector3.one * s,
-				CFrame = base * CFrame.new(0, s / 2, 0),
-				Color = UiTheme.color(palette.pumpkin),
-				Parent = parent,
-			})
+type Builder = (base: CFrame, prop: SeasonRules.Prop, palette: Types.SeasonPalette, parent: Instance) -> ()
+
+local builders: { [string]: Builder } = {
+	pumpkin = function(base, prop, palette, parent)
+		local s = 2.8 * prop.scale
+		local face = UiTheme.color(palette.pumpkinFace)
+		local body = part({
+			Name = "Pumpkin",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * s,
+			CFrame = base * CFrame.new(0, s / 2, 0),
+			Color = UiTheme.color(palette.pumpkin),
+			Parent = parent,
+		})
+		part({
+			Name = "Stem",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.35 * s, 0.14 * s, 0.14 * s),
+			CFrame = base * CFrame.new(0, s * 1.05, 0) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = UiTheme.color(palette.stem),
+			Parent = parent,
+		})
+		for _, side in { -1, 1 } do
 			part({
-				Name = "Stem",
-				Shape = Enum.PartType.Cylinder,
-				Size = Vector3.new(0.35 * s, 0.14 * s, 0.14 * s),
-				CFrame = base * CFrame.new(0, s * 1.05, 0) * CFrame.Angles(0, 0, math.rad(90)),
-				Color = UiTheme.color(palette.stem),
-				Parent = parent,
-			})
-			for _, side in { -1, 1 } do
-				part({
-					Name = "Eye",
-					Size = Vector3.new(0.22 * s, 0.22 * s, 0.2),
-					CFrame = base * CFrame.new(side * 0.2 * s, 0.62 * s, -0.45 * s) * CFrame.Angles(0, 0, math.rad(45)),
-					Color = face,
-					Material = Enum.Material.Neon,
-					Parent = parent,
-				})
-			end
-			part({
-				Name = "Mouth",
-				Size = Vector3.new(0.42 * s, 0.1 * s, 0.2),
-				CFrame = base * CFrame.new(0, 0.36 * s, -0.47 * s),
+				Name = "Eye",
+				Size = Vector3.new(0.22 * s, 0.22 * s, 0.2),
+				CFrame = base * CFrame.new(side * 0.2 * s, 0.62 * s, -0.45 * s) * CFrame.Angles(0, 0, math.rad(45)),
 				Color = face,
 				Material = Enum.Material.Neon,
 				Parent = parent,
 			})
-			if prop.scale >= 1 then
-				light(body, face, 10, 1.5) -- only the big ones by the plots: lights are not free
-			end
-		end,
+		end
+		part({
+			Name = "Mouth",
+			Size = Vector3.new(0.42 * s, 0.1 * s, 0.2),
+			CFrame = base * CFrame.new(0, 0.36 * s, -0.47 * s),
+			Color = face,
+			Material = Enum.Material.Neon,
+			Parent = parent,
+		})
+		if prop.scale >= 1 then
+			light(body, face, 10, 1.5) -- only the big ones by the plots: lights are not free
+		end
+	end,
 
-		bulb = function(base, prop, _palette, parent)
-			part({
-				Name = "Bulb",
-				Shape = Enum.PartType.Ball,
-				Size = Vector3.one * 0.7 * prop.scale,
-				CFrame = base,
-				Color = UiTheme.color(prop.color or "#FFFFFF"),
-				Material = Enum.Material.Neon,
-				Parent = parent,
-			})
-		end,
+	bulb = function(base, prop, _palette, parent)
+		part({
+			Name = "Bulb",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 0.7 * prop.scale,
+			CFrame = base,
+			Color = UiTheme.color(prop.color or "#FFFFFF"),
+			Material = Enum.Material.Neon,
+			Parent = parent,
+		})
+	end,
 
-		lamp = function(base, _prop, palette, parent)
-			local postColor = UiTheme.color(palette.lampPost)
-			part({
-				Name = "LampPost",
-				Size = Vector3.new(0.5, 6, 0.5),
-				CFrame = base * CFrame.new(0, 3, 0),
-				Color = postColor,
-				Parent = parent,
-			})
-			local lantern = part({
-				Name = "Lantern",
-				Size = Vector3.new(1.2, 1.4, 1.2),
-				CFrame = base * CFrame.new(0, 6.7, 0),
-				Color = UiTheme.color(palette.lampLight),
-				Material = Enum.Material.Neon,
-				Parent = parent,
-			})
-			part({
-				Name = "LampCap",
-				Size = Vector3.new(1.6, 0.3, 1.6),
-				CFrame = base * CFrame.new(0, 7.55, 0),
-				Color = postColor,
-				Parent = parent,
-			})
-			light(lantern, UiTheme.color(palette.lampLight), 14, 1.2)
-		end,
+	lamp = function(base, _prop, palette, parent)
+		local postColor = UiTheme.color(palette.lampPost)
+		part({
+			Name = "LampPost",
+			Size = Vector3.new(0.5, 6, 0.5),
+			CFrame = base * CFrame.new(0, 3, 0),
+			Color = postColor,
+			Parent = parent,
+		})
+		local lantern = part({
+			Name = "Lantern",
+			Size = Vector3.new(1.2, 1.4, 1.2),
+			CFrame = base * CFrame.new(0, 6.7, 0),
+			Color = UiTheme.color(palette.lampLight),
+			Material = Enum.Material.Neon,
+			Parent = parent,
+		})
+		part({
+			Name = "LampCap",
+			Size = Vector3.new(1.6, 0.3, 1.6),
+			CFrame = base * CFrame.new(0, 7.55, 0),
+			Color = postColor,
+			Parent = parent,
+		})
+		light(lantern, UiTheme.color(palette.lampLight), 14, 1.2)
+	end,
 
-		bat = function(base, prop, palette, parent)
-			local color = UiTheme.color(palette.bat)
-			local s = prop.scale
+	bat = function(base, prop, palette, parent)
+		local color = UiTheme.color(palette.bat)
+		local s = prop.scale
+		part({
+			Name = "Bat",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 1.1 * s,
+			CFrame = base,
+			Color = color,
+			Parent = parent,
+		})
+		for _, side in { -1, 1 } do
 			part({
-				Name = "Bat",
-				Shape = Enum.PartType.Ball,
-				Size = Vector3.one * 1.1 * s,
-				CFrame = base,
+				Name = "Wing",
+				Size = Vector3.new(1.8 * s, 0.12, 0.9 * s),
+				CFrame = base * CFrame.new(side * 1.15 * s, 0.15 * s, 0) * CFrame.Angles(0, 0, math.rad(side * 20)),
 				Color = color,
 				Parent = parent,
 			})
-			for _, side in { -1, 1 } do
-				part({
-					Name = "Wing",
-					Size = Vector3.new(1.8 * s, 0.12, 0.9 * s),
-					CFrame = base * CFrame.new(side * 1.15 * s, 0.15 * s, 0) * CFrame.Angles(0, 0, math.rad(side * 20)),
-					Color = color,
-					Parent = parent,
-				})
-			end
-		end,
+		end
+	end,
 
-		ghost = function(base, prop, palette, parent)
-			local s = prop.scale
-			local color = UiTheme.color(palette.ghost)
+	ghost = function(base, prop, palette, parent)
+		local s = prop.scale
+		local color = UiTheme.color(palette.ghost)
+		part({
+			Name = "GhostSkirt",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(2.2 * s, 2.4 * s, 2.4 * s),
+			CFrame = base * CFrame.new(0, 1.1 * s, 0) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = color,
+			Transparency = 0.3,
+			Parent = parent,
+		})
+		part({
+			Name = "GhostHead",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 2.4 * s,
+			CFrame = base * CFrame.new(0, 2.4 * s, 0),
+			Color = color,
+			Transparency = 0.2,
+			Parent = parent,
+		})
+		for _, side in { -1, 1 } do
 			part({
-				Name = "GhostSkirt",
-				Shape = Enum.PartType.Cylinder,
-				Size = Vector3.new(2.2 * s, 2.4 * s, 2.4 * s),
-				CFrame = base * CFrame.new(0, 1.1 * s, 0) * CFrame.Angles(0, 0, math.rad(90)),
-				Color = color,
-				Transparency = 0.3,
+				Name = "GhostEye",
+				Size = Vector3.new(0.3 * s, 0.45 * s, 0.15),
+				CFrame = base * CFrame.new(side * 0.4 * s, 2.6 * s, -1.12 * s),
+				Color = Color3.fromRGB(25, 20, 35),
 				Parent = parent,
 			})
-			part({
-				Name = "GhostHead",
-				Shape = Enum.PartType.Ball,
-				Size = Vector3.one * 2.4 * s,
-				CFrame = base * CFrame.new(0, 2.4 * s, 0),
-				Color = color,
-				Transparency = 0.2,
-				Parent = parent,
-			})
-			for _, side in { -1, 1 } do
-				part({
-					Name = "GhostEye",
-					Size = Vector3.new(0.3 * s, 0.45 * s, 0.15),
-					CFrame = base * CFrame.new(side * 0.4 * s, 2.6 * s, -1.12 * s),
-					Color = Color3.fromRGB(25, 20, 35),
-					Parent = parent,
-				})
-			end
-		end,
-	}
+		end
+	end,
+}
 
 -- The map as SeasonRules sees it, from the plots MapBuilder actually built.
 local function mapShape(): SeasonRules.MapShape
