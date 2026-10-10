@@ -171,7 +171,10 @@ function LiveOpsService.publishAttributes()
 	workspace:SetAttribute("PurchasedLuckEndsAt", LiveOpsRules.boostEndsAt(boosts, "purchase", now))
 	workspace:SetAttribute("LuckMultiplier", luck)
 	-- When the luck shown next changes (a boost or luck event ends), not when the last one ends.
-	workspace:SetAttribute("LuckEndsAt", if luck > 1 then LiveOpsRules.luckChangesAt(events, boosts, now) else 0)
+	workspace:SetAttribute(
+		"LuckEndsAt",
+		if luck > 1 then LiveOpsRules.luckChangesAt(events, boosts, now, LiveOps.limits) else 0
+	)
 	-- The HUD event pill: banner text, which event it belongs to (theme colour), its title and end for the countdown.
 	local bannerEvent = LiveOpsRules.bannerEvent(events, now)
 	workspace:SetAttribute("EventBanner", if bannerEvent then bannerEvent.bannerText else "")

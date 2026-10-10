@@ -58,7 +58,7 @@ T.describe("LiveOpsRules events", function()
 		T.expect(#distinct).toBe(2)
 		T.expect(distinct[1]).toBe(luckB)
 		T.expect(distinct[2]).toBe(cashB)
-		T.expect(LiveOpsRules.luckChangesAt(list, {}, 100)).toBe(400)
+		T.expect(LiveOpsRules.luckChangesAt(list, {}, 100, limits)).toBe(400)
 		local banner = {
 			{ id = "B", startsAt = 0, endsAt = 100, bannerText = "Hi" },
 			{ id = "B", startsAt = 0, endsAt = 900, bannerText = "Hi" },
@@ -67,13 +67,35 @@ T.describe("LiveOpsRules events", function()
 	end)
 	T.it("counts the luck down to its next change, not its last", function()
 		local boosts = { { multiplier = 2, endsAt = 180, source = "purchase" } }
-		T.expect(LiveOpsRules.luckChangesAt(events, {}, 50)).toBe(0) -- nothing raises the luck
-		T.expect(LiveOpsRules.luckChangesAt(events, {}, 150)).toBe(200) -- the luck event's end
-		T.expect(LiveOpsRules.luckChangesAt(events, boosts, 150)).toBe(180) -- the boost ends first
-		T.expect(LiveOpsRules.luckChangesAt(events, boosts, 190)).toBe(200) -- boost over: the event's end
-		T.expect(LiveOpsRules.luckChangesAt(events, boosts, 250)).toBe(0) -- the cash event doesn't count
+		T.expect(LiveOpsRules.luckChangesAt(events, {}, 50, limits)).toBe(0) -- nothing raises the luck
+		T.expect(LiveOpsRules.luckChangesAt(events, {}, 150, limits)).toBe(200) -- the luck event's end
+		T.expect(LiveOpsRules.luckChangesAt(events, boosts, 150, limits)).toBe(180) -- the boost ends first
+		T.expect(LiveOpsRules.luckChangesAt(events, boosts, 190, limits)).toBe(200) -- boost over: the event's end
+		T.expect(LiveOpsRules.luckChangesAt(events, boosts, 250, limits)).toBe(0) -- the cash event doesn't count
 		local long = { { multiplier = 2, endsAt = 900, source = "admin" } }
-		T.expect(LiveOpsRules.luckChangesAt(events, long, 150)).toBe(200)
+		T.expect(LiveOpsRules.luckChangesAt(events, long, 150, limits)).toBe(200)
+	end)
+	T.it("skips ends that leave the capped luck unchanged", function()
+		-- 2x event (ends 200) x 3x admin (ends 600) x 2x bought (ends 180) = 12x, shown as the 6x cap
+		local boosts = {
+			{ multiplier = 3, endsAt = 600, source = "admin" },
+			{ multiplier = 2, endsAt = 180, source = "purchase" },
+		}
+		T.expect(LiveOpsRules.luckMultiplier(events, boosts, 150, limits)).toBe(6)
+		-- at 180 the bought 2x ends but 2 x 3 = 6 still: the first real change is the event's end (-> 3x)
+		T.expect(LiveOpsRules.luckChangesAt(events, boosts, 150, limits)).toBe(200)
+		T.expect(LiveOpsRules.luckMultiplier(events, boosts, 200, limits)).toBe(3)
+		T.expect(LiveOpsRules.luckChangesAt(events, boosts, 200, limits)).toBe(600)
+		-- two ends at once that only together drop below the cap
+		local capped = {
+			{ multiplier = 6, endsAt = 300, source = "admin" },
+			{ multiplier = 2, endsAt = 250, source = "purchase" },
+		}
+		T.expect(LiveOpsRules.luckChangesAt({}, capped, 100, limits)).toBe(300)
+		-- an event starting later never counts as a change of the current luck
+		local later: { LiveOpsRules.EventDef } = { { id = "Later", startsAt = 120, endsAt = 130, luckMultiplier = 2 } }
+		T.expect(LiveOpsRules.luckChangesAt(later, { { multiplier = 2, endsAt = 500, source = "admin" } }, 100, limits))
+			.toBe(500)
 	end)
 	T.it("shows the banner of the first active event that has one", function()
 		local list: { LiveOpsRules.EventDef } = {
@@ -138,7 +160,7 @@ T.describe("LiveOpsRules shipped Halloween 2026 events", function()
 		local banner = LiveOpsRules.bannerEvent(all, midWeekend) :: LiveOpsRules.EventDef
 		T.expect(banner.id).toBe("Halloween2026")
 		T.expect(banner.title).toBe("Halloween")
-		T.expect(LiveOpsRules.luckChangesAt(all, {}, midWeekend)).toBe(luckWeekend.endsAt)
+		T.expect(LiveOpsRules.luckChangesAt(all, {}, midWeekend, LiveOps.limits)).toBe(luckWeekend.endsAt)
 	end)
 end)
 

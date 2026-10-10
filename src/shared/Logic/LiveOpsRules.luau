@@ -80,22 +80,43 @@ function LiveOpsRules.luckMultiplier(events: { EventDef }, boosts: { Boost }, no
 	return math.clamp(m, 1, limits.maxLuckMultiplier)
 end
 
--- When the luck multiplier next changes because something feeding it ends: the earliest end among the active luck
--- events (luckMultiplier > 1) and unexpired boosts. 0 when nothing raises the luck. The HUD counts down to this, so
--- a 15-minute bought boost during a two-day luck event shows 15 minutes (then the event's own time), not two days.
-function LiveOpsRules.luckChangesAt(events: { EventDef }, boosts: { Boost }, now: number): number
-	local earliest = math.huge
+-- When the luck multiplier shown now next changes because something feeding it ends: the earliest end of an active
+-- luck event (luckMultiplier > 1) or unexpired boost after which the CLAMPED multiplier is different. 0 when nothing
+-- raises the luck. The HUD counts down to this, so a 15-minute bought boost during a two-day luck event shows 15
+-- minutes (then the event's own time), not two days; and an end that leaves the luck at the cap is skipped (2x event
+-- x 3x admin x 2x bought = 12x shows as 6x, and stays 6x when the 2x bought ends).
+function LiveOpsRules.luckChangesAt(events: { EventDef }, boosts: { Boost }, now: number, limits: Limits): number
+	local sources: { { multiplier: number, endsAt: number } } = {}
 	for _, event in LiveOpsRules.distinctActiveEvents(events, now) do
 		if (event.luckMultiplier or 1) > 1 then
-			earliest = math.min(earliest, event.endsAt)
+			table.insert(sources, { multiplier = event.luckMultiplier :: number, endsAt = event.endsAt })
 		end
 	end
 	for _, boost in boosts do
 		if now < boost.endsAt and boost.multiplier > 1 then
-			earliest = math.min(earliest, boost.endsAt)
+			table.insert(sources, { multiplier = boost.multiplier, endsAt = boost.endsAt })
 		end
 	end
-	return if earliest == math.huge then 0 else earliest
+	-- The clamped luck once every source ending at or before `t` has ended (starts after now are not counted).
+	local function luckAfter(t: number): number
+		local m = 1
+		for _, source in sources do
+			if source.endsAt > t then
+				m *= source.multiplier
+			end
+		end
+		return math.clamp(m, 1, limits.maxLuckMultiplier)
+	end
+	table.sort(sources, function(a, b): boolean
+		return a.endsAt < b.endsAt
+	end)
+	local current = luckAfter(now)
+	for _, source in sources do
+		if luckAfter(source.endsAt) ~= current then
+			return source.endsAt
+		end
+	end
+	return 0
 end
 
 -- The event whose banner the HUD shows: the first active event (in list order) that has bannerText, or nil. A
