@@ -11,7 +11,7 @@
 	  /friends <n|off>      pretend n Roblox friends are in your server (Studio test players can't be friends)
 	  /tutorial             start the first-time tutorial again (clears your tutorial progress; it pays the reward
 	                        again when completed, Studio only)
-	  /gallery [mutationId] every Snackling in labelled rows behind the north bases (and you, in front of them), to
+	  /gallery [mutationId] every Snackling in labelled rows past the north boundary wall (and you, in front of them), to
 	                        check and screenshot the models, e.g. /gallery, /gallery golden; /gallery off removes it
 	  /sky <clockTime>      preview the lighting at another time of day, e.g. /sky 18 (dusk), /sky 14.6 (back to
 	                        Config/Scenery's afternoon); everyone in the session sees it

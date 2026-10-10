@@ -688,11 +688,19 @@ local function onSync(payload: Types.SnackdexSync)
 		if def then
 			newIds[def.id] = true
 			lastDiscovery = def.id
-			NotificationController.toast(
-				Format.template(Theme.text.snackdexNew, { creature = GameData.displayName(def, discovered.variant) }),
-				"success"
-			)
-			SoundPlayer.ui("claim")
+			-- Quiet during the first-time tutorial (like quest toasts): a new player's first seconds belong to the
+			-- tutorial banner. The NEW badge on the Snackdex button still shows.
+			local state = StateStore.get()
+			if state == nil or state.tutorial.step == "" then
+				NotificationController.toast(
+					Format.template(
+						Theme.text.snackdexNew,
+						{ creature = GameData.displayName(def, discovered.variant) }
+					),
+					"success"
+				)
+				SoundPlayer.ui("claim")
+			end
 		end
 	end
 	local completed = payload.completed

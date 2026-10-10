@@ -226,6 +226,14 @@ local function buildTerrain()
 
 	for _, hill in T.hills do
 		terrain:FillBall(Vector3.new(hill.x, hill.height - hill.radius, hill.z), hill.radius, Enum.Material.Grass)
+		-- Only the cap above ground is seen; the rest of the ball (down to ~y -130) would just be voxels every client
+		-- downloads and keeps in memory. Clear everything under the ground slab.
+		local below = 2 * hill.radius
+		terrain:FillBlock(
+			CFrame.new(hill.x, -depth - below / 2, hill.z),
+			Vector3.new(2 * hill.radius + 4, below, 2 * hill.radius + 4),
+			Enum.Material.Air
+		)
 	end
 	for _, rock in T.rocks do
 		terrain:FillBall(Vector3.new(rock.x, -rock.radius * 0.35, rock.z), rock.radius, Enum.Material.Rock)

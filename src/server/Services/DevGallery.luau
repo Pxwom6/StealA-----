@@ -11,7 +11,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
+local Scenery = require(ReplicatedStorage.Shared.Config.Scenery)
 local CreatureVisuals = require(ReplicatedStorage.Shared.CreatureVisuals)
 local GameData = require(ReplicatedStorage.Shared.GameData)
 local Types = require(ReplicatedStorage.Shared.Types)
@@ -24,9 +24,7 @@ local SPACING = 8 -- studs between Snacklings in a row
 local ROW_GAP = 16 -- studs between rows
 local STEP_UP = 1.5 -- each row stands this much higher than the one in front
 local BASE_HEIGHT = 0.4
-local CLEARANCE = 26 -- studs between the back walls of the north bases and the first row
-
-local MAP = Gameplay.map
+local CLEARANCE = 60 -- studs between the north boundary wall and the first row (clear of the wall and tree line)
 
 local function anchoredPart(props: { [string]: any }): Part
 	local part = Instance.new("Part")
@@ -113,7 +111,8 @@ function DevGallery.build(mutation: Types.MutationDef?): (CFrame, number)
 	local folder = Instance.new("Folder")
 	folder.Name = FOLDER_NAME
 
-	local firstZ = MAP.walkwayWidth + MAP.plotDepth + CLEARANCE
+	-- Outside the north boundary wall, on the open grass (the play area inside the wall has no room for 60+ models).
+	local firstZ = Scenery.boundary.maxZ + CLEARANCE
 	local count = 0
 	for index, row in rows() do
 		local k = index - 1

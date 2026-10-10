@@ -221,7 +221,7 @@ particles, the belt / factory animations, Bloom and SunRays on that device; clie
 
 `/cash <amount>`, `/spawn <creatureId> [mutationId]` (e.g. `/spawn pizza_pup rainbow`), `/noshield`,
 `/friends <n|off>`, `/tutorial` (start the first-time tutorial again) and `/gallery [mutationId]` (every Snackling in
-labelled rows behind the north bases, e.g. `/gallery golden`; `/gallery off` removes it) work in Studio only
+labelled rows past the north boundary wall, e.g. `/gallery golden`; `/gallery off` removes it) work in Studio only
 `/friends <n|off>`, `/tutorial` (start the first-time tutorial again) and `/sky <clockTime>` (preview the lighting at
 another time of day, e.g. `/sky 18`; `/sky 14.6` is the normal afternoon) work in Studio only
 (`src/server/Services/DevCommands.luau`). `/spawn` also puts event Snacklings
