@@ -186,6 +186,9 @@ local function checkGroup(session: Session, manual: boolean, attempt: number)
 	check.checking = true
 	check.checkingManual = manual
 	local groupId = Social.group.groupId
+	-- IsInGroupAsync's answer may be cached on the server for the rest of the session (Roblox doesn't document it), so
+	-- after an in-game join it can still say "no". The manual check therefore also reads the group list
+	-- (listedInGroup -> GroupService:GetGroupsAsync), which is what picks up a membership that is new this session.
 	local ok, result = pcall(function(): boolean
 		return session.player:IsInGroupAsync(groupId)
 	end)
