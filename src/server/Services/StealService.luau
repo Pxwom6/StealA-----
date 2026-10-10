@@ -220,7 +220,7 @@ local function deliver(thief: Session)
 	if Analytics.milestone(thief, "FirstSteal") then
 		Analytics.custom(thief, "first_steal_rarity", rarity.order)
 	end
-	Analytics.custom(thief, "steal", rarity.order, { creature = def.id })
+	Analytics.custom(thief, "steal", rarity.order, { def.id, if mutation then mutation.id else "" })
 	local byMutation = mutation ~= nil and mutation.announceOnSteal
 	if rarity.announceOnSteal or byMutation then
 		Announcer.broadcast({

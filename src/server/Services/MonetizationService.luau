@@ -207,8 +207,8 @@ local function grantPass(session: Session, key: string)
 		Format.template(Theme.text.passGranted, { pass = if copy then copy.name else key }),
 		"success"
 	)
-	Analytics.storeStep(session, "ProductPurchased", { kind = "pass", key = key })
-	Analytics.custom(session, "pass_purchased", nil, { key = key })
+	Analytics.storeStep(session, "ProductPurchased", { "pass", key })
+	Analytics.custom(session, "pass_purchased", nil, { key })
 end
 
 local function waitForSession(player: Player): Session?
@@ -355,14 +355,12 @@ local function processFor(player: Player, key: string, receipt: { [string]: any 
 		if followUp then
 			task.spawn(followUp)
 		end
-		Analytics.storeStep(session, "ProductPurchased", { kind = "product", key = key })
+		Analytics.storeStep(session, "ProductPurchased", { "product", key })
 		Analytics.custom(
 			session,
 			"product_purchased",
 			if type(receipt.CurrencySpent) == "number" then receipt.CurrencySpent else 0,
-			{
-				key = key,
-			}
+			{ key }
 		)
 		return Enum.ProductPurchaseDecision.PurchaseGranted
 	end
@@ -429,7 +427,7 @@ local function onClientEvent(player: Player, nameArg: unknown, keyArg: unknown)
 		Analytics.storeStep(session, "StoreOpened")
 	else
 		local key = Guard.shortString(keyArg, 40)
-		Analytics.storeStep(session, "ProductPrompted", { key = key or "" })
+		Analytics.storeStep(session, "ProductPrompted", { key or "" })
 	end
 end
 
