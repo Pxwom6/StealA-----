@@ -6,15 +6,21 @@
 	                social) stacked below in TOP_ORDER, so nothing in the stack can overlap
 	  left middle   round feature buttons (Shop, Rebirth, Daily...) — other controllers add them
 	  right, above the jump button   contextual action area (e.g. the big TAG! button)
+	  top right     the settings gear (SettingsController) and nothing else: on computers Roblox's player list sits
+	                there, drawn above all game UI, so the gear goes left of it (playerListWidth, Logic/ScreenLayout)
 
 	Numbers count up instead of jumping so progress always feels alive, and the cash pill pulses on every change.
 ]]
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
+local ScreenLayout = require(ReplicatedStorage.Shared.Logic.ScreenLayout)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local StateStore = require(script.Parent.StateStore)
 
@@ -54,6 +60,18 @@ end
 -- Bottom-right container above the jump button for big contextual buttons.
 function HudController.actionArea(): Frame
 	return actionArea
+end
+
+-- Width (HUD reference units) that Roblox's player list takes from the right edge: 0 on phones (it starts hidden)
+-- or when it is switched off. `assumeShown` = true measures it as if shown (e.g. while the tutorial hides it).
+function HudController.playerListWidth(assumeShown: boolean?): number
+	local viewport = workspace.CurrentCamera.ViewportSize
+	local enabled = assumeShown == true or StarterGui:GetCoreGuiEnabled(Enum.CoreGuiType.PlayerList)
+	local touchOnly = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+	local stats = Players.LocalPlayer:FindFirstChild("leaderstats")
+	local statCount = if stats then #stats:GetChildren() else 0
+	local pixels = ScreenLayout.playerListWidth(enabled, touchOnly, viewport.X, viewport.Y, statCount)
+	return pixels / UiKit.scaleFor(viewport)
 end
 
 export type SideButton = { button: TextButton, badge: Frame }

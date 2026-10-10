@@ -2,12 +2,18 @@
 --[[
 	Centered modal dialog: dimmed backdrop (tap outside to close), title bar, a 52px close button in the corner
 	(easy thumb target), and a body frame for content. Only one modal is open at a time.
+
+	Opening fades the backdrop in and pops the panel (with its drop shadow) in with a page-turn sound; closing fades
+	the backdrop out and shrinks the panel away. A closing dialog stops taking input at once, so the next dialog (or
+	the game) gets every tap.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local UiKit = require(script.Parent.UiKit)
+local SoundPlayer = require(script.Parent.Parent.Controllers.SoundPlayer)
 
 local Modal = {}
 
@@ -18,6 +24,9 @@ export type ModalHandle = {
 	close: () -> (),
 	isOpen: () -> boolean,
 }
+
+local BACKDROP_TRANSPARENCY = 0.45
+local FADE_SECONDS = 0.18
 
 local screen: ScreenGui? = nil
 local current: ModalHandle? = nil
@@ -44,9 +53,11 @@ function Modal.open(title: string, size: Vector2, onClose: (() -> ())?): ModalHa
 		Name = "ModalRoot",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundColor3 = Color3.new(0, 0, 0),
-		BackgroundTransparency = 0.45,
+		BackgroundTransparency = 1,
+		ZIndex = 2,
 		Parent = getScreen(),
 	}) :: Frame
+	TweenService:Create(root, TweenInfo.new(FADE_SECONDS), { BackgroundTransparency = BACKDROP_TRANSPARENCY }):Play()
 	local backdrop = UiKit.new("TextButton", {
 		Name = "Backdrop",
 		Size = UDim2.fromScale(1, 1),
@@ -56,6 +67,16 @@ function Modal.open(title: string, size: Vector2, onClose: (() -> ())?): ModalHa
 		Parent = root,
 	}) :: TextButton
 
+	-- Panel and shadow share a container, so they pop in and out together.
+	local container = UiKit.new("Frame", {
+		Name = "PanelContainer",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(size.X, size.Y),
+		BackgroundTransparency = 1,
+		ZIndex = 2,
+		Parent = root,
+	}) :: Frame
 	-- The panel is a (text-less) button so taps on its labels and empty space land on it instead of falling
 	-- through to the backdrop, which would close the dialog. Plain Frames/labels do not sink input.
 	local panel = UiKit.new("TextButton", {
@@ -63,13 +84,13 @@ function Modal.open(title: string, size: Vector2, onClose: (() -> ())?): ModalHa
 		AutoButtonColor = false,
 		Text = "",
 		BackgroundColor3 = UiTheme.palette("panel"),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(size.X, size.Y),
-		Parent = root,
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 2,
+		Parent = container,
 	}) :: TextButton
-	UiKit.corner(18).Parent = panel
-	UiKit.stroke(4).Parent = panel
+	UiKit.corner(UiKit.RADIUS.large).Parent = panel
+	UiKit.stroke(UiKit.STROKE.thick).Parent = panel
+	UiKit.shadow(panel)
 	UiKit.label({
 		Name = "Title",
 		Text = title,
@@ -92,10 +113,16 @@ function Modal.open(title: string, size: Vector2, onClose: (() -> ())?): ModalHa
 			return
 		end
 		open = false
-		root:Destroy()
 		if current == handle then
 			current = nil
 		end
+		-- Out of the way at once (no more taps, under any new dialog), then animate away.
+		root.Interactable = false
+		root.ZIndex = 1
+		TweenService:Create(root, TweenInfo.new(FADE_SECONDS), { BackgroundTransparency = 1 }):Play()
+		UiKit.popOut(container, function()
+			root:Destroy()
+		end)
 		if onClose then
 			onClose()
 		end
@@ -122,7 +149,8 @@ function Modal.open(title: string, size: Vector2, onClose: (() -> ())?): ModalHa
 		end,
 	}
 	current = handle
-	UiKit.popIn(panel)
+	UiKit.popIn(container)
+	SoundPlayer.ui("open")
 	return handle
 end
 

@@ -213,17 +213,19 @@ function RewardsController.start()
 		Visible = false,
 		Parent = pillStack,
 	})
+	-- Same 48 px pill (the HUD's layout maths depend on it), but the countdown line is a readable 20 px (it was 17,
+	-- about 14 real pixels on a small phone).
 	eventLabel = UiKit.label({
 		Name = "Banner",
-		Size = UDim2.new(1, -16, 0, 24),
+		Size = UDim2.new(1, -16, 0, 22),
 		Position = UDim2.fromOffset(8, 3),
 		Parent = eventPill,
 	})
 	eventCountdown = UiKit.label({
 		Name = "Countdown",
 		FontFace = UiTheme.bodyFont,
-		Size = UDim2.new(1, -16, 0, 17),
-		Position = UDim2.fromOffset(8, 27),
+		Size = UDim2.new(1, -16, 0, 20),
+		Position = UDim2.fromOffset(8, 25),
 		Parent = eventPill,
 	})
 	luckPill = UiKit.panel({
