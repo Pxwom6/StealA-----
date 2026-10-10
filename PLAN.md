@@ -56,10 +56,11 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | Monetisation | `MonetizationService` (ProcessReceipt, passes) | `StoreController` | `ReceiptLedger`, `EconomyMath.cashPackAmount` |
 | Retention | `RetentionService` (daily streak, offline earnings), `LeaderboardService` | `RewardsController` | `DailyStreak`, `OfflineEarnings` |
 | Social | `Announcer` (server-wide banners), `SocialService` (friends in server, group membership, welcome gift) | `NotificationController`, `ChatTagController`, `SocialController` (bonus pill, invite / join group panel) | `SocialRules` |
-| LiveOps | `LiveOpsService` (scheduled events, luck boosts, admin commands, cross-server) | luck banner | `LiveOpsRules` |
+| LiveOps | `LiveOpsService` (scheduled events, luck boosts, admin commands, cross-server, active-event change listeners) | event pill (banner + countdown), luck pill | `LiveOpsRules` |
+| Seasonal events | `SeasonService` (theme decorations + lighting while a themed event runs, restored after) | event pill colour, "EVENT" tag on event Snacklings' billboards | `SeasonRules` |
 | Analytics | `Analytics` (funnel + economy events) | sends whitelisted `store_opened` | – |
 | State sync | `Replication` (dirty-flag batching, 5 Hz) | `StateStore` | – |
-| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`) | – | – |
+| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends`); LiveOps `/event <id> [minutes]`, `/event off` (anyone in Studio, local only) | – | – |
 
 ## 3. Module list
 
@@ -69,11 +70,12 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | `Theme` | game title, currency symbol, every UI string & template, UI palette (hex), fonts, plot colours |
 | `Rarities` | 7 tiers: order, display name, colour, belt weight, luck-affected flag, glow/particles/announce flags |
 | `Creatures` | the Snackling catalogue: id, name, rarity, price, income, belt weight, model name, colours, shape recipe, optional `eventId` |
-| `Mutations` | rare variants of any creature (Golden, Diamond, Rainbow): id, name, colour, chance per spawn, income / price multipliers, announce flags, look (material, tint, sparkles, rainbow), optional `eventId` |
+| `Mutations` | rare variants of any creature (Golden, Diamond, Rainbow; event-only Haunted): id, name, colour, chance per spawn, income / price multipliers, announce flags, look (material, tint, sparkles, rainbow, glow light), optional `eventId` |
 | `Economy` | start cash, podium upgrade curve, sell refund, offline earnings, rebirth curve, cash packs, daily rewards |
 | `Gameplay` | belt timing, plot geometry, steal/tag ranges, carry speed, lock/grace timers, rate limits |
 | `Monetization` | game-pass and developer-product IDs (**placeholders, TODO**), perk values, store layout |
-| `LiveOps` | admin user IDs, scheduled events (luck / cash multipliers, featured creatures), luck-boost limits |
+| `LiveOps` | admin user IDs, scheduled events (luck / cash multipliers, banner, countdown title; Halloween 2026 and its luck weekend), luck-boost limits |
+| `Seasons` | seasonal themes keyed by LiveOps event id (`Halloween2026` → `halloween`): lighting mood, decoration counts, colours, part budget |
 | `Sounds` | sound asset IDs (**placeholders**) |
 | `Social` | friend bonus (+10% per friend in the server, max 3), group id (**placeholder 0 = off**), group bonus, one-time welcome gift |
 
@@ -98,7 +100,8 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `DailyStreak` | UTC-day streak maths and reward lookup |
 | `DataSchema` | save template, `migrate` (versioned), `sanitise` (clamp garbage) |
 | `BeltMath` | belt item position & lifetime from spawn time |
-| `LiveOpsRules` | active events at time *t*, combined luck/cash multipliers, boost stacking, remote-config validation |
+| `LiveOpsRules` | active events at time *t*, combined luck/cash multipliers, boost stacking, Server Luck preview, banner event, when the luck next changes, remote-config validation |
+| `SeasonRules` | active seasonal theme from the active event ids, decoration layout on the map (outside plots, off the belt), part count, `Config/Seasons` validation |
 | `Inventory` | podium slot operations on the save table (free slot, place, remove, find by uid) |
 | `PlotAssignment` | pick a free plot, release |
 | `SocialRules` | friend / group income bonus, friend counting per pair, group welcome gift, recheck cooldown, config validation |
@@ -111,7 +114,7 @@ mutation look), `UiTheme` (hex → Color3, fonts, text templates, rich-text crea
 
 ### `src/server`
 `init.server.luau` bootstraps in order:
-`Remotes → DataService → MapBuilder → PlotService → Analytics → LiveOpsService → Replication →
+`Remotes → DataService → MapBuilder → PlotService → Analytics → LiveOpsService → SeasonService → Replication →
 EconomyService → BeltService → LockService → StealService → RebirthService → MonetizationService →
 RetentionService → SocialService → LeaderboardService → DevCommands → PlayerLifecycle`, and wires cross-service join/leave steps
 through `PlayerLifecycle.hooks()` (keeps services free of circular requires). `Sessions` holds per-player state.
@@ -164,7 +167,9 @@ Server → client:
 World state the client reads from **attributes** (replicated automatically): plot `OwnerUserId`, `LockedUntil`,
 `GraceUntil`, `PodiumCount`; podium `CreatureId`, `Variant` (mutation id, "" for none), `Stored`, `Income`
 (mutation and multipliers included), `BeingStolen`; player `Carrying`, `VIP`. Rainbow parts carry the
-CollectionService tag `MutationRainbow`.
+CollectionService tag `MutationRainbow`. LiveOps state is on `workspace`: `LuckMultiplier`, `LuckEndsAt` (when the
+luck next changes), `PurchasedLuckEndsAt`, `CashMultiplier`, `ActiveEventIds`, `EventBanner`, `EventBannerId`,
+`EventTitle`, `EventEndsAt`, and `SeasonTheme` (the seasonal theme on, "" for none).
 
 ## 5. Data schema (version 2)
 
@@ -208,7 +213,16 @@ type PlayerData = {   -- exactly Types.PlayerData
 
 ## 7. Out of scope this round (but not blocked)
 
-Trading (creatures have stable `uid`s and live in one list → a trade is two `Inventory` moves), event creatures
-(`eventId` field + `LiveOps.events` already gate spawns), event-only mutations (a mutation with an `eventId`, e.g. a
-Halloween "Haunted"; the roll already supports it), battle pass, private servers, extra maps (plot geometry is data), custom models/sounds
-(`CreatureModels` folder + `Config/Sounds`).
+Trading (creatures have stable `uid`s and live in one list → a trade is two `Inventory` moves), battle pass,
+private servers, extra maps (plot geometry is data), custom models/sounds (`CreatureModels` folder + `Config/Sounds`),
+animated seasonal props (decorations are static anchored parts; a client controller could bob the bats / ghosts).
+
+## 8. Seasonal events (Halloween 2026)
+
+One LiveOps event id drives everything (DECISIONS.md #20): `Halloween2026` in `Config/LiveOps` (dates, banner,
+countdown title) gates four event Snacklings (`eventId` in `Config/Creatures`), the Haunted mutation (`eventId` in
+`Config/Mutations`) and the `halloween` seasonal theme (`Config/Seasons`), and `HalloweenLuck2026` adds a 2× luck
+weekend. `LiveOpsService` re-evaluates active events every second and tells `SeasonService` when the set changes;
+`SeasonService` builds or removes the theme's decorations (`Logic/SeasonRules.layout`) and fades the lighting in or
+back. The HUD shows the banner with "Halloween ends in 3d 4h" and event Snacklings carry an "EVENT" tag. Balance:
+BALANCE.md "Halloween". Studio: `/event Halloween2026 [minutes]`, `/event off`, `/spawn <eventCreature> haunted`.

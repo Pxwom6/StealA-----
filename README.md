@@ -54,10 +54,10 @@ CI (`.github/workflows/ci.yml`) runs all of the above on every pull request.
 ### Layout
 
 ```
-src/shared/Config   plain data: names, colours, prices, timers, product IDs, LiveOps events, social rewards
-                    (re-theme = edit these)
+src/shared/Config   plain data: names, colours, prices, timers, product IDs, LiveOps events, seasonal themes,
+                    social rewards (re-theme = edit these)
 src/shared/Logic    pure game rules (economy, rarity rolls, rebirth, offline earnings, receipts, steal/lock rules,
-                    friend & group bonus)
+                    friend & group bonus, seasonal themes)
 src/shared          small Roblox helpers shared by server & client (remotes, creature visuals, UI theme)
 src/server          server bootstrap + services (authoritative)
 src/client          client bootstrap + controllers (UI, rendering, intents)
@@ -88,11 +88,36 @@ to the live DataStore: test schema changes with it off.
 * **No publish needed:** put the same JSON list in the DataStore `LiveOpsConfig`, key `events` (Creator Hub →
   Data Stores manager). Servers re-read it every 5 minutes, e.g.
   `[{"id":"FridayLuck","startsAt":1767312000,"endsAt":1767398400,"luckMultiplier":2,"bannerText":"2x Luck Friday!"}]`
-* **Right now, every server:** admin chat commands `/luck 2 30` (2× luck for 30 min), `/event <id>`,
-  `/announce <text>` (filtered). In Studio anyone can use them for testing.
+* **Right now, every server:** admin chat commands `/luck 2 30` (2× luck for 30 min), `/event <id> [minutes]`
+  (start a configured event now), `/event off [id]` (end events started that way), `/announce <text>` (filtered).
+  In Studio anyone can use them for testing, and they only affect that Studio session.
 * **Limited-time creatures:** give a creature an `eventId`; it only appears on the belt while that event runs.
 * **Event-only mutations:** give a mutation in `src/shared/Config/Mutations.luau` an `eventId` the same way (e.g.
-  a Halloween "Haunted"); it only rolls while that event runs.
+  Halloween's "Haunted"); it only rolls while that event runs.
+
+### Seasonal events (Halloween 2026 and future ones)
+
+A seasonal event is one LiveOps event id that everything keys off, so it switches on and off by date with no code
+change:
+
+| Piece | Where | Halloween 2026 |
+| --- | --- | --- |
+| Dates, HUD banner + countdown title, luck | `events` in `src/shared/Config/LiveOps.luau` | `Halloween2026` (23 Oct–2 Nov), `HalloweenLuck2026` (2× luck, 30 Oct–1 Nov) |
+| Event Snacklings | `eventId` in `src/shared/Config/Creatures.luau` | Candy Corn Cat, Pumpkin Pie Bat, Caramel Apple Ghoul, Jack-o'-Lantern Latte |
+| Event mutation | `eventId` in `src/shared/Config/Mutations.luau` | Haunted (4%, x3 income) |
+| Map decorations + lighting | `eventThemes` / `themes` in `src/shared/Config/Seasons.luau` | `halloween`: pumpkins, string lights, lamps, bats, ghosts, dusk + light fog |
+
+* **Change the dates:** edit `startsAt` / `endsAt` (Unix seconds, UTC; e.g. `date -u -d "2026-10-23 17:00" +%s`)
+  in `LiveOps.luau` and publish. Running servers pick up the start and end on their own (checked every second): the
+  decorations appear, the lighting fades to dusk, and at the end everything is removed and the lighting restored.
+* **Run Halloween again next year:** add an event (e.g. `Halloween2027`, new dates) to `LiveOps.luau`, map it in
+  `Seasons.luau` (`Halloween2027 = "halloween"`), and give new event Snacklings that `eventId`. Owned 2026 Snacklings
+  keep working; to bring a 2026 Snackling back, change its `eventId` to the new event (never its `id`).
+* **A new season** (e.g. winter): add a theme to `Seasons.luau` (colours, lighting, decoration counts; CI checks it
+  stays under the part budget and away from plots and the belt). New prop kinds are built in
+  `src/server/Services/SeasonService.luau` and laid out in `src/shared/Logic/SeasonRules.luau`.
+* New creature / mutation ids must be appended to the released lists in `tests/Config.spec.luau`, and the
+  simulation's `EVENT_ID` (`tools/simulate.luau`) shows the event's balance effect (see BALANCE.md "Halloween").
 
 ### Swapping in your own art
 
@@ -106,5 +131,10 @@ to the live DataStore: test schema changes with it off.
 
 ### Studio test commands
 
-`/cash <amount>`, `/spawn <creatureId> [mutationId]` (e.g. `/spawn pizza_pup rainbow`) and `/noshield` work in
-Studio only (`src/server/Services/DevCommands.luau`).
+`/cash <amount>`, `/spawn <creatureId> [mutationId]` (e.g. `/spawn pizza_pup rainbow`), `/noshield` and
+`/friends <n|off>` work in Studio only (`src/server/Services/DevCommands.luau`). `/spawn` also puts event Snacklings
+and event mutations on the belt when their event isn't running (e.g. `/spawn candy_corn_cat haunted`).
+
+To test a seasonal event in Studio: `/event Halloween2026 5` turns Halloween on for 5 minutes (decorations, dusk
+lighting, banner with countdown, event Snacklings and Haunted on the belt), and `/event off` ends it early.
+`/event HalloweenLuck2026` adds the 2× luck weekend.
