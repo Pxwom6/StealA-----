@@ -22,5 +22,6 @@ require("./DataSchema.spec")
 require("./BeltMath.spec")
 require("./LiveOpsRules.spec")
 require("./Inventory.spec")
+require("./SocialRules.spec")
 
 T.finish()
