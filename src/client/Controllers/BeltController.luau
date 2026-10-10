@@ -5,7 +5,8 @@
 
 	Models are pooled per creature type and mutation (built once, reused forever) and each item gets a local "Buy"
 	prompt that sends the BuyBeltItem intent — the server re-validates price, range and space. A mutated item shows
-	the mutation's name in its colour, its mutated name ("Golden Pizza Pup") and its mutated price and income.
+	the mutation's name in its colour, its mutated name ("Golden Pizza Pup") and its mutated price and income; a
+	limited-time (event) Snackling has a small "EVENT" tag in its event's colour on top.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -71,6 +72,10 @@ local function makeBillboard(
 	local mutation = GameData.mutation(variant)
 	local rows: { Row } =
 		{ { text = string.upper(rarity.displayName), color = UiTheme.color(rarity.color), weight = 0.26 } }
+	if def.eventId then
+		-- Limited-time Snackling: a small tag in its event's colour.
+		table.insert(rows, 1, { text = Theme.text.eventTag, color = UiTheme.eventColor(def.eventId), weight = 0.2 })
+	end
 	if mutation then
 		-- One more line, the mutation's name in its colour; the billboard grows so every line keeps its size.
 		table.insert(

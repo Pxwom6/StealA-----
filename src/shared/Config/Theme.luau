@@ -35,6 +35,7 @@ local Theme = {
 		vip = "#FFD700",
 		luck = "#7CFF4D",
 		social = "#FF6FB5",
+		event = "#FF8C1A", -- event pill / "EVENT" tag when the event has no seasonal theme colour (Config/Seasons)
 	},
 
 	world = {
@@ -89,6 +90,9 @@ local Theme = {
 		lockPillCooldown = "Lock in {time}",
 		lockPillToken = "Instant lock x{count}",
 		luckBanner = "{multiplier}x LUCK {time}",
+		eventEndsIn = "{event} ends in {time}", -- under the event banner: "Halloween ends in 3d 4h"
+		eventFallbackTitle = "Event", -- {event} for an event without a `title`
+		eventTag = "EVENT", -- on the billboards of limited-time (event) Snacklings
 		socialPillFriends = "Friends +{percent}%",
 		socialPillGroup = "Group +{percent}%",
 		-- The bonus is for friends PLAYING here together, never for sending invites (Roblox policy): keep the wording so.

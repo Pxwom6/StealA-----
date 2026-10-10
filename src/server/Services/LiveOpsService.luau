@@ -2,7 +2,9 @@
 --[[
 	Server-wide modifiers: scheduled events (Config/LiveOps), purchased / admin luck boosts, and the cash
 	multiplier from events. Current values are mirrored to workspace attributes (LuckMultiplier, LuckEndsAt,
-	EventBanner, CashMultiplier, ActiveEventIds) so every client can show them without extra remotes.
+	PurchasedLuckEndsAt, EventBanner, EventBannerId, EventTitle, EventEndsAt, CashMultiplier, ActiveEventIds) so
+	every client can show them without extra remotes. Listeners hear when the set of active events changes
+	(onActiveEventsChanged; SeasonService switches seasonal themes with it).
 
 	Runtime control without publishing:
 	  * remote config: event list JSON in a DataStore entry, re-read every few minutes
@@ -132,24 +134,18 @@ end
 function LiveOpsService.publishAttributes()
 	local now = LiveOpsService.now()
 	boosts = LiveOpsRules.pruneBoosts(boosts, now)
+	local events = LiveOpsService.events()
 	local luck = LiveOpsService.luckMultiplier()
-	local luckEndsAt = 0
-	for _, boost in boosts do
-		luckEndsAt = math.max(luckEndsAt, boost.endsAt)
-	end
-	local banner = ""
-	for _, event in LiveOpsRules.activeEvents(LiveOpsService.events(), now) do
-		if (event.luckMultiplier or 1) > 1 then
-			luckEndsAt = math.max(luckEndsAt, event.endsAt)
-		end
-		if banner == "" and event.bannerText then
-			banner = event.bannerText
-		end
-	end
 	workspace:SetAttribute("PurchasedLuckEndsAt", LiveOpsRules.boostEndsAt(boosts, "purchase", now))
 	workspace:SetAttribute("LuckMultiplier", luck)
-	workspace:SetAttribute("LuckEndsAt", if luck > 1 then luckEndsAt else 0)
-	workspace:SetAttribute("EventBanner", banner)
+	-- When the luck shown next changes (a boost or luck event ends), not when the last one ends.
+	workspace:SetAttribute("LuckEndsAt", if luck > 1 then LiveOpsRules.luckChangesAt(events, boosts, now) else 0)
+	-- The HUD event pill: banner text, which event it belongs to (theme colour), its title and end for the countdown.
+	local bannerEvent = LiveOpsRules.bannerEvent(events, now)
+	workspace:SetAttribute("EventBanner", if bannerEvent then bannerEvent.bannerText else "")
+	workspace:SetAttribute("EventBannerId", if bannerEvent then bannerEvent.id else "")
+	workspace:SetAttribute("EventTitle", if bannerEvent then bannerEvent.title or "" else "")
+	workspace:SetAttribute("EventEndsAt", if bannerEvent then bannerEvent.endsAt else 0)
 	local activeIds: { string } = {}
 	for id in LiveOpsService.activeEventIds() do
 		table.insert(activeIds, id)

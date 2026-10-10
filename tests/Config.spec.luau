@@ -504,6 +504,16 @@ T.describe("Halloween 2026 Haunted mutation", function()
 	end)
 end)
 
+T.describe("Event HUD copy", function()
+	T.it("counts the banner event down as '<title> ends in 3d 4h'", function()
+		local seconds = 3 * 86400 + 4 * 3600 + 59 * 60
+		local text = Format.template(Theme.text.eventEndsIn, { event = "Halloween", time = Format.duration(seconds) })
+		T.expect(text).toBe("Halloween ends in 3d 4h")
+		T.expect(type(Theme.text.eventFallbackTitle)).toBe("string")
+		T.expect(#Theme.text.eventTag).toBeGreaterThan(0)
+	end)
+end)
+
 T.describe("Config integrity (continued)", function()
 	T.it("every LiveOps event id is unique", function()
 		local seen: { [string]: boolean } = {}
