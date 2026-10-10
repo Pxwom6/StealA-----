@@ -60,6 +60,7 @@ export type MutationLook = {
 	reflectance: number?,
 	sparkles: boolean?, -- sparkle particles in the mutation colour
 	rainbow: boolean?, -- hue-cycling colours (animated on the client) and rainbow particles
+	glow: string?, -- "#RRGGBB": a soft point light in this colour (ghostly / glowing looks)
 }
 
 export type MutationDef = {

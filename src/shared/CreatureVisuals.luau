@@ -9,7 +9,7 @@
 	Every model returned has a PrimaryPart called "Root" at its feet, all other parts welded to it, and no
 	collisions, so it can be anchored on a podium, moved along the belt, or welded above a thief's head.
 	Rarity flair (glow, sparkles, aura ring) is added on top of either kind of model, then the mutation look (if
-	any): material, tint, transparency, sparkles, rainbow. The face (Eye/Pupil/Mouth), the Root and the rarity Aura
+	any): material, tint, transparency, sparkles, rainbow, glow light. The face (Eye/Pupil/Mouth), the Root and the rarity Aura
 	keep their look; in a custom model, give a part the attribute MutationSkip = true to keep its look too.
 	Rainbow parts are tagged RAINBOW_TAG; the client cycles their hue (MutationFxController).
 ]]
@@ -362,6 +362,15 @@ local function addMutationLook(model: Model, mutation: Types.MutationDef)
 		})
 		emitter.Color = if look.rainbow then rainbowSequence() else ColorSequence.new(UiTheme.color(mutation.color))
 		emitter.Parent = body
+	end
+	if look.glow and body ~= nil and body:IsA("BasePart") then
+		local light = Instance.new("PointLight")
+		light.Name = "MutationGlow"
+		light.Color = UiTheme.color(look.glow)
+		light.Range = 10
+		light.Brightness = 1.6
+		light.Shadows = false
+		light.Parent = body
 	end
 	model:SetAttribute("Variant", mutation.id)
 end

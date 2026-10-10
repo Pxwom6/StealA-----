@@ -221,6 +221,9 @@ function Catalog.validateMutations(mutations: { MutationInfo }): { string }
 		if look.reflectance ~= nil and not (look.reflectance >= 0 and look.reflectance <= 1) then
 			problem(`mutation {id} look.reflectance must be between 0 and 1`)
 		end
+		if look.glow ~= nil and string.match(look.glow, HEX_PATTERN) == nil then
+			problem(`mutation {id} look.glow must be #RRGGBB`)
+		end
 	end
 	if not (totalChance < 1) then
 		problem(`mutation chances add up to {totalChance}; together they must stay below 1`)

@@ -56,6 +56,7 @@ local RELEASED_MUTATION_IDS = {
 	"golden",
 	"diamond",
 	"rainbow",
+	"haunted", -- Halloween 2026 (event-only)
 }
 
 T.describe("Config integrity", function()
@@ -446,6 +447,59 @@ T.describe("Halloween 2026 event Snacklings", function()
 		end
 		for _, creature in eventCreatures do
 			T.expect(seen[creature.id]).toBe(true)
+		end
+	end)
+end)
+
+T.describe("Halloween 2026 Haunted mutation", function()
+	local haunted: Types.MutationDef? = nil
+	for _, mutation in Mutations do
+		if mutation.id == "haunted" then
+			haunted = mutation
+		end
+	end
+	local function total(events: { [string]: boolean }): number
+		local sum = 0
+		for _, entry in MutationRules.odds(Mutations, events) do
+			sum += entry.chance
+		end
+		return sum
+	end
+
+	T.it("only rolls during Halloween2026 and is always a lucky find", function()
+		local def = haunted :: Types.MutationDef
+		T.expect(def.eventId).toBe("Halloween2026")
+		T.expect(def.incomeMultiplier).toBeAtLeast(def.priceMultiplier)
+		for _, entry in MutationRules.odds(Mutations, {}) do
+			T.expect(entry.id ~= "haunted").toBe(true)
+		end
+		T.expect(total({ Halloween2026 = true }) - total({})).toBeNear(def.chance, 1e-12)
+	end)
+
+	T.it("keeps every mutation chance together, event ones included, below 10%", function()
+		local allEvents: { [string]: boolean } = {}
+		for _, mutation in Mutations do
+			if mutation.eventId then
+				allEvents[mutation.eventId] = true
+			end
+		end
+		T.expect(total(allEvents)).toBeLessThan(0.1)
+	end)
+
+	T.it("rolls after the permanent mutations, so their rolls are unchanged", function()
+		local def = haunted :: Types.MutationDef
+		for _, mutation in Mutations do
+			if mutation.eventId == nil then
+				T.expect(mutation.order).toBeLessThan(def.order)
+			end
+		end
+		local a, b = T.seededRandom(5), T.seededRandom(5)
+		for _ = 1, 20000 do
+			local during = MutationRules.roll(Mutations, { Halloween2026 = true }, a)
+			local outside = MutationRules.roll(Mutations, {}, b)
+			if during ~= "haunted" then
+				T.expect(during).toBe(outside)
+			end
 		end
 	end)
 end)
