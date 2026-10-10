@@ -254,6 +254,59 @@ local Creatures: { CreatureDef } = {
 		flavor = "Flaky on the outside. Legendary on the inside.",
 		look = { body = "Wedge", bodyColor = "#E0A84E", accent = "Crown", accentColor = "#B266FF", size = 4.4 },
 	},
+
+	-- Event: Halloween 2026 ------------------------------------------------------------------------------
+	-- Only spawn while LiveOps event "Halloween2026" runs (they share their tier's odds with the regular
+	-- Snacklings, see BALANCE.md "Halloween"). Owned ones keep earning forever after the event ends.
+	-- Keep these after every regular creature: appending keeps the regular belt rolls identical outside events.
+	{
+		id = "candy_corn_cat",
+		displayName = "Candy Corn Cat",
+		rarity = "Rare",
+		price = 10000,
+		income = 135,
+		beltWeight = 30,
+		modelName = "CandyCornCat",
+		flavor = "Nine lives, three stripes, zero chill.",
+		look = { body = "Wedge", bodyColor = "#FF9F1C", accent = "Ears", accentColor = "#FFF4DC", size = 3 },
+		eventId = "Halloween2026",
+	},
+	{
+		id = "pumpkin_pie_bat",
+		displayName = "Pumpkin Pie Bat",
+		rarity = "Epic",
+		price = 120000,
+		income = 780,
+		beltWeight = 30,
+		modelName = "PumpkinPieBat",
+		flavor = "Hangs upside down. Never drops a crumb.",
+		look = { body = "Cylinder", bodyColor = "#E07A2E", accent = "Wings", accentColor = "#3B2A4A", size = 3.2 },
+		eventId = "Halloween2026",
+	},
+	{
+		id = "caramel_apple_ghoul",
+		displayName = "Caramel Apple Ghoul",
+		rarity = "Legendary",
+		price = 2800000,
+		income = 5500,
+		beltWeight = 30,
+		modelName = "CaramelAppleGhoul",
+		flavor = "Sticky fingers. Stickier grin.",
+		look = { body = "Ball", bodyColor = "#C7792E", accent = "Horns", accentColor = "#7DDB4C", size = 3.5 },
+		eventId = "Halloween2026",
+	},
+	{
+		id = "jack_o_lantern_latte",
+		displayName = "Jack-o'-Lantern Latte",
+		rarity = "Mythic",
+		price = 70000000,
+		income = 47000,
+		beltWeight = 40,
+		modelName = "JackOLanternLatte",
+		flavor = "Extra foam, extra boo.",
+		look = { body = "Cylinder", bodyColor = "#F28C28", accent = "Crown", accentColor = "#FFE9C7", size = 3.9 },
+		eventId = "Halloween2026",
+	},
 }
 
 return Creatures
