@@ -88,6 +88,7 @@ function PlotService.assign(session: Session): number?
 	refs.model:SetAttribute("OwnerUserId", session.userId)
 	refs.model:SetAttribute("OwnerName", session.player.DisplayName)
 	refs.signLabel.Text = Format.template(Theme.text.ownerSign, { name = session.player.DisplayName })
+	MapBuilder.setSignOwner(refs, session.userId)
 	return plot
 end
 
@@ -111,9 +112,7 @@ function PlotService.release(session: Session)
 		podium.model:SetAttribute("Stored", 0)
 		podium.model:SetAttribute("Income", 0)
 		podium.model:SetAttribute("BeingStolen", false)
-		podium.base.Color = UiTheme.world("lockedPodium")
-		podium.base.Transparency = 0.6
-		podium.pad.Transparency = 1
+		MapBuilder.setPodiumActive(podium, false, refs.accent)
 	end
 	refs.model:SetAttribute("OwnerUserId", 0)
 	refs.model:SetAttribute("OwnerName", "")
@@ -123,6 +122,7 @@ function PlotService.release(session: Session)
 	refs.model:SetAttribute("NextPodiumCost", -1)
 	refs.signLabel.Text = Theme.text.freePlotSign
 	refs.signIncome.Text = ""
+	MapBuilder.setSignOwner(refs, 0)
 	PlotService.setVipTrim(plot, false)
 	PlotService.applyShield(plot, "None")
 	session.plot = 0
@@ -144,9 +144,7 @@ function PlotService.syncPodiums(session: Session)
 		local i = podium.index
 		local active = i <= session.capacity
 		podium.model:SetAttribute("Active", active)
-		podium.base.Color = if active then UiTheme.world("podium") else UiTheme.world("lockedPodium")
-		podium.base.Transparency = if active then 0 else 0.6
-		podium.pad.Transparency = if active then 0.15 else 1
+		MapBuilder.setPodiumActive(podium, active, refs.accent)
 
 		local record = byPodium[i]
 		local current = placed[plot][i]
