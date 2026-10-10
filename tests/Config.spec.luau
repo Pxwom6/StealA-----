@@ -331,6 +331,8 @@ T.describe("Config integrity", function()
 				"Rebirth",
 				"ClaimDaily",
 				"ClientEvent",
+				"CheckGroup",
+				"InvitePrompted",
 				"DevGrantProduct",
 			}
 		do

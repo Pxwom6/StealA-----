@@ -134,7 +134,7 @@ inside when the owner locks drops the creature.
   15 minutes — a purchase never takes Robux without an effect.
 * Cash packs scale with income (always "about N minutes of your income"), so they never trivialise the game. The
   basis is the steady income (`EconomyMath.packIncome`: active podiums only, nothing mid-steal, no LiveOps cash
-  event). A pack's amount is fixed the first time its receipt reaches the player's session (`data.cashPackQuotes`),
+  event, no friend & group bonus). A pack's amount is fixed the first time its receipt reaches the player's session (`data.cashPackQuotes`),
   so a retry after a failed grant pays that amount even if the player rebirthed meanwhile; a receipt that arrives
   while the player's save is still loading waits for the load, so it is sized before they can play.
 * Stealing ends your own new-player protection.
@@ -214,3 +214,29 @@ around $10^8/s, far below that (a Rainbow Secret earns 8× a plain one: still ar
 leave the rarity chase in BALANCE.md almost unchanged (≤ ~4%).
 **Reversal cost:** medium — ids and the meaning of `variant` are in players' saves; chances and multipliers are
 free to re-tune (existing creatures simply earn the new multiplier).
+around $10^8/s, far below that.
+
+### 19. Friend & group rewards raise live income only
+
+**Chose:** Roblox friends playing in the same server give +10% income each (at most 3 counted, +30%), and members of
+the owner's Roblox group get +10% more (`Config/Social`, `Logic/SocialRules`, `SocialService`): at most +40%, applied
+as one more multiplier, `×(1 + bonus)`. The bonus is left out of everything sized from income and paid or saved for
+later: cash packs (`EconomyMath.permanentMultiplier`, which also drops LiveOps events), and daily rewards, offline
+earnings and the saved best cash/sec stat that feeds the global leaderboard (`EconomyMath.rewardMultiplier` →
+`session.rewardIncome`; a running LiveOps cash event still counts there, as before). Group members get a one-time
+welcome gift (10 minutes of steady income, at least $1,000), remembered in `data.flags.social_groupWelcome`, so leaving
+and rejoining the group never pays it twice; no schema bump was needed (`flags` already exists and `sanitise` keeps any
+`true` flag).
+**Why:** these are proven growth levers on Roblox and allowed by its rules: we reward friends who are actually playing
+together and group membership, never sending invites (the Invite button only opens Roblox's own prompt; opening it is
+logged for analytics). Keeping the bonus out of packs, rewards and saved stats means a paid pack, a daily claim or a
+leaderboard entry can't be inflated by who happened to be in the server, and offline earnings don't depend on the
+friend checks still running at join. +40% is less than one rebirth's ×1.5 and far less than 2× Cash, so it is a nice
+extra, not a must-have.
+**How it is checked:** `Player:IsFriendsWithAsync` per pair of players when the second one's session starts (pcall'd,
+retried up to 3 times, cached while both stay, answers that arrive after either left are dropped; Studio test players
+with UserIds ≤ 0 are never asked about), and `Player:IsInGroupAsync` on join (retried) and again when the client says
+it just joined in-game (`CheckGroup`, at most once per 10 s, which also consults `GroupService:GetGroupsAsync` in case
+the server cached the old answer). Nothing in the join flow waits for these web calls. While `groupId` is 0 the group
+part is off and hidden. In Studio, `/friends <n>` pretends n friends are present.
+**Reversal cost:** low — set `incomeBonusPerFriend` / `incomeBonus` to 0. The welcome-gift flag name must stay.

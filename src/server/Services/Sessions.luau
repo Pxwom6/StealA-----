@@ -44,6 +44,12 @@ export type Carry = {
 	marker: BillboardGui?,
 }
 
+-- Friend & group state behind the social income bonus (Logic/SocialRules).
+export type Social = {
+	friends: number, -- Roblox friends with a session in this server
+	groupMember: boolean, -- member of Config/Social.group.groupId (false while the group feature is off)
+}
+
 -- A Steal button press (StealBegin): when the server-timed hold started, or why it didn't (StealRules.canBeginHold).
 export type Hold = { plot: number, podium: number, startedAt: number?, refusal: string? }
 
@@ -71,11 +77,13 @@ export type Session = {
 	dirty: boolean, -- state changed since the last StateUpdate
 	-- caches maintained by the services that own them
 	incomePerSecond: number,
+	rewardIncome: number, -- income without the social bonus: daily/offline rewards, best cash/sec (rewardMultiplier)
 	packIncome: number, -- steady income cash packs are sized from (EconomyMath.packIncome)
 	multiplier: number,
 	capacity: number,
 	lockDuration: number,
 	pendingWelcome: { amount: number, seconds: number }?,
+	social: Social, -- written by SocialService, read by EconomyService and Replication
 }
 
 local Sessions = {}
