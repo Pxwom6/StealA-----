@@ -81,13 +81,14 @@ local Mutations: { MutationDef } = {
 
 	-- Event-only ------------------------------------------------------------------------------------------
 	-- Halloween 2026: ghostly purple shimmer with a green glow. Rolls only while LiveOps event "Halloween2026" runs;
-	-- Haunted Snacklings keep it (and earn x3) forever. Generous on purpose: it is the event's everyday surprise.
+	-- Haunted Snacklings keep it (and earn x3) forever. Rarer than Golden and stronger, so it is the event's chase
+	-- without making Golden feel worthless while it runs.
 	{
 		id = "haunted",
 		displayName = "Haunted",
 		color = "#B57BFF",
 		order = 4,
-		chance = 0.04,
+		chance = 0.02,
 		incomeMultiplier = 3,
 		priceMultiplier = 2,
 		announceOnSpawn = false,

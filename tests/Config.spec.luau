@@ -476,6 +476,18 @@ T.describe("Halloween 2026 Haunted mutation", function()
 		T.expect(total({ Halloween2026 = true }) - total({})).toBeNear(def.chance, 1e-12)
 	end)
 
+	T.it("is a chase: rarer than Golden and stronger, so Golden still matters during the event", function()
+		local def = haunted :: Types.MutationDef
+		local golden: Types.MutationDef? = nil
+		for _, mutation in Mutations do
+			if mutation.id == "golden" then
+				golden = mutation
+			end
+		end
+		T.expect(def.chance).toBeLessThan((golden :: Types.MutationDef).chance)
+		T.expect(def.incomeMultiplier).toBeGreaterThan((golden :: Types.MutationDef).incomeMultiplier)
+	end)
+
 	T.it("keeps every mutation chance together, event ones included, below 10%", function()
 		local allEvents: { [string]: boolean } = {}
 		for _, mutation in Mutations do

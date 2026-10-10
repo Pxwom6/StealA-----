@@ -116,10 +116,12 @@ Any mutation: 3.95% of spawns (56.9 per server-hour). Expected value of one spaw
 
 | Mutation | Chance per spawn | Per server-hour | Income | Price | Payback vs plain | Announced |
 | --- | --- | --- | --- | --- | --- | --- |
-| Haunted (event only) | 4% | 57.6 | x3 | x2 | x0.67 | no |
+| Haunted (event only) | 2% | 28.8 | x3 | x2 | x0.67 | no |
 
-With Haunted, any mutation is 7.95% of spawns (114.5 per server-hour; CI keeps all chances together below 10%), and
-one spawn's expected value is income x1.1445, price x1.0715 (x1.0645 / x1.0315 without the event).
+Haunted is rarer than Golden (2% vs 3%) and stronger (x3 vs x2), so it is the event's chase without making Golden
+feel worthless while it runs. With Haunted, any mutation is 5.95% of spawns (85.7 per server-hour; CI keeps all
+chances together below 10%), and one spawn's expected value is income x1.1045, price x1.0515 (x1.0645 / x1.0315
+without the event).
 
 Time to reach each rarity and income for a **new free player whose whole session is inside the event** (same model as
 above; the last column has the luck weekend on for the whole session too):
@@ -128,23 +130,23 @@ above; the last column has the luck weekend on for the whole session too):
 | --- | --- | --- | --- |
 | Common | 7s | 7s | 7s |
 | Uncommon | 2m 2s | 2m 2s | 2m 12s |
-| Rare | 4m 55s | 4m 57s | 4m 45s |
-| Epic | 11m 37s | 11m 10s | 10m 30s |
-| Legendary | 30m 52s | 30m 52s | 26m 47s |
-| Mythic | 1h 58m | 1h 42m | 1h 29m |
-| Secret | 9h 35m | 9h 22m | 5h 49m |
-| First rebirth affordable | 1h 2m | 58m 5s | 53m 25s |
+| Rare | 4m 55s | 5m 0s | 4m 47s |
+| Epic | 11m 37s | 11m 37s | 10m 30s |
+| Legendary | 30m 52s | 30m 52s | 27m 5s |
+| Mythic | 1h 58m | 1h 53m | 1h 29m |
+| Secret | 9h 35m | 9h 22m | 5h 58m |
+| First rebirth affordable | 1h 2m | 59m 0s | 54m 40s |
 
 | Play time | No event | Halloween | Halloween + 2x luck weekend |
 | --- | --- | --- | --- |
-| 10m | $980/s | $1.15K/s | $1.46K/s |
-| 30m | $8.62K/s | $10.9K/s | $15.5K/s |
-| 1h | $29.9K/s | $34.1K/s | $53.3K/s |
-| 3h | $174K/s | $206K/s | $310K/s |
-| 8h | $560K/s | $657K/s | $1.14M/s |
-| 24h | $2.32M/s | $2.65M/s | $3.99M/s |
+| 10m | $980/s | $1.01K/s | $1.36K/s |
+| 30m | $8.62K/s | $10K/s | $14.9K/s |
+| 1h | $29.9K/s | $32.8K/s | $51K/s |
+| 3h | $174K/s | $186K/s | $296K/s |
+| 8h | $560K/s | $616K/s | $1.09M/s |
+| 24h | $2.32M/s | $2.47M/s | $3.8M/s |
 
-A free player buys a median of 26 event Snacklings in 24 hours of event play (29 with the luck weekend), the first
+A free player buys a median of 26 event Snacklings in 24 hours of event play (28 with the luck weekend), the first
 after about 7½ minutes (a Candy Corn Cat).
 
 * **Normal progression outside the event is untouched.** Event Snacklings are listed after every regular one and
@@ -155,10 +157,10 @@ after about 7½ minutes (a Candy Corn Cat).
   disclosure) are the same during the event; within a tier, an event Snackling takes about a quarter of the spawns.
   Their price and payback sit inside their tier's regular range (CI checks it), so they are a fun collectible and
   steal target, not a shortcut.
-* **The event itself is a gentle boost**: about +15-25% income (Haunted's expected value alone is +7.5% per spawn;
-  the rest is a cheaper Mythic option and more variety to upgrade into), the first Mythic ~14% sooner and the first
-  rebirth ~6% sooner. The **luck weekend** is the big lever, as any 2× luck is: belt-gated tiers come
-  much sooner (Secret 9h 35m → 5h 49m) and income is ~1.5-2× higher. It lasts about 55 hours of one weekend, so for a
+* **The event itself is a gentle boost**: about +5-15% income (Haunted's expected value is +3.75% per spawn; the
+  rest is a cheaper Mythic option and more variety to upgrade into), the first Mythic ~4% sooner and the first
+  rebirth ~5% sooner. The **luck weekend** is the big lever, as any 2× luck is: belt-gated tiers come
+  much sooner (Secret 9h 35m → 5h 58m) and income is ~1.4-2× higher. It lasts about 55 hours of one weekend, so for a
   regular player it is a burst, not a new baseline.
 * **Server Luck during the luck weekend**: the event's 2× and a bought 2× multiply to 4× (the cap is 6×); the store's
   before/after odds include the event's luck, and a test proves they match what the server rolls exactly.

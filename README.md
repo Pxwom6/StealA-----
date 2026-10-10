@@ -104,7 +104,7 @@ change:
 | --- | --- | --- |
 | Dates, HUD banner + countdown title, luck | `events` in `src/shared/Config/LiveOps.luau` | `Halloween2026` (23 Oct–2 Nov), `HalloweenLuck2026` (2× luck, 30 Oct–1 Nov) |
 | Event Snacklings | `eventId` in `src/shared/Config/Creatures.luau` | Candy Corn Cat, Pumpkin Pie Bat, Caramel Apple Ghoul, Jack-o'-Lantern Latte |
-| Event mutation | `eventId` in `src/shared/Config/Mutations.luau` | Haunted (4%, x3 income) |
+| Event mutation | `eventId` in `src/shared/Config/Mutations.luau` | Haunted (2%, x3 income) |
 | Map decorations + lighting | `eventThemes` / `themes` in `src/shared/Config/Seasons.luau` | `halloween`: pumpkins, string lights, lamps, bats, ghosts, dusk + light fog |
 
 * **Change the dates:** edit `startsAt` / `endsAt` (Unix seconds, UTC; e.g. `date -u -d "2026-10-23 17:00" +%s`)
