@@ -9,6 +9,8 @@
 	                        e.g. /spawn jack_o_lantern_latte haunted
 	  /noshield             end new-player protection for everyone (so a 2-player test can steal right away)
 	  /friends <n|off>      pretend n Roblox friends are in your server (Studio test players can't be friends)
+	  /tutorial             start the first-time tutorial again (clears your tutorial progress; it pays the reward
+	                        again when completed, Studio only)
 
 	The LiveOps admin commands (LiveOpsService) also work for anyone in Studio, only in that session:
 	  /event <eventId> [minutes], /event off [eventId], /luck <multiplier> <minutes>, /announce <text>
@@ -28,6 +30,7 @@ local LockService = require(script.Parent.LockService)
 local Remotes = require(script.Parent.Remotes)
 local Sessions = require(script.Parent.Sessions)
 local SocialService = require(script.Parent.SocialService)
+local TutorialService = require(script.Parent.TutorialService)
 
 local DevCommands = {}
 
@@ -108,8 +111,16 @@ function DevCommands.start()
 			Remotes.notify(player, "[Studio] back to real friends", "info")
 		end
 	end)
+	add("tutorial", function(player: Player)
+		local session = Sessions.get(player)
+		if session then
+			TutorialService.restart(session)
+			Remotes.notify(player, "[Studio] tutorial restarted", "info")
+		end
+	end)
 	print(
-		"[DevCommands] Studio commands enabled: /cash <n>, /spawn <creatureId> [mutationId], /noshield, /friends <n|off>"
+		"[DevCommands] Studio commands enabled: /cash <n>, /spawn <creatureId> [mutationId], /noshield, /friends <n|off>,"
+			.. " /tutorial"
 			.. " (LiveOps: /event <id> [minutes], /event off, /luck <x> <min>)"
 	)
 end

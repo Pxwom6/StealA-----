@@ -2,8 +2,14 @@
 --[[
 	Thin wrapper over AnalyticsService (Creator Hub → Analytics → Funnels / Economy / Custom).
 
-	Onboarding funnel (each step logged once per player, tracked in the save so rejoining doesn't re-log):
-	  1 Joined  2 FirstBeltPurchase  3 FirstCollect  4 FirstSteal  5 FirstRebirth
+	Onboarding funnel (each step logged once per player, tracked in the save so rejoining doesn't re-log). Steps 2-5
+	follow the first-time tutorial (Config/Tutorial: buy, collect, lock, steal):
+	  1 Joined  2 FirstBeltPurchase  3 FirstCollect  4 TutorialLock (the lock step ended: locked, or it moved on by
+	  itself)  5 TutorialComplete (completed and rewarded; a skip never logs it)  6 FirstSteal  7 FirstRebirth
+	Roblox counts a logged step as completing every earlier one, so a funnel step must be one every player passes in
+	order: skipping the tutorial is the custom event `tutorial_skipped` instead, and exact completion / skip rates come
+	from `tutorial_step` and `tutorial_skipped` (a player who skipped and later steals shows steps 4-5 as completed in
+	the funnel view). Steps are matched by number: never renumber a step once the game is live (DECISIONS.md #21).
 	Store funnel (recurring, one funnel session per store visit):
 	  1 StoreOpened  2 ProductPrompted  3 ProductPurchased
 	Economy events: cash sources and sinks (collect events are aggregated per minute to stay within limits).
@@ -15,6 +21,9 @@
 	  pass_purchased / product_purchased   01 item key
 	  steal                                01 creature id  02 mutation id ("" when plain)
 	  mutation_bought                      01 mutation id  02 creature id  (value = mutation order)
+	  tutorial_step                        01 step id  02 outcome ("done" | "early" | "unavailable" | "timeout")
+	                                       (value = whole seconds spent on the step)
+	  tutorial_skipped                     01 step id the player skipped at  (value = that step's number)
 
 	Every call is pcall'd: analytics must never break gameplay (and is a no-op in some Studio configurations).
 ]]
@@ -59,8 +68,10 @@ local ONBOARDING_STEPS: { [string]: number } = {
 	Joined = 1,
 	FirstBeltPurchase = 2,
 	FirstCollect = 3,
-	FirstSteal = 4,
-	FirstRebirth = 5,
+	TutorialLock = 4,
+	TutorialComplete = 5,
+	FirstSteal = 6,
+	FirstRebirth = 7,
 }
 
 local STORE_STEPS: { [string]: number } = {
@@ -175,6 +186,16 @@ end
 -- A mutated creature was bought off the belt.
 function Analytics.mutationBought(session: Session, mutationId: string, mutationOrder: number, creatureId: string)
 	Analytics.custom(session, "mutation_bought", mutationOrder, { mutationId, creatureId })
+end
+
+-- A tutorial step ended (`outcome`: TutorialRules.StepOutcome) after `seconds` on it.
+function Analytics.tutorialStep(session: Session, stepId: string, outcome: string, seconds: number)
+	Analytics.custom(session, "tutorial_step", math.max(0, math.floor(seconds)), { stepId, outcome })
+end
+
+-- The player pressed Skip on step number `stepIndex` (`stepId`).
+function Analytics.tutorialSkipped(session: Session, stepId: string, stepIndex: number)
+	Analytics.custom(session, "tutorial_skipped", stepIndex, { stepId })
 end
 
 function Analytics.forget(session: Session)

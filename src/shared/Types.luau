@@ -298,6 +298,14 @@ export type SocialView = {
 	groupRewardClaimed: boolean, -- the one-time group welcome reward was already paid to this account
 }
 
+-- The player's tutorial progress (server-owned, Logic/TutorialRules).
+export type TutorialView = {
+	step: string, -- current step id (TutorialStepId), "" when no tutorial is running
+	index: number, -- 1-based position of `step` in Config/Tutorial.steps, 0 when none
+	count: number, -- number of steps
+	stepStartedAt: number, -- server time the current step started
+}
+
 -- What the server sends the owning client in StateUpdate (see server/Services/Replication.luau).
 -- Costs of -1 mean "not available" (max reached).
 export type ClientState = {
@@ -325,6 +333,7 @@ export type ClientState = {
 	steals: number,
 	daily: DailyView,
 	social: SocialView,
+	tutorial: TutorialView,
 }
 
 export type BeltItem = { id: number, creatureId: string, spawnAt: number, variant: string? }

@@ -131,6 +131,7 @@ local Gameplay = {
 		-- Social.group.recheckCooldownSeconds and tells the player to wait, so this only stops spam.
 		CheckGroup = { burst = 2, perSecond = 0.2 },
 		InvitePrompted = { burst = 2, perSecond = 0.2 }, -- analytics only
+		SkipTutorial = { burst = 2, perSecond = 0.2 }, -- once per account in practice (TutorialService)
 		DevGrantProduct = { burst = 3, perSecond = 1 },
 	} :: { [string]: RateLimit },
 }

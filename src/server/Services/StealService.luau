@@ -35,6 +35,7 @@ local PositionTracker = require(script.Parent.PositionTracker)
 local Remotes = require(script.Parent.Remotes)
 local Replication = require(script.Parent.Replication)
 local Sessions = require(script.Parent.Sessions)
+local TutorialService = require(script.Parent.TutorialService)
 
 type Session = Sessions.Session
 type Carry = Sessions.Carry
@@ -218,6 +219,7 @@ local function deliver(thief: Session)
 	if podiumRefs then
 		Remotes.fire(thief.player, "Effect", { kind = "stolen", position = podiumRefs.standCFrame.Position })
 	end
+	TutorialService.record(thief, "steal") -- before FirstSteal: the funnel logs TutorialComplete first
 	if Analytics.milestone(thief, "FirstSteal") then
 		Analytics.custom(thief, "first_steal_rarity", rarity.order)
 	end

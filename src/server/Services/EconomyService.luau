@@ -32,6 +32,7 @@ local PlotService = require(script.Parent.PlotService)
 local Remotes = require(script.Parent.Remotes)
 local Replication = require(script.Parent.Replication)
 local Sessions = require(script.Parent.Sessions)
+local TutorialService = require(script.Parent.TutorialService)
 
 type Session = Sessions.Session
 
@@ -219,6 +220,7 @@ local function padCheck()
 					amount = amount,
 					position = nearest.padPosition,
 				})
+				TutorialService.record(session, "collect") -- only a pad collect counts (not selling, not leaving)
 			end
 		end
 	end

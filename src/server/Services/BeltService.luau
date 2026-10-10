@@ -28,6 +28,7 @@ local LiveOpsService = require(script.Parent.LiveOpsService)
 local PlotService = require(script.Parent.PlotService)
 local Remotes = require(script.Parent.Remotes)
 local Sessions = require(script.Parent.Sessions)
+local TutorialService = require(script.Parent.TutorialService)
 
 type Session = Sessions.Session
 
@@ -176,6 +177,7 @@ local function onBuy(player: Player, idArg: unknown)
 	end
 	session.data.stats.beltPurchases += 1
 	Analytics.milestone(session, "FirstBeltPurchase")
+	TutorialService.record(session, "buy")
 	if mutation then
 		Analytics.mutationBought(session, mutation.id, mutation.order, def.id)
 	end

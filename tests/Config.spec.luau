@@ -339,6 +339,7 @@ T.describe("Config integrity", function()
 				"ClientEvent",
 				"CheckGroup",
 				"InvitePrompted",
+				"SkipTutorial",
 				"DevGrantProduct",
 			}
 		do
