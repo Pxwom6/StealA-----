@@ -46,7 +46,8 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | Data / persistence | `DataService` (ProfileStore, session-locked, autosave, BindToClose) | – | `DataSchema` (template, migrate, sanitise) |
 | Plots | `PlotService` (assign / release / reset, podium attributes) | `PlotController` (billboards, owner barrier pass-through) | `PlotAssignment`, `Inventory` |
 | Map | `MapBuilder` | – | – |
-| Conveyor | `BeltService` (weighted spawns, buy validation) | `BeltController` (pooled models, local prompts) | `BeltMath`, `RarityRoll`, `Catalog` |
+| Conveyor | `BeltService` (weighted spawns, mutation rolls, buy validation) | `BeltController` (models pooled per creature + mutation, local prompts) | `BeltMath`, `RarityRoll`, `MutationRules`, `Catalog` |
+| Mutations | `BeltService` rolls, `EconomyService` / `PlotService` / `StealService` price, pay and show them | `MutationFxController` (rainbow hue cycling), labels in the belt / plot / interaction controllers | `MutationRules` |
 | Economy | `EconomyService` (1 s income tick, collect pads checked server-side from the owner's position, podium upgrades, sell) | `HudController` | `EconomyMath` |
 | Stealing | `StealService` (grab, carry, deliver, tag, timeout, speed sanity) | `StealController` (TAG button, alerts) | `StealRules` |
 | Base lock | `LockService` | lock pill + barrier | `LockRules` |
@@ -58,7 +59,7 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | LiveOps | `LiveOpsService` (scheduled events, luck boosts, admin commands, cross-server) | luck banner | `LiveOpsRules` |
 | Analytics | `Analytics` (funnel + economy events) | sends whitelisted `store_opened` | – |
 | State sync | `Replication` (dirty-flag batching, 5 Hz) | `StateStore` | – |
-| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn`, `/noshield`) | – | – |
+| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`) | – | – |
 
 ## 3. Module list
 
@@ -68,6 +69,7 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | `Theme` | game title, currency symbol, every UI string & template, UI palette (hex), fonts, plot colours |
 | `Rarities` | 7 tiers: order, display name, colour, belt weight, luck-affected flag, glow/particles/announce flags |
 | `Creatures` | the Snackling catalogue: id, name, rarity, price, income, belt weight, model name, colours, shape recipe, optional `eventId` |
+| `Mutations` | rare variants of any creature (Golden, Diamond, Rainbow): id, name, colour, chance per spawn, income / price multipliers, announce flags, look (material, tint, sparkles, rainbow), optional `eventId` |
 | `Economy` | start cash, podium upgrade curve, sell refund, offline earnings, rebirth curve, cash packs, daily rewards |
 | `Gameplay` | belt timing, plot geometry, steal/tag ranges, carry speed, lock/grace timers, rate limits |
 | `Monetization` | game-pass and developer-product IDs (**placeholders, TODO**), perk values, store layout |
@@ -83,8 +85,9 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `Format` | `1.25K`, `3.4M`, `1e33` suffixes; `mm:ss`, `1h 5m` durations |
 | `Guard` | remote-argument validators (finite integer in range, short string, enum member, no NaN/inf) |
 | `RateLimiter` | token bucket keyed by (player, remote) with injected clock |
-| `Catalog` | indexes `Creatures`/`Rarities` config, validation of config integrity |
+| `Catalog` | indexes `Creatures`/`Rarities`/`Mutations` config, validation of config integrity |
 | `RarityRoll` | weighted rarity → creature roll with luck multiplier; exact odds table for display |
+| `MutationRules` | mutation roll per spawn (fixed chances, no luck, event-only mutations), mutated price / income / name (unknown variant = x1) |
 | `EconomyMath` | income with multipliers, totals, podium upgrade cost, sell value, cash-pack amounts |
 | `RebirthMath` | rebirth cost, multiplier, lock bonus, preview (what you lose / gain) |
 | `OfflineEarnings` | capped offline earnings with clock-skew protection |
@@ -99,9 +102,10 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `PlotAssignment` | pick a free plot, release |
 
 ### `src/shared` (Roblox helpers, not unit-tested)
-`Net` (create/get remotes by name), `GameData` (catalogue built once from config), `CreatureVisuals` (build
-placeholder model or clone from `ReplicatedStorage.CreatureModels`, apply rarity glow / particles / aura),
-`UiTheme` (hex → Color3, fonts, text templates).
+`Net` (create/get remotes by name), `GameData` (catalogue built once from config; `price` / `income` /
+`displayName` of a creature + variant, used for every belt item and owned creature), `CreatureVisuals` (build
+placeholder model or clone from `ReplicatedStorage.CreatureModels`, apply rarity glow / particles / aura, then the
+mutation look), `UiTheme` (hex → Color3, fonts, text templates, rich-text creature names).
 
 ### `src/server`
 `init.server.luau` bootstraps in order:
@@ -117,7 +121,8 @@ release plot → release profile.
 ### `src/client`
 `init.client.luau` waits for `game:IsLoaded()` then starts controllers:
 `StateStore, HudController, NotificationController, BeltController, PlotController, InteractionController,
-StealController, LockController, RebirthController, StoreController, ChatTagController, RewardsController`
+StealController, LockController, RebirthController, StoreController, ChatTagController, RewardsController,
+MutationFxController`
 (UI helpers: `UI/UiKit`, `UI/Modal`; audio: `SoundPlayer`).
 
 ## 4. Remotes (all in `ReplicatedStorage.Remotes`, created by the server)
@@ -144,22 +149,24 @@ Server → client:
 | Remote | Payload |
 | --- | --- |
 | `StateUpdate` | batched partial player state (cash, cash/sec, rebirths, multiplier, podium cap, lock, passes, carry…) |
-| `BeltSnapshot` / `BeltSpawn` / `BeltRemove` | conveyor items `{id, creatureId, spawnAt}` |
+| `BeltSnapshot` / `BeltSpawn` / `BeltRemove` | conveyor items `{id, creatureId, spawnAt, variant?}` (variant = mutation id) |
 | `Notify` | toast `{kind, text}` |
-| `Announce` | server-wide banner `{text, rarity}` |
+| `Announce` | server-wide banner `{text, rarity, color?}` (color: a mutation's own banner) |
 | `WelcomeBack` | offline earnings popup `{amount, seconds}` |
 | `DailyInfo` | streak/claimable/reward |
-| `StealAlert` | to victim: `{thiefName, creatureId}` |
+| `StealAlert` | to victim: `{thiefName, creatureId, variant?}` |
 | `Effect` | one-shot VFX cue `{kind, position, rarity}` |
 
 World state the client reads from **attributes** (replicated automatically): plot `OwnerUserId`, `LockedUntil`,
-`GraceUntil`, `PodiumCount`; podium `CreatureId`, `Stored`, `Income`, `BeingStolen`; player `Carrying`,
-`VIP`.
+`GraceUntil`, `PodiumCount`; podium `CreatureId`, `Variant` (mutation id, "" for none), `Stored`, `Income`
+(mutation and multipliers included), `BeingStolen`; player `Carrying`, `VIP`. Rainbow parts carry the
+CollectionService tag `MutationRainbow`.
 
 ## 5. Data schema (version 2)
 
 ```lua
-type CreatureRecord = { uid: string, id: string, podium: number, acquiredAt: number, stored: number, variant: string? }
+type CreatureRecord = { uid: string, id: string, podium: number, acquiredAt: number, stored: number,
+                        variant: string? } -- variant = mutation id (Config/Mutations), nil = plain
 type PurchaseRecord = { purchaseId: string, productId: number, key: string, robux: number, at: number }
 type PlayerData = {   -- exactly Types.PlayerData
     version: number,             -- schema version for migrate()
@@ -198,6 +205,6 @@ type PlayerData = {   -- exactly Types.PlayerData
 ## 7. Out of scope this round (but not blocked)
 
 Trading (creatures have stable `uid`s and live in one list → a trade is two `Inventory` moves), event creatures
-(`eventId` field + `LiveOps.events` already gate spawns), mutations (`variant` field reserved in the save),
-battle pass, friend/group rewards, private servers, extra maps (plot geometry is data), custom models/sounds
+(`eventId` field + `LiveOps.events` already gate spawns), event-only mutations (a mutation with an `eventId`, e.g. a
+Halloween "Haunted"; the roll already supports it), battle pass, friend/group rewards, private servers, extra maps (plot geometry is data), custom models/sounds
 (`CreatureModels` folder + `Config/Sounds`).

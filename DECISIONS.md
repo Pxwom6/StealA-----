@@ -188,4 +188,29 @@ it (e.g. `pcall(fn :: () -> ...any)`, explicit pass accessors instead of indexin
 
 Cash is a Luau number (exact to 2^53 ≈ 9 quadrillion, approximate above, displayed with suffixes to 1e33).
 OrderedDataStore values are floored and clamped to 2^53. A maxed base of Secrets with every multiplier earns
-around $10^8/s, far below that.
+around $10^8/s, far below that (a Rainbow Secret earns 8× a plain one: still around $10^9/s at most).
+
+### 18. Mutations: a fixed-chance roll per spawn, saved as `CreatureRecord.variant`
+
+**Chose:**
+* Every belt spawn rolls its creature first (rarity weights × luck), then at most one mutation with each
+  mutation's fixed `chance` (`Logic/MutationRules.roll`: one random number per spawn, mutations in `order`).
+* **Luck never changes mutation chances.** Server Luck and luck events only scale rarity weights, so the store's
+  exact before/after odds disclosure for the paid boost stays true (#9) without listing mutations, and buying luck
+  can't stack two multipliers on the same rare moment.
+* A mutation is a creature's permanent property: saved as `CreatureRecord.variant` (the field reserved since the
+  first save version; `DataSchema.sanitise` already kept it, so no `DataSchema.VERSION` bump and a code rollback
+  keeps it too), carried by `Inventory.transfer` on a steal, priced into sell value.
+* Mutation ids are permanent like creature ids (CI list `RELEASED_MUTATION_IDS`). A save holding a variant the
+  config doesn't know keeps it untouched but earns, sells and looks like a plain creature (x1), so restoring the
+  config restores it. Retire a mutation with a never-active `eventId`.
+* Mutated price = round(price × priceMultiplier), never below the base price; income = income × incomeMultiplier,
+  with `incomeMultiplier >= priceMultiplier` so a mutation is always a good find. Every read of price or income for
+  a belt item or owned creature goes through `GameData.price` / `GameData.income`.
+* Event-only mutations (`eventId`) roll only while their LiveOps event is active; CI requires all chances together,
+  event ones included, to stay below 1.
+
+**Why:** fixed per-spawn odds are easy to explain and to disclose, keep the paid luck product's numbers exact, and
+leave the rarity chase in BALANCE.md almost unchanged (≤ ~4%).
+**Reversal cost:** medium — ids and the meaning of `variant` are in players' saves; chances and multipliers are
+free to re-tune (existing creatures simply earn the new multiplier).
