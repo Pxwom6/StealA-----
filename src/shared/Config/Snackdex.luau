@@ -9,7 +9,9 @@
 	  * a permanent income bonus of `incomeBonusPerTier` per completed tier, at most `maxIncomeBonus` in total
 
 	Rewards are keyed by rarity id (Config/Rarities); a rarity without an entry uses `defaultTierReward`. Each minimum is
-	about the price of the tier's cheapest Snackling, so a tier completed early is still worth one of them.
+	about a quarter of the price of the tier's cheapest Snackling: enough to feel like a reward for a player who
+	completes a tier early, but well below what passing Snacklings between two accounts by stealing would have to
+	"pay", so lending Snacklings to an alt can't mint cash (a delivered steal counts as owning it).
 	Balance notes: BALANCE.md "Snackdex".
 ]]
 
@@ -21,13 +23,13 @@ local Snackdex: Types.SnackdexConfig = {
 	maxIncomeBonus = 0.21,
 
 	tierRewards = {
-		Common = { incomeSeconds = 3 * 60, minimum = 250 },
-		Uncommon = { incomeSeconds = 5 * 60, minimum = 1000 },
-		Rare = { incomeSeconds = 8 * 60, minimum = 10000 },
-		Epic = { incomeSeconds = 10 * 60, minimum = 100000 },
-		Legendary = { incomeSeconds = 15 * 60, minimum = 2500000 },
-		Mythic = { incomeSeconds = 20 * 60, minimum = 75000000 },
-		Secret = { incomeSeconds = 30 * 60, minimum = 2500000000 },
+		Common = { incomeSeconds = 3 * 60, minimum = 10 },
+		Uncommon = { incomeSeconds = 5 * 60, minimum = 250 },
+		Rare = { incomeSeconds = 8 * 60, minimum = 1000 },
+		Epic = { incomeSeconds = 10 * 60, minimum = 15000 },
+		Legendary = { incomeSeconds = 15 * 60, minimum = 350000 },
+		Mythic = { incomeSeconds = 20 * 60, minimum = 12500000 },
+		Secret = { incomeSeconds = 30 * 60, minimum = 450000000 },
 	},
 	defaultTierReward = { incomeSeconds = 10 * 60, minimum = 1000 },
 }

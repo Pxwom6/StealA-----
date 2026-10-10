@@ -163,6 +163,9 @@ T.describe("QuestRules day reset", function()
 		-- Another server's clock ran ahead: the later day's quests are kept, never rolled back.
 		state.day = DAY + 1
 		T.expect(QuestRules.isStale(state, DAY)).toBe(false)
+		-- ...but a day far in the future (clock glitch / damaged save) would freeze quests, so it re-rolls.
+		state.day = DAY + 30
+		T.expect(QuestRules.isStale(state, DAY)).toBe(true)
 	end)
 
 	T.it("a new day starts progress, claims and the bonus over", function()

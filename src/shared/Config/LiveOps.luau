@@ -33,8 +33,9 @@ local Types = require("../Types")
 export type EventDef = Types.EventDef
 
 local LiveOps = {
-	-- TODO(owner): add your own Roblox UserId(s). Group-rank based admin can be added in LiveOpsService.
-	adminUserIds = {} :: { number },
+	-- Roblox UserIds allowed to use the admin chat commands in live servers. 723735722 = Pxwom5 (the owner).
+	-- Group-rank based admin can be added in LiveOpsService.
+	adminUserIds = { 723735722 } :: { number },
 
 	events = {
 		-- Example (dates in the past, so it never runs). Copy, change the id and dates, publish.

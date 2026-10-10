@@ -308,16 +308,18 @@ The simulation above includes neither.
 
 | Tier | Reward | Minimum |
 | --- | --- | --- |
-| Common | 3 min of steady income | $250 |
-| Uncommon | 5 min | $1K |
-| Rare | 8 min | $10K |
-| Epic | 10 min | $100K |
-| Legendary | 15 min | $2.5M |
-| Mythic | 20 min | $75M |
-| Secret | 30 min | $2.5B |
+| Common | 3 min of steady income | $10 |
+| Uncommon | 5 min | $250 |
+| Rare | 8 min | $1K |
+| Epic | 10 min | $15K |
+| Legendary | 15 min | $350K |
+| Mythic | 20 min | $12.5M |
+| Secret | 30 min | $450M |
 
-Each minimum is about the tier's cheapest Snackling, so even a tier completed early (by stealing) is worth one. All
-seven tiers pay about 91 minutes of income over a player's whole life, less than half of one Snack Truck. Each
+Each minimum is about a quarter of the tier's cheapest Snackling (a test keeps it at most half). The minimum only
+matters for a player who completes a tier very early, mostly by stealing; keeping it below the cheapest price means
+lending Snacklings to a second account by stealing can't mint cash. For a normal player the income-based amount is
+far bigger. All seven tiers pay about 91 minutes of income over a player's whole life, less than half of one Snack Truck. Each
 completed tier also adds **+3% income forever** (all seven: +21%, the cap), which counts like rebirths everywhere
 (cash packs, daily and offline rewards, the leaderboard). For scale: one rebirth is ×1.5, so the whole collection is
 worth less than half a rebirth; it rewards collecting without replacing the rebirth chase. A new mutation of a known

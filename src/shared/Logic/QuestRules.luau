@@ -173,7 +173,10 @@ end
 
 -- True when the saved quests belong to an earlier day than `today` (or were never rolled).
 function QuestRules.isStale(state: QuestState, today: number): boolean
-	return state.day < today
+	-- A day more than one ahead of the server's can only come from a clock glitch or a damaged save; without this the
+	-- player's quests would stay frozen until that date. (One day ahead is allowed: servers' clocks differ a little
+	-- around midnight, and rolling back would re-roll quests a player already has.)
+	return state.day < today or state.day > today + 1
 end
 
 -- Replaces the quests with `day`'s (progress, claims and the bonus start over).
