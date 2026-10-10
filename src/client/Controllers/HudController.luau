@@ -30,7 +30,7 @@ local cashPill: Frame
 
 -- Left column (reference px): four 76x58 buttons with 6 px gaps are 250 tall, the same footprint as the three 74 px
 -- buttons before (246). Centred at 42% of the height: at 667x375 (about 785x373 under the top bar, UI scale 0.85) the
--- column spans y 32-282 and x 10-86 (badges reach x 94), clear of the top stack (x >= 242), the tutorial banner
+-- column spans y 32-282 and x 10-86 (badges included), clear of the top stack (x >= 242), the tutorial banner
 -- (x >= 182) and the movement thumbstick in the bottom-left corner. Keep it at most four buttons tall: a fifth feature
 -- belongs in an existing panel (as the daily rewards and quests share Rewards).
 local SIDE_BUTTON_SIZE = Vector2.new(76, 58)

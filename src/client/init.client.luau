@@ -45,6 +45,6 @@ RewardsController.start()
 MutationFxController.start()
 SocialController.start()
 TutorialController.start()
-SnackdexController.start() -- after RewardsController: its side button is the 4th
+SnackdexController.start() -- side button LayoutOrder 4, under Rewards
 
 Net.get("ClientReady"):FireServer()

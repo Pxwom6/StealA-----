@@ -389,7 +389,8 @@ must stay once live.
   a store item and the lock fairness rules (#9) stay untouched. A full day of quests pays about 21 minutes of steady
   income (less than the day-7 daily reward), CI keeps it under an hour.
 * **HUD:** the left column is Shop, Rebirth, Rewards, Snackdex: four 76×58 buttons with 6 px gaps (250 reference
-  px), the footprint of the three 74 px buttons before, so the layout notes in #21 still hold (x ≤ 94 with badges).
+  px), the footprint of the three 74 px buttons before, so the layout notes in #21 still hold (x ≤ 86, badges
+  included).
   Daily login rewards and quests share the Rewards panel (two tabs) instead of a fifth button; it still opens itself
   on Daily once per session, never during the tutorial. The top-right corner and the bottom-right action area are
   untouched.
