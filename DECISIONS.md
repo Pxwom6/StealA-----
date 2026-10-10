@@ -342,3 +342,29 @@ the game. Flags avoid a save-format change for what is a handful of booleans.
 **Reversal cost:** low — `Tutorial.enabled = false` turns it off for everyone (nothing is saved while it is off);
 steps, timeouts and the reward are data. The flag names must stay (they are in saves), and the funnel step numbers
 must stay once live.
+
+### 22. Snackling models are data recipes built from primitives
+
+**Chose:** every Snackling's 3D model is a recipe in `Config/CreatureLooks` (keyed by creature id): a body plan
+(blob, biped, quadruped, swimmer, tentacled), food skins for body and head, a face, animal features and toppings, in
+units of a `size`. The pure `Logic/CreatureRecipe` compiles a recipe into plain part specs (shape, size, CFrame
+numbers, colour, role) at the rarity's `modelScale`, placing faces, features and toppings by casting rays at the
+skin's actual shapes; `CreatureVisuals` turns the specs into Ball / Block / Cylinder parts, WedgeParts and Block parts
+with a Sphere SpecialMesh (ellipsoids). No mesh or image assets. A Model in `ReplicatedStorage.CreatureModels` named
+the creature's `modelName` still replaces the recipe (custom art).
+* Recipes live in their own module rather than a field on `Config/Creatures`, so the economy catalogue stays short and
+  the art can be restyled without touching balance data.
+* Budgets (Root and Mythic+ aura included): 30 parts for Common / Uncommon, 40 for Rare / Epic, 50 for Legendary and
+  up. CI checks every recipe: valid kinds, colours and materials, the budget, nothing below the feet, a face on the
+  front, at most 6.6 studs wide (the podium row spacing) and 7.4 tall at its rarity's scale, exact scaling.
+* Face parts (eyes, pupils, highlights, mouth, tongue, teeth, cheeks, brows, nose, panda patches) carry
+  `MutationSkip`, so Golden / Diamond / Rainbow / Haunted restyle the body but never the face.
+* The idle animation (`Logic/IdleMotion`) is client-only and purely visual: `IdleController` moves the anchored Root of
+  the nearest 48 tagged models within 120 studs at ~30 Hz (one CFrame write, plus a size write on the one or two body
+  parts it squashes); `BeltController` folds the hop into the move it already does every frame. The server never
+  animates anything.
+**Why:** we can't import meshes, and primitives are free, instant to load and look the same on every device; making
+the recipe a pure function means CI can check all 64 models without Studio, and the lead and Leo can preview them in
+Studio with `/gallery`. Part counts stay bounded: a full base of 20 Legendaries is about 1,000 parts.
+**Reversal cost:** low — recipes are data; moving to meshes only means adding Models to `CreatureModels` (the code
+already prefers them). Creature ids, not recipes, are what saves hold.

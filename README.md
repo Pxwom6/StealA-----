@@ -55,9 +55,9 @@ CI (`.github/workflows/ci.yml`) runs all of the above on every pull request.
 
 ```
 src/shared/Config   plain data: names, colours, prices, timers, product IDs, LiveOps events, seasonal themes,
-                    social rewards, the first-time tutorial (re-theme = edit these)
+                    social rewards, the first-time tutorial, Snackling model recipes (re-theme = edit these)
 src/shared/Logic    pure game rules (economy, rarity rolls, rebirth, offline earnings, receipts, steal/lock rules,
-                    friend & group bonus, seasonal themes, tutorial progress)
+                    friend & group bonus, seasonal themes, tutorial progress, Snackling models, idle animation)
 src/shared          small Roblox helpers shared by server & client (remotes, creature visuals, UI theme)
 src/server          server bootstrap + services (authoritative)
 src/client          client bootstrap + controllers (UI, rendering, intents)
@@ -134,11 +134,27 @@ already had progress when it shipped never see it. Steps finish only when the se
 * **Test it in Studio:** a fresh Studio player (API access off) starts it automatically; `/tutorial` starts it again
   any time.
 
+### Snackling models
+
+Every Snackling is a 3D "living snack" built in code from plain Roblox parts (no meshes or asset ids): its recipe in
+`src/shared/Config/CreatureLooks.luau` picks a body plan (blob, biped, quadruped, swimmer, tentacled), the food its
+body and head are made of (pizza slice, sushi roll, donut, cupcake, burger, pancake stack, bowl...), a face, animal
+features (ears, tails, wings, snouts, horns, shells, manes...) and toppings (sprinkles, drips, a cherry...). Every
+kind is listed at the top of `src/shared/Logic/CreatureRecipe.luau`.
+
+* **Restyle one:** change its colours, swap a feature or topping, or change `size`, then check it in Studio with
+  `/gallery`. CI keeps every recipe valid, inside its rarity's part budget (30 Common / Uncommon, 40 Rare / Epic,
+  50 Legendary and up), standing on its feet and narrow enough for the podiums.
+* **Faces stay readable:** eyes, mouths and cheeks are never restyled by mutations (Golden, Diamond, Rainbow,
+  Haunted).
+* **They feel alive:** Snacklings near your camera bob, squash and sway on their podiums, and hop along the belt
+  (client-only, `IdleController` / `BeltController`).
+
 ### Swapping in your own art
 
 * **Creature models:** put a Model named exactly as the creature's `modelName` (see
   `src/shared/Config/Creatures.luau`) into `ReplicatedStorage/CreatureModels` in Studio. The game clones it instead
-  of building the placeholder. Rojo will not delete instances you add there.
+  of building it from its recipe. Rojo will not delete instances you add there.
 * **Sounds:** paste asset IDs into `src/shared/Config/Sounds.luau`.
 * **Names, colours, UI text:** `src/shared/Config/Theme.luau`, `Creatures.luau`, `Rarities.luau`, `Mutations.luau`.
 * **Mutations on custom models:** a mutation restyles every visible part of the model (material, colour, ...).
@@ -147,7 +163,8 @@ already had progress when it shipped never see it. Steps finish only when the se
 ### Studio test commands
 
 `/cash <amount>`, `/spawn <creatureId> [mutationId]` (e.g. `/spawn pizza_pup rainbow`), `/noshield`,
-`/friends <n|off>` and `/tutorial` (start the first-time tutorial again) work in Studio only
+`/friends <n|off>`, `/tutorial` (start the first-time tutorial again) and `/gallery [mutationId]` (every Snackling in
+labelled rows behind the north bases, e.g. `/gallery golden`; `/gallery off` removes it) work in Studio only
 (`src/server/Services/DevCommands.luau`). `/spawn` also puts event Snacklings
 and event mutations on the belt when their event isn't running (e.g. `/spawn candy_corn_cat haunted`).
 

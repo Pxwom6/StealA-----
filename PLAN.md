@@ -61,7 +61,8 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | First-time tutorial | `TutorialService` (steps finished by real purchases / collects / locks / steals, timeouts, one-time reward, existing players skipped) | `TutorialController` (banner under the cash, beam + bouncing arrow + highlight on the target, Skip) | `TutorialRules` |
 | Analytics | `Analytics` (onboarding funnel following the tutorial, store funnel, economy events) | sends whitelisted `store_opened` | – |
 | State sync | `Replication` (dirty-flag batching, 5 Hz) | `StateStore` | – |
-| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends`, `/tutorial`); LiveOps `/event <id> [minutes]`, `/event off` (anyone in Studio, local only) | – | – |
+| Snackling models | podium models built by `PlotService` through `CreatureVisuals` | belt models (`BeltController`), idle bob / squash / sway (`IdleController`) | `CreatureRecipe` (recipe → parts), `IdleMotion` |
+| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends`, `/tutorial`, `/gallery [mutationId]` via `DevGallery`); LiveOps `/event <id> [minutes]`, `/event off` (anyone in Studio, local only) | – | – |
 
 ## 3. Module list
 
@@ -70,7 +71,8 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | --- | --- |
 | `Theme` | game title, currency symbol, every UI string & template, UI palette (hex), fonts, plot colours |
 | `Rarities` | 7 tiers: order, display name, colour, belt weight, luck-affected flag, glow/particles/announce flags |
-| `Creatures` | the Snackling catalogue: id, name, rarity, price, income, belt weight, model name, colours, shape recipe, optional `eventId` |
+| `Creatures` | the Snackling catalogue (60 + 4 Halloween): id, name, rarity, price, income, belt weight, model name, flavour text, optional `eventId` |
+| `CreatureLooks` | one 3D model recipe per Snackling, keyed by id: body plan, food skins, face, animal features, toppings, size |
 | `Mutations` | rare variants of any creature (Golden, Diamond, Rainbow; event-only Haunted): id, name, colour, chance per spawn, income / price multipliers, announce flags, look (material, tint, sparkles, rainbow, glow light), optional `eventId` |
 | `Economy` | start cash, podium upgrade curve, sell refund, offline earnings, rebirth curve, cash packs, daily rewards |
 | `Gameplay` | belt timing, plot geometry, steal/tag ranges, carry speed, lock/grace timers, rate limits |
@@ -109,12 +111,14 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `SocialRules` | friend / group income bonus, friend counting per pair, group welcome gift, recheck cooldown, config validation |
 | `OnboardingFunnel` | onboarding funnel steps and their order: a milestone reached early waits until every earlier step is logged |
 | `TutorialRules` | tutorial progress in `flags` (current step, early actions, resume), existing-player detection, automatic step endings, one-time reward, guide targets (belt item, collect pad), config validation |
+| `CreatureRecipe` | Snackling recipe → plain part list (shape, size, CFrame numbers, colour, role): plans, food skins, faces, features, toppings placed by ray casts on the real shapes; part budgets per rarity, recipe validation |
+| `IdleMotion` | idle animation curves: podium breathing bob with squash & stretch and sway, belt hop with landing squash and waddle |
 
 ### `src/shared` (Roblox helpers, not unit-tested)
 `Net` (create/get remotes by name), `GameData` (catalogue built once from config; `price` / `income` /
-`displayName` of a creature + variant, used for every belt item and owned creature), `CreatureVisuals` (build
-placeholder model or clone from `ReplicatedStorage.CreatureModels`, apply rarity glow / particles / aura, then the
-mutation look), `UiTheme` (hex → Color3, fonts, text templates, rich-text creature names).
+`displayName` of a creature + variant, used for every belt item and owned creature), `CreatureVisuals` (build the
+creature's recipe from primitives, or clone from `ReplicatedStorage.CreatureModels`, apply rarity glow / particles /
+aura, then the mutation look, which skips the face; tags anchored models for the idle animation), `UiTheme` (hex → Color3, fonts, text templates, rich-text creature names).
 
 ### `src/server`
 `init.server.luau` bootstraps in order:
@@ -131,7 +135,7 @@ release plot → release profile.
 `init.client.luau` waits for `game:IsLoaded()` then starts controllers:
 `StateStore, HudController, NotificationController, BeltController, PlotController, InteractionController,
 StealController, LockController, RebirthController, StoreController, ChatTagController, RewardsController,
-MutationFxController, SocialController, TutorialController`
+MutationFxController, SocialController, TutorialController, IdleController`
 (UI helpers: `UI/UiKit`, `UI/Modal`; audio: `SoundPlayer`).
 
 ## 4. Remotes (all in `ReplicatedStorage.Remotes`, created by the server)
