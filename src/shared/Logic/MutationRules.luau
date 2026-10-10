@@ -101,6 +101,24 @@ function MutationRules.displayName(
 	return Format.template(template, { mutation = mutation.displayName, creature = creature.displayName })
 end
 
+-- Whether a spawn / buy / steal (`kind`) gets a server-wide banner, and its colour override. Either the rarity's own
+-- flag (`rarityAnnounces`) or the mutation's flag for that kind is enough. When the rarity announces, its colour is
+-- kept (nil override) even if the mutation would announce too; the mutation still shows, because the banner text
+-- always uses the mutated name (displayName). Only a banner the mutation alone triggers takes the mutation colour.
+function MutationRules.banner(rarityAnnounces: boolean, mutation: MutationDef?, kind: string): (boolean, string?)
+	local mutationAnnounces = false
+	if mutation then
+		mutationAnnounces = if kind == "spawn"
+			then mutation.announceOnSpawn
+			elseif kind == "buy" then mutation.announceOnBuy
+			else mutation.announceOnSteal
+	end
+	if not rarityAnnounces and not mutationAnnounces then
+		return false, nil
+	end
+	return true, if not rarityAnnounces and mutation then mutation.color else nil
+end
+
 -- Expected income and price multiplier of one belt spawn (for BALANCE.md): 1 + sum of chance × (multiplier - 1).
 function MutationRules.expectedMultipliers(
 	mutations: { MutationDef },

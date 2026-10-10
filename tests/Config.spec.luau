@@ -7,6 +7,7 @@ local Creatures = require("../src/shared/Config/Creatures")
 local Rarities = require("../src/shared/Config/Rarities")
 local Mutations = require("../src/shared/Config/Mutations")
 local MutationRules = require("../src/shared/Logic/MutationRules")
+local Format = require("../src/shared/Logic/Format")
 local Economy = require("../src/shared/Config/Economy")
 local Gameplay = require("../src/shared/Config/Gameplay")
 local Monetization = require("../src/shared/Config/Monetization")
@@ -156,6 +157,22 @@ T.describe("Config integrity", function()
 			-- payback never gets worse than the plain creature's (a mutation is always a lucky find)
 			T.expect(mutation.incomeMultiplier).toBeAtLeast(mutation.priceMultiplier)
 			previous = mutation
+		end
+	end)
+
+	T.it("every announcement names the mutation (banners use the mutated creature name)", function()
+		local catalog = Catalog.build(Creatures, Rarities, Mutations)
+		local def = catalog.creatureList[1]
+		for _, mutation in catalog.mutationList do
+			local name = MutationRules.displayName(catalog.mutations, def, mutation.id, Theme.text.mutatedName)
+			for _, template in { Theme.text.announceSpawn, Theme.text.announceBuy, Theme.text.announceSteal } do
+				local text = Format.template(
+					template,
+					{ creature = name, rarity = "Secret", player = "A", thief = "A", owner = "B" }
+				)
+				T.expect(string.find(text, mutation.displayName, 1, true) ~= nil).toBe(true)
+				T.expect(string.find(text, def.displayName, 1, true) ~= nil).toBe(true)
+			end
 		end
 	end)
 

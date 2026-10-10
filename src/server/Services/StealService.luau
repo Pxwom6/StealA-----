@@ -23,6 +23,7 @@ local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local Guard = require(ReplicatedStorage.Shared.Logic.Guard)
 local Inventory = require(ReplicatedStorage.Shared.Logic.Inventory)
 local LockRules = require(ReplicatedStorage.Shared.Logic.LockRules)
+local MutationRules = require(ReplicatedStorage.Shared.Logic.MutationRules)
 local StealRules = require(ReplicatedStorage.Shared.Logic.StealRules)
 local Analytics = require(script.Parent.Analytics)
 local Announcer = require(script.Parent.Announcer)
@@ -221,8 +222,9 @@ local function deliver(thief: Session)
 		Analytics.custom(thief, "first_steal_rarity", rarity.order)
 	end
 	Analytics.custom(thief, "steal", rarity.order, { def.id, if mutation then mutation.id else "" })
-	local byMutation = mutation ~= nil and mutation.announceOnSteal
-	if rarity.announceOnSteal or byMutation then
+	-- MutationRules.banner: the rarity or the mutation can trigger it; `name` is the mutated name either way.
+	local announce, bannerColor = MutationRules.banner(rarity.announceOnSteal, mutation, "steal")
+	if announce then
 		Announcer.broadcast({
 			text = Format.template(Theme.text.announceSteal, {
 				thief = thief.player.DisplayName,
@@ -231,8 +233,7 @@ local function deliver(thief: Session)
 				creature = name,
 			}),
 			rarity = rarity.id,
-			-- the mutation's colour when it alone is the reason for the banner
-			color = if not rarity.announceOnSteal and mutation then mutation.color else nil,
+			color = bannerColor,
 			kind = "steal",
 		})
 	end

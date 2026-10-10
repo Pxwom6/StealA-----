@@ -66,8 +66,8 @@ local function nextRandom(): number
 	return rng:NextNumber()
 end
 
--- The banner for a belt moment (`kind`: "spawn" or "buy") if the rarity's flag or the mutation's asks for one. It
--- takes the mutation's colour only when the mutation alone is the reason.
+-- The banner for a belt moment (`kind`: "spawn" or "buy"), or nil: see MutationRules.banner for who triggers it and
+-- its colour. `text` must name the creature with its mutated name (GameData.displayName).
 local function announcement(
 	text: string,
 	rarity: Types.RarityDef,
@@ -75,17 +75,11 @@ local function announcement(
 	kind: string -- "spawn" | "buy"
 ): Announcer.Announcement?
 	local byRarity = if kind == "spawn" then rarity.announceOnSpawn else rarity.announceOnBuy
-	local byMutation = mutation ~= nil
-		and (if kind == "spawn" then mutation.announceOnSpawn else mutation.announceOnBuy)
-	if not byRarity and not byMutation then
+	local announce, color = MutationRules.banner(byRarity, mutation, kind)
+	if not announce then
 		return nil
 	end
-	return {
-		text = text,
-		rarity = rarity.id,
-		color = if not byRarity and mutation then mutation.color else nil,
-		kind = kind,
-	}
+	return { text = text, rarity = rarity.id, color = color, kind = kind }
 end
 
 -- Spawns one rolled item, or exactly `forcedId` (with `forcedVariant`, nil = plain) for dev commands.
