@@ -50,13 +50,16 @@ local BEAM_PULSE_SPEED = 1.2 -- pulses per second flowing toward the target
 local BEAM_KEYPOINTS = 20 -- NumberSequence maximum
 local BEAM_HIDE_DISTANCE = 6 -- hide the beam (keep the arrow) once this close
 local FEET_OFFSET = Vector3.new(0, -2.4, 0) -- root part → just above the ground
-local ARROW_BOUNCE = 1.2 -- studs
+-- The arrow hangs `arrowHeight` studs above its target, then `arrowLift` of its own height higher on screen (so it
+-- clears the target's billboard at any distance) and bounces by ARROW_BOUNCE of its height.
+local ARROW_BOUNCE = 0.3
 local HIDDEN_BELOW_Y = -400 -- pooled belt models are parked at y = -500
 
 type Target = {
 	adornee: PVInstance?, -- followed every frame (belt items move); nil for a fixed point
 	point: Vector3?,
-	arrowHeight: number, -- studs above the target
+	arrowHeight: number, -- studs above the target (e.g. where its billboard is)
+	arrowLift: number, -- extra lift in arrow heights (screen space)
 	textKey: string?, -- overrides the step's banner line (e.g. "collect" with nothing to collect: buy first)
 }
 
@@ -182,12 +185,12 @@ end
 local function beltTarget(root: BasePart, state: Types.ClientState): Target?
 	local now = workspace:GetServerTimeNow()
 	local candidates: { TutorialRules.BeltCandidate } = {}
-	local models: { [number]: Model } = {}
+	local models: { [number]: BeltController.ItemView } = {}
 	for _, view in BeltController.items() do
 		local def = GameData.catalog.creatures[view.item.creatureId]
 		local position = view.model:GetPivot().Position
 		if def and position.Y > HIDDEN_BELOW_Y then
-			models[view.item.id] = view.model
+			models[view.item.id] = view
 			table.insert(candidates, {
 				id = view.item.id,
 				price = GameData.price(def, view.variant),
@@ -200,13 +203,19 @@ local function beltTarget(root: BasePart, state: Types.ClientState): Target?
 	local position = root.Position
 	beltTargetId =
 		TutorialRules.pickBeltItem(candidates, state.cash, position.X, position.Z, beltTargetId, Tutorial.belt)
-	local model = if beltTargetId then models[beltTargetId] else nil
-	if model then
-		return { adornee = model :: PVInstance, arrowHeight = 6, textKey = nil }
+	local view = if beltTargetId then models[beltTargetId] else nil
+	if view then
+		-- Above the item's name / price billboard (up to ~130 px tall with a mutation row).
+		return { adornee = view.model :: PVInstance, arrowHeight = view.labelHeight, arrowLift = 1.5, textKey = nil }
 	end
 	-- Nothing affordable right now: point at the nearest spot on the belt (it runs along X, see BeltMath.centered).
 	local x = math.clamp(position.X, belt.startX, belt.startX + belt.length)
-	return { point = Vector3.new(x, Gameplay.belt.surfaceY, belt.startZ), arrowHeight = 4, textKey = nil }
+	return {
+		point = Vector3.new(x, Gameplay.belt.surfaceY, belt.startZ),
+		arrowHeight = 2,
+		arrowLift = 0.5,
+		textKey = nil,
+	}
 end
 
 local function collectTarget(root: BasePart, state: Types.ClientState): Target?
@@ -235,7 +244,7 @@ local function collectTarget(root: BasePart, state: Types.ClientState): Target?
 	end
 	local index = TutorialRules.pickCollectPodium(candidates)
 	if index and pads[index] then
-		return { adornee = pads[index] :: PVInstance, arrowHeight = 4, textKey = nil }
+		return { adornee = pads[index] :: PVInstance, arrowHeight = 1, arrowLift = 0.5, textKey = nil }
 	end
 	-- No Snackling to collect from (sold or stolen): buy one first.
 	local target = beltTarget(root, state)
@@ -249,7 +258,8 @@ local function lockTarget(): Target?
 	local plot = PlotController.myPlot()
 	local button = plot and plot:FindFirstChild("LockButton")
 	if button and button:IsA("BasePart") then
-		return { adornee = button :: PVInstance, arrowHeight = 5, textKey = nil }
+		-- Above the lock board (LockController: 44 px, 4 studs up).
+		return { adornee = button :: PVInstance, arrowHeight = 4, arrowLift = 1, textKey = nil }
 	end
 	return nil
 end
@@ -332,8 +342,8 @@ local function render()
 	if beam.Enabled then
 		beam.Transparency = pulseSequence(clock * BEAM_PULSE_SPEED)
 	end
-	arrowGui.StudsOffsetWorldSpace =
-		Vector3.new(0, target.arrowHeight + math.abs(math.sin(clock * math.pi * 1.5)) * ARROW_BOUNCE, 0)
+	arrowGui.StudsOffsetWorldSpace = Vector3.new(0, target.arrowHeight, 0)
+	arrowGui.SizeOffset = Vector2.new(0, target.arrowLift + math.abs(math.sin(clock * math.pi * 1.5)) * ARROW_BOUNCE)
 	arrowGui.Enabled = true
 	local highlightTarget: Instance? = adornee
 	highlight.Adornee = highlightTarget
@@ -458,8 +468,7 @@ function TutorialController.start()
 			local position = payload.position or (root and root.Position)
 			if position then
 				NotificationController.sparkle(position + Vector3.new(0, 2, 0), UiTheme.palette("tutorial"))
-			end
-			SoundPlayer.ui("claim")
+			end -- the "You're ready!" toast (Notify, success) plays the sound
 		end
 	end)
 end
