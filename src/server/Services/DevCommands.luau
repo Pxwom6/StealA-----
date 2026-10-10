@@ -5,6 +5,7 @@
 	  /cash <amount>        add cash to yourself              e.g. /cash 30000000  (test rebirth)
 	  /spawn <creatureId>   put a creature on the belt now    e.g. /spawn gelato_griffin
 	  /noshield             end new-player protection for everyone (so a 2-player test can steal right away)
+	  /friends <n|off>      pretend n Roblox friends are in your server (Studio test players can't be friends)
 ]]
 
 local Players = game:GetService("Players")
@@ -16,6 +17,7 @@ local EconomyService = require(script.Parent.EconomyService)
 local LockService = require(script.Parent.LockService)
 local Remotes = require(script.Parent.Remotes)
 local Sessions = require(script.Parent.Sessions)
+local SocialService = require(script.Parent.SocialService)
 
 local DevCommands = {}
 
@@ -63,7 +65,21 @@ function DevCommands.start()
 		end
 		Remotes.notify(player, "[Studio] new-player shields removed", "info")
 	end)
-	print("[DevCommands] Studio commands enabled: /cash <n>, /spawn <creatureId>, /noshield")
+	add("friends", function(player: Player, args: { string })
+		local session = Sessions.get(player)
+		local count = tonumber(args[1])
+		if session == nil then
+			return
+		end
+		if count and count >= 0 and count <= 7 then
+			SocialService.devSetFriends(session, math.floor(count))
+			Remotes.notify(player, `[Studio] pretending {math.floor(count)} friends are here`, "info")
+		else
+			SocialService.devSetFriends(session, nil)
+			Remotes.notify(player, "[Studio] back to real friends", "info")
+		end
+	end)
+	print("[DevCommands] Studio commands enabled: /cash <n>, /spawn <creatureId>, /noshield, /friends <n|off>")
 end
 
 return DevCommands

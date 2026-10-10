@@ -34,6 +34,7 @@ local Theme = {
 		lock = "#4DA8FF",
 		vip = "#FFD700",
 		luck = "#7CFF4D",
+		social = "#FF6FB5",
 	},
 
 	world = {
@@ -87,6 +88,9 @@ local Theme = {
 		lockPillCooldown = "Lock in {time}",
 		lockPillToken = "Instant lock x{count}",
 		luckBanner = "{multiplier}x LUCK {time}",
+		socialPillFriends = "Friends +{percent}%",
+		socialPillGroup = "Group +{percent}%",
+		socialPillInvite = "Invite friends: +{percent}% each",
 
 		-- Toasts
 		notEnoughCash = "Not enough cash!",
@@ -130,6 +134,18 @@ local Theme = {
 		passGranted = "{pass} unlocked!",
 		lockTokenReady = "Instant Lock ready! Tap the lock button.",
 		lockTokenLater = "Instant Lock saved! You can use it in {time}.",
+		socialFriendJoined = "Your friend {name} joined! Friends bonus +{percent}%",
+		socialFriendHere = "Your friend {name} is here! Friends bonus +{percent}%",
+		socialFriendLeft = "Your friend {name} left. Friends bonus +{percent}%",
+		socialFriendLeftNoBonus = "Your friend {name} left.",
+		socialGroupJoined = "Thanks for joining the group! +{percent}% income",
+		socialGroupWelcome = "Group welcome gift: {amount}!",
+		socialGroupNotYet = "We can't see you in the group yet - try again in a moment.",
+		socialGroupCheckFailed = "Couldn't check the group right now - try again soon.",
+		socialGroupCheckWait = "Give it a few seconds before checking again.",
+		socialGroupPending = "Join request sent! The bonus starts once you're accepted.",
+		socialGroupPromptFailed = "Couldn't open the join prompt. Search for {group} on Roblox!",
+		socialInviteUnavailable = "Invites aren't available right now.",
 
 		-- Announcements (server-wide banners)
 		announceSpawn = "A {rarity} {creature} appeared on the belt!",
@@ -156,6 +172,17 @@ local Theme = {
 		rebirthNeed = "Need {amount} to rebirth",
 		rebirthConfirm = "Rebirth!",
 		rebirthMax = "Max rebirths reached",
+		socialTitle = "Friends & Group",
+		socialFriendsLine = "Friends playing here: {count}  (+{percent}% income)",
+		socialFriendsHint = "Every Roblox friend in this server: +{per}% income, up to +{max}%.",
+		socialGroupMember = "{group} member: +{percent}% income",
+		socialGroupPitch = "Join {group} for +{percent}% income!",
+		socialGroupPitchGift = "Join {group} for +{percent}% income and a {amount} welcome gift!",
+		socialGroupFallbackName = "our group",
+		socialInvite = "Invite friends",
+		socialGroupJoin = "Join group",
+		socialGroupCheck = "Check again",
+		socialInviteMessage = "Come steal Snacklings with me!",
 
 		-- Store
 		storeTitle = "Snack Shop",

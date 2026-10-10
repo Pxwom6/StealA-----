@@ -198,6 +198,7 @@ export type ClientState = {
 	stealCooldownUntil: number,
 	steals: number,
 	daily: DailyView,
+	social: SocialView,
 }
 
 export type BeltItem = { id: number, creatureId: string, spawnAt: number }
