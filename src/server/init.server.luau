@@ -24,6 +24,7 @@ local RebirthService = require(Services.RebirthService)
 local Remotes = require(Services.Remotes)
 local Replication = require(Services.Replication)
 local RetentionService = require(Services.RetentionService)
+local SeasonService = require(Services.SeasonService)
 local SocialService = require(Services.SocialService)
 local StealService = require(Services.StealService)
 
@@ -35,6 +36,7 @@ PlotService.start(world)
 
 Analytics.start()
 LiveOpsService.start()
+SeasonService.start(world) -- seasonal decorations + lighting follow the active LiveOps events
 Replication.start()
 PositionTracker.start()
 EconomyService.start()

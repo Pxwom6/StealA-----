@@ -30,6 +30,8 @@ local adminEvents: { Types.EventDef } = {}
 local boosts: { LiveOpsRules.Boost } = {}
 local cashListeners: { () -> () } = {}
 local lastCashMultiplier = 1
+local activeEventListeners: { (ids: { [string]: boolean }) -> () } = {}
+local lastActiveIds = ""
 
 function LiveOpsService.now(): number
 	return workspace:GetServerTimeNow()
@@ -120,6 +122,13 @@ function LiveOpsService.onCashMultiplierChanged(listener: () -> ())
 	table.insert(cashListeners, listener)
 end
 
+-- Calls `listener` with the active event ids whenever that set changes: an event starts or ends by its dates (checked
+-- every second), arrives with remote config, or is started / ended by an admin command. Listeners should also read
+-- activeEventIds() once when they start, for the events already running.
+function LiveOpsService.onActiveEventsChanged(listener: (ids: { [string]: boolean }) -> ())
+	table.insert(activeEventListeners, listener)
+end
+
 function LiveOpsService.publishAttributes()
 	local now = LiveOpsService.now()
 	boosts = LiveOpsRules.pruneBoosts(boosts, now)
@@ -146,7 +155,14 @@ function LiveOpsService.publishAttributes()
 		table.insert(activeIds, id)
 	end
 	table.sort(activeIds)
-	workspace:SetAttribute("ActiveEventIds", table.concat(activeIds, ","))
+	local activeKey = table.concat(activeIds, ",")
+	workspace:SetAttribute("ActiveEventIds", activeKey)
+	if activeKey ~= lastActiveIds then
+		lastActiveIds = activeKey
+		for _, listener in activeEventListeners do
+			task.spawn(listener, LiveOpsService.activeEventIds())
+		end
+	end
 
 	local cash = LiveOpsService.cashMultiplier()
 	workspace:SetAttribute("CashMultiplier", cash)
