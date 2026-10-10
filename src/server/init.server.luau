@@ -25,6 +25,7 @@ local Remotes = require(Services.Remotes)
 local Replication = require(Services.Replication)
 local RetentionService = require(Services.RetentionService)
 local SeasonService = require(Services.SeasonService)
+local SettingsService = require(Services.SettingsService)
 local SocialService = require(Services.SocialService)
 local StealService = require(Services.StealService)
 local TutorialService = require(Services.TutorialService)
@@ -50,6 +51,7 @@ RetentionService.start()
 SocialService.start()
 TutorialService.start(EconomyService.addCash) -- pays the one-time completion reward
 LeaderboardService.start(world)
+SettingsService.start() -- music / sound effects / reduce effects, saved in flags
 DevCommands.start() -- Studio only
 
 local hooks = PlayerLifecycle.hooks()

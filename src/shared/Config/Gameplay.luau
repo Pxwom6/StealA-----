@@ -25,6 +25,9 @@ local Gameplay = {
 		podiumRowSpacing = 6.6,
 		podiumFirstRowOffset = 11, -- distance from the entrance to the first podium row
 		maxPodiums = 20,
+		-- Where players appear before their base is assigned (a second or so on join): the spawn plaza past the belt's
+		-- east end (Config/Scenery.plaza), facing back along the belt (-X).
+		lobby = { x = 184, z = 0 },
 	},
 
 	belt = {
@@ -132,6 +135,7 @@ local Gameplay = {
 		CheckGroup = { burst = 2, perSecond = 0.2 },
 		InvitePrompted = { burst = 2, perSecond = 0.2 }, -- analytics only
 		SkipTutorial = { burst = 2, perSecond = 0.2 }, -- once per account in practice (TutorialService)
+		SetSetting = { burst = 8, perSecond = 2 }, -- settings toggles (the client also coalesces quick changes)
 		DevGrantProduct = { burst = 3, perSecond = 1 },
 	} :: { [string]: RateLimit },
 }

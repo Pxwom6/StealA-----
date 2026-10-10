@@ -157,6 +157,100 @@ export type SeasonsConfig = {
 	transitionSeconds: number, -- lighting fades in / out over this long
 }
 
+-- Config: scenery (Config/Scenery): the world's look around the gameplay geometry -----------------------------------
+
+-- The everyday lighting MapBuilder applies at server start (a seasonal theme fades from it and back to it).
+export type SceneryLighting = {
+	clockTime: number, -- 0..24
+	geographicLatitude: number,
+	brightness: number,
+	exposureCompensation: number,
+	ambient: string,
+	outdoorAmbient: string,
+	colorShiftTop: string,
+	colorShiftBottom: string,
+	environmentDiffuseScale: number, -- 0..1
+	environmentSpecularScale: number, -- 0..1
+	shadowSoftness: number, -- 0..1
+	atmosphere: SeasonAtmosphere,
+	colorCorrection: SeasonColorCorrection,
+	bloom: { intensity: number, size: number, threshold: number },
+	sunRays: { intensity: number, spread: number },
+	sky: { sunAngularSize: number, moonAngularSize: number, starCount: number },
+	clouds: { cover: number, density: number, color: string },
+}
+
+-- The play area is a rectangle with a low stone wall (and an invisible barrier above it) on its edge.
+export type SceneryBoundary = {
+	minX: number,
+	maxX: number,
+	minZ: number,
+	maxZ: number,
+	wallHeight: number, -- the visible wall
+	wallThickness: number,
+	barrierHeight: number, -- invisible, collidable: nobody jumps out
+}
+
+-- A terrain hill: a sphere of `radius` sunk into the ground so its top is `height` above it.
+export type HillDef = { x: number, z: number, radius: number, height: number }
+export type RockDef = { x: number, z: number, radius: number }
+export type LakeDef = { x: number, z: number, radius: number, depth: number }
+
+export type SceneryTerrain = {
+	extent: number, -- grass reaches this far from the map centre (studs, in X and Z)
+	depth: number, -- thickness of the grass layer under y = 0
+	hills: { HillDef },
+	rocks: { RockDef },
+	lake: LakeDef?,
+}
+
+-- The spawn plaza past the belt's east end. Ring items are placed by angle (degrees; x = x0 + r cos a,
+-- z = z0 + r sin a, so 180 points back along the belt).
+export type SceneryPlaza = {
+	x: number,
+	z: number,
+	radius: number, -- paving
+	fountainRadius: number,
+	archX: number, -- the "Steal a Snackling" archway over the path from the walkway
+	archSpan: number, -- distance between its pillars
+	pathWidth: number,
+	boardX: number, -- the two leaderboards flank the archway at z = ±boardZ
+	boardZ: number,
+	benchRadius: number,
+	benchAngles: { number },
+	lampRadius: number,
+	lampAngles: { number },
+	flowerRadius: number,
+	flowerAngles: { number },
+	extraFlowerBeds: { { x: number, z: number, yaw: number } },
+	treeRadius: number,
+	treeAngles: { number },
+}
+
+export type TreeKind = "round" | "pine"
+export type TreeDef = { x: number, z: number, scale: number?, kind: TreeKind? }
+
+export type SceneryConfig = {
+	lighting: SceneryLighting,
+	boundary: SceneryBoundary,
+	terrain: SceneryTerrain,
+	plaza: SceneryPlaza,
+	trees: { TreeDef }, -- inside the boundary (around the bases)
+	treeLine: { count: number, minDistance: number, maxDistance: number, seed: number }, -- outside the wall
+	chevronSpacing: number, -- belt markings
+	partBudget: number, -- every part MapBuilder + SceneryBuilder add on top of the gameplay geometry
+}
+
+-- Config: sounds (Config/Sounds) -----------------------------------------------------------------------------------
+
+-- A sound effect: an asset ("rbxassetid://123", or a file that ships with Roblox: "rbxasset://sounds/x.wav"), its
+-- volume (0..1, default 0.5) and playback speed (pitch, default 1). "" = silent.
+export type SoundDef = { id: string, volume: number?, pitch: number? }
+export type SoundSlot = string | SoundDef
+
+-- A looping music track. id "" = no music for that slot.
+export type MusicTrack = { id: string, volume: number? }
+
 -- Config: friend & group rewards (Config/Social) ---------------------------------------------------------------
 
 export type FriendsConfig = {
@@ -306,6 +400,13 @@ export type TutorialView = {
 	stepStartedAt: number, -- server time the current step started
 }
 
+-- The player's settings (Logic/SettingsRules), saved as `settings_<key>` flags. All default to false.
+export type SettingsView = {
+	musicOff: boolean,
+	sfxOff: boolean,
+	reduceEffects: boolean, -- fewer particles / animated flair (low-end phones)
+}
+
 -- What the server sends the owning client in StateUpdate (see server/Services/Replication.luau).
 -- Costs of -1 mean "not available" (max reached).
 export type ClientState = {
@@ -334,6 +435,7 @@ export type ClientState = {
 	daily: DailyView,
 	social: SocialView,
 	tutorial: TutorialView,
+	settings: SettingsView,
 }
 
 export type BeltItem = { id: number, creatureId: string, spawnAt: number, variant: string? }

@@ -27,5 +27,7 @@ require("./SocialRules.spec")
 require("./SeasonRules.spec")
 require("./TutorialRules.spec")
 require("./OnboardingFunnel.spec")
+require("./SceneryLayout.spec")
+require("./SettingsRules.spec")
 
 T.finish()
