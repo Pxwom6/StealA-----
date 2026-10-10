@@ -180,6 +180,33 @@ export type GroupConfig = {
 
 export type SocialConfig = { friends: FriendsConfig, group: GroupConfig }
 
+-- Config: first-time player tutorial (Config/Tutorial) ----------------------------------------------------------
+
+-- Each step is finished by doing its gameplay action, which the server observes (never a client message).
+export type TutorialStepId = "buy" | "collect" | "lock" | "steal"
+
+export type TutorialStepDef = {
+	id: TutorialStepId,
+	-- The step also finishes on its own after this many seconds on it (nil: only by doing it).
+	timeoutSeconds: number?,
+	-- The step also finishes on its own once its action has been unavailable this many seconds in a row (e.g. the
+	-- base lock recharging). nil: never.
+	unavailableSeconds: number?,
+}
+
+-- Which belt item the "buy" guide points at (Logic/TutorialRules.pickBeltItem).
+export type TutorialBeltConfig = {
+	minSecondsLeft: number, -- skip items about to fall off the belt end
+	switchMargin: number, -- keep the current item unless another one is this many studs closer
+}
+
+export type TutorialConfig = {
+	enabled: boolean, -- false: nobody sees the tutorial (and nothing is saved)
+	reward: number, -- cash paid once per account when the tutorial is completed (not skipped)
+	steps: { TutorialStepDef },
+	belt: TutorialBeltConfig,
+}
+
 -- Save data ---------------------------------------------------------------------------------------------------
 
 export type CreatureRecord = {
