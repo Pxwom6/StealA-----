@@ -223,6 +223,19 @@ local function buildCard(def: Types.CreatureDef, order: number, width: number, h
 	if rarity then
 		local ok, model = pcall(CreatureVisuals.build, def, rarity, { anchored = true })
 		if ok then
+			-- A ViewportFrame never draws particles, lights, beams or trails: drop the rarity / mutation effects (and any
+			-- sound) the model would carry there for nothing.
+			for _, descendant in model:GetDescendants() do
+				if
+					descendant:IsA("ParticleEmitter")
+					or descendant:IsA("Light")
+					or descendant:IsA("Beam")
+					or descendant:IsA("Trail")
+					or descendant:IsA("Sound")
+				then
+					descendant:Destroy()
+				end
+			end
 			-- Feet at the origin; a ViewportFrame has no physics, so every part is placed by PivotTo itself.
 			model:PivotTo(CFrame.new())
 			local modelHeight = CreatureVisuals.height(model)
