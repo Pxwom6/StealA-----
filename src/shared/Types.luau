@@ -328,6 +328,8 @@ export type PlayerData = {
 	flags: { [string]: boolean },
 	firstJoin: number,
 	lastSeen: number,
+	snackdex: Snackdex, -- v3
+	quests: QuestState, -- v3
 }
 
 -- Runtime / network ---------------------------------------------------------------------------------------------
