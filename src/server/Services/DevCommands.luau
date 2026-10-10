@@ -5,8 +5,14 @@
 	  /cash <amount>        add cash to yourself              e.g. /cash 30000000  (test rebirth)
 	  /spawn <creatureId> [mutationId]
 	                        put a creature on the belt now    e.g. /spawn gelato_griffin, /spawn pizza_pup golden
+	                        works for event creatures and event mutations whether or not their event is running,
+	                        e.g. /spawn jack_o_lantern_latte haunted
 	  /noshield             end new-player protection for everyone (so a 2-player test can steal right away)
 	  /friends <n|off>      pretend n Roblox friends are in your server (Studio test players can't be friends)
+
+	The LiveOps admin commands (LiveOpsService) also work for anyone in Studio, only in that session:
+	  /event <eventId> [minutes], /event off [eventId], /luck <multiplier> <minutes>, /announce <text>
+	  e.g. /event Halloween2026 2  (Halloween theme, event Snacklings and Haunted for 2 minutes, then it ends itself)
 ]]
 
 local Players = game:GetService("Players")
@@ -104,6 +110,7 @@ function DevCommands.start()
 	end)
 	print(
 		"[DevCommands] Studio commands enabled: /cash <n>, /spawn <creatureId> [mutationId], /noshield, /friends <n|off>"
+			.. " (LiveOps: /event <id> [minutes], /event off, /luck <x> <min>)"
 	)
 end
 
