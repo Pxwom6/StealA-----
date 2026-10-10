@@ -89,6 +89,7 @@ local function setupPodium(podium: Model)
 		end
 		local variant = podium:GetAttribute("Variant")
 		nameLabel.Text = UiTheme.creatureNameRich(def, if type(variant) == "string" then variant else nil)
+		nameLabel.TextColor3 = UiTheme.palette("text") -- the rich text colours each word
 		local income = podium:GetAttribute("Income")
 		incomeLabel.Text = UiTheme.perSecond(if type(income) == "number" then income else 0)
 		local stored = podium:GetAttribute("Stored")
