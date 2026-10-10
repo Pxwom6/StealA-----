@@ -37,6 +37,7 @@ export type Carry = {
 	podium: number,
 	uid: string,
 	creatureId: string,
+	variant: string?, -- the carried creature's mutation (it stays in the victim's save until delivery)
 	startedAt: number,
 	track: StealRules.CarryTrack, -- movement budget, timed with os.clock()
 	model: Model?,

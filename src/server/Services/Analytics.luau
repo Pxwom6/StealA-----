@@ -7,6 +7,7 @@
 	Store funnel (recurring, one funnel session per store visit):
 	  1 StoreOpened  2 ProductPrompted  3 ProductPurchased
 	Economy events: cash sources and sinks (collect events are aggregated per minute to stay within limits).
+	Custom events: e.g. "mutation_bought" (value = mutation order; CustomField01 = mutation id, 02 = creature id).
 
 	Every call is pcall'd: analytics must never break gameplay (and is a no-op in some Studio configurations).
 ]]
@@ -135,6 +136,14 @@ function Analytics.custom(session: Session, name: string, value: number?, custom
 	safe(function()
 		AnalyticsService:LogCustomEvent(session.player, name, value, customFields)
 	end)
+end
+
+-- A mutated creature was bought off the belt. Breakdowns use the Creator Hub's custom-field keys.
+function Analytics.mutationBought(session: Session, mutationId: string, mutationOrder: number, creatureId: string)
+	Analytics.custom(session, "mutation_bought", mutationOrder, {
+		[Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = mutationId,
+		[Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = creatureId,
+	})
 end
 
 function Analytics.forget(session: Session)
