@@ -109,7 +109,7 @@ local function build()
 		Name = "TopStack",
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, 6),
-		Size = UDim2.fromOffset(300, 220),
+		Size = UDim2.fromOffset(300, 280),
 		BackgroundTransparency = 1,
 		Parent = screen,
 	}) :: Frame

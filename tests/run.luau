@@ -24,5 +24,6 @@ require("./LiveOpsRules.spec")
 require("./Inventory.spec")
 require("./MutationRules.spec")
 require("./SocialRules.spec")
+require("./SeasonRules.spec")
 
 T.finish()

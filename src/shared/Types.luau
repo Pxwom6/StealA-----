@@ -60,6 +60,7 @@ export type MutationLook = {
 	reflectance: number?,
 	sparkles: boolean?, -- sparkle particles in the mutation colour
 	rainbow: boolean?, -- hue-cycling colours (animated on the client) and rainbow particles
+	glow: string?, -- "#RRGGBB": a soft point light in this colour (ghostly / glowing looks)
 }
 
 export type MutationDef = {
@@ -86,7 +87,74 @@ export type EventDef = {
 	luckMultiplier: number?,
 	cashMultiplier: number?,
 	bannerText: string?,
+	title: string?, -- short name for the HUD countdown ("Halloween ends in 3d 4h")
 	durationSeconds: number?,
+}
+
+-- Config: seasonal themes (Config/Seasons) --------------------------------------------------------------------
+
+-- Lighting while a theme is on. Colours are "#RRGGBB"; the server puts the original values back when it ends.
+export type SeasonAtmosphere = {
+	density: number, -- 0..1 (fog)
+	offset: number, -- 0..1
+	color: string,
+	decay: string,
+	glare: number, -- 0..10
+	haze: number, -- 0..10
+}
+
+export type SeasonColorCorrection = {
+	tint: string,
+	brightness: number, -- -1..1
+	contrast: number, -- -1..1
+	saturation: number, -- -1..1
+}
+
+export type SeasonLighting = {
+	clockTime: number, -- 0..24 (17.8 = dusk)
+	brightness: number,
+	ambient: string,
+	outdoorAmbient: string,
+	colorShiftTop: string,
+	atmosphere: SeasonAtmosphere,
+	colorCorrection: SeasonColorCorrection,
+}
+
+-- How many of each code-built prop the server places (0 / nil = none). Positions come from the map layout.
+export type SeasonDecorations = {
+	pumpkinsPerPlot: number?, -- glowing jack-o'-lanterns beside each plot entrance
+	beltPumpkinsPerSide: number?, -- smaller ones along both belt rails
+	bulbsPerPlot: number?, -- string-light bulbs along each plot's front wall
+	lampsBetweenPlots: boolean?, -- lamp posts in the gaps between plots
+	bats: number?, -- floating above the walkway
+	ghosts: number?, -- near the leaderboards at the belt ends
+}
+
+export type SeasonPalette = {
+	pumpkin: string,
+	pumpkinFace: string, -- glowing eyes / mouth (and their light)
+	stem: string,
+	bulbs: { string }, -- string lights cycle through these
+	lampPost: string,
+	lampLight: string,
+	bat: string,
+	ghost: string,
+}
+
+export type SeasonTheme = {
+	displayName: string,
+	accentColor: string, -- HUD event pill and the "EVENT" tag on this event's Snacklings
+	priority: number, -- when several themed events overlap, the highest priority wins
+	lighting: SeasonLighting?,
+	decorations: SeasonDecorations,
+	palette: SeasonPalette,
+}
+
+export type SeasonsConfig = {
+	eventThemes: { [string]: string }, -- LiveOps event id -> theme id
+	themes: { [string]: SeasonTheme },
+	maxParts: number, -- decoration part budget (CI checks every theme's estimate against it)
+	transitionSeconds: number, -- lighting fades in / out over this long
 }
 
 -- Config: friend & group rewards (Config/Social) ---------------------------------------------------------------

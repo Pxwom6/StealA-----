@@ -176,8 +176,8 @@ paid-for podiums avoids a feel-bad. One config flag flips it.
 ### 15. Studio-only test hooks
 
 **Chose:** the `DevGrantProduct` remote (simulated purchases through the real receipt path) is only created, and
-its handler only connected, when `RunService:IsStudio()`; LiveOps admin commands accept anyone in Studio. Live servers only accept
-`LiveOps.adminUserIds`.
+its handler only connected, when `RunService:IsStudio()`; LiveOps admin commands accept anyone in Studio and apply to
+that Studio session only (never published to live servers, #20). Live servers only accept `LiveOps.adminUserIds`.
 
 ### 16. Strict typing targets the new Luau type solver
 
@@ -214,7 +214,6 @@ around $10^8/s, far below that (a Rainbow Secret earns 8× a plain one: still ar
 leave the rarity chase in BALANCE.md almost unchanged (≤ ~4%).
 **Reversal cost:** medium — ids and the meaning of `variant` are in players' saves; chances and multipliers are
 free to re-tune (existing creatures simply earn the new multiplier).
-around $10^8/s, far below that.
 
 ### 19. Friend & group rewards raise live income only
 
@@ -240,3 +239,38 @@ it just joined in-game (`CheckGroup`, at most once per 10 s, which also consults
 the server cached the old answer). Nothing in the join flow waits for these web calls. While `groupId` is 0 the group
 part is off and hidden. In Studio, `/friends <n>` pretends n friends are present.
 **Reversal cost:** low — set `incomeBonusPerFriend` / `incomeBonus` to 0. The welcome-gift flag name must stay.
+
+### 20. Seasonal events are LiveOps events plus data-only themes
+
+**Chose:** a limited-time event (Halloween 2026 is the first) is one LiveOps event id that everything keys off, so it
+starts and ends by its dates with no code change, and the next one is a config change:
+* `Config/LiveOps` `events`: the window (Unix seconds, UTC), the HUD banner and its countdown `title`, optional luck.
+  Halloween runs Fri 23 Oct 17:00 UTC → Mon 2 Nov 08:00 UTC; its luck weekend is a separate event (`HalloweenLuck2026`,
+  2×), so the luck can be moved or dropped without touching the rest.
+* Event Snacklings and event mutations carry that `eventId` (#1 and #18 already gated spawns and rolls on it). Event
+  Snacklings **share their tier's belt weight** instead of adding tier weight: the tier odds, and so the Server Luck
+  odds disclosure (#9), are the same during the event, and an event can't make high tiers more common by accident.
+  They are listed after every regular creature (and event mutations roll after the permanent ones), so outside the
+  event every belt roll is exactly what it was (CI replays rolls with and without them). Price and payback stay inside
+  the tier's regular range (CI). Ids are permanent like any other: after the event they stop spawning, owned ones keep
+  working; no save-format change.
+* `Config/Seasons` maps event ids to reusable themes (`Halloween2026 = "halloween"`; next year one more line). A theme
+  is data: lighting mood, decoration counts and colours. `Logic/SeasonRules` picks the theme from the active event ids
+  (highest priority, then event id, so every server agrees) and lays the props out on the map shape (tested: outside
+  every plot, off the belt and the lobby spawn, under the 240-part budget). `SeasonService` builds them as anchored
+  parts with CanCollide / CanTouch / CanQuery off (gameplay, steals, tags and plot bounds never see them), saves the
+  Lighting values it changes, fades to the theme and back, and removes the Atmosphere / ColorCorrection it created.
+  `LiveOpsService.onActiveEventsChanged` drives it, so a start or end while the server runs (dates, remote config,
+  `/event`) applies within a second.
+* Event luck stacks with Server Luck multiplicatively and is clamped by `maxLuckMultiplier` (2 × 2 = 4 of 6). The
+  store's "now" already includes the event's luck (`LuckMultiplier`), and `previewBoost` stays exact (tested with the
+  shipped luck weekend). The HUD luck countdown shows when the luck next changes (`LiveOpsRules.luckChangesAt`), not
+  when the last boost ends.
+* In Studio the LiveOps admin commands (open to anyone there, #15) apply to the Studio session only; they are never
+  published to live servers. `/event <id> [minutes]` and `/event off [id]` make a theme testable on demand.
+
+**Why:** dates and content live in data the owner can edit (no code to touch before each holiday), the paid luck
+product's odds stay honest during events, and decorations can't change how the game plays. Built in code (no place
+file), like the map (#3).
+**Reversal cost:** low — themes and event dates are free to change or delete; event creature and mutation ids are
+permanent (retire them with a never-active `eventId`).

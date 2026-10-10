@@ -15,6 +15,9 @@
 	  * free podium → buy anything affordable; full base → buy only upgrades over the worst Snackling, selling it
 	  * podiums are bought when full and the next one costs at most half of current cash
 	  * no stealing, no offline earnings, no daily rewards, no luck boosts (all of these only speed things up)
+	  * the main tables run with no LiveOps event; the "During an event" tables replay the free player with every
+	    spawn rolled as if the event ran for the whole session (event Snacklings and mutations eligible), with and
+	    without the event's luck weekend
 ]]
 
 local Creatures = require("../src/shared/Config/Creatures")
@@ -23,6 +26,7 @@ local Rarities = require("../src/shared/Config/Rarities")
 local Economy = require("../src/shared/Config/Economy")
 local Gameplay = require("../src/shared/Config/Gameplay")
 local Monetization = require("../src/shared/Config/Monetization")
+local LiveOps = require("../src/shared/Config/LiveOps")
 local Types = require("../src/shared/Types")
 local Catalog = require("../src/shared/Logic/Catalog")
 local EconomyMath = require("../src/shared/Logic/EconomyMath")
@@ -38,13 +42,21 @@ local LOOKAHEAD = 10
 
 local catalog = Catalog.build(Creatures, Rarities, Mutations)
 
-type Scenario = { name: string, multiplier: number, extraPodiums: number }
+type Scenario = {
+	name: string,
+	multiplier: number,
+	extraPodiums: number,
+	events: { [string]: boolean }?, -- active LiveOps events (default none)
+	luck: number?, -- belt luck (default 1)
+}
 -- One Snackling in the simulated base, with its mutated price and income.
 type Owned = { def: Types.CreatureDef, price: number, income: number }
 type RunResult = {
 	firstTier: { [string]: number },
 	rebirthReadyAt: number?,
 	incomeAt: { [number]: number },
+	eventBought: number, -- event Snacklings bought
+	firstEventAt: number?, -- play time of the first event Snackling bought
 }
 
 local SCENARIOS: { Scenario } = {
@@ -58,6 +70,27 @@ local SCENARIOS: { Scenario } = {
 		name = "2x Cash + VIP + Extra Podiums",
 		multiplier = Monetization.perks.doubleCashMultiplier * (1 + Monetization.perks.vipIncomeBonus),
 		extraPodiums = Monetization.perks.extraPodiums,
+	},
+}
+
+-- The seasonal event the "During an event" tables simulate, and its luck weekend's multiplier (Config/LiveOps).
+local EVENT_ID = "Halloween2026"
+local EVENT_LUCK_ID = "HalloweenLuck2026"
+local eventLuck = 1
+for _, event in LiveOps.events do
+	if event.id == EVENT_LUCK_ID then
+		eventLuck = event.luckMultiplier or 1
+	end
+end
+
+local EVENT_SCENARIOS: { Scenario } = {
+	{ name = `Free player, {EVENT_ID}`, multiplier = 1, extraPodiums = 0, events = { [EVENT_ID] = true } },
+	{
+		name = `Free player, {EVENT_ID} + {eventLuck}x luck weekend`,
+		multiplier = 1,
+		extraPodiums = 0,
+		events = { [EVENT_ID] = true, [EVENT_LUCK_ID] = true },
+		luck = eventLuck,
 	},
 }
 
@@ -104,6 +137,10 @@ local function simulate(scenario: Scenario, seed: number): RunResult
 		)
 	end
 
+	local events = scenario.events or {}
+	local luck = scenario.luck or 1
+	local eventBought = 0
+	local firstEventAt: number? = nil
 	local currentIncome = 0
 	local t = 0
 	while t < horizon do
@@ -117,8 +154,8 @@ local function simulate(scenario: Scenario, seed: number): RunResult
 			rebirthReadyAt = t
 		end
 
-		local id = RarityRoll.roll(catalog.rarityList, catalog.creatureList, 1, {}, rng)
-		local variant = MutationRules.roll(catalog.mutationList, {}, mutationRng)
+		local id = RarityRoll.roll(catalog.rarityList, catalog.creatureList, luck, events, rng)
+		local variant = MutationRules.roll(catalog.mutationList, events, mutationRng)
 		local def = if id then catalog.creatures[id] else nil
 		local item: Owned? = if def
 			then {
@@ -146,6 +183,10 @@ local function simulate(scenario: Scenario, seed: number): RunResult
 			if firstTier[item.def.rarity] == nil and table.find(owned, item) then
 				firstTier[item.def.rarity] = t
 			end
+			if item.def.eventId ~= nil and table.find(owned, item) then
+				eventBought += 1
+				firstEventAt = firstEventAt or t
+			end
 			currentIncome = income()
 		end
 
@@ -162,7 +203,13 @@ local function simulate(scenario: Scenario, seed: number): RunResult
 			incomeAt[checkpoint] = currentIncome
 		end
 	end
-	return { firstTier = firstTier, rebirthReadyAt = rebirthReadyAt, incomeAt = incomeAt }
+	return {
+		firstTier = firstTier,
+		rebirthReadyAt = rebirthReadyAt,
+		incomeAt = incomeAt,
+		eventBought = eventBought,
+		firstEventAt = firstEventAt,
+	}
 end
 
 local function median(values: { number }): number?
@@ -182,105 +229,179 @@ local function cell(values: { number }, runs: number): string
 end
 
 local results: { [string]: { RunResult } } = {}
-for _, scenario in SCENARIOS do
-	local list: { RunResult } = {}
-	for run = 1, RUNS do
-		table.insert(list, simulate(scenario, run * 7919))
+local function runAll(scenarios: { Scenario })
+	for _, scenario in scenarios do
+		if results[scenario.name] == nil then
+			local list: { RunResult } = {}
+			for run = 1, RUNS do
+				table.insert(list, simulate(scenario, run * 7919))
+			end
+			results[scenario.name] = list
+		end
 	end
-	results[scenario.name] = list
 end
 
-local header = "| Rarity | "
-	.. table.concat(
-		(function(): { string }
-			local names: { string } = {}
-			for _, scenario in SCENARIOS do
-				table.insert(names, scenario.name)
-			end
-			return names
-		end)(),
-		" | "
-	)
-	.. " |"
-local divider = "| --- |" .. string.rep(" --- |", #SCENARIOS)
+local function printTables(scenarios: { Scenario }, tierHeading: string, incomeHeading: string)
+	local names: { string } = {}
+	for _, scenario in scenarios do
+		table.insert(names, scenario.name)
+	end
+	local header = "| Rarity | " .. table.concat(names, " | ") .. " |"
+	local divider = "| --- |" .. string.rep(" --- |", #scenarios)
 
-print(`## Median play time until the first Snackling of each rarity ({RUNS} runs, {HOURS}h cap)\n`)
-print(header)
-print(divider)
-for _, rarity in catalog.rarityList do
-	local cells: { string } = {}
-	for _, scenario in SCENARIOS do
+	print(tierHeading .. "\n")
+	print(header)
+	print(divider)
+	for _, rarity in catalog.rarityList do
+		local cells: { string } = {}
+		for _, scenario in scenarios do
+			local values: { number } = {}
+			for _, result in results[scenario.name] do
+				local first = result.firstTier[rarity.id]
+				if first then
+					table.insert(values, first)
+				end
+			end
+			table.insert(cells, cell(values, RUNS))
+		end
+		print(`| {rarity.displayName} | {table.concat(cells, " | ")} |`)
+	end
+
+	local rebirthCells: { string } = {}
+	for _, scenario in scenarios do
 		local values: { number } = {}
 		for _, result in results[scenario.name] do
-			local first = result.firstTier[rarity.id]
-			if first then
-				table.insert(values, first)
+			if result.rebirthReadyAt then
+				table.insert(values, result.rebirthReadyAt)
 			end
 		end
-		table.insert(cells, cell(values, RUNS))
+		table.insert(rebirthCells, cell(values, RUNS))
 	end
-	print(`| {rarity.displayName} | {table.concat(cells, " | ")} |`)
-end
+	print(`| First rebirth affordable | {table.concat(rebirthCells, " | ")} |`)
 
-local rebirthCells: { string } = {}
-for _, scenario in SCENARIOS do
-	local values: { number } = {}
-	for _, result in results[scenario.name] do
-		if result.rebirthReadyAt then
-			table.insert(values, result.rebirthReadyAt)
+	print(`\n{incomeHeading}\n`)
+	print((string.gsub(header, "Rarity", "Play time")))
+	print(divider)
+	for _, checkpoint in CHECKPOINTS do
+		local cells: { string } = {}
+		for _, scenario in scenarios do
+			local values: { number } = {}
+			for _, result in results[scenario.name] do
+				table.insert(values, result.incomeAt[checkpoint] or 0)
+			end
+			table.insert(cells, Format.cash(median(values) or 0, "$") .. "/s")
 		end
+		print(`| {Format.duration(checkpoint)} | {table.concat(cells, " | ")} |`)
 	end
-	table.insert(rebirthCells, cell(values, RUNS))
-end
-print(`| First rebirth affordable | {table.concat(rebirthCells, " | ")} |`)
-
-print(`\n## Median cash/sec after N minutes of play\n`)
-print((string.gsub(header, "Rarity", "Play time")))
-print(divider)
-for _, checkpoint in CHECKPOINTS do
-	local cells: { string } = {}
-	for _, scenario in SCENARIOS do
-		local values: { number } = {}
-		for _, result in results[scenario.name] do
-			table.insert(values, result.incomeAt[checkpoint] or 0)
-		end
-		table.insert(cells, Format.cash(median(values) or 0, "$") .. "/s")
-	end
-	print(`| {Format.duration(checkpoint)} | {table.concat(cells, " | ")} |`)
 end
 
-print(`\n## Mutations (per belt spawn, any rarity; luck never changes these)\n`)
 local spawnsPerHour = 3600 / Gameplay.belt.spawnInterval
-print("| Mutation | Chance per spawn | Per server-hour | Income | Price | Payback vs plain | Announced |")
-print("| --- | --- | --- | --- | --- | --- | --- |")
-for _, entry in MutationRules.odds(catalog.mutationList, {}) do
-	local mutation = catalog.mutations[entry.id]
-	local announced: { string } = {}
-	if mutation.announceOnSpawn then
-		table.insert(announced, "spawn")
+local function perHour(chance: number): number
+	return math.floor(chance * spawnsPerHour * 10 + 0.5) / 10
+end
+
+local function printMutations(events: { [string]: boolean })
+	print("| Mutation | Chance per spawn | Per server-hour | Income | Price | Payback vs plain | Announced |")
+	print("| --- | --- | --- | --- | --- | --- | --- |")
+	for _, entry in MutationRules.odds(catalog.mutationList, events) do
+		local mutation = catalog.mutations[entry.id]
+		local announced: { string } = {}
+		if mutation.announceOnSpawn then
+			table.insert(announced, "spawn")
+		end
+		if mutation.announceOnBuy then
+			table.insert(announced, "buy")
+		end
+		if mutation.announceOnSteal then
+			table.insert(announced, "steal")
+		end
+		print(
+			`| {mutation.displayName} | {Format.percent(entry.chance)} | {perHour(entry.chance)} `
+				.. `| x{mutation.incomeMultiplier} | x{mutation.priceMultiplier} `
+				.. `| x{math.floor(mutation.priceMultiplier / mutation.incomeMultiplier * 100 + 0.5) / 100} `
+				.. `| {if #announced > 0 then table.concat(announced, ", ") else "no"} |`
+		)
 	end
-	if mutation.announceOnBuy then
-		table.insert(announced, "buy")
-	end
-	if mutation.announceOnSteal then
-		table.insert(announced, "steal")
+	local expectedIncome, expectedPrice = MutationRules.expectedMultipliers(catalog.mutationList, events)
+	local anyChance = 0
+	for _, entry in MutationRules.odds(catalog.mutationList, events) do
+		anyChance += entry.chance
 	end
 	print(
-		`| {mutation.displayName} | {Format.percent(entry.chance)} | {math.floor(
-			entry.chance * spawnsPerHour * 10 + 0.5
-		) / 10} `
-			.. `| x{mutation.incomeMultiplier} | x{mutation.priceMultiplier} `
-			.. `| x{math.floor(mutation.priceMultiplier / mutation.incomeMultiplier * 100 + 0.5) / 100} `
-			.. `| {if #announced > 0 then table.concat(announced, ", ") else "no"} |`
+		`\nAny mutation: {Format.percent(anyChance)} of spawns ({perHour(anyChance)} per `
+			.. `server-hour). Expected value of one spawn: income x{math.floor(expectedIncome * 10000 + 0.5) / 10000}, `
+			.. `price x{math.floor(expectedPrice * 10000 + 0.5) / 10000}.`
 	)
 end
-local expectedIncome, expectedPrice = MutationRules.expectedMultipliers(catalog.mutationList, {})
-local anyChance = 0
-for _, entry in MutationRules.odds(catalog.mutationList, {}) do
-	anyChance += entry.chance
-end
-print(
-	`\nAny mutation: {Format.percent(anyChance)} of spawns ({math.floor(anyChance * spawnsPerHour * 10 + 0.5) / 10} per `
-		.. `server-hour). Expected value of one spawn: income x{math.floor(expectedIncome * 10000 + 0.5) / 10000}, `
-		.. `price x{math.floor(expectedPrice * 10000 + 0.5) / 10000}.`
+
+runAll(SCENARIOS)
+printTables(
+	SCENARIOS,
+	`## Median play time until the first Snackling of each rarity ({RUNS} runs, {HOURS}h cap)`,
+	"## Median cash/sec after N minutes of play"
 )
+
+print(`\n## Mutations (per belt spawn, any rarity; luck never changes these)\n`)
+printMutations({})
+
+-- During an event ----------------------------------------------------------------------------------------------
+
+local eventScenarios: { Scenario } = { SCENARIOS[1] } -- the free player without the event, for comparison
+for _, scenario in EVENT_SCENARIOS do
+	table.insert(eventScenarios, scenario)
+end
+runAll(eventScenarios)
+print(`\n## During an event: {EVENT_ID} running for the whole session (free player)\n`)
+printTables(
+	eventScenarios,
+	`### Median play time until the first Snackling of each rarity ({RUNS} runs, {HOURS}h cap)`,
+	"### Median cash/sec after N minutes of play"
+)
+
+print(`\n### {EVENT_ID} Snacklings on the belt (they share their tier's odds)\n`)
+print("| Snackling | Rarity | Price | Income | Payback | Share of its tier | Per server-hour | With 2x luck |")
+print("| --- | --- | --- | --- | --- | --- | --- | --- |")
+local eventIds = { [EVENT_ID] = true }
+local tierOdds = RarityRoll.odds(catalog.rarityList, catalog.creatureList, 1, eventIds)
+local luckyOdds = RarityRoll.odds(catalog.rarityList, catalog.creatureList, 2, eventIds)
+for _, def in catalog.creatureList do
+	if def.eventId ~= EVENT_ID then
+		continue
+	end
+	local tierWeight = 0
+	for _, other in catalog.byRarity[def.rarity] do
+		if other.eventId == nil or eventIds[other.eventId] then
+			tierWeight += other.beltWeight
+		end
+	end
+	local share = def.beltWeight / tierWeight
+	local tierChance, luckyChance = 0, 0
+	for index, entry in tierOdds do
+		if entry.id == def.rarity then
+			tierChance, luckyChance = entry.chance, luckyOdds[index].chance
+		end
+	end
+	print(
+		`| {def.displayName} | {def.rarity} | {Format.cash(def.price, "$")} | {Format.cash(def.income, "$")}/s `
+			.. `| {Format.duration(def.price / def.income)} | {Format.percent(share)} `
+			.. `| {perHour(tierChance * share)} | {perHour(luckyChance * share)} |`
+	)
+end
+
+for _, scenario in EVENT_SCENARIOS do
+	local bought: { number } = {}
+	local first: { number } = {}
+	for _, result in results[scenario.name] do
+		table.insert(bought, result.eventBought)
+		if result.firstEventAt then
+			table.insert(first, result.firstEventAt)
+		end
+	end
+	print(
+		`\n{scenario.name}: median {median(bought) or 0} event Snacklings bought in {HOURS}h, first one after `
+			.. `{cell(first, RUNS)}.`
+	)
+end
+
+print(`\n### Mutations while {EVENT_ID} runs\n`)
+printMutations(eventIds)

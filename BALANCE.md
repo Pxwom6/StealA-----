@@ -4,11 +4,11 @@ How the economy is shaped, and how long each rarity takes to reach. Every number
 modules in `src/shared/Config/` and is reproduced by:
 
 ```sh
-lune run tools/simulate.luau      # ~40 s, prints the tables below
+lune run tools/simulate.luau      # ~1-2 min, prints the tables below
 ```
 
-Re-run it after any change to `Creatures.luau`, `Rarities.luau`, `Mutations.luau`, `Economy.luau` or
-`Gameplay.luau` and paste the new tables here.
+Re-run it after any change to `Creatures.luau`, `Rarities.luau`, `Mutations.luau`, `Economy.luau`,
+`Gameplay.luau` or the events in `LiveOps.luau` and paste the new tables here.
 
 ## Design intent
 
@@ -102,6 +102,71 @@ Any mutation: 3.95% of spawns (56.9 per server-hour). Expected value of one spaw
 * Want mutations rarer or stronger? Change `chance` (how often) or `incomeMultiplier` (how much) and re-run the
   simulation; keep `incomeMultiplier >= priceMultiplier`.
 
+## Halloween 2026 (limited-time event)
+
+`Halloween2026` runs Fri 23 Oct 17:00 UTC → Mon 2 Nov 08:00 UTC; `HalloweenLuck2026` adds **2× luck** from Fri 30 Oct
+17:00 UTC → Sun 1 Nov 23:59 UTC (`Config/LiveOps.luau`). While Halloween runs:
+
+| Snackling | Rarity | Price | Income | Payback | Share of its tier | Per server-hour | With 2x luck |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Candy Corn Cat | Rare | $10K | $135/s | 1m 14s | 23.1% | 38.2 | 65.3 |
+| Pumpkin Pie Bat | Epic | $120K | $780/s | 2m 33s | 23.1% | 14 | 23.9 |
+| Caramel Apple Ghoul | Legendary | $2.8M | $5.5K/s | 8m 29s | 23.1% | 3.7 | 6.2 |
+| Jack-o'-Lantern Latte | Mythic | $70M | $47K/s | 24m 49s | 28.6% | 0.7 | 1.3 |
+
+| Mutation | Chance per spawn | Per server-hour | Income | Price | Payback vs plain | Announced |
+| --- | --- | --- | --- | --- | --- | --- |
+| Haunted (event only) | 2% | 28.8 | x3 | x2 | x0.67 | no |
+
+Haunted is rarer than Golden (2% vs 3%) and stronger (x3 vs x2), so it is the event's chase without making Golden
+feel worthless while it runs. With Haunted, any mutation is 5.95% of spawns (85.7 per server-hour; CI keeps all
+chances together below 10%), and one spawn's expected value is income x1.1045, price x1.0515 (x1.0645 / x1.0315
+without the event).
+
+Time to reach each rarity and income for a **new free player whose whole session is inside the event** (same model as
+above; the last column has the luck weekend on for the whole session too):
+
+| Rarity | No event | Halloween | Halloween + 2x luck weekend |
+| --- | --- | --- | --- |
+| Common | 7s | 7s | 7s |
+| Uncommon | 2m 2s | 2m 2s | 2m 12s |
+| Rare | 4m 55s | 5m 0s | 4m 47s |
+| Epic | 11m 37s | 11m 37s | 10m 30s |
+| Legendary | 30m 52s | 30m 52s | 27m 5s |
+| Mythic | 1h 58m | 1h 53m | 1h 29m |
+| Secret | 9h 35m | 9h 22m | 5h 58m |
+| First rebirth affordable | 1h 2m | 59m 0s | 54m 40s |
+
+| Play time | No event | Halloween | Halloween + 2x luck weekend |
+| --- | --- | --- | --- |
+| 10m | $980/s | $1.01K/s | $1.36K/s |
+| 30m | $8.62K/s | $10K/s | $14.9K/s |
+| 1h | $29.9K/s | $32.8K/s | $51K/s |
+| 3h | $174K/s | $186K/s | $296K/s |
+| 8h | $560K/s | $616K/s | $1.09M/s |
+| 24h | $2.32M/s | $2.47M/s | $3.8M/s |
+
+A free player buys a median of 26 event Snacklings in 24 hours of event play (28 with the luck weekend), the first
+after about 7½ minutes (a Candy Corn Cat).
+
+* **Normal progression outside the event is untouched.** Event Snacklings are listed after every regular one and
+  only join the roll while their event runs, and Haunted rolls after the permanent mutations, so with no event active
+  every belt roll is exactly what it was (CI replays 60,000 rolls with and without them), and the tables at the top
+  of this file are unchanged.
+* **Event Snacklings share their tier's odds instead of adding to them**: the tier odds (and so the Server Luck
+  disclosure) are the same during the event; within a tier, an event Snackling takes about a quarter of the spawns.
+  Their price and payback sit inside their tier's regular range (CI checks it), so they are a fun collectible and
+  steal target, not a shortcut.
+* **The event itself is a gentle boost**: about +5-15% income (Haunted's expected value is +3.75% per spawn; the
+  rest is a cheaper Mythic option and more variety to upgrade into), the first Mythic ~4% sooner and the first
+  rebirth ~5% sooner. The **luck weekend** is the big lever, as any 2× luck is: belt-gated tiers come
+  much sooner (Secret 9h 35m → 5h 58m) and income is ~1.4-2× higher. It lasts about 55 hours of one weekend, so for a
+  regular player it is a burst, not a new baseline.
+* **Server Luck during the luck weekend**: the event's 2× and a bought 2× multiply to 4× (the cap is 6×); the store's
+  before/after odds include the event's luck, and a test proves they match what the server rolls exactly.
+* **After the event** event Snacklings stop spawning but owned ones (and Haunted ones) keep earning forever, sell at
+  their normal value and can still be stolen; nothing about them is saved differently (no save-format change).
+
 ## Other knobs
 
 **Podiums** (`Economy.podiumUpgrade`): 8 to start, then +1 at a time for
@@ -156,3 +221,7 @@ spams locks, whatever the lock length.
   2× Cash more valuable; belt gates affect everyone equally.
 * Events: a `cashMultiplier` event speeds everyone up; a `luckMultiplier` event shortens only the belt gate (it
   never changes mutation chances).
+* Event Snacklings: keep price and payback inside their tier's regular range, and keep their `beltWeight` modest
+  (Halloween's take ~25% of their tier). Append them after the regular creatures and event mutations after the
+  permanent ones, so rolls outside the event stay identical. The simulation's "During an event" tables (set
+  `EVENT_ID` in `tools/simulate.luau`) show the event's effect.

@@ -241,6 +241,12 @@ T.describe("Catalog mutations", function()
 		T.expect(problemsWith(function(m)
 			m.look = { material = "Glass", tintStrength = 2, reflectance = -1 }
 		end)).toBeAtLeast(2)
+		T.expect(problemsWith(function(m)
+			m.look = { material = "ForceField", glow = "green" }
+		end)).toBe(1)
+		T.expect(problemsWith(function(m)
+			m.look = { material = "ForceField", glow = "#7CFF9B" }
+		end)).toBe(0)
 	end)
 	T.it("rejects duplicate ids and orders, and chances that add up to 1 or more", function()
 		T.expect(#Catalog.validateMutations({ F.mutation("a", 1, 0.1), F.mutation("a", 2, 0.1) })).toBe(1)

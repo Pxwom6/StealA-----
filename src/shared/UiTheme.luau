@@ -4,7 +4,9 @@
 ]]
 
 local Theme = require("./Config/Theme")
+local Seasons = require("./Config/Seasons")
 local Format = require("./Logic/Format")
+local SeasonRules = require("./Logic/SeasonRules")
 local GameData = require("./GameData")
 local Types = require("./Types")
 
@@ -36,6 +38,13 @@ end
 function UiTheme.rarityColor(rarityId: string): Color3
 	local rarity = GameData.catalog.rarities[rarityId]
 	return UiTheme.color(if rarity then rarity.color else "#FFFFFF")
+end
+
+-- Colour of a LiveOps event in the UI (event pill, "EVENT" tag): its seasonal theme's accent (Config/Seasons), or the
+-- palette's event colour.
+function UiTheme.eventColor(eventId: string?): Color3
+	local theme = SeasonRules.themeForEvent(Seasons, eventId)
+	return if theme then UiTheme.color(theme.accentColor) else UiTheme.palette("event")
 end
 
 function UiTheme.plotColor(plotIndex: number): Color3
