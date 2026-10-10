@@ -11,6 +11,8 @@
 	  /friends <n|off>      pretend n Roblox friends are in your server (Studio test players can't be friends)
 	  /tutorial             start the first-time tutorial again (clears your tutorial progress; it pays the reward
 	                        again when completed, Studio only)
+	  /gallery [mutationId] every Snackling in labelled rows behind the north bases (and you, in front of them), to
+	                        check and screenshot the models, e.g. /gallery, /gallery golden; /gallery off removes it
 
 	The LiveOps admin commands (LiveOpsService) also work for anyone in Studio, only in that session:
 	  /event <eventId> [minutes], /event off [eventId], /luck <multiplier> <minutes>, /announce <text>
@@ -25,6 +27,7 @@ local TextChatService = game:GetService("TextChatService")
 local GameData = require(ReplicatedStorage.Shared.GameData)
 
 local BeltService = require(script.Parent.BeltService)
+local DevGallery = require(script.Parent.DevGallery)
 local EconomyService = require(script.Parent.EconomyService)
 local LockService = require(script.Parent.LockService)
 local Remotes = require(script.Parent.Remotes)
@@ -54,6 +57,16 @@ local function add(alias: string, handler: (player: Player, args: { string }) ->
 	end)
 end
 
+-- A mutation id typed in chat, matched case-insensitively ("/spawn pizza_pup Golden").
+local function mutationId(text: string): string?
+	for id in GameData.catalog.mutations do
+		if string.lower(id) == string.lower(text) then
+			return id
+		end
+	end
+	return nil
+end
+
 function DevCommands.start()
 	if not RunService:IsStudio() then
 		return
@@ -75,14 +88,9 @@ function DevCommands.start()
 			Remotes.notify(player, `[Studio] unknown creature {creatureId}`, "error")
 			return
 		end
-		-- Mutation ids are matched case-insensitively ("/spawn pizza_pup Golden").
 		local variant: string? = nil
 		if mutationArg then
-			for id in GameData.catalog.mutations do
-				if string.lower(id) == string.lower(mutationArg) then
-					variant = id
-				end
-			end
+			variant = mutationId(mutationArg)
 			if variant == nil then
 				Remotes.notify(player, `[Studio] unknown mutation {mutationArg}`, "error")
 				return
@@ -118,9 +126,28 @@ function DevCommands.start()
 			Remotes.notify(player, "[Studio] tutorial restarted", "info")
 		end
 	end)
+	add("gallery", function(player: Player, args: { string })
+		local arg = args[1]
+		if arg and string.lower(arg) == "off" then
+			DevGallery.clear()
+			Remotes.notify(player, "[Studio] gallery removed", "info")
+			return
+		end
+		local variant = if arg then mutationId(arg) else nil
+		if arg and variant == nil then
+			Remotes.notify(player, `[Studio] unknown mutation {arg}`, "error")
+			return
+		end
+		local view, count = DevGallery.build(GameData.mutation(variant))
+		local character = player.Character
+		if character then
+			character:PivotTo(view)
+		end
+		Remotes.notify(player, `[Studio] gallery: {count} Snacklings{if variant then ` ({variant})` else ""}`, "info")
+	end)
 	print(
 		"[DevCommands] Studio commands enabled: /cash <n>, /spawn <creatureId> [mutationId], /noshield, /friends <n|off>,"
-			.. " /tutorial"
+			.. " /tutorial, /gallery [mutationId|off]"
 			.. " (LiveOps: /event <id> [minutes], /event off, /luck <x> <min>)"
 	)
 end
