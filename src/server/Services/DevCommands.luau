@@ -11,12 +11,15 @@
 	  /friends <n|off>      pretend n Roblox friends are in your server (Studio test players can't be friends)
 	  /tutorial             start the first-time tutorial again (clears your tutorial progress; it pays the reward
 	                        again when completed, Studio only)
+	  /sky <clockTime>      preview the lighting at another time of day, e.g. /sky 18 (dusk), /sky 14.6 (back to
+	                        Config/Scenery's afternoon); everyone in the session sees it
 
 	The LiveOps admin commands (LiveOpsService) also work for anyone in Studio, only in that session:
 	  /event <eventId> [minutes], /event off [eventId], /luck <multiplier> <minutes>, /announce <text>
 	  e.g. /event Halloween2026 2  (Halloween theme, event Snacklings and Haunted for 2 minutes, then it ends itself)
 ]]
 
+local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -118,9 +121,18 @@ function DevCommands.start()
 			Remotes.notify(player, "[Studio] tutorial restarted", "info")
 		end
 	end)
+	add("sky", function(player: Player, args: { string })
+		local clockTime = tonumber(args[1])
+		if clockTime and clockTime >= 0 and clockTime <= 24 then
+			Lighting.ClockTime = clockTime
+			Remotes.notify(player, `[Studio] ClockTime {clockTime}`, "info")
+		else
+			Remotes.notify(player, "[Studio] /sky <0-24>", "error")
+		end
+	end)
 	print(
 		"[DevCommands] Studio commands enabled: /cash <n>, /spawn <creatureId> [mutationId], /noshield, /friends <n|off>,"
-			.. " /tutorial"
+			.. " /tutorial, /sky <clockTime>"
 			.. " (LiveOps: /event <id> [minutes], /event off, /luck <x> <min>)"
 	)
 end

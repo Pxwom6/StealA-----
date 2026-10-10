@@ -56,9 +56,15 @@ function ClientSettings.reduceEffects(): boolean
 	return current.reduceEffects
 end
 
--- Calls `listener` whenever a setting changes (not right away).
-function ClientSettings.onChanged(listener: (Types.SettingsView) -> ())
+-- Calls `listener` whenever a setting changes (not right away). Returns a function that stops it.
+function ClientSettings.onChanged(listener: (Types.SettingsView) -> ()): () -> ()
 	table.insert(listeners, listener)
+	return function()
+		local index = table.find(listeners, listener)
+		if index then
+			table.remove(listeners, index)
+		end
+	end
 end
 
 local function flush()
