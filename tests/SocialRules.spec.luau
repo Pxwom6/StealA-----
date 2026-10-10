@@ -1,6 +1,9 @@
 --!strict
 local T = require("./TestKit")
 local SocialRules = require("../src/shared/Logic/SocialRules")
+local EconomyMath = require("../src/shared/Logic/EconomyMath")
+local DailyStreak = require("../src/shared/Logic/DailyStreak")
+local OfflineEarnings = require("../src/shared/Logic/OfflineEarnings")
 local Social = require("../src/shared/Config/Social")
 local Types = require("../src/shared/Types")
 
@@ -135,6 +138,72 @@ T.describe("SocialRules group welcome reward", function()
 		T.expect(SocialRules.canRecheckGroup(100, 105, 10)).toBe(false)
 		T.expect(SocialRules.canRecheckGroup(100, 110, 10)).toBe(true)
 		T.expect(SocialRules.canRecheckGroup(100, 50, 10)).toBe(true) -- clock went backwards
+	end)
+end)
+
+T.describe("Social bonus in the economy", function()
+	-- A player with a rebirth, 2x Cash and VIP, mid LiveOps 2x cash event.
+	local function inputs(socialBonus: number): EconomyMath.MultiplierInputs
+		return {
+			rebirthMultiplier = 1.5,
+			hasDoubleCash = true,
+			doubleCashMultiplier = 2,
+			isVip = true,
+			vipIncomeBonus = 0.1,
+			eventCashMultiplier = 2,
+			socialBonus = socialBonus,
+		}
+	end
+	local withFriends = inputs(SocialRules.totalBonus(3, true, config(12345))) -- the +40% maximum
+	local alone = inputs(0)
+
+	T.it("multiplies live income by (1 + bonus) on top of every other multiplier", function()
+		T.expect(EconomyMath.incomeMultiplier(withFriends)).toBeNear(1.5 * 2 * 1.1 * 2 * 1.4)
+		T.expect(EconomyMath.incomeMultiplier(inputs(0.2)) / EconomyMath.incomeMultiplier(alone)).toBeNear(1.2)
+		T.expect(EconomyMath.incomeMultiplier(alone)).toBeNear(1.5 * 2 * 1.1 * 2)
+	end)
+	T.it("ignores a garbage bonus instead of producing NaN or a penalty", function()
+		T.expect(EconomyMath.incomeMultiplier(inputs(0 / 0))).toBeNear(EconomyMath.incomeMultiplier(alone))
+		T.expect(EconomyMath.incomeMultiplier(inputs(-0.5))).toBeNear(EconomyMath.incomeMultiplier(alone))
+		T.expect(EconomyMath.incomeMultiplier(inputs(math.huge))).toBeNear(EconomyMath.incomeMultiplier(alone))
+	end)
+	T.it("is left out of the steady multiplier, so cash packs can't be inflated by friends", function()
+		T.expect(EconomyMath.permanentMultiplier(withFriends)).toBeNear(1.5 * 2 * 1.1) -- no event, no social
+		T.expect(EconomyMath.permanentMultiplier(withFriends)).toBe(EconomyMath.permanentMultiplier(alone))
+		local sources: { EconomyMath.PackSource } = {
+			{ baseIncome = 100, podium = 1, inTransit = false },
+			{ baseIncome = 50, podium = 2, inTransit = false },
+		}
+		local pack = { incomeSeconds = 3600, minimum = 15000 }
+		local packWithFriends = EconomyMath.cashPackAmount(
+			EconomyMath.packIncome(sources, 8, EconomyMath.permanentMultiplier(withFriends)),
+			pack
+		)
+		local packAlone =
+			EconomyMath.cashPackAmount(EconomyMath.packIncome(sources, 8, EconomyMath.permanentMultiplier(alone)), pack)
+		T.expect(packWithFriends).toBe(packAlone)
+		T.expect(withFriends.socialBonus).toBeNear(0.4) -- the caller's inputs are not modified
+	end)
+	T.it("is left out of daily rewards, offline earnings and saved stats (rewardMultiplier)", function()
+		T.expect(EconomyMath.rewardMultiplier(withFriends)).toBe(EconomyMath.rewardMultiplier(alone))
+		T.expect(EconomyMath.rewardMultiplier(withFriends)).toBe(EconomyMath.incomeMultiplier(alone)) -- event stays
+		local incomes = { 100, 50, 7 }
+		local rewardIncomeWithFriends = EconomyMath.totalIncome(incomes, EconomyMath.rewardMultiplier(withFriends))
+		local rewardIncomeAlone = EconomyMath.totalIncome(incomes, EconomyMath.rewardMultiplier(alone))
+		T.expect(rewardIncomeWithFriends).toBe(rewardIncomeAlone)
+		T.expect(EconomyMath.totalIncome(incomes, EconomyMath.incomeMultiplier(withFriends)))
+			.toBeGreaterThan(rewardIncomeWithFriends) -- live income does get the bonus
+		local slot = { minimum = 250, incomeMinutes = 3 }
+		T.expect(DailyStreak.rewardAmount(slot, rewardIncomeWithFriends))
+			.toBe(DailyStreak.rewardAmount(slot, rewardIncomeAlone))
+		local offline = { rate = 0.5, capSeconds = 7200, minSecondsAway = 120 }
+		T.expect(OfflineEarnings.compute(1000, 5000, rewardIncomeWithFriends, offline).amount)
+			.toBe(OfflineEarnings.compute(1000, 5000, rewardIncomeAlone, offline).amount)
+	end)
+	T.it("sizes the group welcome reward from the steady income too", function()
+		local sources: { EconomyMath.PackSource } = { { baseIncome = 100, podium = 1, inTransit = false } }
+		local steady = EconomyMath.packIncome(sources, 8, EconomyMath.permanentMultiplier(withFriends))
+		T.expect(SocialRules.groupWelcomeAmount(steady, config(12345).group)).toBe(190000) -- 100 * 3.3 * 600
 	end)
 end)
 

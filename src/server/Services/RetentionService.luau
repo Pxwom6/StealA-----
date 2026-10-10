@@ -24,11 +24,12 @@ type Session = Sessions.Session
 
 local RetentionService = {}
 
--- PlayerLifecycle onJoined hook (income is already computed at this point).
+-- PlayerLifecycle onJoined hook (income is already computed at this point). Paid from rewardIncome: the friend &
+-- group bonus is still being looked up at this point, and never counts towards time-based rewards.
 function RetentionService.payOfflineEarnings(session: Session)
 	local bonus = if session.passes.VIP then Monetization.perks.vipOfflineCapBonusSeconds else 0
 	local result =
-		OfflineEarnings.compute(session.lastSeenAtJoin, os.time(), session.incomePerSecond, Economy.offline, bonus)
+		OfflineEarnings.compute(session.lastSeenAtJoin, os.time(), session.rewardIncome, Economy.offline, bonus)
 	if result.amount > 0 then
 		EconomyService.addCash(session, result.amount, "TimedReward", "Offline")
 		session.pendingWelcome = { amount = result.amount, seconds = result.secondsAway }
@@ -54,7 +55,7 @@ local function onClaimDaily(player: Player)
 		return
 	end
 	local slot = Economy.daily[DailyStreak.slot(claimed.streak, #Economy.daily)]
-	local amount = DailyStreak.rewardAmount(slot, session.incomePerSecond)
+	local amount = DailyStreak.rewardAmount(slot, session.rewardIncome) -- no social bonus (see rewardMultiplier)
 	session.data.daily = claimed
 	EconomyService.addCash(session, amount, "TimedReward", "Daily")
 	Remotes.notify(

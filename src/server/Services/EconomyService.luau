@@ -15,12 +15,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
 local Monetization = require(ReplicatedStorage.Shared.Config.Monetization)
+local Social = require(ReplicatedStorage.Shared.Config.Social)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local GameData = require(ReplicatedStorage.Shared.GameData)
 local Types = require(ReplicatedStorage.Shared.Types)
 local EconomyMath = require(ReplicatedStorage.Shared.Logic.EconomyMath)
 local Inventory = require(ReplicatedStorage.Shared.Logic.Inventory)
 local Guard = require(ReplicatedStorage.Shared.Logic.Guard)
+local SocialRules = require(ReplicatedStorage.Shared.Logic.SocialRules)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local Analytics = require(script.Parent.Analytics)
@@ -47,6 +49,7 @@ local function multiplierInputs(session: Session): EconomyMath.MultiplierInputs
 		isVip = session.passes.VIP,
 		vipIncomeBonus = perks.vipIncomeBonus,
 		eventCashMultiplier = LiveOpsService.cashMultiplier(),
+		socialBonus = SocialRules.totalBonus(session.social.friends, session.social.groupMember, Social),
 	}
 end
 
@@ -71,7 +74,8 @@ end
 
 -- Recomputes cached income / multiplier / capacity and pushes them to the world and the HUD.
 function EconomyService.refresh(session: Session)
-	session.multiplier = EconomyService.multiplier(session)
+	local inputs = multiplierInputs(session)
+	session.multiplier = EconomyMath.incomeMultiplier(inputs)
 	session.capacity = EconomyService.capacity(session)
 	local incomes: { number } = {}
 	local packSources: { EconomyMath.PackSource } = {}
@@ -87,13 +91,11 @@ function EconomyService.refresh(session: Session)
 		end
 	end
 	session.incomePerSecond = EconomyMath.totalIncome(incomes, session.multiplier)
-	session.packIncome = EconomyMath.packIncome(
-		packSources,
-		session.capacity,
-		EconomyMath.permanentMultiplier(multiplierInputs(session))
-	)
+	session.rewardIncome = EconomyMath.totalIncome(incomes, EconomyMath.rewardMultiplier(inputs))
+	session.packIncome = EconomyMath.packIncome(packSources, session.capacity, EconomyMath.permanentMultiplier(inputs))
 	local stats = session.data.stats
-	stats.bestCashPerSecond = math.max(stats.bestCashPerSecond, session.incomePerSecond)
+	-- Saved (and on the global leaderboard): never inflated by the temporary social bonus.
+	stats.bestCashPerSecond = math.max(stats.bestCashPerSecond, session.rewardIncome)
 	if session.plot ~= 0 then
 		PlotService.syncPodiums(session)
 		PlotService.setNextPodiumCost(

@@ -59,7 +59,7 @@ function Replication.snapshot(session: Session): Types.ClientState
 			streak = data.daily.streak,
 			nextStreak = daily.nextStreak,
 			secondsUntilNext = daily.secondsUntilNext,
-			reward = DailyStreak.rewardAmount(slot, session.incomePerSecond),
+			reward = DailyStreak.rewardAmount(slot, session.rewardIncome), -- as RetentionService pays it
 		},
 	}
 end
