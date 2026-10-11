@@ -269,9 +269,22 @@ rebirths become a multi-session goal. The multiplier is saved when earned, so la
 
 **Cash packs** (`Economy.cashPacks`) pay N seconds of the buyer's steady income (creatures on active podiums that
 are not being stolen, at the rebirth and pass multipliers, without LiveOps cash events or the friend & group bonus),
-rounded down to 2 significant digits, with a floor so they are worth something on day one: Snack Pack 15 min (min $2.5K), Snack Crate 1 h
-(min $15K), Snack Truck 6 h (min $120K). They therefore stay meaningful at every stage instead of becoming
-worthless (fixed amounts) or game-breaking (huge fixed amounts).
+rounded down to 2 significant digits, with a floor so they are worth something on day one. They therefore stay
+meaningful at every stage instead of becoming worthless (fixed amounts) or game-breaking (huge fixed amounts).
+
+| Pack | Launch price | Income | Floor | Minutes per 10 R$ |
+| --- | --- | --- | --- | --- |
+| Snack Bite | 5 R$ | 2 min | $400 | 4 |
+| Snack Bag | 15 R$ | 8 min | $1.3K | 5.3 |
+| Snack Pack | 25 R$ | 15 min | $2.5K | 6 |
+| Snack Basket | 49 R$ | 35 min | $6K | 7.1 |
+| Snack Crate | 75 R$ | 1 h | $15K | 8 |
+| Snack Truck | 199 R$ | 6 h | $120K | 18 |
+
+Each step up is better value per Robux, the usual ladder in Roblox stores: the cheap packs are low-risk first
+purchases and impulse top-ups ("just need a bit more for that Snackling"), the big ones reward committed players.
+Prices are set on the Creator Hub, so if one changes, keep this column (and the comment in `Economy.cashPacks`) in
+step and keep the ladder rising. A test checks that income time and floor both rise in store order.
 
 **Offline earnings** (`Economy.offline`): 50% of income for up to 2 h away (VIP: 3 h), only after 2+ minutes away.
 
