@@ -352,7 +352,10 @@ local Theme = {
 			description = "{extraPodiums} extra podiums in your base, forever.",
 		},
 		LongerLock = { name = "Longer Lock", description = "Your base lock lasts {lockSeconds} seconds longer." },
+		CashBite = { name = "Snack Bite", description = "About 2 minutes of your income." },
+		CashBag = { name = "Snack Bag", description = "About 8 minutes of your income." },
 		CashSmall = { name = "Snack Pack", description = "About 15 minutes of your income." },
+		CashBasket = { name = "Snack Basket", description = "About 35 minutes of your income." },
 		CashMedium = { name = "Snack Crate", description = "About 1 hour of your income." },
 		CashLarge = { name = "Snack Truck", description = "About 6 hours of your income." },
 		InstantLock = {

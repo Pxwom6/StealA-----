@@ -342,6 +342,31 @@ T.describe("Config integrity", function()
 		end
 	end)
 
+	T.it("cash packs in store order step up in both income time and minimum (cheapest first)", function()
+		local previous: Economy.CashPack? = nil
+		local count = 0
+		for _, key in Monetization.storeProducts do
+			if Monetization.products[key].kind == "Cash" then
+				local pack = (Economy.cashPacks :: any)[key] :: Economy.CashPack
+				T.expect(pack.incomeSeconds > 0 and pack.minimum > 0).toBe(true)
+				if previous then
+					T.expect(pack.incomeSeconds).toBeGreaterThan(previous.incomeSeconds)
+					T.expect(pack.minimum).toBeGreaterThan(previous.minimum)
+				end
+				previous = pack
+				count += 1
+			end
+		end
+		-- Every cash product is listed in the store.
+		local total = 0
+		for _, product in Monetization.products do
+			if product.kind == "Cash" then
+				total += 1
+			end
+		end
+		T.expect(count).toBe(total)
+	end)
+
 	T.it("product and pass ids are whole numbers and never duplicated", function()
 		local seen: { [number]: boolean } = {}
 		local function check(id: number)

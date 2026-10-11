@@ -17,7 +17,15 @@
 ]]
 
 export type PassKey = "DoubleCash" | "VIP" | "ExtraPodiums" | "LongerLock"
-export type ProductKey = "CashSmall" | "CashMedium" | "CashLarge" | "InstantLock" | "ServerLuck"
+export type ProductKey =
+	"CashBite"
+	| "CashBag"
+	| "CashSmall"
+	| "CashBasket"
+	| "CashMedium"
+	| "CashLarge"
+	| "InstantLock"
+	| "ServerLuck"
 export type ProductKind = "Cash" | "LockToken" | "ServerLuck"
 
 export type PassDef = { id: number }
@@ -32,7 +40,10 @@ local Monetization = {
 	} :: { [string]: PassDef },
 
 	products = {
+		CashBite = { id = 3717868366, kind = "Cash" }, -- Snack Bite, 5 R$
+		CashBag = { id = 3717868501, kind = "Cash" }, -- Snack Bag, 15 R$
 		CashSmall = { id = 3717840270, kind = "Cash" }, -- Snack Pack, 25 R$
+		CashBasket = { id = 3717868578, kind = "Cash" }, -- Snack Basket, 49 R$
 		CashMedium = { id = 3717844121, kind = "Cash" }, -- Snack Crate, 75 R$
 		CashLarge = { id = 3717844684, kind = "Cash" }, -- Snack Truck, 199 R$
 		InstantLock = { id = 3717845411, kind = "LockToken" }, -- Instant Lock, 15 R$
@@ -52,7 +63,16 @@ local Monetization = {
 
 	-- Order of items in the store UI.
 	storePasses = { "DoubleCash", "VIP", "ExtraPodiums", "LongerLock" } :: { string },
-	storeProducts = { "ServerLuck", "CashSmall", "CashMedium", "CashLarge", "InstantLock" } :: { string },
+	storeProducts = {
+		"ServerLuck",
+		"CashBite",
+		"CashBag",
+		"CashSmall",
+		"CashBasket",
+		"CashMedium",
+		"CashLarge",
+		"InstantLock",
+	} :: { string },
 
 	-- Receipt idempotency: how many recent PurchaseIds each player's save remembers, and purchase history length.
 	purchaseIdCacheSize = 100,

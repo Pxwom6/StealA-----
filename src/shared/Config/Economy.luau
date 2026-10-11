@@ -41,11 +41,15 @@ local Economy = {
 	},
 
 	-- Developer-product cash packs scale with the buyer's steady income (EconomyMath.packIncome) so they stay
-	-- meaningful.
+	-- meaningful. Bigger packs give more minutes of income per Robux (prices live on the Creator Hub; the launch
+	-- price is in the comment), so the cheap packs are impulse buys and the big ones are the best value.
 	cashPacks = {
-		CashSmall = { incomeSeconds = 15 * 60, minimum = 2500 } :: CashPack,
-		CashMedium = { incomeSeconds = 60 * 60, minimum = 15000 } :: CashPack,
-		CashLarge = { incomeSeconds = 6 * 60 * 60, minimum = 120000 } :: CashPack,
+		CashBite = { incomeSeconds = 2 * 60, minimum = 400 } :: CashPack, -- 5 R$
+		CashBag = { incomeSeconds = 8 * 60, minimum = 1300 } :: CashPack, -- 15 R$
+		CashSmall = { incomeSeconds = 15 * 60, minimum = 2500 } :: CashPack, -- 25 R$
+		CashBasket = { incomeSeconds = 35 * 60, minimum = 6000 } :: CashPack, -- 49 R$
+		CashMedium = { incomeSeconds = 60 * 60, minimum = 15000 } :: CashPack, -- 75 R$
+		CashLarge = { incomeSeconds = 6 * 60 * 60, minimum = 120000 } :: CashPack, -- 199 R$
 	},
 
 	-- Daily login streak (cycles after the last entry). Reward = max(minimum, income * incomeMinutes).
