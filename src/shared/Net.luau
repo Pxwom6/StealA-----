@@ -41,6 +41,7 @@ export type ServerToClient =
 	| "StealAlert"
 	| "Effect"
 	| "SnackdexSync"
+	| "CashOffer"
 
 export type RemoteName = ClientToServer | ServerToClient
 
@@ -75,6 +76,7 @@ local SERVER_TO_CLIENT: { ServerToClient } = {
 	"StealAlert",
 	"Effect",
 	"SnackdexSync",
+	"CashOffer",
 }
 
 local FOLDER_NAME = "Remotes"

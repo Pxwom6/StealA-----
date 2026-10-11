@@ -34,6 +34,7 @@ local SettingsController = require(Controllers.SettingsController)
 local MusicController = require(Controllers.MusicController)
 local WorldFxController = require(Controllers.WorldFxController)
 local SnackdexController = require(Controllers.SnackdexController)
+local CashOfferController = require(Controllers.CashOfferController)
 
 StateStore.start()
 ClientSettings.start() -- saved settings (music, sound effects, reduce effects) arrive with the first state
@@ -56,5 +57,6 @@ SettingsController.start() -- the gear, top right
 MusicController.start()
 WorldFxController.start() -- belt chevrons, factory cog; Reduce effects
 SnackdexController.start() -- side button LayoutOrder 4, under Rewards
+CashOfferController.start() -- "Need $X more?" card when a purchase fails for lack of cash
 
 Net.get("ClientReady"):FireServer()

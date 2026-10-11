@@ -34,5 +34,6 @@ require("./SettingsRules.spec")
 require("./SnackdexRules.spec")
 require("./QuestRules.spec")
 require("./RetentionConfig.spec")
+require("./CashOfferRules.spec")
 
 T.finish()

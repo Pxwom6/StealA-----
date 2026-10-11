@@ -23,6 +23,7 @@ local RarityRoll = require(ReplicatedStorage.Shared.Logic.RarityRoll)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local Analytics = require(script.Parent.Analytics)
 local Announcer = require(script.Parent.Announcer)
+local CashOfferService = require(script.Parent.CashOfferService)
 local EconomyService = require(script.Parent.EconomyService)
 local GameEvents = require(script.Parent.GameEvents)
 local LiveOpsService = require(script.Parent.LiveOpsService)
@@ -164,7 +165,7 @@ local function onBuy(player: Player, idArg: unknown)
 	local mutation = GameData.mutation(item.variant)
 	local price = GameData.price(def, item.variant)
 	if not EconomyService.trySpend(session, price, "Shop", def.id) then
-		Remotes.notify(player, Theme.text.notEnoughCash, "error")
+		CashOfferService.notEnoughCash(session, price) -- "Need $X more?" offer, or the usual toast
 		return
 	end
 

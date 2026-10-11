@@ -29,6 +29,7 @@ local SocialRules = require(ReplicatedStorage.Shared.Logic.SocialRules)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local Analytics = require(script.Parent.Analytics)
+local CashOfferService = require(script.Parent.CashOfferService)
 local GameEvents = require(script.Parent.GameEvents)
 local LiveOpsService = require(script.Parent.LiveOpsService)
 local PlotService = require(script.Parent.PlotService)
@@ -250,7 +251,7 @@ local function onBuyPodium(player: Player)
 		return
 	end
 	if not EconomyService.trySpend(session, cost, "Shop", "Podium") then
-		Remotes.notify(player, Theme.text.notEnoughCash, "error")
+		CashOfferService.notEnoughCash(session, cost) -- "Need $X more?" offer, or the usual toast
 		return
 	end
 	session.data.podiumUpgrades += 1
