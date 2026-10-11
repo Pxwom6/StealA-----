@@ -111,4 +111,33 @@ T.describe("EconomyMath selling and cash packs", function()
 	end)
 end)
 
+T.describe("EconomyMath Snackdex collection bonus", function()
+	T.it("multiplies income like the other bonuses; missing or garbage means none", function()
+		T.expect(EconomyMath.incomeMultiplier(inputs({ collectionBonus = 0.06 }))).toBeNear(1.06)
+		T.expect(EconomyMath.incomeMultiplier(inputs({ rebirthMultiplier = 2, collectionBonus = 0.21 }))).toBeNear(2.42)
+		T.expect(EconomyMath.incomeMultiplier(inputs({ collectionBonus = 0.1, socialBonus = 0.3 }))).toBeNear(1.1 * 1.3)
+		T.expect(EconomyMath.incomeMultiplier(inputs())).toBe(1) -- nil: none
+		T.expect(EconomyMath.incomeMultiplier(inputs({ collectionBonus = 0 / 0 }))).toBe(1)
+		T.expect(EconomyMath.incomeMultiplier(inputs({ collectionBonus = -0.5 }))).toBe(1)
+	end)
+
+	T.it("is earned for good: cash packs, rewards and saved stats count it, unlike temporary boosts", function()
+		local all = inputs({
+			rebirthMultiplier = 1.5,
+			collectionBonus = 0.09,
+			eventCashMultiplier = 2,
+			socialBonus = 0.3,
+		})
+		-- permanent (packs, quest and Snackdex rewards): rebirth and collection bonus, no event, no social bonus
+		T.expect(EconomyMath.permanentMultiplier(all)).toBeNear(1.5 * 1.09)
+		-- reward (daily, offline, best cash/sec): everything but the social bonus
+		T.expect(EconomyMath.rewardMultiplier(all)).toBeNear(1.5 * 1.09 * 2)
+		-- live: everything
+		T.expect(EconomyMath.incomeMultiplier(all)).toBeNear(1.5 * 1.09 * 2 * 1.3)
+		T.expect(all.collectionBonus).toBe(0.09) -- the caller's inputs are not modified
+		local sources: { EconomyMath.PackSource } = { { baseIncome = 100, podium = 1, inTransit = false } }
+		T.expect(EconomyMath.packIncome(sources, 8, EconomyMath.permanentMultiplier(all))).toBeNear(163.5)
+	end)
+end)
+
 return nil

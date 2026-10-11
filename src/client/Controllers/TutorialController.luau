@@ -18,6 +18,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
 
 local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
@@ -28,6 +29,7 @@ local Types = require(ReplicatedStorage.Shared.Types)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local BeltMath = require(ReplicatedStorage.Shared.Logic.BeltMath)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
+local ScreenLayout = require(ReplicatedStorage.Shared.Logic.ScreenLayout)
 local TutorialRules = require(ReplicatedStorage.Shared.Logic.TutorialRules)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local BeltController = require(script.Parent.BeltController)
@@ -85,6 +87,7 @@ local arrowGui: BillboardGui
 local highlight: Highlight
 
 local step = "" -- the step the server says we are on ("" = no tutorial)
+local hidPlayerList = false -- we switched Roblox's player list off so the banner's Skip stays reachable
 local skippedStep = "" -- the step Skip was pressed on (hidden until the server moves on)
 local beltTargetId: number? = nil
 local renderConnection: RBXScriptConnection? = nil
@@ -322,9 +325,27 @@ local function spaceForBanner(carrying: boolean): number
 	return bottom - used
 end
 
+-- Roblox draws its player list (top right on computers) above every game UI. When even the narrowest banner would
+-- run under it, the list is switched off while the banner shows and back on afterwards (only if we switched it off).
+local function setPlayerListHidden(hide: boolean)
+	if hide == hidPlayerList then
+		return
+	end
+	if hide then
+		if StarterGui:GetCoreGuiEnabled(Enum.CoreGuiType.PlayerList) then
+			StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
+			hidPlayerList = true
+		end
+	else
+		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, true)
+		hidPlayerList = false
+	end
+end
+
 -- Sizes the banner so the top stack never reaches anything below it (DECISIONS.md #21): with the steal step's tip
 -- (how long your shield lasts, or what yellow shields are) when there is room, one line when not, hidden while
--- carrying if even one line doesn't fit (the carry banner says what to do then).
+-- carrying if even one line doesn't fit (the carry banner says what to do then). Across, it also stays left of
+-- Roblox's player list on computers (Logic/ScreenLayout), so Skip is never under it.
 local function fitBanner(state: Types.ClientState)
 	local carrying = state.carrying ~= ""
 	local mode = TutorialRules.bannerMode(
@@ -340,19 +361,32 @@ local function fitBanner(state: Types.ClientState)
 			else Theme.text.tutorialShieldOtherTip
 	end
 	tipLabel.Visible = mode == "full"
-	-- Centred on the screen like the whole stack; narrowed on small phones (e.g. 640x360) to clear the TAG button.
+	-- Centred on the screen like the whole stack; narrowed on small phones (e.g. 640x360) to clear the TAG button,
+	-- and on computers to clear the player list (measured as if shown, so hiding it never undoes the decision).
 	local scale = UiKit.scaleFor(workspace.CurrentCamera.ViewportSize)
 	local screen = HudController.screen()
 	local actionArea = HudController.actionArea()
-	local width = TutorialRules.bannerWidth(
-		BANNER_WIDTH,
-		screen.AbsoluteSize.X / 2 / scale,
+	local screenWidth = screen.AbsoluteSize.X / scale
+	local playerList = HudController.playerListWidth(hidPlayerList)
+	local rightLimit = ScreenLayout.bannerRightLimit(
 		(actionArea.AbsolutePosition.X - screen.AbsolutePosition.X) / scale,
-		ACTION_AREA_GAP,
-		MIN_BANNER_WIDTH
+		screenWidth,
+		playerList
 	)
+	local width =
+		TutorialRules.bannerWidth(BANNER_WIDTH, screenWidth / 2, rightLimit, ACTION_AREA_GAP, MIN_BANNER_WIDTH)
 	banner.Size = UDim2.fromOffset(width, BANNER_HEIGHT + (if mode == "full" then TIP_HEIGHT else 0))
 	banner.Visible = mode ~= "hidden"
+	setPlayerListHidden(
+		banner.Visible
+			and ScreenLayout.bannerNeedsPlayerListHidden(
+				screenWidth / 2,
+				width,
+				screenWidth,
+				playerList,
+				ACTION_AREA_GAP
+			)
+	)
 end
 
 local function render()
@@ -419,6 +453,7 @@ local function setStep(newStep: string, view: Types.TutorialView)
 	end
 	if not visible then
 		banner.Visible = false
+		setPlayerListHidden(false)
 		if renderConnection then
 			renderConnection:Disconnect()
 			renderConnection = nil

@@ -31,7 +31,6 @@ function Fixtures.creature(id: string, rarity: string, beltWeight: number, event
 		beltWeight = beltWeight,
 		modelName = id,
 		flavor = "",
-		look = { body = "Ball", bodyColor = "#FFFFFF", accent = "Ears", accentColor = "#000000", size = 1 },
 		eventId = eventId,
 	}
 end

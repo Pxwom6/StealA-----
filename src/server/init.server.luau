@@ -20,11 +20,14 @@ local MonetizationService = require(Services.MonetizationService)
 local PlayerLifecycle = require(Services.PlayerLifecycle)
 local PlotService = require(Services.PlotService)
 local PositionTracker = require(Services.PositionTracker)
+local QuestService = require(Services.QuestService)
 local RebirthService = require(Services.RebirthService)
 local Remotes = require(Services.Remotes)
 local Replication = require(Services.Replication)
 local RetentionService = require(Services.RetentionService)
 local SeasonService = require(Services.SeasonService)
+local SettingsService = require(Services.SettingsService)
+local SnackdexService = require(Services.SnackdexService)
 local SocialService = require(Services.SocialService)
 local StealService = require(Services.StealService)
 local TutorialService = require(Services.TutorialService)
@@ -48,8 +51,11 @@ RebirthService.start()
 MonetizationService.start()
 RetentionService.start()
 SocialService.start()
-TutorialService.start(EconomyService.addCash) -- pays the one-time completion reward
+TutorialService.start(EconomyService.addCash) -- pays the one-time completion reward; first GameEvents listener
+SnackdexService.start() -- after the tutorial: discoveries (and the quest event they emit) follow its steps
+QuestService.start()
 LeaderboardService.start(world)
+SettingsService.start() -- music / sound effects / reduce effects, saved in flags
 DevCommands.start() -- Studio only
 
 local hooks = PlayerLifecycle.hooks()
@@ -59,7 +65,9 @@ table.insert(hooks.onJoined, LockService.restore)
 table.insert(hooks.onJoined, RetentionService.payOfflineEarnings)
 table.insert(hooks.onJoined, SocialService.onJoined)
 table.insert(hooks.onJoined, TutorialService.onJoined) -- after the lock timers are restored
+table.insert(hooks.onJoined, QuestService.onJoined) -- after income is computed (collect targets, rewards)
 table.insert(hooks.onReady, RetentionService.sendWelcome)
+table.insert(hooks.onReady, SnackdexService.onReady)
 table.insert(hooks.onLeaving, function(session)
 	StealService.releaseAll(session, "left")
 end)

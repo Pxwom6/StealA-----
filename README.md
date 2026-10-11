@@ -55,9 +55,9 @@ CI (`.github/workflows/ci.yml`) runs all of the above on every pull request.
 
 ```
 src/shared/Config   plain data: names, colours, prices, timers, product IDs, LiveOps events, seasonal themes,
-                    social rewards, the first-time tutorial (re-theme = edit these)
+                    social rewards, the first-time tutorial, Snackling model recipes (re-theme = edit these)
 src/shared/Logic    pure game rules (economy, rarity rolls, rebirth, offline earnings, receipts, steal/lock rules,
-                    friend & group bonus, seasonal themes, tutorial progress)
+                    friend & group bonus, seasonal themes, tutorial progress, Snackling models, idle animation)
 src/shared          small Roblox helpers shared by server & client (remotes, creature visuals, UI theme)
 src/server          server bootstrap + services (authoritative)
 src/client          client bootstrap + controllers (UI, rendering, intents)
@@ -75,7 +75,8 @@ tools               Lune scripts (balance simulation)
 5. **Group rewards:** paste your Roblox group's ID into `groupId` in `src/shared/Config/Social.luau`
    (`TODO(owner)`; the number in the group's URL). While it is `0` the group bonus, welcome gift and Join group button
    are off and hidden; the friends bonus works either way.
-6. Optional: sound IDs in `src/shared/Config/Sounds.luau`, models in `ReplicatedStorage/CreatureModels`.
+6. Optional: music and your own sounds in `src/shared/Config/Sounds.luau` (see "Sounds and music" below), models in
+   `ReplicatedStorage/CreatureModels`.
 
 **Changing the save format:** bump `DataSchema.VERSION` whenever a saved key is added, removed, renamed or changes
 meaning, and never publish a lower VERSION than before. A rollback keeps the current save code (`DataSchema`,
@@ -134,21 +135,99 @@ already had progress when it shipped never see it. Steps finish only when the se
 * **Test it in Studio:** a fresh Studio player (API access off) starts it automatically; `/tutorial` starts it again
   any time.
 
+### Snackling models
+
+Every Snackling is a 3D "living snack" built in code from plain Roblox parts (no meshes or asset ids): its recipe in
+`src/shared/Config/CreatureLooks.luau` picks a body plan (blob, biped, quadruped, swimmer, tentacled), the food its
+body and head are made of (pizza slice, sushi roll, donut, cupcake, burger, pancake stack, bowl...), a face, animal
+features (ears, tails, wings, snouts, horns, shells, manes...) and toppings (sprinkles, drips, a cherry...). Every
+kind is listed at the top of `src/shared/Logic/CreatureRecipe.luau`.
+
+* **Restyle one:** change its colours, swap a feature or topping, or change `size`, then check it in Studio with
+  `/gallery`. CI keeps every recipe valid, inside its rarity's part budget (30 Common / Uncommon, 40 Rare / Epic,
+  50 Legendary and up), standing on its feet and narrow enough for the podiums.
+* **Faces stay readable:** eyes, mouths and cheeks are never restyled by mutations (Golden, Diamond, Rainbow,
+  Haunted).
+* **They feel alive:** Snacklings near your camera bob, squash and sway on their podiums, and hop along the belt
+  (client-only, `IdleController` / `BeltController`).
+### Snackdex and daily quests
+
+* **Snackdex** (the 📖 button): every Snackling a player has ever owned, with its mutations. Owning every regular
+  Snackling of a rarity pays a one-time reward (sized from steady income) and +3% income forever (all seven tiers:
+  +21%). Event Snacklings have their own tab and never block a tier. Tune it in `src/shared/Config/Snackdex.luau`; new
+  Snacklings show up by themselves.
+* **Daily quests** (the Rewards button, Quests tab): three a day (2 easy + 1 hard), new at UTC midnight; anything
+  finished but not claimed by then is paid automatically. Add or tune quests in `src/shared/Config/Quests.luau` (texts:
+  `quest*` keys in `Theme.luau`).
+* **Analytics:** custom events `snackdex_tier_completed`, `quest_claimed` and `quests_all_done` (DECISIONS.md #24).
+
 ### Swapping in your own art
 
 * **Creature models:** put a Model named exactly as the creature's `modelName` (see
   `src/shared/Config/Creatures.luau`) into `ReplicatedStorage/CreatureModels` in Studio. The game clones it instead
-  of building the placeholder. Rojo will not delete instances you add there.
+  of building it from its recipe. Rojo will not delete instances you add there.
 * **Sounds:** paste asset IDs into `src/shared/Config/Sounds.luau`.
+  of building the placeholder. Rojo will not delete instances you add there.
+* **Sounds:** paste asset IDs into `src/shared/Config/Sounds.luau` (see "Sounds and music").
+* **The world's look:** lighting, the spawn plaza, trees, the boundary wall and the terrain outside it are data in
+  `src/shared/Config/Scenery.luau` (colours in `Theme.world`). CI checks every prop stays off the plots, the belt,
+  the walkway, the lobby spawn and the Halloween decorations, and that the extra parts stay under `partBudget`.
 * **Names, colours, UI text:** `src/shared/Config/Theme.luau`, `Creatures.luau`, `Rarities.luau`, `Mutations.luau`.
 * **Mutations on custom models:** a mutation restyles every visible part of the model (material, colour, ...).
   Give a part (e.g. eyes) the attribute `MutationSkip = true` to keep its own look.
 
+### Sounds and music
+
+Every sound effect slot in `src/shared/Config/Sounds.luau` is `{ id, volume, pitch }`. All of them use public
+audio from Roblox's own libraries, so nothing needs uploading and they work in any experience. Each one was checked to
+load in Studio (October 2026):
+
+| Asset | Library | Used for |
+| --- | --- | --- |
+| `15675032796` Roblox_UI_Small_Click | Roblox | every button click |
+| `15675059323` Roblox_UI_Bright_Click | Roblox | settings switches, Rare spawn |
+| `15675037413` Roblox_UI_Paper_Swipe | Roblox | a dialog opens, selling |
+| `127645268874265` CoinTransfer_01 | Roblox | success toasts, collecting cash |
+| `15675075163` Roblox_UI_Delete | Roblox | error toasts |
+| `15675055424` Roblox_UI_Cute_Pop | Roblox | buying from the belt, Common / Uncommon spawn |
+| `15675085146` Roblox_UI_Indicator | Roblox | locking your base |
+| `15675046931` Roblox_UI_Sweep | Roblox | unlocking |
+| `15675024286` Roblox_UI_Whoosh_01 | Roblox | starting a steal |
+| `15675012262` Roblox_UI_Whoosh_04 | Roblox | announcement banners |
+| `15675043410` Roblox_UI_Tonal_Stinger | Roblox | steal success, Epic spawn |
+| `15675062723` Roblox_UI_Whistle_Low | Roblox | tagging a thief |
+| `15675016548` Roblox_UI_Piano_Hello | Roblox | mutation spawn, Legendary spawn |
+| `9125775930` Police Whistle | ProSoundEffects | the owner's alarm while someone carries their Snackling |
+| `1842030434` The Big Toy Race (sting d) | APM Music | rebirth, Secret spawn |
+| `9038314266` Funfair Fun (sting) | APM Music | luck boosts, Mythic spawn |
+| `9040476631` Early Bird - Mnemonic2 | APM Music | daily reward claim |
+
+**Music** (APM Music, loops, crossfades on change, follows the player's Music setting):
+`music.lobby` = `1842203609` "Laugh To Learn" (59 s) everywhere; `music.halloween` = `1848232312` "Hear, The Wind
+Blows" while the Halloween theme is on. Another seasonal theme gets music by adding a slot named after its theme id.
+
+To swap any sound, paste another audio asset id (`rbxassetid://...`); an empty id is silent. Quick check in Studio's
+Command Bar: `local s = Instance.new("Sound") s.SoundId = "rbxassetid://15675032796" game:GetService("SoundService"):PlayLocalSound(s)`
+
+### Settings
+
+The gear button in the top-right corner (left of Roblox's player list on computers) opens Music, Sound effects and
+Reduce effects switches. They apply at once and are saved per player in the save's `flags` map
+(`settings_musicOff`, `settings_sfxOff`, `settings_reduceEffects`; no save-format change). Reduce effects switches off
+particles, the belt / factory animations, Bloom and SunRays on that device; client code can read it with
+`ClientSettings.reduceEffects()` (or the LocalPlayer attribute `ReduceEffects`).
+
 ### Studio test commands
 
 `/cash <amount>`, `/spawn <creatureId> [mutationId]` (e.g. `/spawn pizza_pup rainbow`), `/noshield`,
-`/friends <n|off>` and `/tutorial` (start the first-time tutorial again) work in Studio only
+`/friends <n|off>`, `/tutorial` (start the first-time tutorial again) and `/gallery [mutationId]` (every Snackling in
+labelled rows past the north boundary wall, e.g. `/gallery golden`; `/gallery off` removes it) work in Studio only
+`/friends <n|off>`, `/tutorial` (start the first-time tutorial again) and `/sky <clockTime>` (preview the lighting at
+another time of day, e.g. `/sky 18`; `/sky 14.6` is the normal afternoon) work in Studio only
 (`src/server/Services/DevCommands.luau`). `/spawn` also puts event Snacklings
+`/friends <n|off>`, `/tutorial` (start the first-time tutorial again), `/quests reset` (re-roll today's quests) and
+`/dex fill <rarity|event>` (discover every Snackling of a tier but one, e.g. `/dex fill common`; the toast names the
+missing one to `/spawn`) work in Studio only (`src/server/Services/DevCommands.luau`). `/spawn` also puts event Snacklings
 and event mutations on the belt when their event isn't running (e.g. `/spawn candy_corn_cat haunted`).
 
 To test a seasonal event in Studio: `/event Halloween2026 5` turns Halloween on for 5 minutes (decorations, dusk

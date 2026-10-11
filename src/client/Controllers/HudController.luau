@@ -4,17 +4,23 @@
 
 	  top centre    cash (animated count-up) + cash/sec, then the tutorial banner and status pills (event + luck, lock,
 	                social) stacked below in TOP_ORDER, so nothing in the stack can overlap
-	  left middle   round feature buttons (Shop, Rebirth, Daily...) — other controllers add them
+	  left middle   feature buttons (Shop, Rebirth, Rewards, Snackdex) — other controllers add them, in LayoutOrder
 	  right, above the jump button   contextual action area (e.g. the big TAG! button)
+	  top right     the settings gear (SettingsController) and nothing else: on computers Roblox's player list sits
+	                there, drawn above all game UI, so the gear goes left of it (playerListWidth, Logic/ScreenLayout)
 
 	Numbers count up instead of jumping so progress always feels alive, and the cash pill pulses on every change.
 ]]
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
+local ScreenLayout = require(ReplicatedStorage.Shared.Logic.ScreenLayout)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local StateStore = require(script.Parent.StateStore)
 
@@ -27,6 +33,14 @@ local actionArea: Frame
 local cashLabel: TextLabel
 local incomeLabel: TextLabel
 local cashPill: Frame
+
+-- Left column (reference px): four 76x58 buttons with 6 px gaps are 250 tall, the same footprint as the three 74 px
+-- buttons before (246). Centred at 42% of the height: at 667x375 (about 785x373 under the top bar, UI scale 0.85) the
+-- column spans y 32-282 and x 10-86 (badges included), clear of the top stack (x >= 242), the tutorial banner
+-- (x >= 182) and the movement thumbstick in the bottom-left corner. Keep it at most four buttons tall: a fifth feature
+-- belongs in an existing panel (as the daily rewards and quests share Rewards).
+local SIDE_BUTTON_SIZE = Vector2.new(76, 58)
+local SIDE_BUTTON_GAP = 6
 
 local displayedCash = 0
 local targetCash = 0
@@ -56,9 +70,22 @@ function HudController.actionArea(): Frame
 	return actionArea
 end
 
+-- Width (HUD reference units) that Roblox's player list takes from the right edge: 0 on phones (it starts hidden)
+-- or when it is switched off. `assumeShown` = true measures it as if shown (e.g. while the tutorial hides it).
+function HudController.playerListWidth(assumeShown: boolean?): number
+	local viewport = workspace.CurrentCamera.ViewportSize
+	local enabled = assumeShown == true or StarterGui:GetCoreGuiEnabled(Enum.CoreGuiType.PlayerList)
+	local touchOnly = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+	local stats = Players.LocalPlayer:FindFirstChild("leaderstats")
+	local statCount = if stats then #stats:GetChildren() else 0
+	local pixels = ScreenLayout.playerListWidth(enabled, touchOnly, viewport.X, viewport.Y, statCount)
+	return pixels / UiKit.scaleFor(viewport)
+end
+
 export type SideButton = { button: TextButton, badge: Frame }
 
--- Adds a round feature button to the left column.
+-- Adds a feature button to the left column (`order`: 1 Shop, 2 Rebirth, 3 Rewards, 4 Snackdex). The badge is a red dot
+-- for "something to claim / new".
 function HudController.addSideButton(
 	order: number,
 	icon: string,
@@ -69,21 +96,21 @@ function HudController.addSideButton(
 	local button = UiKit.button({
 		Name = caption,
 		LayoutOrder = order,
-		Size = UDim2.fromOffset(74, 74),
+		Size = UDim2.fromOffset(SIDE_BUTTON_SIZE.X, SIDE_BUTTON_SIZE.Y),
 		BackgroundColor3 = color,
 		Text = "",
 	}, onTap)
 	UiKit.label({
 		Name = "Icon",
 		Text = icon,
-		Size = UDim2.fromScale(1, 0.62),
+		Size = UDim2.fromScale(1, 0.56),
 		Parent = button,
 	})
 	UiKit.label({
 		Name = "Caption",
 		Text = caption,
-		Size = UDim2.fromScale(1, 0.32),
-		Position = UDim2.fromScale(0, 0.66),
+		Size = UDim2.fromScale(1, 0.4),
+		Position = UDim2.fromScale(0, 0.6),
 		Parent = button,
 	})
 	local badge = UiKit.new("Frame", {
@@ -166,7 +193,7 @@ local function build()
 	UiKit.new("UIListLayout", {
 		SortOrder = Enum.SortOrder.LayoutOrder,
 		VerticalAlignment = Enum.VerticalAlignment.Center,
-		Padding = UDim.new(0, 12),
+		Padding = UDim.new(0, SIDE_BUTTON_GAP),
 		Parent = sideColumn,
 	})
 

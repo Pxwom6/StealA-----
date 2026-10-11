@@ -12,6 +12,7 @@ local TweenService = game:GetService("TweenService")
 local Net = require(ReplicatedStorage.Shared.Net)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
+local ClientSettings = require(script.Parent.ClientSettings)
 local SoundPlayer = require(script.Parent.SoundPlayer)
 
 local NotificationController = {}
@@ -57,7 +58,7 @@ function NotificationController.toast(text: string, kind: string?)
 	end
 	local toasts = {}
 	for _, child in toastList:GetChildren() do
-		if child:IsA("Frame") then
+		if child:IsA("Frame") and child.Name == "Toast" then -- not one already on its way out
 			table.insert(toasts, child)
 		end
 	end
@@ -69,7 +70,8 @@ function NotificationController.toast(text: string, kind: string?)
 	end
 	task.delay(TOAST_SECONDS, function()
 		if toast.Parent then
-			toast:Destroy()
+			toast.Name = "ToastLeaving"
+			UiKit.popOut(toast) -- shrinks and fades away
 		end
 	end)
 end
@@ -105,6 +107,9 @@ function NotificationController.floatText(position: Vector3, text: string, color
 end
 
 function NotificationController.sparkle(position: Vector3, color: Color3)
+	if ClientSettings.reduceEffects() then
+		return -- Settings > Reduce effects: no particle bursts
+	end
 	local anchor = Instance.new("Part")
 	anchor.Anchored = true
 	anchor.CanCollide = false

@@ -13,12 +13,15 @@ local Social = require(ReplicatedStorage.Shared.Config.Social)
 local DailyStreak = require(ReplicatedStorage.Shared.Logic.DailyStreak)
 local EconomyMath = require(ReplicatedStorage.Shared.Logic.EconomyMath)
 local RebirthMath = require(ReplicatedStorage.Shared.Logic.RebirthMath)
+local SettingsRules = require(ReplicatedStorage.Shared.Logic.SettingsRules)
 local SocialRules = require(ReplicatedStorage.Shared.Logic.SocialRules)
 local TutorialRules = require(ReplicatedStorage.Shared.Logic.TutorialRules)
 local Tutorial = require(ReplicatedStorage.Shared.Config.Tutorial)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local Types = require(ReplicatedStorage.Shared.Types)
+local Quests = require(ReplicatedStorage.Shared.Config.Quests)
+local QuestRules = require(ReplicatedStorage.Shared.Logic.QuestRules)
 local Remotes = require(script.Parent.Remotes)
 local Sessions = require(script.Parent.Sessions)
 
@@ -26,13 +29,16 @@ type Session = Sessions.Session
 
 local Replication = {}
 
+local questDefs = QuestRules.index(Quests.pool)
+
 function Replication.markDirty(session: Session)
 	session.dirty = true
 end
 
 function Replication.snapshot(session: Session): Types.ClientState
 	local data = session.data
-	local daily = DailyStreak.status(data.daily, os.time())
+	local now = os.time()
+	local daily = DailyStreak.status(data.daily, now)
 	local slot = Economy.daily[DailyStreak.slot(daily.nextStreak, #Economy.daily)]
 	local carry = session.carry
 	local social = session.social
@@ -83,6 +89,9 @@ function Replication.snapshot(session: Session): Types.ClientState
 			count = #Tutorial.steps,
 			stepStartedAt = if tutorial then tutorial.startedAt else 0,
 		},
+		settings = SettingsRules.fromFlags(data.flags),
+		-- Rewards as QuestService pays them (steady income, see EconomyMath.packIncome).
+		quests = QuestRules.view(data.quests, questDefs, Quests, session.packIncome, DailyStreak.dayIndex(now)),
 	}
 end
 

@@ -29,7 +29,7 @@ T.describe("DataSchema", function()
 
 	T.it("migrates version 1 saves: lock timers start empty, existing ones are kept", function()
 		local v1 = DataSchema.migrate({ version = 1, cash = 5 })
-		T.expect(v1.version).toBe(2)
+		T.expect(v1.version).toBe(DataSchema.VERSION)
 		T.expect(v1.lockTimers).toEqual({ cooldownUntil = 0, vulnerableUntil = 0 })
 		T.expect(v1.quarantine).toEqual({})
 		local clean = DataSchema.sanitise(v1, 100, rules)
@@ -220,6 +220,163 @@ T.describe("DataSchema", function()
 		T.expect(back.creatures[3].podium).toBe(11)
 		T.expect(#back.quarantine).toBe(1)
 		T.expect(back.quarantine[1].uid).toBe("31")
+	end)
+
+	T.it("migrates version 2 saves to 3: the Snackdex is backfilled from podiums and quarantine", function()
+		local v2: any = {
+			version = 2,
+			creatures = {
+				{ uid = "1", id = "pizza_pup", podium = 1, acquiredAt = 5, stored = 0 },
+				{ uid = "2", id = "pizza_pup", podium = 2, acquiredAt = 5, stored = 0, variant = "golden" },
+				{ uid = "3", id = "donut_dragon", podium = 3, acquiredAt = 5, stored = 0, variant = "rainbow" },
+				"garbage" :: any,
+				{ uid = "4", id = 42, podium = 4 } :: any,
+				{ uid = "5", id = "", podium = 5 } :: any,
+			},
+			quarantine = { { uid = "6", id = "retired_pup", podium = 6, acquiredAt = 5, stored = 0, variant = "old" } },
+		}
+		local raw = DataSchema.migrate(v2)
+		T.expect(raw.version).toBe(3)
+		T.expect(raw.snackdex.creatures).toEqual({ pizza_pup = true, donut_dragon = true, retired_pup = true })
+		T.expect(raw.snackdex.variants).toEqual({
+			pizza_pup = { golden = true },
+			donut_dragon = { rainbow = true },
+			retired_pup = { old = true },
+		})
+		T.expect(raw.snackdex.tiers).toEqual({}) -- tier rewards are paid by the server (SnackdexService) on join
+		T.expect(raw.quests).toEqual({ day = -1, list = {}, bonusClaimed = false })
+		-- Unknown ids survive sanitise (the quarantined Snackling may come back), and so does the backfill.
+		local clean = DataSchema.sanitise(raw, 100, rules)
+		T.expect(clean.snackdex).toEqual(raw.snackdex)
+		T.expect(clean.quests).toEqual({ day = -1, list = {}, bonusClaimed = false })
+		T.expect((DataSchema.sanitise(clean :: any, 100, rules))).toEqual(clean)
+		-- A save with nothing owned starts with an empty Snackdex; so does an unversioned one.
+		T.expect(DataSchema.migrate({ version = 2 }).snackdex).toEqual({ creatures = {}, variants = {}, tiers = {} })
+		T.expect(DataSchema.migrate({}).quests).toEqual({ day = -1, list = {}, bonusClaimed = false })
+	end)
+
+	T.it("backfills even when ProfileStore's Reconcile already added the empty v3 tables", function()
+		-- DataService runs Reconcile (fills missing keys from the template) before migrate.
+		local reconciled: any = DataSchema.template(100)
+		reconciled.version = 2
+		reconciled.creatures = { { uid = "1", id = "pizza_pup", podium = 1, acquiredAt = 5, stored = 0 } }
+		reconciled.quarantine = { { uid = "2", id = "donut_dragon", podium = 9, variant = "golden" } }
+		local raw = DataSchema.migrate(reconciled)
+		T.expect(raw.snackdex.creatures).toEqual({ pizza_pup = true, donut_dragon = true })
+		T.expect(raw.snackdex.variants).toEqual({ donut_dragon = { golden = true } })
+		-- Garbage in the reconciled tables is repaired, not trusted.
+		local broken: any = { version = 2, snackdex = { creatures = "x", variants = 5 }, creatures = {} }
+		broken.creatures[1] = { uid = "1", id = "pizza_pup", podium = 1, variant = "golden" }
+		T.expect(DataSchema.migrate(broken).snackdex).toEqual({
+			creatures = { pizza_pup = true },
+			variants = { pizza_pup = { golden = true } },
+			tiers = {},
+		})
+	end)
+
+	T.it("backfills only once: a version 3 save keeps its Snackdex as saved", function()
+		local v3: any = {
+			version = 3,
+			creatures = { { uid = "1", id = "pizza_pup", podium = 1 } },
+			snackdex = { creatures = { donut_dragon = true }, variants = {}, tiers = { Common = true } },
+			quests = { day = 20000, list = {}, bonusClaimed = true },
+		}
+		local raw = DataSchema.migrate(v3)
+		T.expect(raw.snackdex.creatures).toEqual({ donut_dragon = true })
+		T.expect(raw.quests.day).toBe(20000)
+	end)
+
+	T.it("sanitises the Snackdex: keeps unknown ids, drops garbage, bounds every list", function()
+		local saved: any = {
+			snackdex = {
+				creatures = {
+					pizza_pup = true,
+					gone_pup = true,
+					nope = false,
+					[5 :: any] = true,
+					[string.rep("x", 65)] = true,
+					weird = "yes" :: any,
+				},
+				variants = {
+					pizza_pup = { golden = true, bad = 1 },
+					only_mutated = { rainbow = true }, -- owned with a mutation = owned
+					empty = {},
+					broken = "golden",
+				},
+				tiers = { Common = true, Rare = "yes", Retired = true },
+			},
+		}
+		local clean, fixes = DataSchema.sanitise(saved, 100, rules)
+		T.expect(clean.snackdex).toEqual({
+			creatures = { pizza_pup = true, gone_pup = true, only_mutated = true },
+			variants = { pizza_pup = { golden = true }, only_mutated = { rainbow = true } },
+			tiers = { Common = true, Retired = true },
+		})
+		T.expect(table.find(fixes, "snackdex entries dropped") ~= nil).toBe(true)
+		-- Not a table at all: an empty Snackdex.
+		local garbage: any = { snackdex = "lots" }
+		T.expect(DataSchema.sanitise(garbage, 100, rules).snackdex)
+			.toEqual({ creatures = {}, variants = {}, tiers = {} })
+		-- Bounded: at most 1024 creatures (alphabetically first kept), 32 mutations each, 64 tiers.
+		local huge: any = { snackdex = { creatures = {}, variants = { a_pup = {} }, tiers = {} } }
+		for i = 1, 1100 do
+			huge.snackdex.creatures[string.format("c%04d", i)] = true
+			huge.snackdex.tiers[string.format("t%04d", i)] = true
+		end
+		for i = 1, 40 do
+			huge.snackdex.variants.a_pup[string.format("m%02d", i)] = true
+		end
+		local bounded = DataSchema.sanitise(huge, 100, rules).snackdex
+		local creatures, mutations, tiers = 0, 0, 0
+		for _ in bounded.creatures do
+			creatures += 1
+		end
+		local pupMutations: { [string]: boolean } = bounded.variants.a_pup or {}
+		for _ in pupMutations do
+			mutations += 1
+		end
+		for _ in bounded.tiers do
+			tiers += 1
+		end
+		T.expect(creatures).toBe(1024)
+		T.expect(bounded.creatures.c0001).toBe(true)
+		T.expect(bounded.creatures.c1100).toBeNil()
+		T.expect(mutations).toBe(32)
+		T.expect(tiers).toBe(64)
+	end)
+
+	T.it("sanitises daily quests: repairs every field, keeps unknown quest ids, bounds the list", function()
+		local saved: any = {
+			quests = {
+				day = 20000.7,
+				bonusClaimed = "yes",
+				list = {
+					{ id = "buy_belt", target = 5, progress = 9, claimed = true },
+					{ id = "retired_quest", target = 0 / 0, progress = -3, claimed = "no" :: any },
+					{ id = "collect_small", target = 2500.5, progress = 12.9 } :: any,
+					"junk" :: any,
+					{ id = 7, target = 1, progress = 0 } :: any,
+				},
+			},
+		}
+		local clean, fixes = DataSchema.sanitise(saved, 100, rules)
+		T.expect(clean.quests).toEqual({
+			day = 20000,
+			bonusClaimed = false,
+			list = {
+				{ id = "buy_belt", target = 5, progress = 5, claimed = true },
+				{ id = "retired_quest", target = 1, progress = 0, claimed = false },
+				{ id = "collect_small", target = 2500, progress = 12, claimed = false },
+			},
+		})
+		T.expect(table.find(fixes, "quest entry is not a quest") ~= nil).toBe(true)
+		local badDay: any = { quests = { day = -50, list = "x" } }
+		T.expect(DataSchema.sanitise(badDay, 100, rules).quests).toEqual({ day = -1, list = {}, bonusClaimed = false })
+		local long: any = { quests = { day = 1, list = {} } }
+		for i = 1, 20 do
+			long.quests.list[i] = { id = `q{i}`, target = 1, progress = 0, claimed = false }
+		end
+		T.expect(#DataSchema.sanitise(long, 100, rules).quests.list).toBe(8)
 	end)
 
 	T.it("nextUid always starts above every existing uid", function()

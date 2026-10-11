@@ -11,7 +11,9 @@
 	hand out impossible values (NaN cash, two creatures on one podium...). A creature whose id is no longer in the
 	config is never deleted: it moves to `quarantine` and comes back once the id exists again. Nor is a creature whose
 	podium is invalid or taken: it moves to the lowest free podium within the base capacity, or waits in quarantine
-	until a later load finds a free podium.
+	until a later load finds a free podium. Snackdex and quest ids the config doesn't know are kept too (bounded).
+	Version history: v1 initial; v2 lock timers, quarantine, cash pack quotes; v3 Snackdex (backfilled from what the
+	player owns) and daily quests.
 	Pure: no Roblox APIs.
 ]]
 
@@ -22,6 +24,9 @@ export type PurchaseRecord = Types.PurchaseRecord
 export type ReceiptQuote = Types.ReceiptQuote
 export type Stats = Types.Stats
 export type PlayerData = Types.PlayerData
+export type Snackdex = Types.Snackdex
+export type QuestState = Types.QuestState
+export type QuestSlot = Types.QuestSlot
 
 export type SanitiseRules = {
 	isValidCreature: (id: string) -> boolean,
@@ -33,7 +38,14 @@ export type SanitiseRules = {
 	maxHistory: number,
 }
 
-local SCHEMA_VERSION = 2
+local SCHEMA_VERSION = 3
+
+-- Bounds for the Snackdex and quest lists (far above any real config; they only stop a corrupted save from growing).
+local MAX_ID_LENGTH = 64
+local MAX_DEX_CREATURES = 1024
+local MAX_DEX_VARIANTS = 32 -- mutations per creature
+local MAX_DEX_TIERS = 64
+local MAX_QUESTS = 8
 
 local DataSchema = {}
 DataSchema.VERSION = SCHEMA_VERSION
@@ -66,6 +78,8 @@ function DataSchema.template(startingCash: number): PlayerData
 		flags = {},
 		firstJoin = 0,
 		lastSeen = 0,
+		snackdex = { creatures = {}, variants = {}, tiers = {} },
+		quests = { day = -1, list = {}, bonusClaimed = false },
 	}
 end
 
@@ -78,6 +92,10 @@ end
 
 local function wholeInRange(value: unknown, min: number, max: number, fallback: number): number
 	return math.clamp(math.floor(finite(value, fallback)), min, max)
+end
+
+local function isId(value: unknown): boolean
+	return type(value) == "string" and #value > 0 and #value <= MAX_ID_LENGTH
 end
 
 -- True when `raw` was written by a newer release (a schema version this server does not know). Such a save must not
@@ -104,6 +122,38 @@ function DataSchema.migrate(raw: { [string]: any }): { [string]: any }
 			raw.cashPackQuotes = {}
 		end
 		version = 2
+	end
+	if version < 3 then -- v3: the Snackdex (backfilled from every Snackling the player owns now) and daily quests
+		-- ProfileStore's Reconcile runs before this and may already have added the template's empty tables, so the
+		-- backfill always merges into what is there instead of only creating missing tables.
+		local dex = if type(raw.snackdex) == "table" then raw.snackdex else {}
+		for _, key in { "creatures", "variants", "tiers" } do
+			if type(dex[key]) ~= "table" then
+				dex[key] = {}
+			end
+		end
+		for _, list in { raw.creatures, raw.quarantine } do
+			if type(list) ~= "table" then
+				continue
+			end
+			for _, entry in list do
+				if type(entry) ~= "table" or not isId(entry.id) then
+					continue
+				end
+				dex.creatures[entry.id] = true
+				if isId(entry.variant) then
+					if type(dex.variants[entry.id]) ~= "table" then
+						dex.variants[entry.id] = {}
+					end
+					dex.variants[entry.id][entry.variant] = true
+				end
+			end
+		end
+		raw.snackdex = dex
+		if type(raw.quests) ~= "table" then
+			raw.quests = { day = -1, list = {}, bonusClaimed = false }
+		end
+		version = 3
 	end
 	raw.version = version
 	return raw
@@ -300,6 +350,82 @@ function DataSchema.sanitise(
 	local rawDaily = if type(raw.daily) == "table" then raw.daily else {}
 	local rawLock = if type(raw.lockTimers) == "table" then raw.lockTimers else {}
 
+	-- Snackdex: sets of ids (a key mapped to true). Ids the config doesn't know are kept; only non-ids, non-true values
+	-- and anything past the bounds (alphabetically last) are dropped. A creature owned with a mutation was owned.
+	local rawDex = if type(raw.snackdex) == "table" then raw.snackdex else {}
+	local function idSet(source: unknown, limit: number): { [string]: boolean }
+		local keys: { string } = {}
+		local entries = 0
+		if type(source) == "table" then
+			for key, value in source :: { [any]: any } do
+				entries += 1
+				if isId(key) and value == true then
+					table.insert(keys, key)
+				end
+			end
+		end
+		table.sort(keys)
+		local set: { [string]: boolean } = {}
+		for index = 1, math.min(#keys, limit) do
+			set[keys[index]] = true
+		end
+		if entries > math.min(#keys, limit) then
+			fix("snackdex entries dropped")
+		end
+		return set
+	end
+	local owned = idSet(rawDex.creatures, math.huge)
+	local variants: { [string]: { [string]: boolean } } = {}
+	if type(rawDex.variants) == "table" then
+		for creatureId, rawSet in rawDex.variants do
+			local set = if isId(creatureId) and type(rawSet) == "table" then idSet(rawSet, MAX_DEX_VARIANTS) else {}
+			if next(set) ~= nil then
+				variants[creatureId] = set
+				owned[creatureId] = true
+			else
+				fix("snackdex entries dropped")
+			end
+		end
+	end
+	local snackdex: Snackdex = {
+		creatures = idSet(owned, MAX_DEX_CREATURES),
+		variants = variants,
+		tiers = idSet(rawDex.tiers, MAX_DEX_TIERS),
+	}
+	for creatureId in variants do
+		if not snackdex.creatures[creatureId] then
+			variants[creatureId] = nil -- past the bound with its creature
+		end
+	end
+
+	-- Daily quests: unknown quest ids are kept (they simply stop counting until the next day's roll).
+	local rawQuests = if type(raw.quests) == "table" then raw.quests else {}
+	local questList: { QuestSlot } = {}
+	if type(rawQuests.list) == "table" then
+		for _, entry in rawQuests.list do
+			if #questList >= MAX_QUESTS then
+				fix("too many quests")
+				break
+			end
+			if type(entry) ~= "table" or not isId(entry.id) then
+				fix("quest entry is not a quest")
+				continue
+			end
+			local target = math.max(1, math.floor(finite(entry.target, 1)))
+			table.insert(questList, {
+				id = entry.id,
+				target = target,
+				progress = math.clamp(math.floor(finite(entry.progress, 0)), 0, target),
+				claimed = entry.claimed == true,
+			})
+		end
+	end
+	local quests: QuestState = {
+		day = math.max(-1, math.floor(finite(rawQuests.day, -1))),
+		list = questList,
+		bonusClaimed = rawQuests.bonusClaimed == true,
+	}
+
 	local data: PlayerData = {
 		version = SCHEMA_VERSION,
 		cash = math.max(0, cash),
@@ -325,6 +451,8 @@ function DataSchema.sanitise(
 		flags = flags,
 		firstJoin = finite(raw.firstJoin, 0),
 		lastSeen = finite(raw.lastSeen, 0),
+		snackdex = snackdex,
+		quests = quests,
 	}
 	return data, fixes
 end

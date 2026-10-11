@@ -27,6 +27,9 @@
 	  tutorial_step                        01 step id  02 outcome ("done" | "early" | "unavailable" | "timeout")
 	                                       (value = whole seconds spent on the step)
 	  tutorial_skipped                     01 step id the player skipped at  (value = that step's number)
+	  snackdex_tier_completed              01 rarity id  (value = the rarity's order; once per tier per account)
+	  quest_claimed                        01 quest id  02 difficulty  03 how ("claim" | "auto": paid at the day change)
+	  quests_all_done                      01 how ("claim" | "auto")  (once per player per UTC day)
 
 	Every call is pcall'd: analytics must never break gameplay (and is a no-op in some Studio configurations).
 ]]
@@ -199,6 +202,21 @@ end
 -- The player pressed Skip on step number `stepIndex` (`stepId`).
 function Analytics.tutorialSkipped(session: Session, stepId: string, stepIndex: number)
 	Analytics.custom(session, "tutorial_skipped", stepIndex, { stepId })
+end
+
+-- A Snackdex rarity tier was completed and its one-time reward paid.
+function Analytics.snackdexTierCompleted(session: Session, rarityId: string, rarityOrder: number)
+	Analytics.custom(session, "snackdex_tier_completed", rarityOrder, { rarityId })
+end
+
+-- A daily quest's reward was paid: claimed in the Rewards panel ("claim") or automatically at the day change ("auto").
+function Analytics.questClaimed(session: Session, questId: string, difficulty: string, how: string)
+	Analytics.custom(session, "quest_claimed", nil, { questId, difficulty, how })
+end
+
+-- Every quest of the day was finished and claimed (the all-done bonus was paid).
+function Analytics.questsAllDone(session: Session, how: string)
+	Analytics.custom(session, "quests_all_done", nil, { how })
 end
 
 function Analytics.forget(session: Session)

@@ -42,7 +42,8 @@ checker: Luau tables are invariant, so narrower per-module copies of `CreatureDe
 **Chose:** `MapBuilder` builds ground, belt, 8 plots and boards at server start from `Config/Gameplay.map`;
 `Workspace.StreamingEnabled = false` in the Rojo project.
 **Why:** the repo syncs into an empty Baseplate (no binary place file to merge), geometry is data, and every
-client can rely on the whole (small, ~500 parts before creatures) map existing. Custom builds can later replace parts of it.
+client can rely on the whole map existing (about 1,500 parts before creatures, two thirds of them decoration, #22).
+Custom builds can later replace parts of it.
 **Reversal cost:** medium — switching to a hand-built map means keeping the names/attributes the services read
 (`Plot{n}`, `Podiums/Podium{i}/Base|Pad`, `LockButton`, `UpgradePad`, `Barrier`, `Dome`, `Sign`), or adapting
 `MapBuilder`'s return value. Enabling streaming needs the client controllers to handle plots streaming in/out.
@@ -282,9 +283,10 @@ belt → collect cash from its pad → lock the base → steal from another base
 the cash plus a 3D guide (a pulsing beam from the player's feet, a bouncing arrow above the target that shows through
 walls, a highlight on it); the steal step has no guide (any unshielded base will do) and a one-line tip about the
 new-player shield instead. Completing it pays `Tutorial.reward` ($500) once per account.
-* **Server-authoritative.** `TutorialService.record` is called by the services right after they apply the action: a
-  belt purchase (BeltService), a collect from a pad (EconomyService's pad check only, not the collect when selling),
-  a lock (LockService, Instant Lock included) and a delivered steal (StealService). No client message can finish a
+* **Server-authoritative.** `TutorialService.record` runs on the gameplay events the services emit right after they
+  apply the action (`GameEvents`, #22): a belt purchase (BeltService), a collect from a pad (EconomyService's pad check
+  only, not the collect when selling), a lock (LockService, Instant Lock included) and a delivered steal
+  (StealService). No client message can finish a
   step; the client's only tutorial intent is `SkipTutorial` (rate-limited), which ends it with no reward. The step
   reaches the owning client in `StateUpdate.tutorial`, like every other HUD state.
 * **Saved in the existing `flags` map, no schema bump:** `tutorial_<step>` per finished step and `tutorial_done` at the
@@ -342,3 +344,128 @@ the game. Flags avoid a save-format change for what is a handful of booleans.
 **Reversal cost:** low — `Tutorial.enabled = false` turns it off for everyone (nothing is saved while it is off);
 steps, timeouts and the reward are data. The flag names must stay (they are in saves), and the funnel step numbers
 must stay once live.
+
+### 22. Snackling models are data recipes built from primitives
+
+**Chose:** every Snackling's 3D model is a recipe in `Config/CreatureLooks` (keyed by creature id): a body plan
+(blob, biped, quadruped, swimmer, tentacled), food skins for body and head, a face, animal features and toppings, in
+units of a `size`. The pure `Logic/CreatureRecipe` compiles a recipe into plain part specs (shape, size, CFrame
+numbers, colour, role) at the rarity's `modelScale`, placing faces, features and toppings by casting rays at the
+skin's actual shapes; `CreatureVisuals` turns the specs into Ball / Block / Cylinder parts, WedgeParts and Block parts
+with a Sphere SpecialMesh (ellipsoids). No mesh or image assets. A Model in `ReplicatedStorage.CreatureModels` named
+the creature's `modelName` still replaces the recipe (custom art).
+* Recipes live in their own module rather than a field on `Config/Creatures`, so the economy catalogue stays short and
+  the art can be restyled without touching balance data.
+* Budgets (Root and Mythic+ aura included): 30 parts for Common / Uncommon, 40 for Rare / Epic, 50 for Legendary and
+  up. CI checks every recipe: valid kinds, colours and materials, the budget, nothing below the feet, a face on the
+  front, at most 6.6 studs wide (the podium row spacing) and 7.4 tall at its rarity's scale, exact scaling.
+* Face parts (eyes, pupils, highlights, mouth, tongue, teeth, cheeks, brows, nose, panda patches) carry
+  `MutationSkip`, so Golden / Diamond / Rainbow / Haunted restyle the body but never the face.
+* The idle animation (`Logic/IdleMotion`) is client-only and purely visual: `IdleController` moves the anchored Root of
+  the nearest 48 tagged models within 120 studs at ~30 Hz (one CFrame write, plus a size write on the one or two body
+  parts it squashes); `BeltController` folds the hop into the move it already does every frame. The server never
+  animates anything.
+**Why:** we can't import meshes, and primitives are free, instant to load and look the same on every device; making
+the recipe a pure function means CI can check all 64 models without Studio, and the lead and Leo can preview them in
+Studio with `/gallery`. Part counts stay bounded: a full base of 20 Legendaries is about 1,000 parts.
+**Reversal cost:** low — recipes are data; moving to meshes only means adding Models to `CreatureModels` (the code
+already prefers them). Creature ids, not recipes, are what saves hold.
+### 23. The world's look: code-built scenery around an unchanged gameplay contract; settings in `flags`
+
+**Chose:**
+* **Looks, not geometry.** MapBuilder keeps every name, attribute and position the services read (#3): plot rects,
+  floor heights, podium / pad / lock button / upgrade pad positions, the entrance and sign (players can stand on the
+  sign, so its size is unchanged), the belt line and buy range. What it adds is decoration: anchored parts with
+  CanCollide / CanTouch / CanQuery off, in each plot's `Decor` folder or next to what they decorate. The plot floor is
+  now an invisible collider under visible tiles at exactly its height; podium collars and pad rings follow the podium's
+  active state (`MapBuilder.setPodiumActive`); the owner sign shows the owner's `rbxthumb://` headshot.
+* **Everything around it is data** (`Config/Scenery`, placed by `Logic/SceneryLayout`, built by `SceneryBuilder`):
+  the afternoon lighting, a spawn plaza past the belt's east end, the Snack Factory and the chute at the belt's ends,
+  trees, a low stone boundary wall with an invisible barrier above it, and terrain (grass, hills, rocks, a lake)
+  outside the wall only. CI checks every prop against the plots (8 studs: ejected visitors land 3 outside a plot), the
+  belt, the walkway, the lobby spawn and every Halloween decoration, keeps the terrain outside the boundary, and keeps
+  the extra parts under `partBudget` (about 1,060 of 1,500). The few solid props are low (benches, flower boxes, the
+  fountain basin) or sheer (pillars, trunks, factory and chute walls): nothing new can be climbed higher than the plot
+  signs, so the carry-height rules (#8) are untouched.
+* **The lobby spawn moved onto the plaza** (`Gameplay.map.lobby`), facing back along the belt. Players stand there for
+  about a second on join, until their base is assigned; nothing else used the old spot. The leaderboards moved to
+  flank the plaza's archway (the factory stands where one of them was).
+* **Lighting is applied before SeasonService starts**, so a seasonal theme snapshots this look and restores it; the
+  world's Atmosphere is a "foreign" one to SeasonService, which restyles and restores it. The seasonal
+  ColorCorrection stacks on the world's mild one (a small extra grade at dusk, on purpose).
+* **No external assets:** parts, terrain, and sounds / particle textures that ship with Roblox (`rbxasset://`). The
+  music player is built, with empty tracks until the owner pastes ids.
+* **Settings live in `flags`** (`settings_<key>`, `Logic/SettingsRules`): no save-format change, and a rollback keeps
+  them (#1), like the tutorial flags (#21). The client applies a change at once and coalesces quick taps into one
+  rate-limited SetSetting intent per setting; the server accepts known keys and booleans only. They come back in
+  `StateUpdate.settings` and are adopted once per join. "Reduce effects" is client-only (particles, belt / factory
+  animation, Bloom, SunRays) and readable by any client code (`ClientSettings.reduceEffects()`).
+* **Top-right corner:** on computers Roblox draws its player list there, above every game UI, and doesn't expose its
+  size. `Logic/ScreenLayout` estimates it (names plus one column per leaderstat); the settings gear sits left of it and
+  the tutorial banner narrows to stay left of it. If even the narrowest banner can't, the tutorial switches the player
+  list off while its banner shows (only then, and back on after), so Skip is always reachable. Phones are unaffected.
+
+**Why:** "polished" for a young audience is mostly the first minute: a place that looks finished, a readable base, a
+belt that visibly moves, sound on every action, and a phone that doesn't stutter. Keeping all of it out of the gameplay
+geometry means none of the steal / lock / collect rules (or their tests) had to change.
+**Reversal cost:** low: scenery, lighting and sounds are data; delete `SceneryBuilder.build` to get the bare map back.
+The `settings_*` flag names must stay (they are in saves).
+### 24. Snackdex and daily quests: save format v3, server-seen events, earned bonus counts as permanent
+
+**Chose:**
+* **Save format v3** (`DataSchema.VERSION` 2 → 3, following #1): `data.snackdex` = `creatures` (ids ever owned),
+  `variants` (creature id → mutation ids ever owned with it) and `tiers` (rarity ids whose reward was paid), all sets
+  of ids mapped to `true`; `data.quests` = `day` (UTC day index), `list` (`{id, target, progress, claimed}`) and
+  `bonusClaimed`. The v2 → v3 step backfills the Snackdex from every Snackling the save holds (podiums and quarantine,
+  with mutations). ProfileStore's `Reconcile` runs before `migrate` and already adds the template's empty tables, so
+  the step merges into what is there instead of only filling missing keys (tested). `sanitise` keeps ids the config
+  doesn't know (like quarantined creatures: they may come back) and bounds every list (1024 Snacklings, 32 mutations
+  each, 64 tiers, 8 quests; past a bound the alphabetically last ids go). A rollback keeps `DataSchema` and
+  `Types.PlayerData` whole, as #1 says; the sanitise code is inside `DataSchema` so nothing else has to stay.
+* **One server hook for "what the player did"** (`GameEvents`): the services emit `beltPurchase`, `acquired` (any
+  way a Snackling lands in a base: `EconomyService.giveCreature`, which belt purchases use, and steal delivery),
+  `collect` (pads only), `sell`, `lock`, `steal` and `discover` right after applying the action, exactly where they
+  used to call `TutorialService.record`. The tutorial, the Snackdex and quests subscribe; each listener runs in its
+  own pcall, in subscription order (the tutorial first, so a delivered steal still finishes its step before
+  `FirstSteal` is logged, #21). No client message can emit one.
+* **Snackdex tiers** count regular Snacklings only (`eventId == nil`); event Snacklings have their own "Event"
+  section and never block a tier. Everything is read from `Config/Creatures`, so roster changes need no code. A tier
+  pays once per account: `SnackdexRules.claimTier` sets the flag before the reward is paid (no yield in between),
+  automatically on the discovery that completes it (or on join for a backfilled save). Adding Snacklings to a
+  completed tier later re-opens its count but keeps its reward and bonus; it does not pay again.
+* **The collection bonus is permanent income** (+3% per completed tier, capped at +21% = all seven tiers):
+  `EconomyMath.MultiplierInputs.collectionBonus` is kept by `permanentMultiplier` (cash packs, quest and Snackdex
+  rewards) and by `rewardMultiplier` (daily, offline earnings, best cash/sec and the leaderboard), like rebirths and
+  passes, unlike LiveOps cash events and the friend & group bonus. It is earned for good, so a pack or reward sized
+  from it is still "N minutes of your steady income". It is derived from the saved tier flags × config (not stored as
+  a number like `rebirthMultiplier`, #12): raising `incomeBonusPerTier` helps everyone; never lower it once live.
+  The whole collection (+21%) stays below one rebirth (×1.5); CI checks that.
+* **No cash for new mutation pairs.** A new (Snackling, mutation) pair gets the "NEW!" toast, a filled pip and counts
+  for the "discover" quest, but pays nothing: the economy stays as BALANCE.md describes and nothing rewards farming
+  mutations.
+* **Daily quests are rolled from a hash of the UserId and the UTC day** (`QuestRules.seed`: MurmurHash3's finaliser
+  over 32-bit words, exact in Luau doubles), 2 easy + 1 hard, no repeated kind while another is left, and the list is
+  saved: rejoining or hopping servers never re-rolls, and a config change mid-day doesn't reshuffle anyone's day. A
+  "collect" target is fixed at roll time from steady income; rewards are sized at claim time (like the daily reward).
+  The day changes at UTC midnight (DailyStreak's day maths); finished-but-unclaimed quests are then paid
+  automatically, so a quest done at 23:59 is never lost. A saved day later than the server's (another server's clock
+  ahead) is kept, never rolled back. `ClaimQuest(slot)` is rate-limited and `QuestRules.claim` marks the quest (and the
+  all-done bonus with the last one) claimed before paying, so nothing pays twice.
+* **The all-done bonus is cash** (5 minutes of steady income, at least $500), not a free Instant Lock: lock tokens stay
+  a store item and the lock fairness rules (#9) stay untouched. A full day of quests pays about 21 minutes of steady
+  income (less than the day-7 daily reward), CI keeps it under an hour.
+* **HUD:** the left column is Shop, Rebirth, Rewards, Snackdex: four 76×58 buttons with 6 px gaps (250 reference
+  px), the footprint of the three 74 px buttons before, so the layout notes in #21 still hold (x ≤ 86, badges
+  included).
+  Daily login rewards and quests share the Rewards panel (two tabs) instead of a fifth button; it still opens itself
+  on Daily once per session, never during the tutorial. The top-right corner and the bottom-right action area are
+  untouched.
+* **Analytics:** `snackdex_tier_completed` (value = rarity order, field = rarity id), `quest_claimed` (quest id,
+  difficulty, "claim" | "auto") and `quests_all_done` ("claim" | "auto").
+
+**Why:** a collection book and daily goals are the two proven "come back tomorrow" loops of the genre; both are
+server-authoritative (only what the server saw counts, claims are idempotent) and data-driven (another Snackling or
+quest is a config line).
+**Reversal cost:** medium — the saved keys and the meaning of the tier flags are permanent (bump the version for any
+change). Rewards, bonus per tier, quest pool and targets are free to re-tune (keep `incomeBonusPerTier` from going
+down). Quest ids are saved for one day only: retiring one costs nothing after that day.

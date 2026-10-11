@@ -7,6 +7,9 @@
 	prompt that sends the BuyBeltItem intent — the server re-validates price, range and space. A mutated item shows
 	the mutation's name in its colour, its mutated name ("Golden Pizza Pup") and its mutated price and income; a
 	limited-time (event) Snackling has a small "EVENT" tag in its event's colour on top.
+
+	Items hop along (Logic/IdleMotion.belt): the hop and a little waddle are part of the per-frame move; the squash
+	and stretch of the body is only applied to items near the camera, about 30 times a second.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -21,7 +24,9 @@ local Types = require(ReplicatedStorage.Shared.Types)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local CreatureVisuals = require(ReplicatedStorage.Shared.CreatureVisuals)
 local BeltMath = require(ReplicatedStorage.Shared.Logic.BeltMath)
+local IdleMotion = require(ReplicatedStorage.Shared.Logic.IdleMotion)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
+local ClientSettings = require(script.Parent.ClientSettings)
 local NotificationController = require(script.Parent.NotificationController)
 local SoundPlayer = require(script.Parent.SoundPlayer)
 local StateStore = require(script.Parent.StateStore)
@@ -32,9 +37,16 @@ type Pooled = {
 	prompt: ProximityPrompt,
 	priceLabel: TextLabel,
 	height: number,
+	squash: { CreatureVisuals.SquashPart }, -- body parts the hop squashes
 }
 
-type Active = { item: Types.BeltItem, variant: string?, pooled: Pooled, connection: RBXScriptConnection }
+type Active = {
+	item: Types.BeltItem,
+	variant: string?,
+	pooled: Pooled,
+	connection: RBXScriptConnection,
+	phase: number, -- idle animation phase (from the item id)
+}
 
 type Row = { text: string, color: Color3?, weight: number }
 
@@ -46,6 +58,11 @@ local active: { [number]: Active } = {}
 local pools: { [string]: { Pooled } } = {}
 local folder: Folder
 local hidden = CFrame.new(0, -500, 0) -- parked pooled models (MutationFxController skips anything below y = -400)
+
+-- Squash and stretch only items this close to the camera, at most this often.
+local SQUASH_RANGE = 120
+local SQUASH_STEP = 1 / 30
+local lastSquash = 0
 
 -- Studs between the top of an item's model and the centre of its name / price billboard.
 local LABEL_GAP = 2.2
@@ -127,7 +144,9 @@ end
 local function build(creatureId: string, variant: string?): Pooled
 	local def = GameData.catalog.creatures[creatureId]
 	local rarity = GameData.catalog.rarities[def.rarity]
-	local model = CreatureVisuals.build(def, rarity, { anchored = true, mutation = GameData.mutation(variant) })
+	-- idle = false: the belt moves its own models (the hop is folded into step below)
+	local model =
+		CreatureVisuals.build(def, rarity, { anchored = true, mutation = GameData.mutation(variant), idle = false })
 	local height = CreatureVisuals.height(model)
 	local priceLabel = makeBillboard(model, def, rarity, variant, height)
 	local prompt = UiKit.new("ProximityPrompt", {
@@ -146,6 +165,7 @@ local function build(creatureId: string, variant: string?): Pooled
 		prompt = prompt,
 		priceLabel = priceLabel,
 		height = height,
+		squash = CreatureVisuals.squashParts(model),
 	}
 end
 
@@ -161,6 +181,7 @@ end
 
 local function release(pooled: Pooled)
 	pooled.prompt.Enabled = false
+	CreatureVisuals.applySquash(pooled.squash, 0)
 	pooled.model:PivotTo(hidden)
 	local pool = pools[pooled.key]
 	if pool == nil then
@@ -188,7 +209,13 @@ local function add(item: Types.BeltItem)
 	local connection = pooled.prompt.Triggered:Connect(function()
 		Net.get("BuyBeltItem"):FireServer(item.id)
 	end)
-	active[item.id] = { item = item, variant = variant, pooled = pooled, connection = connection }
+	active[item.id] = {
+		item = item,
+		variant = variant,
+		pooled = pooled,
+		connection = connection,
+		phase = IdleMotion.phaseOf(item.id),
+	}
 	local state = StateStore.get()
 	if state then
 		refreshAffordability(state.cash)
@@ -261,8 +288,18 @@ local function onRemove(payload: { id: number, buyerUserId: number?, target: Vec
 	end
 end
 
+local STILL: IdleMotion.Pose = { lift = 0, squash = 0, roll = 0, yaw = 0 }
+
 local function step()
+	local reduced = ClientSettings.reduceEffects()
 	local now = workspace:GetServerTimeNow()
+	local clock = os.clock()
+	local squashNow = clock - lastSquash >= SQUASH_STEP
+	if squashNow then
+		lastSquash = clock
+	end
+	local camera = workspace.CurrentCamera
+	local eye = if camera then camera.CFrame.Position else Vector3.zero
 	for id, entry in active do
 		local item = entry.item
 		if BeltMath.isExpired(belt, item.spawnAt, now) then
@@ -270,9 +307,14 @@ local function step()
 			continue
 		end
 		local x, z = BeltMath.position(belt, item.spawnAt, now)
-		local bob = math.abs(math.sin((now - item.spawnAt) * 6)) * 0.35
-		local position = Vector3.new(x, surfaceY + bob, z)
-		entry.pooled.model:PivotTo(CFrame.lookAt(position, position + Vector3.new(belt.dirX, 0, belt.dirZ)))
+		-- Settings > Reduce effects: items glide instead of hopping (no squash either).
+		local pose = if reduced then STILL else IdleMotion.belt(now - item.spawnAt, entry.phase)
+		local position = Vector3.new(x, surfaceY + pose.lift, z)
+		local facing = CFrame.lookAt(position, position + Vector3.new(belt.dirX, 0, belt.dirZ))
+		entry.pooled.model:PivotTo(facing * CFrame.Angles(0, pose.yaw, pose.roll))
+		if squashNow and (position - eye).Magnitude <= SQUASH_RANGE then
+			CreatureVisuals.applySquash(entry.pooled.squash, pose.squash)
+		end
 	end
 end
 

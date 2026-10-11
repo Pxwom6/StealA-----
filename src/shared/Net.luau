@@ -26,7 +26,9 @@ export type ClientToServer =
 	| "CheckGroup"
 	| "InvitePrompted"
 	| "SkipTutorial"
+	| "SetSetting"
 	| "DevGrantProduct"
+	| "ClaimQuest"
 
 export type ServerToClient =
 	"StateUpdate"
@@ -38,6 +40,7 @@ export type ServerToClient =
 	| "WelcomeBack"
 	| "StealAlert"
 	| "Effect"
+	| "SnackdexSync"
 
 export type RemoteName = ClientToServer | ServerToClient
 
@@ -56,7 +59,9 @@ local CLIENT_TO_SERVER: { ClientToServer } = {
 	"CheckGroup",
 	"InvitePrompted",
 	"SkipTutorial",
+	"SetSetting",
 	"DevGrantProduct",
+	"ClaimQuest",
 }
 
 local SERVER_TO_CLIENT: { ServerToClient } = {
@@ -69,6 +74,7 @@ local SERVER_TO_CLIENT: { ServerToClient } = {
 	"WelcomeBack",
 	"StealAlert",
 	"Effect",
+	"SnackdexSync",
 }
 
 local FOLDER_NAME = "Remotes"

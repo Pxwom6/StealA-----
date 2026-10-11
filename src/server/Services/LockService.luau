@@ -23,12 +23,12 @@ local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local LockRules = require(ReplicatedStorage.Shared.Logic.LockRules)
 local RebirthMath = require(ReplicatedStorage.Shared.Logic.RebirthMath)
 local StealRules = require(ReplicatedStorage.Shared.Logic.StealRules)
+local GameEvents = require(script.Parent.GameEvents)
 local PlotService = require(script.Parent.PlotService)
 local PositionTracker = require(script.Parent.PositionTracker)
 local Remotes = require(script.Parent.Remotes)
 local Replication = require(script.Parent.Replication)
 local Sessions = require(script.Parent.Sessions)
-local TutorialService = require(script.Parent.TutorialService)
 
 type Session = Sessions.Session
 
@@ -207,7 +207,7 @@ function LockService.tryLock(session: Session): (boolean, string?)
 		kind = "lock",
 		position = PlotService.refs(session.plot).lockButton.Position,
 	})
-	TutorialService.record(session, "lock")
+	GameEvents.emit(session, { kind = "lock" }) -- tutorial, quests
 	return true, nil
 end
 

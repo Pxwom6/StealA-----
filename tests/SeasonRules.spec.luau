@@ -116,7 +116,7 @@ T.describe("SeasonRules.layout (Halloween on the real map)", function()
 		T.expect(counts.ghost).toBe(d.ghosts)
 	end)
 	T.it("never puts anything inside a plot, on the belt or on the lobby spawn", function()
-		local lobbyZ = MAP.walkwayWidth - 8
+		local lobby = MAP.lobby -- the spawn plaza (Config/Scenery); MapBuilder puts LobbySpawn there
 		for _, prop in props do
 			for _, rect in rects do
 				local inside = prop.x > rect.minX - 0.5
@@ -130,7 +130,7 @@ T.describe("SeasonRules.layout (Halloween on the real map)", function()
 			if prop.y < 12 then
 				T.expect(math.abs(prop.z)).toBeGreaterThan(Gameplay.belt.width / 2 + 0.8)
 			end
-			T.expect(math.sqrt(prop.x ^ 2 + (prop.z - lobbyZ) ^ 2)).toBeGreaterThan(6)
+			T.expect(math.sqrt((prop.x - lobby.x) ^ 2 + (prop.z - lobby.z) ^ 2)).toBeGreaterThan(6)
 			T.expect(prop.faceX ^ 2 + prop.faceZ ^ 2).toBeNear(1, 1e-9)
 		end
 	end)
