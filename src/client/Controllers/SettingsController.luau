@@ -35,10 +35,11 @@ local ROWS: { Row } = {
 	{ key = "reduceEffects", label = "settingsReduceFx", hint = "settingsReduceFxHint", onMeans = true },
 }
 
-local GEAR_SIZE = 44 -- reference px, a full touch target like the tutorial's Skip
-local GEAR_MARGIN = 8
-local GEAR_TOP = 4 -- under Roblox's top bar (the HUD screen already starts below it)
-local STACK_HALF_WIDTH = 125 -- the cash pill in the centre of the top stack is 250 wide
+-- Shared with the Friends button left of the gear (SocialController), so the two always line up.
+local GEAR_SIZE = ScreenLayout.CORNER.size
+local GEAR_MARGIN = ScreenLayout.CORNER.margin
+local GEAR_TOP = ScreenLayout.CORNER.top
+local STACK_HALF_WIDTH = ScreenLayout.CORNER.stackHalfWidth
 local TRACK_SIZE = Vector2.new(84, 40)
 local KNOB_SIZE = 32
 

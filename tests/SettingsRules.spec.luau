@@ -89,6 +89,28 @@ T.describe("ScreenLayout", function()
 		-- too narrow to fit beside it without covering the cash: back in the corner
 		T.expect(ScreenLayout.gearX(593, 245, 44, 8, 125)).toBe(593 - 8 - 44)
 	end)
+	T.it("puts the Friends button just left of the gear, clear of the cash and the player list", function()
+		local c = ScreenLayout.CORNER
+		local function besideGear(width: number, list: number): number?
+			local gear = ScreenLayout.gearX(width, list, c.size, c.margin, c.stackHalfWidth)
+			return ScreenLayout.besideGearX(width, list, gear, c.size, c.margin, c.stackHalfWidth)
+		end
+		-- iPhone SE landscape (785 units): gear at 733, button at 681-725, top row only (the TAG area starts lower)
+		T.expect(besideGear(785, 0)).toBe(733 - 8 - 44)
+		-- a 640x360 phone (753 units) and a wider one (852 units): in the corner too
+		T.expect(besideGear(753, 0)).toBe(701 - 8 - 44)
+		T.expect(besideGear(852, 0)).toBe(852 - 8 - 44 - 8 - 44)
+		-- 1440x900 Mac at scale 1.35 (1067 units, player list about 290): left of the gear, left of the list
+		local mac = besideGear(1067, 290) :: number
+		T.expect(mac).toBeGreaterThan(1067 / 2 + 125)
+		T.expect(mac + 44).toBeAtMost(1067 - 290)
+		-- 1280x720 window (962 units, list 255): no room beside the gear, so it goes back to the top stack
+		T.expect(besideGear(962, 255)).toBeNil()
+		-- the gear back in the corner under the player list (narrow window): the button must not follow it there
+		T.expect(besideGear(593, 245)).toBeNil()
+		-- the player list switched off on that same window: room again
+		T.expect(besideGear(962, 0)).toBe(962 - 8 - 44 - 8 - 44)
+	end)
 	T.it("keeps the tutorial banner left of the player list and hides the list when even that cannot work", function()
 		-- 1100 px Studio window at scale 1.35: 815 units wide, player list 252 units
 		T.expect(ScreenLayout.bannerRightLimit(700, 815, 252)).toBe(563)

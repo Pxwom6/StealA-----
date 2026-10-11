@@ -491,3 +491,24 @@ down). Quest ids are saved for one day only: retiring one costs nothing after th
 sell, and sizing the offer to the exact gap keeps it honest (the smallest purchase that actually solves the
 problem, not the biggest).
 **Reversal cost:** low — set a very long cooldown to switch offers off; the remote and card are self-contained.
+
+### 26. Friends button: a small icon by the gear, hidden during the tutorial
+
+* **Problem (owner playtest):** the friends / group pill was a 260-wide slot in the top stack, under the cash, the
+  cash/sec, the tutorial banner and the lock pill. During the tutorial that column reached the middle of a phone
+  screen, right where the player looks at their character.
+* **Now:** a 44×44 👥 button in the HUD's top-right row, just left of the settings gear (`ScreenLayout.CORNER`,
+  `ScreenLayout.besideGearX`, same inputs as the gear so they always line up). A small green "+20%" tag hangs under
+  it while friends or the group raise income; tapping it opens the same Friends & Group panel. It is hidden during
+  the first-time tutorial (`SocialRules.buttonVisible`) and pops in when the tutorial ends.
+* **Layout:** in reference units, an iPhone SE in landscape (785 wide) puts the gear at x 733-777 and the button at
+  681-725, y 4-48: clear of the cash pill (x 267-517) and above the TAG area (from y 68). On a 1440×900 Mac
+  (1067 wide, player list about 290) both sit left of the player list. When there is no room beside the gear (a
+  1280×720 window with the player list showing, or the gear pushed back into the corner under the list) the button
+  falls back to the old pill in the top stack, still hidden during the tutorial.
+* **Tutorial stack:** with the social pill gone from the stack while the tutorial runs, every pill but the banner
+  now uses at most 224 px instead of 262 (#21), so the banner and its tip fit more often.
+
+**Why:** a social nudge is worth keeping visible, but not at the cost of the play area, and never while a new
+player is learning the game.
+**Reversal cost:** low — `SocialController.place` decides corner or stack; forcing the stack restores the old pill.

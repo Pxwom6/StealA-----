@@ -4,10 +4,10 @@
 	shows it, and Skip sends the SkipTutorial intent.
 
 	* Banner in the HUD's top stack, right under the cash (HudController.TOP_ORDER.tutorial, so it can never cover
-	  the cash, the event / luck pills, the lock pill or the social pill): a "1/4" badge, one short line and a small
-	  Skip button; the steal step adds a one-line tip about the new-player shield. It is sized every frame so the stack
-	  never reaches the carry banner or the screen bottom (fitBanner): the tip only when it fits, and while carrying
-	  one line or nothing.
+	  the cash, the event / luck pills or the lock pill; the Friends button hides during the tutorial): a "1/4" badge,
+	  one short line and a small Skip button; the steal step adds a one-line tip about the new-player shield. It is
+	  sized every frame so the stack never reaches the carry banner or the screen bottom (fitBanner): the tip only when
+	  it fits, and while carrying one line or nothing.
 	* 3D guide: a glowing beam from the player's feet to the target with pulses flowing toward it, a bouncing arrow
 	  above the target that shows through walls, and a highlight on the target. Targets (Logic/TutorialRules):
 	  buy → the nearest belt item you can afford (re-picked every frame as items move, sell or fall off); collect →
