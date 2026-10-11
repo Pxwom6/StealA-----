@@ -40,10 +40,10 @@ local Monetization = {
 	} :: { [string]: PassDef },
 
 	products = {
-		CashBite = { id = 0, kind = "Cash" }, -- Snack Bite, 5 R$
-		CashBag = { id = 0, kind = "Cash" }, -- Snack Bag, 15 R$
+		CashBite = { id = 3717868366, kind = "Cash" }, -- Snack Bite, 5 R$
+		CashBag = { id = 3717868501, kind = "Cash" }, -- Snack Bag, 15 R$
 		CashSmall = { id = 3717840270, kind = "Cash" }, -- Snack Pack, 25 R$
-		CashBasket = { id = 0, kind = "Cash" }, -- Snack Basket, 49 R$
+		CashBasket = { id = 3717868578, kind = "Cash" }, -- Snack Basket, 49 R$
 		CashMedium = { id = 3717844121, kind = "Cash" }, -- Snack Crate, 75 R$
 		CashLarge = { id = 3717844684, kind = "Cash" }, -- Snack Truck, 199 R$
 		InstantLock = { id = 3717845411, kind = "LockToken" }, -- Instant Lock, 15 R$
