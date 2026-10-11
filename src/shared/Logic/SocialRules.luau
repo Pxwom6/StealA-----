@@ -57,6 +57,20 @@ function SocialRules.totalBonus(friendCount: number, isMember: boolean, cfg: Soc
 	return SocialRules.friendBonus(friendCount, cfg.friends) + SocialRules.groupBonus(isMember, cfg.group)
 end
 
+-- Whether the HUD's Friends button shows: never during the first-time tutorial (the top of the screen belongs to its
+-- banner then), otherwise only when it has a bonus to show or something to offer (inviting, joining the group).
+function SocialRules.buttonVisible(
+	bonus: number,
+	canInvite: boolean,
+	canJoinGroup: boolean,
+	inTutorial: boolean
+): boolean
+	if inTutorial then
+		return false
+	end
+	return bonus > 0 or canInvite or canJoinGroup
+end
+
 -- The largest bonus the config allows (all friends counted, group member if the group is on).
 function SocialRules.maxBonus(cfg: SocialConfig): number
 	return SocialRules.totalBonus(cfg.friends.maxFriends, true, cfg)

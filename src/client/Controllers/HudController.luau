@@ -6,8 +6,9 @@
 	                social) stacked below in TOP_ORDER, so nothing in the stack can overlap
 	  left middle   feature buttons (Shop, Rebirth, Rewards, Snackdex) — other controllers add them, in LayoutOrder
 	  right, above the jump button   contextual action area (e.g. the big TAG! button)
-	  top right     the settings gear (SettingsController) and nothing else: on computers Roblox's player list sits
-	                there, drawn above all game UI, so the gear goes left of it (playerListWidth, Logic/ScreenLayout)
+	  top right     the settings gear (SettingsController) and, left of it, the 👥 Friends button (SocialController):
+	                on computers Roblox's player list sits there, drawn above all game UI, so both go left of it
+	                (playerListWidth, Logic/ScreenLayout.CORNER)
 
 	Numbers count up instead of jumping so progress always feels alive, and the cash pill pulses on every change.
 ]]

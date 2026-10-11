@@ -2,10 +2,12 @@
 --[[
 	Friend & group rewards UI (server: SocialService, rules: Logic/SocialRules).
 
-	  * A tappable pill in the HUD's top stack, under the lock pill, shows the current bonus ("Friends +20%  ·  Group
-	    +10%"), or suggests playing with friends / joining the group while there is none. It is not a fourth round
-	    side button on purpose: three 74px side buttons already fill the left edge between the top bar and the
-	    movement thumbstick on a landscape phone.
+	  * A small 👥 Friends button in the HUD's top-right row, just left of the settings gear (Logic/ScreenLayout,
+	    besideGearX), with a "+20%" tag under it while friends or the group raise income. It used to be a wide pill in
+	    the top stack under the cash, which reached the middle of a phone screen (DECISIONS.md #26). When the corner
+	    has no room (a narrow computer window with Roblox's player list showing) it falls back to that pill.
+	  * Hidden during the first-time tutorial (SocialRules.buttonVisible): the top of the screen belongs to the
+	    tutorial banner then. It pops in once the tutorial ends.
 	  * Tapping it opens the Friends & Group panel with big buttons: Invite friends (Roblox's own invite prompt,
 	    hidden when this player can't send invites) and, when Config/Social.group.groupId is set and the player is not
 	    a member yet, Join group (GroupService:PromptJoinAsync), after which the server is asked to check again.
@@ -23,6 +25,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local Types = require(ReplicatedStorage.Shared.Types)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
+local ScreenLayout = require(ReplicatedStorage.Shared.Logic.ScreenLayout)
 local SocialRules = require(ReplicatedStorage.Shared.Logic.SocialRules)
 local Modal = require(script.Parent.Parent.UI.Modal)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
@@ -33,10 +36,19 @@ local StateStore = require(script.Parent.StateStore)
 
 local SocialController = {}
 
+local CORNER = ScreenLayout.CORNER
+local ICON = "👥"
+local PILL_SIZE = Vector2.new(260, 34) -- the fallback in the top stack
+local BADGE_SIZE = Vector2.new(54, 20)
+
 local localPlayer = Players.LocalPlayer
 local groupEnabled = SocialRules.groupEnabled(Social.group)
 
-local pill: TextButton
+local button: TextButton -- the Friends button: an icon left of the gear, or the pill in the top stack
+local badge: Frame -- "+20%" under the icon
+local badgeLabel: TextLabel
+local inCorner: boolean? = nil -- nil until first placed
+local wasVisible = false
 local canInvite = false
 local groupName: string? = nil
 local joinPromptOpen = false
@@ -69,21 +81,64 @@ local function pillText(view: Types.SocialView): string
 	return Format.template(Theme.text.socialPillJoinGroup, { percent = percent(Social.group.incomeBonus) })
 end
 
-local function updatePill(state: Types.ClientState)
+local function updateButton(state: Types.ClientState)
 	local view = state.social
 	local canJoinGroup = groupEnabled and not view.groupMember
-	-- Only shown when it has something to say or offer (so in Studio, with no group set and no invites, it hides).
-	pill.Visible = view.bonus > 0 or canInvite or canJoinGroup
-	UiKit.setButtonText(pill, "👥 " .. pillText(view))
+	-- Only shown outside the tutorial, and when it has something to say or offer (so in Studio, with no group set and
+	-- no invites, it hides).
+	local visible = SocialRules.buttonVisible(view.bonus, canInvite, canJoinGroup, state.tutorial.step ~= "")
+	if inCorner then
+		UiKit.setButtonText(button, ICON)
+		badgeLabel.Text = Format.template(Theme.text.socialBadge, { percent = percent(view.bonus) })
+		badge.Visible = view.bonus > 0
+	else
+		UiKit.setButtonText(button, ICON .. " " .. pillText(view))
+		badge.Visible = false
+	end
+	button.Visible = visible
+	if visible and not wasVisible then
+		UiKit.popIn(button) -- e.g. when the tutorial ends
+	end
+	wasVisible = visible
 end
 
 local function redraw()
 	local state = StateStore.get()
 	if state then
-		updatePill(state)
+		updateButton(state)
 	end
 	if refreshPanel then
 		refreshPanel()
+	end
+end
+
+-- Left of the settings gear, worked out from the same inputs as the gear itself (SettingsController.placeGear), or
+-- back in the top stack when the corner has no room. Re-run when the window changes and every second (the player
+-- list can be switched on and off).
+local function place()
+	local screen = HudController.screen()
+	local scale = UiKit.scaleFor(workspace.CurrentCamera.ViewportSize)
+	local width = screen.AbsoluteSize.X / scale
+	local playerList = HudController.playerListWidth()
+	local gearX = ScreenLayout.gearX(width, playerList, CORNER.size, CORNER.margin, CORNER.stackHalfWidth)
+	local x = ScreenLayout.besideGearX(width, playerList, gearX, CORNER.size, CORNER.margin, CORNER.stackHalfWidth)
+	local corner = x ~= nil
+	if corner ~= inCorner then
+		inCorner = corner
+		if corner then
+			button.Size = UDim2.fromOffset(CORNER.size, CORNER.size)
+			button.Parent = screen
+		else
+			button.Size = UDim2.fromOffset(PILL_SIZE.X, PILL_SIZE.Y)
+			button.Parent = HudController.topStack() -- at its TOP_ORDER slot; Position is ignored there
+		end
+		redraw()
+	end
+	if x then
+		local position = UDim2.fromOffset(x, CORNER.top)
+		if button.Position ~= position then
+			button.Position = position
+		end
 	end
 end
 
@@ -251,15 +306,41 @@ function SocialController.open()
 end
 
 function SocialController.start()
-	pill = UiKit.button({
-		Name = "SocialPill",
+	button = UiKit.button({
+		Name = "SocialButton",
 		LayoutOrder = HudController.TOP_ORDER.social,
-		Size = UDim2.fromOffset(260, 34),
+		Size = UDim2.fromOffset(CORNER.size, CORNER.size),
 		BackgroundColor3 = UiTheme.palette("social"),
 		Visible = false,
-		Parent = HudController.topStack(),
 	}, SocialController.open)
+	-- Overlaps the icon's bottom edge, like the red dots on the side buttons overlap their corner.
+	badge = UiKit.new("Frame", {
+		Name = "Bonus",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 1, -4),
+		Size = UDim2.fromOffset(BADGE_SIZE.X, BADGE_SIZE.Y),
+		BackgroundColor3 = UiTheme.palette("success"),
+		Visible = false,
+		Parent = button,
+	}) :: Frame
+	UiKit.corner(BADGE_SIZE.Y / 2).Parent = badge
+	UiKit.stroke(2).Parent = badge
+	badgeLabel = UiKit.label({
+		Size = UDim2.new(1, -6, 1, -2),
+		Position = UDim2.fromOffset(3, 1),
+		Text = "",
+		Parent = badge,
+	})
+	place()
 
+	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(place)
+	HudController.screen():GetPropertyChangedSignal("AbsoluteSize"):Connect(place)
+	task.spawn(function()
+		while true do
+			task.wait(1)
+			place()
+		end
+	end)
 	StateStore.onChange(function()
 		redraw()
 	end)

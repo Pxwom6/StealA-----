@@ -157,6 +157,7 @@ local Theme = {
 		-- The bonus is for friends PLAYING here together, never for sending invites (Roblox policy): keep the wording so.
 		socialPillPlayTogether = "Play with friends: +{percent}% each",
 		socialPillJoinGroup = "Join our group: +{percent}%",
+		socialBadge = "+{percent}%", -- the tag under the 👥 Friends button while friends / the group raise income
 
 		-- First-time tutorial (Config/Tutorial): one short line per step, keep them short (they share the banner with
 		-- a step badge and the Skip button)
