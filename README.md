@@ -69,8 +69,8 @@ tools               Lune scripts (balance simulation)
 
 1. **Game Settings → Places → Max Players = 8** (one base per player; see DECISIONS.md #14).
 2. **Game Settings → Security → enable Studio Access to API Services** (to test saving/leaderboards in Studio).
-3. Create the 4 game passes and 5 developer products on the Creator Hub and paste their IDs into
-   `src/shared/Config/Monetization.luau` (every placeholder is marked `TODO(owner)`).
+3. Game passes and developer products: done. The 4 passes and 5 products exist on the Creator Hub and their IDs
+   are in `src/shared/Config/Monetization.luau`. Change prices on the Creator Hub, not in code.
 4. Add your UserId to `adminUserIds` in `src/shared/Config/LiveOps.luau`.
 5. **Group rewards:** paste your Roblox group's ID into `groupId` in `src/shared/Config/Social.luau`
    (`TODO(owner)`; the number in the group's URL). While it is `0` the group bonus, welcome gift and Join group button

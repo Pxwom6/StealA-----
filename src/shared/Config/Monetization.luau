@@ -2,11 +2,11 @@
 --[[
 	Game passes and developer products.
 
-	TODO(owner): create each pass / product on the Creator Hub
-	  (create.roblox.com → Creations → this experience → Monetization → Passes / Developer Products),
-	  then paste the numeric IDs below. An id of 0 means "not configured yet": the store shows the item as
-	  unavailable in live servers, and in Studio the "(Studio) Grant" button simulates the purchase through the
-	  exact same receipt code path so you can test before the IDs exist.
+	IDs come from the Creator Hub (create.roblox.com → Creations → Steal a Snackling → Monetization →
+	  Passes / Developer Products). Prices are set there, not here; the comment on each line records the
+	  price it launched at. An id of 0 means "not configured yet": the store shows the item as unavailable
+	  in live servers, and in Studio the "(Studio) Grant" button simulates the purchase through the exact
+	  same receipt code path.
 
 	Display names and descriptions live in Config/Theme.luau (store section) so a re-theme never touches this file.
 
@@ -25,18 +25,18 @@ export type ProductDef = { id: number, kind: ProductKind }
 
 local Monetization = {
 	passes = {
-		DoubleCash = { id = 0 }, -- TODO(owner): game pass id
-		VIP = { id = 0 }, -- TODO(owner): game pass id
-		ExtraPodiums = { id = 0 }, -- TODO(owner): game pass id
-		LongerLock = { id = 0 }, -- TODO(owner): game pass id
+		DoubleCash = { id = 2025248736 }, -- 2x Cash, 199 R$
+		VIP = { id = 2025212749 }, -- VIP, 149 R$
+		ExtraPodiums = { id = 2026712754 }, -- +4 Podiums, 99 R$
+		LongerLock = { id = 2026892736 }, -- Longer Lock, 49 R$
 	} :: { [string]: PassDef },
 
 	products = {
-		CashSmall = { id = 0, kind = "Cash" }, -- TODO(owner): developer product id
-		CashMedium = { id = 0, kind = "Cash" }, -- TODO(owner): developer product id
-		CashLarge = { id = 0, kind = "Cash" }, -- TODO(owner): developer product id
-		InstantLock = { id = 0, kind = "LockToken" }, -- TODO(owner): developer product id
-		ServerLuck = { id = 0, kind = "ServerLuck" }, -- TODO(owner): developer product id
+		CashSmall = { id = 3717840270, kind = "Cash" }, -- Snack Pack, 25 R$
+		CashMedium = { id = 3717844121, kind = "Cash" }, -- Snack Crate, 75 R$
+		CashLarge = { id = 3717844684, kind = "Cash" }, -- Snack Truck, 199 R$
+		InstantLock = { id = 3717845411, kind = "LockToken" }, -- Instant Lock, 15 R$
+		ServerLuck = { id = 3717845483, kind = "ServerLuck" }, -- Server Luck, 39 R$
 	} :: { [string]: ProductDef },
 
 	-- Perk values (balance knobs).
