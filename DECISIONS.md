@@ -469,3 +469,25 @@ quest is a config line).
 **Reversal cost:** medium — the saved keys and the meaning of the tier flags are permanent (bump the version for any
 change). Rewards, bonus per tier, quest pool and targets are free to re-tune (keep `incomeBonusPerTier` from going
 down). Quest ids are saved for one day only: retiring one costs nothing after that day.
+
+### 25. Cash-pack ladder and "Need $X more?" offers
+
+* **Ladder:** six cash packs from 5 to 199 Robux (Snack Bite, Bag, Pack, Basket, Crate, Truck). Each pays minutes
+  of the buyer's steady income with a minimum, and each step up is better value per Robux (`BALANCE.md`). The cheap
+  ones are low-risk first purchases and top-ups, the big ones reward committed buyers. `tests/Config.spec` keeps
+  income time and minimum rising in store order.
+* **Offer:** when buying off the belt or adding a podium fails for lack of cash, the server
+  (`CashOfferService`, rules in `Logic/CashOfferRules`) suggests the **cheapest pack that covers the gap**. The
+  client (`CashOfferController`) shows a small card: "Need $1.2K more? Snack Bag gives you +$1.3K", the Robux price,
+  a buy button that opens Roblox's own purchase prompt, and ✕. The cash comes through the normal receipt flow.
+* **Kept gentle for a young audience:** only after a purchase the player started themselves; never during the
+  first-time tutorial; at most one offer per 90 s (`Monetization.cashOffer.cooldownSeconds`), otherwise the old
+  "Not enough cash!" toast; never a pack that would still leave them short; the card never blocks play and closes
+  itself after 8 s.
+* **Analytics:** `cash_offer_shown` (value = cash offered, field = pack key) and `cash_offer_clicked` (pack key),
+  to see whether offers help or just annoy (compare with store purchases before deciding to tune the cooldown).
+
+**Why:** prompting at the moment a player wants something they can't afford is the standard place small packs
+sell, and sizing the offer to the exact gap keeps it honest (the smallest purchase that actually solves the
+problem, not the biggest).
+**Reversal cost:** low — set a very long cooldown to switch offers off; the remote and card are self-contained.

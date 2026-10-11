@@ -286,6 +286,11 @@ purchases and impulse top-ups ("just need a bit more for that Snackling"), the b
 Prices are set on the Creator Hub, so if one changes, keep this column (and the comment in `Economy.cashPacks`) in
 step and keep the ladder rising. A test checks that income time and floor both rise in store order.
 
+**"Need $X more?" offers** (`Monetization.cashOffer`): when a belt or podium purchase fails for lack of cash, the
+player is offered the cheapest pack above that covers the gap, at most once per 90 s and never during the
+tutorial (DECISIONS.md #25). Because the floors rise with the ladder, a brand-new player short of a few hundred is
+offered the 5 R$ Snack Bite, not a big pack.
+
 **Offline earnings** (`Economy.offline`): 50% of income for up to 2 h away (VIP: 3 h), only after 2+ minutes away.
 
 **Daily streak** (`Economy.daily`): 7-day cycle, reward = max(minimum, N minutes of income), from 3 minutes on

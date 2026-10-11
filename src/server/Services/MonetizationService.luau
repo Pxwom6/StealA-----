@@ -418,13 +418,16 @@ local function onDevGrant(player: Player, keyArg: unknown)
 end
 
 local function onClientEvent(player: Player, nameArg: unknown, keyArg: unknown)
-	local name = Guard.oneOf(nameArg, { "store_opened", "store_product_clicked" })
+	local name = Guard.oneOf(nameArg, { "store_opened", "store_product_clicked", "cash_offer_clicked" })
 	local session = Sessions.get(player)
 	if name == nil or session == nil then
 		return
 	end
 	if name == "store_opened" then
 		Analytics.storeStep(session, "StoreOpened")
+	elseif name == "cash_offer_clicked" then
+		local key = Guard.shortString(keyArg, 40)
+		Analytics.custom(session, "cash_offer_clicked", nil, { key or "" })
 	else
 		local key = Guard.shortString(keyArg, 40)
 		Analytics.storeStep(session, "ProductPrompted", { key or "" })

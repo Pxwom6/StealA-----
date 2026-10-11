@@ -173,6 +173,9 @@ local Theme = {
 
 		-- Toasts
 		notEnoughCash = "Not enough cash!",
+		-- "Need $X more?" offer (CashOfferController): the cheapest cash pack that covers the gap
+		cashOfferTitle = "Need {amount} more?",
+		cashOfferBody = "{pack} gives you +{amount}",
 		baseFull = "Your base is full! Sell or add a podium.",
 		tooFar = "Get closer!",
 		boughtCreature = "You got {creature}!",

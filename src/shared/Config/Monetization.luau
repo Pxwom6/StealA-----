@@ -74,6 +74,12 @@ local Monetization = {
 		"InstantLock",
 	} :: { string },
 
+	-- "Need $X more?": when a belt or podium purchase fails for lack of cash, offer the cheapest cash pack that covers
+	-- the gap (Logic/CashOfferRules). Never during the first-time tutorial, and at most one offer per cooldown.
+	cashOffer = {
+		cooldownSeconds = 90,
+	},
+
 	-- Receipt idempotency: how many recent PurchaseIds each player's save remembers, and purchase history length.
 	purchaseIdCacheSize = 100,
 	purchaseHistorySize = 100,

@@ -93,6 +93,7 @@ export type Session = {
 	pendingWelcome: { amount: number, seconds: number }?,
 	social: Social, -- written by SocialService, read by EconomyService and Replication
 	tutorial: TutorialRun?, -- written by TutorialService, read by Replication
+	cashOfferAt: number, -- os.clock() of the last "Need $X more?" offer (CashOfferService), -inf: never
 }
 
 local Sessions = {}
