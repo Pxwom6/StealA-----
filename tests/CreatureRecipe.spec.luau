@@ -22,7 +22,7 @@ local TIER_BANDS: { [string]: Band } = {
 	Secret = { price = { 1800000000, 3200000000 }, income = { 360000, 620000 }, payback = { 5000, 5162 } },
 }
 
--- Models must fit the bases (Config/Gameplay.map): neighbouring podiums stand podiumRowSpacing = 6.6 studs apart
+-- Models must fit the bases (Config/Gameplay.map): neighbouring podiums stood 6.6 studs apart (now 8, #27)
 -- side to side, and the podium billboard floats 8.5 studs above the podium (a model starts 0.7 above that point).
 local MAX_WIDTH = 6.6
 local MAX_HEIGHT = 7.4
