@@ -61,6 +61,8 @@ Studio test purchases, etc.).
 | `lune run tools/importParts.luau` | Import the polished Snackling models from `art/snackling-parts/` |
 | `lune run tools/worldsim/smoke.luau` | Build the map offline in every map theme and check it (CI runs this too) |
 | `lune run tools/worldsim/export.luau <mapId> [out.json]` | Dump one map theme's built world as JSON for a 3D preview |
+| `lune run tools/worldsim/exportCreatures.luau <out.json> <ids...>` | Dump Snacklings in a row (`pizza_pup:golden`, `rarity:Mythic`, `event:Winter2026`, `mutations:pizza_pup`) |
+| `node tools/preview/render.mjs <export.json> <outPrefix>` | Render an export to PNGs offline with three.js (see [`tools/preview`](tools/preview/README.md)) |
 | `lune run tools/worldsim/server.luau` | Boot the whole server offline and play a short two-player session (CI runs this too) |
 | `rojo build -o build/sync.rbxl` then `lune run tools/syncTest.luau build/sync.rbxl` | Check the Studio sync script (`studio/SyncFromGitHub.luau`) offline |
 | `stylua src tests tools studio` | Format |
@@ -224,6 +226,7 @@ kind is listed at the top of `src/shared/Logic/CreatureRecipe.luau`.
   Haunted, the map and weather ones).
 * **They feel alive:** Snacklings near your camera bob, squash and sway on their podiums, and hop along the belt
   (client-only, `IdleController` / `BeltController`).
+
 ### Snackdex and daily quests
 
 * **Snackdex** (the 📖 button): every Snackling a player has ever owned, with its mutations. Owning every regular
@@ -240,8 +243,6 @@ kind is listed at the top of `src/shared/Logic/CreatureRecipe.luau`.
 * **Creature models:** put a Model named exactly as the creature's `modelName` (see
   `src/shared/Config/Creatures.luau`) into `ReplicatedStorage/CreatureModels` in Studio. The game clones it instead
   of building it from its recipe. Rojo will not delete instances you add there.
-* **Sounds:** paste asset IDs into `src/shared/Config/Sounds.luau`.
-  of building the placeholder. Rojo will not delete instances you add there.
 * **Sounds:** paste asset IDs into `src/shared/Config/Sounds.luau` (see "Sounds and music").
 * **The world's look:** lighting, the spawn plaza, trees, the boundary wall and the terrain outside it are data in
   `src/shared/Config/Scenery.luau` (colours in `Theme.world`). CI checks every prop stays off the plots, the belt,
