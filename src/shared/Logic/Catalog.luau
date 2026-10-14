@@ -5,6 +5,7 @@
 
 ]]
 
+local MutationRules = require("./MutationRules")
 local Types = require("../Types")
 
 export type RarityInfo = Types.RarityDef
@@ -44,6 +45,26 @@ Catalog.MUTATION_MATERIALS = {
 	"Wood",
 	"WoodPlanks",
 	"CorrodedMetal",
+	"CrackedLava",
+	"Sandstone",
+	"Limestone",
+	"Basalt",
+	"Salt",
+}
+
+-- Particle presets a mutation look may add around the body (MutationLook.particles; built by CreatureVisuals).
+Catalog.MUTATION_PARTICLES = {
+	"drips",
+	"sprinkles",
+	"snow",
+	"dust",
+	"embers",
+	"motes",
+	"bubbles",
+	"leaves",
+	"sparks",
+	"stars",
+	"ooze",
 }
 
 local HEX_PATTERN = "^#%x%x%x%x%x%x$"
@@ -166,7 +187,9 @@ function Catalog.validate(creatures: { CreatureInfo }, rarities: { RarityInfo })
 end
 
 -- Problems with the mutation config (an empty list means valid): unique short ids and orders, chances in (0, 1)
--- whose total stays below 1 even with every event-only mutation active, multipliers >= 1, valid colours and looks.
+-- whose total stays below 1 even with every event-only mutation active plus the strongest map's and modifier's, at
+-- most one gate each, multipliers >= 1, valid colours and looks. Whether a gate names a real map theme / modifier is
+-- checked against those configs in tests/Config.spec.luau.
 function Catalog.validateMutations(mutations: { MutationInfo }): { string }
 	local problems: { string } = {}
 	local function problem(message: string)
@@ -175,7 +198,6 @@ function Catalog.validateMutations(mutations: { MutationInfo }): { string }
 
 	local ids: { [string]: boolean } = {}
 	local orders: { [number]: boolean } = {}
-	local totalChance = 0
 	for _, mutation in mutations do
 		local id = mutation.id
 		if ids[id] then
@@ -197,8 +219,6 @@ function Catalog.validateMutations(mutations: { MutationInfo }): { string }
 		end
 		if not (mutation.chance > 0 and mutation.chance < 1) then
 			problem(`mutation {id} chance must be between 0 and 1 (exclusive)`)
-		else
-			totalChance += mutation.chance
 		end
 		if not (isFinite(mutation.incomeMultiplier) and mutation.incomeMultiplier >= 1) then
 			problem(`mutation {id} incomeMultiplier must be a number >= 1`)
@@ -206,8 +226,18 @@ function Catalog.validateMutations(mutations: { MutationInfo }): { string }
 		if not (isFinite(mutation.priceMultiplier) and mutation.priceMultiplier >= 1) then
 			problem(`mutation {id} priceMultiplier must be a number >= 1`)
 		end
-		if mutation.eventId ~= nil and mutation.eventId == "" then
-			problem(`mutation {id} eventId must not be empty`)
+		local gates = 0
+		for _, key in { "eventId", "mapTheme", "modifierId" } do
+			local value = (mutation :: any)[key]
+			if value ~= nil then
+				gates += 1
+				if type(value) ~= "string" or value == "" or string.find(value, ":", 1, true) then
+					problem(`mutation {id} {key} must be a non-empty id without a colon`)
+				end
+			end
+		end
+		if gates > 1 then
+			problem(`mutation {id} has more than one gate (eventId, mapTheme, modifierId): pick one`)
 		end
 
 		local look = mutation.look
@@ -229,9 +259,14 @@ function Catalog.validateMutations(mutations: { MutationInfo }): { string }
 		if look.glow ~= nil and string.match(look.glow, HEX_PATTERN) == nil then
 			problem(`mutation {id} look.glow must be #RRGGBB`)
 		end
+		if look.particles ~= nil and table.find(Catalog.MUTATION_PARTICLES, look.particles) == nil then
+			problem(`mutation {id} look.particles {look.particles} is not a known preset`)
+		end
 	end
-	if not (totalChance < 1) then
-		problem(`mutation chances add up to {totalChance}; together they must stay below 1`)
+	-- Only one map and one modifier are ever live at once: the most that can roll together (MutationRules).
+	local worst = MutationRules.worstCaseTotal(mutations)
+	if not (worst < 1) then
+		problem(`mutation chances add up to {worst}; together they must stay below 1`)
 	end
 	return problems
 end

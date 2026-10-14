@@ -14,6 +14,8 @@ local Monetization = require("../src/shared/Config/Monetization")
 local Theme = require("../src/shared/Config/Theme")
 local Sounds = require("../src/shared/Config/Sounds")
 local LiveOps = require("../src/shared/Config/LiveOps")
+local MapThemes = require("../src/shared/Config/MapThemes")
+local Modifiers = require("../src/shared/Config/Modifiers")
 local LiveOpsRules = require("../src/shared/Logic/LiveOpsRules")
 local StealRules = require("../src/shared/Logic/StealRules")
 local Types = require("../src/shared/Types")
@@ -98,6 +100,19 @@ local RELEASED_MUTATION_IDS = {
 	"diamond",
 	"rainbow",
 	"haunted", -- Halloween 2026 (event-only)
+	-- map signatures (only on their map)
+	"honey",
+	"sprinkled",
+	"frozen",
+	"fossil",
+	"molten",
+	"moonlit",
+	"pearl",
+	"candy_apple",
+	-- weather (only while their server modifier runs)
+	"electric",
+	"galaxy",
+	"toxic",
 }
 
 T.describe("Config integrity", function()
@@ -197,13 +212,16 @@ T.describe("Config integrity", function()
 		local catalog = Catalog.build(Creatures, Rarities, Mutations)
 		local previous: Types.MutationDef? = nil
 		for _, mutation in catalog.mutationList do
-			if previous ~= nil and previous.eventId == nil and mutation.eventId == nil then
-				T.expect(mutation.chance).toBeLessThan(previous.chance)
-				T.expect(mutation.incomeMultiplier).toBeGreaterThan(previous.incomeMultiplier)
+			-- among the permanent ones (gated ones have their own checks below)
+			if MutationRules.gate(mutation) == nil then
+				if previous ~= nil then
+					T.expect(mutation.chance).toBeLessThan(previous.chance)
+					T.expect(mutation.incomeMultiplier).toBeGreaterThan(previous.incomeMultiplier)
+				end
+				previous = mutation
 			end
 			-- payback never gets worse than the plain creature's (a mutation is always a lucky find)
 			T.expect(mutation.incomeMultiplier).toBeAtLeast(mutation.priceMultiplier)
-			previous = mutation
 		end
 	end)
 
@@ -232,7 +250,7 @@ T.describe("Config integrity", function()
 		end
 		local configured = 0
 		for _, mutation in Mutations do
-			if mutation.eventId == nil then
+			if MutationRules.gate(mutation) == nil then
 				configured += mutation.chance
 			end
 		end
@@ -568,7 +586,7 @@ T.describe("Halloween 2026 Haunted mutation", function()
 	T.it("rolls after the permanent mutations, so their rolls are unchanged", function()
 		local def = haunted :: Types.MutationDef
 		for _, mutation in Mutations do
-			if mutation.eventId == nil then
+			if MutationRules.gate(mutation) == nil then
 				T.expect(mutation.order).toBeLessThan(def.order)
 			end
 		end
@@ -578,6 +596,138 @@ T.describe("Halloween 2026 Haunted mutation", function()
 			local outside = MutationRules.roll(Mutations, {}, b)
 			if during ~= "haunted" then
 				T.expect(during).toBe(outside)
+			end
+		end
+	end)
+end)
+
+T.describe("Map and weather mutations", function()
+	local function byIdOf(id: string): Types.MutationDef
+		for _, mutation in Mutations do
+			if mutation.id == id then
+				return mutation
+			end
+		end
+		error(`no mutation {id}`)
+	end
+	local golden = byIdOf("golden")
+	local diamond = byIdOf("diamond")
+
+	local function total(active: { [string]: boolean }, multiplier: number?): number
+		local sum = 0
+		for _, entry in MutationRules.odds(Mutations, active, multiplier) do
+			sum += entry.chance
+		end
+		return sum
+	end
+
+	T.it("gives every map exactly one signature mutation, and names only real maps", function()
+		for _, themeId in MapThemes.order do
+			local count = 0
+			for _, mutation in Mutations do
+				if mutation.mapTheme == themeId then
+					count += 1
+				end
+			end
+			if count ~= 1 then
+				error(`map {themeId} has {count} signature mutations (needs exactly 1)`)
+			end
+		end
+		for _, mutation in Mutations do
+			if mutation.mapTheme and MapThemes.themes[mutation.mapTheme] == nil then
+				error(`mutation {mutation.id} names unknown map {mutation.mapTheme}`)
+			end
+		end
+	end)
+
+	T.it("unlocks a mutation with every weather modifier, and names only real modifiers", function()
+		for _, mutation in Mutations do
+			if mutation.modifierId then
+				local modifier = Modifiers.modifiers[mutation.modifierId]
+				if modifier == nil then
+					error(`mutation {mutation.id} names unknown modifier {mutation.modifierId}`)
+				end
+				-- the start banner tells everyone what to look for
+				T.expect(string.find(modifier.description, mutation.displayName, 1, true) ~= nil).toBe(true)
+				T.expect(modifier.weight).toBeGreaterThan(0)
+			end
+		end
+		for id, modifier in Modifiers.modifiers do
+			local looksOnly = modifier.weather ~= nil or modifier.lighting ~= nil or modifier.skyEffect ~= nil
+			if
+				looksOnly
+				and next(modifier.effects :: any) == nil
+				and MutationRules.forModifier(Mutations, id) == nil
+			then
+				error(`weather modifier {id} changes nothing: give it a mutation (Config/Mutations modifierId)`)
+			end
+		end
+	end)
+
+	T.it("keeps the worst case (every event, the strongest map and modifier) below 10%", function()
+		local worst = MutationRules.worstCaseTotal(Mutations)
+		T.expect(worst).toBeLessThan(0.1)
+		local events: { [string]: boolean } = {}
+		for _, mutation in Mutations do
+			if mutation.eventId then
+				events[mutation.eventId] = true
+			end
+		end
+		local seen = 0
+		for _, themeId in MapThemes.order do
+			for _, modifierId in Modifiers.order do
+				local live = total(MutationRules.conditions(events, themeId, modifierId))
+				T.expect(live).toBeAtMost(worst + 1e-12)
+				seen = math.max(seen, live)
+			end
+		end
+		T.expect(seen).toBeNear(worst, 1e-12)
+	end)
+
+	T.it("stays sane with Golden Hour on any map (one modifier at a time)", function()
+		local strongest = 1
+		for _, id in Modifiers.order do
+			strongest = math.max(strongest, Modifiers.modifiers[id].effects.mutationChance or 1)
+		end
+		for _, themeId in MapThemes.order do
+			T.expect(total(MutationRules.conditions({}, themeId, "goldenHour"), strongest)).toBeLessThan(0.3)
+		end
+	end)
+
+	T.it("makes signatures a chase between Golden and Diamond, and weather ones like Diamond", function()
+		for _, mutation in Mutations do
+			local gate = MutationRules.gate(mutation)
+			if gate == "map" then
+				T.expect(mutation.chance).toBeLessThan(golden.chance)
+				T.expect(mutation.chance).toBeGreaterThan(diamond.chance)
+				T.expect(mutation.incomeMultiplier).toBeGreaterThan(golden.incomeMultiplier)
+				T.expect(mutation.incomeMultiplier).toBeLessThan(diamond.incomeMultiplier)
+			elseif gate == "modifier" then
+				T.expect(mutation.incomeMultiplier).toBeAtMost(diamond.incomeMultiplier)
+				T.expect(mutation.announceOnSpawn).toBe(true)
+			end
+		end
+	end)
+
+	T.it("rolls every gated mutation after the permanent ones", function()
+		local lastPermanent = 0
+		for _, mutation in Mutations do
+			if MutationRules.gate(mutation) == nil then
+				lastPermanent = math.max(lastPermanent, mutation.order)
+			end
+		end
+		for _, mutation in Mutations do
+			if MutationRules.gate(mutation) ~= nil then
+				T.expect(mutation.order).toBeGreaterThan(lastPermanent)
+			end
+		end
+	end)
+
+	T.it("uses only particle presets the models can build", function()
+		for _, mutation in Mutations do
+			local particles = mutation.look.particles
+			if particles then
+				T.expect(table.find(Catalog.MUTATION_PARTICLES, particles) ~= nil).toBe(true)
 			end
 		end
 	end)

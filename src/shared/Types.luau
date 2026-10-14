@@ -208,6 +208,7 @@ export type MutationLook = {
 	sparkles: boolean?, -- sparkle particles in the mutation colour
 	rainbow: boolean?, -- hue-cycling colours (animated on the client) and rainbow particles
 	glow: string?, -- "#RRGGBB": a soft point light in this colour (ghostly / glowing looks)
+	particles: string?, -- a particle preset around the body (Logic/Catalog.MUTATION_PARTICLES: "snow", "embers"...)
 }
 
 export type MutationDef = {
@@ -222,7 +223,10 @@ export type MutationDef = {
 	announceOnBuy: boolean,
 	announceOnSteal: boolean,
 	look: MutationLook,
+	-- At most one gate (none = it can roll on any spawn):
 	eventId: string?, -- only rolls while this LiveOps event is active
+	mapTheme: string?, -- only rolls while this map theme (Config/MapThemes) is up: the map's signature mutation
+	modifierId: string?, -- only rolls while this server modifier (Config/Modifiers) runs
 }
 
 -- Config: LiveOps ---------------------------------------------------------------------------------------------
@@ -265,6 +269,7 @@ export type SeasonLighting = {
 	colorShiftTop: string,
 	atmosphere: SeasonAtmosphere,
 	colorCorrection: SeasonColorCorrection,
+	clouds: { cover: number, density: number, color: string }?, -- nil: the map's clouds
 }
 
 -- How many of each code-built prop the server places (0 / nil = none). Positions come from the map layout.
@@ -432,7 +437,17 @@ export type LandmarkKind =
 	| "hayBales"
 
 -- Particles drifting around each player's camera (client, WeatherController; off with Reduce effects).
-export type WeatherKind = "none" | "snow" | "embers" | "leaves" | "fireflies" | "sprinkles" | "dust" | "petals"
+export type WeatherKind =
+	"none"
+	| "snow"
+	| "embers"
+	| "leaves"
+	| "fireflies"
+	| "sprinkles"
+	| "dust"
+	| "petals"
+	| "rain"
+	| "spores"
 
 export type MapThemeDef = {
 	displayName: string,
@@ -476,13 +491,21 @@ export type ModifierEffects = {
 	tagRange: number?, -- × how far a tag reaches
 }
 
+-- A one-off effect in the sky while a weather modifier runs (client only; off with Reduce effects).
+export type SkyEffect = "lightning" | "meteors"
+
 export type ModifierDef = {
 	displayName: string,
 	icon: string, -- emoji on the HUD chip and the banner
 	description: string, -- the start banner and the chip's tap toast; keep it short
 	color: string, -- chip and banner colour
 	weight: number, -- how often it comes up; 0 = only by command
-	effects: ModifierEffects,
+	effects: ModifierEffects, -- may be empty when the modifier unlocks a mutation (Config/Mutations modifierId)
+	-- Weather while it runs (looks only, all optional): particles around each player instead of the map's, a lighting
+	-- overlay over the map's (and a seasonal theme's) and an effect in the sky.
+	weather: WeatherKind?,
+	lighting: SeasonLighting?,
+	skyEffect: SkyEffect?,
 }
 
 export type ModifierSchedule = {

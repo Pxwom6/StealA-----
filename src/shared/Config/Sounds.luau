@@ -60,6 +60,9 @@ local Sounds = {
 		luck = { id = FUNFAIR_STING, volume = 0.45 },
 		mutation = { id = PIANO_HELLO, volume = 0.45, pitch = 1.2 }, -- a mutated Snackling (Golden, Diamond...) appears on the belt
 		mapChange = { id = SWEEP, volume = 0.5, pitch = 0.85 }, -- a new map theme (the title card drops in)
+		-- Thunder after a lightning flash (Thunderstorm modifier): the whoosh slowed right down into a low rumble.
+		-- A real thunder clap from the sound library would be better; paste its id here.
+		thunder = { id = WHOOSH, volume = 0.6, pitch = 0.5 },
 	} :: { [string]: SoundSlot },
 	-- Played when a creature of this rarity appears on the belt near you / lands in your base.
 	rarity = {

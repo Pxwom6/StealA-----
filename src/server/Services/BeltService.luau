@@ -1,11 +1,12 @@
 --!strict
 --[[
 	The conveyor. Every `belt.spawnInterval` seconds a creature is rolled (weighted rarity × server luck, event
-	creatures only during their event), then its mutation (Logic/MutationRules: fixed chances, never luck), and it
-	is broadcast to clients as {id, creatureId, spawnAt, variant}. A server modifier (ModifierService) can speed up the
-	spawns (and let the belt hold more), multiply mutation chances, or change prices. Items are not physics objects: position is a pure
-	function of spawn time (Logic/BeltMath), clients render pooled models, and the server validates every purchase
-	against where the item really is.
+	creatures only during their event), then its mutation (Logic/MutationRules: fixed chances, never luck; the map's
+	signature mutation and a weather modifier's only while they are up), and it is broadcast to clients as
+	{id, creatureId, spawnAt, variant}. A server modifier (ModifierService) can speed up the spawns (and let the belt
+	hold more), multiply mutation chances, or change prices. Items are not physics objects: position is a pure function
+	of spawn time (Logic/BeltMath), clients render pooled models, and the server validates every purchase against where
+	the item really is.
 
 	BuyBeltItem(itemId) checks: item exists and is on the belt, buyer is in range of it, buyer has a free podium
 	and enough cash at the SERVER's price (mutation included). Then the creature, with its mutation, "teleports" to
@@ -29,6 +30,7 @@ local CashOfferService = require(script.Parent.CashOfferService)
 local EconomyService = require(script.Parent.EconomyService)
 local GameEvents = require(script.Parent.GameEvents)
 local LiveOpsService = require(script.Parent.LiveOpsService)
+local MapThemeService = require(script.Parent.MapThemeService)
 local ModifierService = require(script.Parent.ModifierService)
 local PlotService = require(script.Parent.PlotService)
 local Remotes = require(script.Parent.Remotes)
@@ -69,6 +71,16 @@ end
 
 local function nextRandom(): number
 	return rng:NextNumber()
+end
+
+-- What the mutation roll may use right now: the running LiveOps events, the current map and the running modifier
+-- (MutationRules.conditions).
+function BeltService.mutationConditions(): { [string]: boolean }
+	return MutationRules.conditions(
+		LiveOpsService.activeEventIds(),
+		MapThemeService.current(),
+		ModifierService.current()
+	)
 end
 
 -- The banner for a belt moment (`kind`: "spawn" or "buy"), or nil: see MutationRules.banner for who triggers it and
@@ -114,7 +126,12 @@ local function spawnOne(forcedId: string?, forcedVariant: string?)
 	end
 	local variant = if forcedId
 		then forcedVariant
-		else MutationRules.roll(catalog.mutationList, activeEvents, nextRandom, effects.mutationChance)
+		else MutationRules.roll(
+			catalog.mutationList,
+			BeltService.mutationConditions(),
+			nextRandom,
+			effects.mutationChance
+		)
 	local item: BeltItem = { id = nextId, creatureId = creatureId, spawnAt = t, variant = variant }
 	nextId += 1
 	items[item.id] = item

@@ -12,7 +12,8 @@
 	Every model returned has a PrimaryPart called "Root" at its feet, all other parts welded to it, and no
 	collisions, so it can be anchored on a podium, moved along the belt, or welded above a thief's head.
 	Rarity flair (glow, sparkles, aura ring) is added on top of either kind of model, then the mutation look (if
-	any): material, tint, transparency, sparkles, rainbow, glow light. Face parts (eyes, pupils, highlights, mouth,
+	any): material, tint, transparency, sparkles, rainbow, glow light, and a particle preset (honey drips, snow,
+	embers, sparks, stars... MUTATION_PARTICLES below; the names are listed in Logic/Catalog.MUTATION_PARTICLES). Face parts (eyes, pupils, highlights, mouth,
 	cheeks...) carry the attribute MutationSkip = true and keep their look, so a face always reads; so do the Root
 	and the rarity Aura. In a custom model, give a part MutationSkip = true to keep its look too.
 	Rainbow parts are tagged RAINBOW_TAG; the client cycles their hue (MutationFxController).
@@ -34,6 +35,7 @@ local CreatureVisuals = {}
 
 local PARTICLE_RATE: { [number]: number } = { [4] = 5, [5] = 9, [6] = 16, [7] = 26 }
 local SPARKLE_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds"
+local SMOKE_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 local MUTATION_PARTICLE_RATE = 8
 -- Parts a mutation never restyles by name (Root is invisible; Aura is the rarity ring). Face parts of recipe models
 -- are skipped through their MutationSkip attribute.
@@ -61,6 +63,164 @@ local function rainbowSequence(): ColorSequence
 		ColorSequenceKeypoint.new(0.66, Color3.fromRGB(90, 255, 200)),
 		ColorSequenceKeypoint.new(1, Color3.fromRGB(170, 110, 255)),
 	})
+end
+
+local function sequence(keys: { { number } }): NumberSequence
+	local points: { NumberSequenceKeypoint } = {}
+	for _, key in keys do
+		table.insert(points, NumberSequenceKeypoint.new(key[1], key[2]))
+	end
+	return NumberSequence.new(points)
+end
+
+local function colours(list: { string }): ColorSequence
+	if #list == 1 then
+		return ColorSequence.new(UiTheme.color(list[1]))
+	end
+	local points: { ColorSequenceKeypoint } = {}
+	for index, hex in list do
+		table.insert(points, ColorSequenceKeypoint.new((index - 1) / (#list - 1), UiTheme.color(hex)))
+	end
+	return ColorSequence.new(points)
+end
+
+-- ParticleEmitter properties of each mutation particle preset (MutationLook.particles), emitted from the body.
+-- Logic/Catalog.MUTATION_PARTICLES lists the names; the world smoke test builds every mutation on a Snackling.
+local MUTATION_PARTICLES: { [string]: { [string]: any } } = {
+	drips = { -- honey sliding off and dripping down
+		Texture = SPARKLE_TEXTURE,
+		Color = colours({ "#F2A022", "#D9780A" }),
+		LightEmission = 0.2,
+		Size = sequence({ { 0, 0.24 }, { 1, 0.16 } }),
+		Speed = NumberRange.new(0.2, 0.6),
+		SpreadAngle = Vector2.new(180, 180),
+		Acceleration = Vector3.new(0, -9, 0),
+		Lifetime = NumberRange.new(0.6, 1),
+		Rate = 5,
+	},
+	sprinkles = { -- candy sprinkles popping off
+		Texture = SPARKLE_TEXTURE,
+		Color = colours({ "#FF5C8A", "#FFD23F", "#7CD9FF", "#B678FF" }),
+		LightEmission = 0.3,
+		Size = sequence({ { 0, 0.22 }, { 1, 0.18 } }),
+		Speed = NumberRange.new(2, 4),
+		SpreadAngle = Vector2.new(60, 60),
+		EmissionDirection = Enum.NormalId.Top,
+		Acceleration = Vector3.new(0, -10, 0),
+		Lifetime = NumberRange.new(0.8, 1.2),
+		Rate = 8,
+		Rotation = NumberRange.new(0, 360),
+		RotSpeed = NumberRange.new(-300, 300),
+	},
+	snow = { -- frost flakes drifting down
+		Texture = SMOKE_TEXTURE,
+		Color = colours({ "#FFFFFF" }),
+		Size = sequence({ { 0, 0.18 }, { 1, 0.12 } }),
+		Transparency = sequence({ { 0, 0.1 }, { 0.8, 0.2 }, { 1, 1 } }),
+		Speed = NumberRange.new(0.5, 1.2),
+		SpreadAngle = Vector2.new(180, 180),
+		Acceleration = Vector3.new(0, -1.5, 0),
+		Lifetime = NumberRange.new(1.2, 2),
+		Rate = 7,
+	},
+	dust = { -- sand puffs
+		Texture = SMOKE_TEXTURE,
+		Color = colours({ "#E8D3A6" }),
+		Size = sequence({ { 0, 0.4 }, { 1, 1.1 } }),
+		Transparency = sequence({ { 0, 0.55 }, { 1, 1 } }),
+		Speed = NumberRange.new(0.3, 0.8),
+		SpreadAngle = Vector2.new(180, 180),
+		Lifetime = NumberRange.new(1, 1.6),
+		Rate = 3,
+	},
+	embers = { -- glowing sparks rising
+		Texture = SPARKLE_TEXTURE,
+		Color = colours({ "#FFD27A", "#FF6A1F", "#C8301A" }),
+		LightEmission = 1,
+		Size = sequence({ { 0, 0.25 }, { 1, 0 } }),
+		Speed = NumberRange.new(1, 2.5),
+		SpreadAngle = Vector2.new(40, 40),
+		EmissionDirection = Enum.NormalId.Top,
+		Acceleration = Vector3.new(0, 2, 0),
+		Lifetime = NumberRange.new(0.8, 1.4),
+		Rate = 10,
+	},
+	motes = { -- pale moonlight motes hanging in the air
+		Texture = SPARKLE_TEXTURE,
+		Color = colours({ "#DCE4FF", "#9DB6FF" }),
+		LightEmission = 1,
+		Size = sequence({ { 0, 0 }, { 0.3, 0.3 }, { 1, 0 } }),
+		Speed = NumberRange.new(0.3, 0.8),
+		SpreadAngle = Vector2.new(180, 180),
+		Drag = 1,
+		Lifetime = NumberRange.new(1.5, 2.5),
+		Rate = 5,
+	},
+	bubbles = { -- pearly bubbles rising
+		Texture = SMOKE_TEXTURE,
+		Color = colours({ "#E8FFFF", "#BFF4FF" }),
+		LightEmission = 0.3,
+		Size = sequence({ { 0, 0.15 }, { 1, 0.3 } }),
+		Transparency = sequence({ { 0, 0.3 }, { 0.8, 0.4 }, { 1, 1 } }),
+		Speed = NumberRange.new(0.5, 1),
+		SpreadAngle = Vector2.new(30, 30),
+		EmissionDirection = Enum.NormalId.Top,
+		Acceleration = Vector3.new(0, 1.2, 0),
+		Lifetime = NumberRange.new(1.2, 2),
+		Rate = 5,
+	},
+	leaves = { -- autumn leaves tumbling down
+		Texture = SPARKLE_TEXTURE,
+		Color = colours({ "#E8762E", "#F2B33A", "#C2452A" }),
+		Size = sequence({ { 0, 0.3 }, { 1, 0.26 } }),
+		Speed = NumberRange.new(0.5, 1.5),
+		SpreadAngle = Vector2.new(180, 180),
+		Acceleration = Vector3.new(0.6, -2.5, 0.3),
+		Lifetime = NumberRange.new(1.2, 1.8),
+		Rate = 4,
+		Rotation = NumberRange.new(0, 360),
+		RotSpeed = NumberRange.new(-150, 150),
+	},
+	sparks = { -- quick electric zaps
+		Texture = SPARKLE_TEXTURE,
+		Color = colours({ "#FFFFFF", "#7FDBFF" }),
+		LightEmission = 1,
+		Size = sequence({ { 0, 0.35 }, { 1, 0 } }),
+		Speed = NumberRange.new(5, 9),
+		SpreadAngle = Vector2.new(180, 180),
+		Drag = 4,
+		Lifetime = NumberRange.new(0.15, 0.3),
+		Rate = 18,
+	},
+	stars = { -- twinkling stars
+		Texture = SPARKLE_TEXTURE,
+		Color = colours({ "#FFFFFF", "#B9A6FF", "#7FDBFF", "#FF9AE0" }),
+		LightEmission = 1,
+		Size = sequence({ { 0, 0 }, { 0.5, 0.4 }, { 1, 0 } }),
+		Speed = NumberRange.new(0.3, 1),
+		SpreadAngle = Vector2.new(180, 180),
+		Lifetime = NumberRange.new(1, 2),
+		Rate = 8,
+		RotSpeed = NumberRange.new(-60, 60),
+	},
+	ooze = { -- toxic green bubbles rising
+		Texture = SMOKE_TEXTURE,
+		Color = colours({ "#9BFF6B", "#4DFF7A" }),
+		LightEmission = 0.6,
+		Size = sequence({ { 0, 0.15 }, { 1, 0.3 } }),
+		Transparency = sequence({ { 0, 0.2 }, { 0.8, 0.35 }, { 1, 1 } }),
+		Speed = NumberRange.new(0.6, 1.2),
+		SpreadAngle = Vector2.new(30, 30),
+		EmissionDirection = Enum.NormalId.Top,
+		Acceleration = Vector3.new(0, 1.5, 0),
+		Lifetime = NumberRange.new(1, 1.6),
+		Rate = 6,
+	},
+}
+
+-- Whether `name` is a particle preset this module can build (MutationLook.particles).
+function CreatureVisuals.hasParticles(name: string): boolean
+	return MUTATION_PARTICLES[name] ~= nil
 end
 
 -- Colour of a rainbow part at clock time `t`; `offset` (0..1) staggers the parts of one model.
@@ -289,6 +449,15 @@ local function addMutationLook(model: Model, mutation: Types.MutationDef)
 			NumberSequenceKeypoint.new(1, 0),
 		})
 		emitter.Color = if look.rainbow then rainbowSequence() else ColorSequence.new(UiTheme.color(mutation.color))
+		emitter.Parent = body
+	end
+	local preset = if look.particles then MUTATION_PARTICLES[look.particles] else nil
+	if preset and body ~= nil and body:IsA("BasePart") then
+		local emitter = Instance.new("ParticleEmitter")
+		emitter.Name = "MutationParticles"
+		for key, value in preset do
+			(emitter :: any)[key] = value
+		end
 		emitter.Parent = body
 	end
 	if look.glow and body ~= nil and body:IsA("BasePart") then

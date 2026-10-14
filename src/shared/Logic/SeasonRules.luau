@@ -240,6 +240,45 @@ function SeasonRules.partCount(props: { Prop }): number
 	return total
 end
 
+-- Problems with a lighting overlay (a seasonal theme's, or a weather modifier's); `name` starts each message.
+function SeasonRules.lightingProblems(lighting: Types.SeasonLighting, name: string): { string }
+	local problems: { string } = {}
+	local function hex(value: string?, what: string)
+		if value == nil or string.match(value, HEX_PATTERN) == nil then
+			table.insert(problems, `{name} {what} must be #RRGGBB`)
+		end
+	end
+	local function range(value: number, low: number, high: number, what: string)
+		if not (value >= low and value <= high) then
+			table.insert(problems, `{name} {what} must be between {low} and {high}`)
+		end
+	end
+	range(lighting.clockTime, 0, 24, "lighting.clockTime")
+	range(lighting.brightness, 0, 10, "lighting.brightness")
+	hex(lighting.ambient, "lighting.ambient")
+	hex(lighting.outdoorAmbient, "lighting.outdoorAmbient")
+	hex(lighting.colorShiftTop, "lighting.colorShiftTop")
+	local atmosphere = lighting.atmosphere
+	range(atmosphere.density, 0, 1, "atmosphere.density")
+	range(atmosphere.offset, 0, 1, "atmosphere.offset")
+	range(atmosphere.glare, 0, 10, "atmosphere.glare")
+	range(atmosphere.haze, 0, 10, "atmosphere.haze")
+	hex(atmosphere.color, "atmosphere.color")
+	hex(atmosphere.decay, "atmosphere.decay")
+	local correction = lighting.colorCorrection
+	hex(correction.tint, "colorCorrection.tint")
+	range(correction.brightness, -1, 1, "colorCorrection.brightness")
+	range(correction.contrast, -1, 1, "colorCorrection.contrast")
+	range(correction.saturation, -1, 1, "colorCorrection.saturation")
+	local clouds = lighting.clouds
+	if clouds then
+		range(clouds.cover, 0, 1, "clouds.cover")
+		range(clouds.density, 0, 1, "clouds.density")
+		hex(clouds.color, "clouds.color")
+	end
+	return problems
+end
+
 -- Problems with Config/Seasons (an empty list means valid). `map` is used for the part budget.
 function SeasonRules.validate(config: SeasonsConfig, map: MapShape): { string }
 	local problems: { string } = {}
@@ -249,11 +288,6 @@ function SeasonRules.validate(config: SeasonsConfig, map: MapShape): { string }
 	local function hex(value: string?, what: string)
 		if value == nil or string.match(value, HEX_PATTERN) == nil then
 			problem(`{what} must be #RRGGBB`)
-		end
-	end
-	local function range(value: number, low: number, high: number, what: string)
-		if not (value >= low and value <= high) then
-			problem(`{what} must be between {low} and {high}`)
 		end
 	end
 
@@ -302,23 +336,9 @@ function SeasonRules.validate(config: SeasonsConfig, map: MapShape): { string }
 
 		local lighting = theme.lighting
 		if lighting then
-			range(lighting.clockTime, 0, 24, `{name} lighting.clockTime`)
-			range(lighting.brightness, 0, 10, `{name} lighting.brightness`)
-			hex(lighting.ambient, `{name} lighting.ambient`)
-			hex(lighting.outdoorAmbient, `{name} lighting.outdoorAmbient`)
-			hex(lighting.colorShiftTop, `{name} lighting.colorShiftTop`)
-			local atmosphere = lighting.atmosphere
-			range(atmosphere.density, 0, 1, `{name} atmosphere.density`)
-			range(atmosphere.offset, 0, 1, `{name} atmosphere.offset`)
-			range(atmosphere.glare, 0, 10, `{name} atmosphere.glare`)
-			range(atmosphere.haze, 0, 10, `{name} atmosphere.haze`)
-			hex(atmosphere.color, `{name} atmosphere.color`)
-			hex(atmosphere.decay, `{name} atmosphere.decay`)
-			local correction = lighting.colorCorrection
-			hex(correction.tint, `{name} colorCorrection.tint`)
-			range(correction.brightness, -1, 1, `{name} colorCorrection.brightness`)
-			range(correction.contrast, -1, 1, `{name} colorCorrection.contrast`)
-			range(correction.saturation, -1, 1, `{name} colorCorrection.saturation`)
+			for _, message in SeasonRules.lightingProblems(lighting, name) do
+				problem(message)
+			end
 		end
 	end
 	return problems
