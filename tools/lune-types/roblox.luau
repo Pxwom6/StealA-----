@@ -22,6 +22,11 @@ roblox.ColorSequence = nil :: any
 roblox.ColorSequenceKeypoint = nil :: any
 roblox.PhysicalProperties = nil :: any
 
+-- A place file's contents (fs.readFile) as a DataModel.
+function roblox.deserializePlace(_contents: string): any
+	error("stub")
+end
+
 function roblox.implementMethod(_className: string, _name: string, _callback: (...any) -> ...any)
 	error("stub")
 end
