@@ -681,3 +681,24 @@ id); give a weather modifier `weight = 0` to keep it for `/mod` only.
 rarely sees the same one twice in an evening.
 **Reversal cost:** none — a map with `weight = 0` never comes up on its own (its mutation then can't roll either, so
 keep its id in the config).
+
+### 33. Drop modifiers: crates to race for and coins to grab, checked like steals
+
+* **What:** two modifiers that put things on the walkways between the belt and the bases (`DropService`,
+  `Config/Drops`). **Supply Drop**: four crates parachute down during the five minutes (each announced); the first
+  player to hold one open for 2.5 s gets a Snackling rolled at 3x luck and 2x mutation chance (its sell value when
+  the base is full) plus 45 s of income, announced to everyone. **Coin Rain**: eight showers of twelve floating
+  coins; walking through one pays 3 s of income.
+* **Server-authoritative pickups:** coins are picked up by the server's own distance check against trusted positions
+  (`PositionTracker.isTrusted`), every 0.1 s, not by client touch events, so touch spoofing and teleporting get
+  nothing. A crate opens with two intents like a steal (`CrateBegin`, `CrateOpen`): landed and closed, in reach at a
+  trusted position both times, and held for the configured time less the usual network tolerance.
+* **Sized like cash packs:** every payout scales with the player's steady income (`EconomyMath.cashPackAmount`), so
+  drops matter to a newcomer and to a big base alike, and a full Coin Rain is about five minutes of income for the
+  whole server to share.
+* **Lifetimes, not the modifier, end them:** an unopened crate stays 90 s after landing and coins 22 s, even if the
+  modifier has ended, so nobody's hold is cut short.
+
+**Why:** the other modifiers change numbers; these give the whole server something to run for, on the walkways
+where everyone already is, and they make the belt area busier (more steals, more chances to tag).
+**Reversal cost:** none — `weight = 0` keeps either for `/mod` only; nothing is saved.

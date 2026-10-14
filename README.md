@@ -147,9 +147,9 @@ what grows on the tree spots, ten landmarks outside the wall and the weather; ga
 ### Server modifiers
 
 Every 4-8 minutes a server runs a 5-minute twist (`src/shared/Config/Modifiers.luau`): Rush Hour, Clearance Sale,
-Golden Hour, Lucky Breeze, Cash Splash, Sugar Rush, Quick Hands, Fortress, Snack Patrol, the rare Snack Party, or
-weather: a Thunderstorm (rain, lightning, Electric Snacklings), a Meteor Shower (a starry night with shooting stars,
-Galaxy Snacklings) or Toxic Fog (green haze, Toxic Snacklings). Change an effect, a name or the schedule there (CI
+Golden Hour, Lucky Breeze, Cash Splash, Sugar Rush, Quick Hands, Fortress, Snack Patrol, the rare Snack Party,
+weather (a Thunderstorm with rain, lightning and Electric Snacklings; a Meteor Shower with shooting stars and Galaxy
+Snacklings; Toxic Fog with Toxic Snacklings) or drops (a Supply Drop of crates to race for, or a Coin Rain). Change an effect, a name or the schedule there (CI
 keeps every effect inside `limits`); `schedule.enabled = false` turns them off and `weight = 0` keeps one for `/mod`
 only. BALANCE.md "Server modifiers" has the numbers.
 
@@ -158,6 +158,8 @@ only. BALANCE.md "Server modifiers" has the numbers.
   the mutation; CI checks).
 * **Thunder:** `world.thunder` in `src/shared/Config/Sounds.luau` is a slowed-down whoosh for now; paste a real
   thunder clap from the sound library there when you find one you like.
+* **Drops:** what crates and coins pay, how long crates take to fall and to open, and where they land are in
+  `src/shared/Config/Drops.luau`; how often they come is the modifier's `drops` (CI checks both).
 
 ### First-time tutorial
 
@@ -274,8 +276,8 @@ These work in Studio only (`src/server/Services/DevCommands.luau`):
 * `/gallery [mutationId|off]` (every Snackling in labelled rows past the north boundary wall, e.g. `/gallery golden`),
   `/sky <clockTime>` (preview another time of day, e.g. `/sky 18`; the next map or season change resets it)
 * `/map <id>`, `/map vote`, `/map list` (map themes; admins can use these in live servers too, that server only)
-* `/mod <id> [minutes]`, `/mod off`, `/mod list` (server modifiers, e.g. `/mod rushHour 2`, `/mod thunderstorm`;
-  admins too, that server only)
+* `/mod <id> [minutes]`, `/mod off`, `/mod list` (server modifiers, e.g. `/mod rushHour 2`, `/mod thunderstorm`,
+  `/mod supplyDrop` (first crate after 10 s); admins too, that server only)
 
 To test a seasonal event in Studio: `/event Halloween2026 5` turns Halloween on for 5 minutes (decorations, dusk
 lighting, banner with countdown, event Snacklings and Haunted on the belt), and `/event off` ends it early.

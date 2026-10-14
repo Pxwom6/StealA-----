@@ -524,6 +524,14 @@ export type ModifierEffects = {
 -- A one-off effect in the sky while a weather modifier runs (client only; off with Reduce effects).
 export type SkyEffect = "lightning" | "meteors"
 
+-- Things a modifier drops on the walkways while it runs (DropService, Config/Drops): supply crates (hold to open,
+-- first player wins) or a shower of coins (walk over them).
+export type ModifierDrops = {
+	kind: "crate" | "coins",
+	firstSeconds: number, -- the first drop this long after the modifier starts
+	everySeconds: number, -- then one every this long until it ends
+}
+
 export type ModifierDef = {
 	displayName: string,
 	icon: string, -- emoji on the HUD chip and the banner
@@ -536,6 +544,7 @@ export type ModifierDef = {
 	weather: WeatherKind?,
 	lighting: SeasonLighting?,
 	skyEffect: SkyEffect?,
+	drops: ModifierDrops?, -- crates or coins on the walkways (Config/Drops)
 }
 
 export type ModifierSchedule = {
@@ -551,6 +560,32 @@ export type ModifiersConfig = {
 	order: { string }, -- every modifier id once (display order; ties in picks resolve by it)
 	schedule: ModifierSchedule,
 	limits: { [string]: { min: number, max: number } }, -- allowed range of each effect
+}
+
+-- Config: drops (Config/Drops): what Supply Drop and Coin Rain put on the walkways -------------------------------
+
+-- Rewards are IncomeReward (below): sized from the player's steady income, like a cash pack.
+export type DropsConfig = {
+	-- Where drops land: a band on each side of the belt, between it and the bases (world X / Z; mirrored in Z).
+	area: { minX: number, maxX: number, minZ: number, maxZ: number },
+	crate: {
+		fallSeconds: number, -- parachuting down from the sky
+		dropHeight: number, -- studs above the walkway it starts falling from
+		holdSeconds: number, -- hold to open (the server re-checks it, like a steal)
+		holdTolerance: number, -- share of holdSeconds the server accepts (network jitter)
+		openRange: number, -- studs from the crate (the client prompt's reach; the server allows a little more)
+		lifetimeSeconds: number, -- an unopened crate vanishes this long after landing
+		luck: number, -- × server luck for the Snackling inside
+		mutationChance: number, -- × mutation chances for it
+		cash: IncomeReward, -- cash inside as well
+	},
+	coins: {
+		perWave: number,
+		height: number, -- studs above the walkway they float at
+		lifetimeSeconds: number,
+		pickupRange: number, -- horizontal studs from a coin's centre to the player's root
+		value: IncomeReward, -- each coin
+	},
 }
 
 export type MapThemesConfig = {

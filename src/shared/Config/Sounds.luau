@@ -63,6 +63,8 @@ local Sounds = {
 		-- Thunder after a lightning flash (Thunderstorm modifier): the whoosh slowed right down into a low rumble.
 		-- A real thunder clap from the sound library would be better; paste its id here.
 		thunder = { id = WHOOSH, volume = 0.6, pitch = 0.5 },
+		crateLand = { id = PAPER, volume = 0.5, pitch = 0.6 }, -- a supply crate thuds onto the walkway
+		crateOpen = { id = STINGER, volume = 0.55, pitch = 1.2 }, -- you opened a supply crate
 	} :: { [string]: SoundSlot },
 	-- Played when a creature of this rarity appears on the belt near you / lands in your base.
 	rarity = {

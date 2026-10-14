@@ -30,6 +30,8 @@ export type ClientToServer =
 	| "DevGrantProduct"
 	| "ClaimQuest"
 	| "VoteMap"
+	| "CrateBegin"
+	| "CrateOpen"
 
 export type ServerToClient =
 	"StateUpdate"
@@ -65,6 +67,8 @@ local CLIENT_TO_SERVER: { ClientToServer } = {
 	"DevGrantProduct",
 	"ClaimQuest",
 	"VoteMap",
+	"CrateBegin",
+	"CrateOpen",
 }
 
 local SERVER_TO_CLIENT: { ServerToClient } = {

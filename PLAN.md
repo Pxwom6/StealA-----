@@ -186,6 +186,8 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `SetSetting` | `key: string, on: boolean` | key is a known setting (`SettingsRules.KEYS`), value a boolean → `settings_<key>` flag |
 | `ClaimQuest` | `slot: int` | today's quest `slot` is finished and not claimed (`QuestRules.claim`; a stale day is paid automatically instead) |
 | `VoteMap` | `themeId: string` | a map vote is running and `themeId` is on its ballot (one vote per player, changeable) |
+| `CrateBegin` | `crateId: int` | the supply crate exists, has landed and is closed; the player's trusted position is within reach → the hold starts |
+| `CrateOpen` | `crateId: int` | same, and the hold lasted long enough (`DropRules.holdLongEnough`); the first one wins |
 | `DevGrantProduct` | `key: string` | **Studio only** – runs the real receipt path with a fake receipt |
 
 Server → client:
@@ -315,10 +317,10 @@ whatever map is on. Studio: `/map <id>`, `/map vote`, `/map list`. Offline: `lun
 
 ## 12. Server modifiers
 
-Every 4-8 minutes a server runs one of thirteen modifiers for 5 minutes (DECISIONS.md #30, `Config/Modifiers`): Rush
+Every 4-8 minutes a server runs one of fifteen modifiers for 5 minutes (DECISIONS.md #30, `Config/Modifiers`): Rush
 Hour, Clearance Sale, Golden Hour, Lucky Breeze, Cash Splash, Sugar Rush, Quick Hands, Fortress, Snack Patrol, the rare
-Snack Party, and three weathers (Thunderstorm, Meteor Shower, Toxic Fog) that change the sky and unlock a mutation
-(DECISIONS.md #31). A banner announces it, a chip beside the luck chip counts it down (tap it for the description), and
+Snack Party, three weathers (Thunderstorm, Meteor Shower, Toxic Fog) that change the sky and unlock a mutation
+(DECISIONS.md #31), and two drops (Supply Drop, Coin Rain; DropService, `Config/Drops`, DECISIONS.md #33). A banner announces it, a chip beside the luck chip counts it down (tap it for the description), and
 each system applies the effect where it decides (belt, economy, locks, steals, movement), the client showing the same
 prices, hold time and tag reach. Studio: `/mod <id> [minutes]`, `/mod off`, `/mod list`. Offline:
 `lune run tools/worldsim/server.luau` (CI) boots the server and plays a session that checks them.

@@ -79,6 +79,11 @@ function ModifierService.current(): string?
 	return current
 end
 
+-- When the running modifier ends (server time; 0 when none runs).
+function ModifierService.endsAt(): number
+	return if current then endsAt else 0
+end
+
 -- The walking-speed multiplier movement checks should allow right now: the current one, or the previous one for a
 -- few seconds after a change if that was faster.
 function ModifierService.walkSpeedAllowance(): number
