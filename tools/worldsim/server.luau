@@ -6,8 +6,9 @@
 	Boots src/server/init.server.luau in the Roblox stand-in (tools/worldsim/Sim) with ProfileStore replaced by an
 	in-memory store, then plays a short session with two fake players through the real remotes and chat commands:
 	join, buy from the belt, every server modifier's effect where it applies (belt prices, speed, locks, steals),
-	weather (the sky and the mutation it unlocks), a map change and a map vote, a base lock, and leaving with the save
-	written. It fails on any error, any
+	weather (the sky and the mutation it unlocks), drops, codes, gifts and the Lucky Spin, achievements, a base lock, a
+	map change and a map vote, a seasonal event switched on and off (Winter's decorations, lighting and mutation), and
+	leaving with the save written. It fails on any error, any
 	unexpected warning, or any check below. Server time only moves when the test moves it (Sim.advance).
 ]]
 
@@ -391,6 +392,50 @@ local function scenario()
 	task.wait(1.2)
 	check(workspace:GetAttribute("MapTheme") == candidates[2], `the most voted map wins ({candidates[2]})`)
 	check(workspace:GetAttribute("MapVoteEndsAt") == 0, "the vote is over")
+
+	-- Seasonal events: `/event` switches a theme on (decorations, lighting, its weather), its Snacklings and mutation
+	-- can spawn, and `/event off` takes it all away again ------------------------------------------------------------
+	local Seasons = Sim.shared("Config/Seasons")
+	local mapNow = workspace:GetAttribute("MapTheme")
+	Sim.chat(alice, "/event Winter2026 5")
+	task.wait(1.2)
+	check(workspace:GetAttribute("SeasonTheme") == "winter", "/event Winter2026 switches the winter theme on")
+	local decor = workspace:FindFirstChild("SeasonDecor")
+	local decorParts, inTheWay = 0, 0
+	local byName: { [string]: number } = {}
+	if decor then
+		for _, descendant in decor:GetDescendants() do
+			if descendant:IsA("BasePart") then
+				decorParts += 1
+				byName[descendant.Name] = (byName[descendant.Name] or 0) + 1
+				if descendant.CanCollide or descendant.CanTouch or descendant.CanQuery or not descendant.Anchored then
+					inTheWay += 1
+				end
+			end
+		end
+	end
+	-- 24 presents by the bases + 6 at the belt, 6 trees, 4 snowmen, 8 snowflakes, 16 drifts, 64 bulbs: 380 parts
+	-- (tests/SeasonRules.spec.luau pins the same layout)
+	check(decorParts == 380, `the winter decorations are built ({decorParts} parts)`)
+	check(
+		byName.Present == 30 and byName.Tier == 24 and byName.Snowball == 12 and byName.Snowdrift == 16,
+		"presents, trees, snowmen and drifts, each built from the parts the budget counts"
+	)
+	check(inTheWay == 0, "every decoration is anchored and never collides, touches or blocks a raycast")
+	local winterLighting = Seasons.themes.winter.lighting
+	check(math.abs(Lighting.ClockTime - winterLighting.clockTime) < 1e-3, "the winter mood lights the map")
+	Sim.chat(alice, "/spawn peppermint_puffin festive")
+	task.wait(0.1)
+	local festive = lastBeltItem("peppermint_puffin")
+	check(festive ~= nil and festive.variant == "festive", "a Festive Peppermint Puffin rides the belt")
+	check(BeltService.mutationConditions().Winter2026 == true, "Festive Snacklings can roll while the event runs")
+	Sim.chat(alice, "/event off")
+	task.wait(1.2)
+	check(workspace:GetAttribute("SeasonTheme") == "", "/event off ends the theme")
+	check(workspace:FindFirstChild("SeasonDecor") == nil, "and takes the decorations away")
+	check(BeltService.mutationConditions().Winter2026 == nil, "and the Festive mutation with it")
+	local mapSky = MapThemes.themes[mapNow].lighting
+	check(math.abs(Lighting.ClockTime - mapSky.clockTime) < 1e-3, "the map's own sky comes back")
 
 	-- Leaving -------------------------------------------------------------------------------------------------------------
 	local owned = #aliceSession.data.creatures

@@ -9,7 +9,11 @@
 
 	Reusing a theme next year: add the new event to Config/LiveOps and one line here, e.g.
 	    eventThemes = { Halloween2026 = "halloween", Halloween2027 = "halloween" }
-	A new season (e.g. winter): add a theme below; new prop kinds go in server/Services/SeasonService.luau.
+	A new season: add a theme below, mixing any of the props (Types.SeasonDecorations lists them and where they go);
+	a new prop kind goes in Logic/SeasonRules (where) and server/Services/SeasonService.luau (how it is built).
+	A theme only needs the palette colours of the props it places (Logic/SeasonRules.PALETTE_KEYS; CI checks them).
+	`weather` (optional) replaces the map's particles while the theme is on, e.g. "snow"; a weather modifier's still
+	wins while one runs. Its music is Config/Sounds `music.<theme id>`.
 
 	Every decoration is anchored, non-colliding and invisible to raycasts (CanQuery false), so it never changes
 	movement, steals, tagging or plot bounds. Keep each theme within `maxParts` (CI checks the estimate).
@@ -22,6 +26,7 @@ export type SeasonsConfig = Types.SeasonsConfig
 local Seasons: SeasonsConfig = {
 	eventThemes = {
 		Halloween2026 = "halloween",
+		Winter2026 = "winter",
 	},
 
 	themes = {
@@ -64,9 +69,57 @@ local Seasons: SeasonsConfig = {
 				ghost = "#EDEBFF",
 			},
 		},
+
+		winter = {
+			displayName = "Winter",
+			accentColor = "#4FC3FF",
+			priority = 1,
+			weather = "snow",
+			lighting = {
+				clockTime = 17.2, -- late afternoon: low warm sun, long blue shadows, the lights already glowing
+				brightness = 1.9,
+				ambient = "#4C5878",
+				outdoorAmbient = "#97A8CC",
+				colorShiftTop = "#FFC98F",
+				atmosphere = {
+					density = 0.28, -- a light winter haze: the whole map stays readable
+					offset = 0.12,
+					color = "#E4ECFF",
+					decay = "#93A8D6",
+					glare = 0.35,
+					haze = 1.3,
+				},
+				colorCorrection = { tint = "#F2F6FF", brightness = 0.02, contrast = 0.06, saturation = 0.04 },
+				clouds = { cover = 0.62, density = 0.5, color = "#F4F7FF" },
+			},
+			decorations = {
+				presentsPerPlot = 3,
+				beltPresentsPerSide = 3,
+				bulbsPerPlot = 8,
+				treesBetweenPlots = true,
+				snowmen = 4,
+				snowflakes = 8,
+				snowPilesPerPlot = 2,
+			},
+			palette = {
+				bulbs = { "#FF3B3B", "#2EE66B", "#FFD23F", "#3BA4FF" },
+				presents = { "#D7263D", "#2E8B57", "#2F6FD6", "#F2C230", "#8E44D9" },
+				ribbons = { "#FFD23F", "#FFFFFF", "#D7263D" },
+				tree = "#2E8050",
+				wood = "#6B4A2E",
+				treeStar = "#FFD54A",
+				ornaments = { "#FF3B3B", "#FFD23F", "#3BA4FF", "#FF7BD5" },
+				snow = "#F4F8FF",
+				carrot = "#FF8A2A",
+				coal = "#2A2A30",
+				scarf = "#D7263D",
+				hat = "#2A2A30",
+				snowflake = "#DDF0FF",
+			},
+		},
 	},
 
-	maxParts = 240,
+	maxParts = 400, -- Halloween builds 220, Winter 380 (DECISIONS.md #37)
 	transitionSeconds = 4,
 }
 

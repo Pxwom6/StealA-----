@@ -24,6 +24,15 @@ local Codes = {
 		reward = { kind = "creature", creatureId = "candy_corn_cat", variant = "haunted" },
 		expiresAt = 1793606400, -- 2026-11-02 08:00 UTC
 	},
+	-- Winter 2026: a Festive Peppermint Puffin until the event ends, and a New Year cash gift for its last week.
+	JINGLE26 = {
+		reward = { kind = "creature", creatureId = "peppermint_puffin", variant = "festive" },
+		expiresAt = 1799049600, -- 2027-01-04 08:00 UTC
+	},
+	HAPPY2027 = {
+		reward = { kind = "cash", incomeSeconds = 300, minimum = 5000 },
+		expiresAt = 1799366400, -- 2027-01-08 00:00 UTC
+	},
 }
 
 return Codes

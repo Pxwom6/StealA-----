@@ -203,8 +203,9 @@ no modifier): 5.15% of spawns (74.2 per server-hour). Expected value of one spaw
 * **Weather mutations** (`modifierId`): only while their weather modifier runs (5 minutes, a few times a day per
   server), about 2–3 per storm, each announced to the whole server so everyone races to the belt. x4 like Diamond.
 * **Event-only mutations** (with an `eventId`) roll only while that LiveOps event runs.
-* **The worst case stays small.** Only one map and one modifier are ever live, so CI checks every event plus the
-  strongest map and modifier together (`MutationRules.worstCaseTotal`, today 9.15%) against 10%, and the total
+* **The worst case stays small.** Only one map and one modifier are ever live, so CI checks any one seasonal event
+  plus the strongest map and modifier together (9.15% today) against 10%, every event at once (only possible if an
+  admin starts them together with `/event`; `MutationRules.worstCaseTotal`, today 11.15%) against 12%, and the total
   with Golden Hour on any map against 30%.
 * Want mutations rarer or stronger? Change `chance` (how often) or `incomeMultiplier` (how much) and re-run the
   simulation; keep `incomeMultiplier >= priceMultiplier`.
@@ -273,6 +274,65 @@ after about 7½ minutes (a Candy Corn Cat).
   before/after odds include the event's luck, and a test proves they match what the server rolls exactly.
 * **After the event** event Snacklings stop spawning but owned ones (and Haunted ones) keep earning forever, sell at
   their normal value and can still be stolen; nothing about them is saved differently (no save-format change).
+
+## Winter 2026 (limited-time event)
+
+`Winter2026` runs Fri 18 Dec 17:00 UTC → Mon 4 Jan 08:00 UTC; `WinterLuck2026` adds **2× luck** for Christmas, Thu 24
+Dec 17:00 UTC → Sat 26 Dec 23:59 UTC, and `NewYearCash2026` doubles **everyone's income** for New Year's Eve, Thu 31
+Dec 17:00 UTC → Fri 1 Jan 23:59 UTC (`Config/LiveOps.luau`). While Winter runs:
+
+| Snackling | Rarity | Price | Income | Payback | Share of its tier | Per server-hour | With 2x luck |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Peppermint Puffin | Rare | $11.5K | $152/s | 1m 15s | 23.1% | 38.2 | 65.3 |
+| Candy Cane Chameleon | Epic | $130K | $840/s | 2m 34s | 23.1% | 14 | 23.9 |
+| Yule Log Yak | Legendary | $3M | $5.85K/s | 8m 32s | 23.1% | 3.7 | 6.2 |
+| Spun Sugar Stag | Mythic | $75M | $50.5K/s | 24m 45s | 28.6% | 0.7 | 1.3 |
+
+| Mutation | Chance per spawn | Per server-hour | Income | Price | Payback vs plain | Announced |
+| --- | --- | --- | --- | --- | --- | --- |
+| Festive (event only) | 2% | 28.8 | x3 | x2 | x0.67 | no |
+
+The same shape as Halloween, on purpose: four Snacklings sharing their tiers' odds (a little pricier than the
+Halloween ones, still inside each tier's regular price and payback range), and an event mutation exactly as rare and
+strong as Haunted. With Festive (and the map's signature), any mutation is 7.15% of spawns, and one spawn's expected
+value is income x1.1285, price x1.0635, the same as during Halloween.
+
+Time to reach each rarity and income for a **new free player whose whole session is inside the event** (the last
+column has the Christmas luck on for the whole session too):
+
+| Rarity | No event | Winter | Winter + 2x Christmas luck |
+| --- | --- | --- | --- |
+| Common | 7s | 7s | 7s |
+| Uncommon | 1m 52s | 1m 52s | 2m 2s |
+| Rare | 4m 52s | 4m 52s | 4m 37s |
+| Epic | 11m 5s | 10m 50s | 10m 22s |
+| Legendary | 30m 52s | 30m 45s | 26m 40s |
+| Mythic | 1h 57m | 1h 50m | 1h 28m |
+| Secret | 9h 35m | 9h 22m | 5h 41m |
+| First rebirth affordable | 1h 2m | 58m 35s | 54m 17s |
+
+| Play time | No event | Winter | Winter + 2x Christmas luck |
+| --- | --- | --- | --- |
+| 10m | $1.01K/s | $1.14K/s | $1.52K/s |
+| 30m | $8.68K/s | $10.2K/s | $14.7K/s |
+| 1h | $31.5K/s | $34.4K/s | $53K/s |
+| 3h | $173K/s | $202K/s | $316K/s |
+| 8h | $568K/s | $639K/s | $1.12M/s |
+| 24h | $2.26M/s | $2.48M/s | $3.6M/s |
+
+A free player buys a median of 29 event Snacklings in 24 hours of event play (32 with the Christmas luck), the first
+after about 7½ minutes (a Peppermint Puffin). Re-run with `lune run tools/simulate.luau Winter2026 WinterLuck2026
+"Christmas luck"`.
+
+* **Everything said about Halloween holds**: no regular roll changes outside the event (CI replays the rolls for
+  both events), the tier odds and the Server Luck disclosure are the same during it, and after it the Snacklings
+  (and Festive ones) keep earning forever.
+* **New Year's Eve 2x Cash** is a ~31-hour party: income doubles for everyone. It stacks with the 2x Cash pass, and
+  with a Cash Splash modifier (×1.5) up to the 3× cap on event and modifier cash together (`maxCashMultiplier`).
+  Cash packs and rewards are sized from steady income without LiveOps events, so buying a pack during it is no better
+  or worse. Its banner ("New Year's Eve: 2x Cash!", counting down) replaces the Winter one while it runs.
+* **The Christmas luck** is shorter than Halloween's weekend (about 55 hours over the 24th-26th) and works the same
+  (2× of 6×; the store's odds stay exact).
 
 ## Server modifiers
 

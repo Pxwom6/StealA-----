@@ -286,6 +286,17 @@ local MUTATION_PARTICLES: { [string]: { [string]: any } } = {
 		Lifetime = NumberRange.new(1.4, 2.2),
 		Rate = 7,
 	},
+	festive = { -- red, green and gold fairy lights twinkling on and off
+		Texture = SPARKLE_TEXTURE,
+		Color = colours({ "#FF3B3B", "#FF3B3B", "#2EE66B", "#2EE66B", "#FFD23F", "#FFD23F" }),
+		LightEmission = 1,
+		Size = sequence({ { 0, 0 }, { 0.15, 0.3 }, { 0.4, 0.3 }, { 0.55, 0.05 }, { 0.7, 0.3 }, { 1, 0 } }),
+		Speed = NumberRange.new(0.2, 0.7),
+		SpreadAngle = Vector2.new(180, 180),
+		Drag = 1.5,
+		Lifetime = NumberRange.new(1.2, 2),
+		Rate = 9,
+	},
 }
 
 -- The halo: a ring of glowing segments floating above the head (MutationLook.halo).

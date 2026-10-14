@@ -3,9 +3,11 @@
 	Background music (Config/Sounds.music): the `lobby` track, or the track named after the seasonal theme that is on
 	(workspace attribute SeasonTheme, e.g. "halloween"), looping. Changing track crossfades; switching Music off in
 	Settings fades it out, and on again fades back in. A track with an empty id is silent, so nothing plays until the
-	owner pastes an audio id into Config/Sounds.
+	owner pastes an audio id into Config/Sounds. A track that fails to load (a removed or private audio) is skipped
+	for the rest of the session: a seasonal one falls back to the lobby track.
 ]]
 
+local ContentProvider = game:GetService("ContentProvider")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
@@ -22,17 +24,45 @@ type Playing = { sound: Sound, id: string }
 
 local current: Playing? = nil
 local musicGroup: SoundGroup
+-- Audio ids that failed to load this session.
+local broken: { [string]: boolean } = {}
+
+local function usable(track: Types.MusicTrack?): boolean
+	return track ~= nil and track.id ~= "" and not broken[track.id]
+end
 
 local function trackFor(theme: string): Types.MusicTrack?
 	local seasonal = if theme ~= "" then Sounds.music[theme] else nil
-	if seasonal and seasonal.id ~= "" then
+	if usable(seasonal) then
 		return seasonal
 	end
 	local lobby = Sounds.music.lobby
-	if lobby and lobby.id ~= "" then
+	if usable(lobby) then
 		return lobby
 	end
 	return nil
+end
+
+-- Waits for `sound` to load; if it can't, skips its id from now on and picks the next track.
+local function watchLoad(sound: Sound, id: string)
+	task.spawn(function()
+		local failed = false
+		local ok = pcall(function()
+			ContentProvider:PreloadAsync({ sound }, function(_, status: Enum.AssetFetchStatus)
+				if status == Enum.AssetFetchStatus.Failure then
+					failed = true
+				end
+			end)
+		end)
+		if (failed or not ok) and not broken[id] then
+			warn(`[Music] {id} did not load; skipping it`)
+			broken[id] = true
+			local playing = current
+			if playing and playing.sound == sound then
+				MusicController.refresh()
+			end
+		end
+	end)
 end
 
 local function fadeInfo(): TweenInfo
@@ -74,6 +104,7 @@ function MusicController.refresh()
 	sound:Play()
 	TweenService:Create(sound, fadeInfo(), { Volume = track.volume or DEFAULT_VOLUME }):Play()
 	current = { sound = sound, id = track.id }
+	watchLoad(sound, track.id)
 end
 
 function MusicController.start()

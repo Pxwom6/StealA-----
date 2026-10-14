@@ -15,7 +15,8 @@
 	order             display order (rarest last; event-only mutations after the permanent ones); also the order
 	                  mutations are rolled in, so append new ones with a higher order to keep existing rolls as they are
 	chance            probability per belt spawn, 0 < chance < 1; all chances together, event ones included, must stay
-	                  below 1 (CI keeps them below 10%)
+	                  below 1 (CI keeps any one event's with the strongest map and modifier below 10%, every event's
+	                  together below 12%)
 	incomeMultiplier  × the creature's base income (>= 1)
 	priceMultiplier   × the creature's belt price, rounded to a whole number (>= 1); sell value follows it
 	announce*         server-wide banner on spawn / buy / steal (in addition to the rarity's own flags)
@@ -112,6 +113,29 @@ local Mutations: { MutationDef } = {
 			glow = "#7CFF9B",
 		},
 		eventId = "Halloween2026",
+	},
+	-- Winter 2026: a pine-green knitted-sweater look with twinkling red, green and gold fairy lights, like a dressed
+	-- tree. Rolls only while LiveOps event "Winter2026" runs; like Haunted, rarer than Golden and stronger (order 22:
+	-- rolled after every other one, so no existing roll changes).
+	{
+		id = "festive",
+		displayName = "Festive",
+		color = "#FF4D5E",
+		order = 22,
+		chance = 0.02,
+		incomeMultiplier = 3,
+		priceMultiplier = 2,
+		announceOnSpawn = false,
+		announceOnBuy = false,
+		announceOnSteal = false,
+		look = {
+			material = "Fabric",
+			tint = "#1E7A45",
+			tintStrength = 0.55,
+			glow = "#FFD27A",
+			particles = "festive",
+		},
+		eventId = "Winter2026",
 	},
 
 	-- Map signatures -------------------------------------------------------------------------------------------

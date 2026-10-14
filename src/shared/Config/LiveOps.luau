@@ -71,6 +71,40 @@ local LiveOps = {
 			title = "Luck weekend",
 			durationSeconds = 1800,
 		},
+
+		-- Winter 2026: four event Snacklings (Config/Creatures), the Festive mutation (Config/Mutations) and the
+		-- "winter" seasonal theme (Config/Seasons: presents, trees, snowmen, string lights, snowfall, a wintry dusk).
+		-- New Year's Eve 2x Cash comes first in this list so its banner shows instead of the Winter one while it runs
+		-- (the HUD shows the first active event that has a banner).
+		-- Thu 31 Dec 17:00 UTC (12 PM EST / 9 AM PST) -> Fri 1 Jan 23:59 UTC (6:59 PM EST / 3:59 PM PST).
+		{
+			id = "NewYearCash2026",
+			startsAt = 1798736400, -- 2026-12-31 17:00 UTC
+			endsAt = 1798847940, -- 2027-01-01 23:59 UTC
+			cashMultiplier = 2,
+			bannerText = "New Year's Eve: 2x Cash!",
+			title = "2x Cash",
+			durationSeconds = 1800,
+		},
+		-- Fri 18 Dec 17:00 UTC (12 PM EST / 9 AM PST) -> Mon 4 Jan 08:00 UTC (3 AM EST / Sun midnight PST).
+		{
+			id = "Winter2026",
+			startsAt = 1797613200, -- 2026-12-18 17:00 UTC
+			endsAt = 1799049600, -- 2027-01-04 08:00 UTC
+			bannerText = "Winter: festive Snacklings & Festive mutations!",
+			title = "Winter",
+			durationSeconds = 3600, -- `/event Winter2026` runs it for an hour
+		},
+		-- Christmas luck days inside the event: 2x luck (stacks with Server Luck, clamped by limits below).
+		-- Thu 24 Dec 17:00 UTC (12 PM EST / 9 AM PST) -> Sat 26 Dec 23:59 UTC (6:59 PM EST / 3:59 PM PST).
+		{
+			id = "WinterLuck2026",
+			startsAt = 1798131600, -- 2026-12-24 17:00 UTC
+			endsAt = 1798329540, -- 2026-12-26 23:59 UTC
+			luckMultiplier = 2,
+			title = "Christmas luck",
+			durationSeconds = 1800,
+		},
 	} :: { EventDef },
 
 	limits = {

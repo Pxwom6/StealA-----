@@ -1,7 +1,7 @@
 --!strict
 --[[
 	How every Snackling looks: one model recipe per creature id (Config/Creatures). Plain data only. The polished models in
-	Config/CreatureParts replace these where they exist (all 64 today); the recipes stay as the fallback.
+	Config/CreatureParts replace these where they exist (all 68 today); the recipes stay as the fallback.
 	Logic/CreatureRecipe turns a recipe into parts (its header lists every plan, skin, face, feature and topping) and
 	CreatureVisuals builds them in 3D; ReplicatedStorage.CreatureModels/<modelName> replaces a recipe with custom art.
 
@@ -1187,6 +1187,85 @@ local CreatureLooks: { [string]: CreatureLook } = {
 			{ kind = "swirl", colors = { "#FFF4DC" }, n = 3 },
 			{ kind = "crumbs", colors = { "#8A4A1E" }, n = 4 },
 			{ kind = "leaf", colors = { "#5BBF3A", "#4A7A2A" } },
+		},
+	},
+
+	-- Event: Winter 2026 ------------------------------------------------------------------------------------------
+	peppermint_puffin = {
+		size = 2.5,
+		plan = "biped",
+		arms = false,
+		body = { skin = "round", color = "#2B2D3A", w = 0.78, h = 0.62 },
+		head = { skin = "round", color = "#2B2D3A", w = 0.78, h = 0.66 },
+		face = { eyes = "round", mouth = "none", cheeks = CHEEKS },
+		limbs = "#FF7A2E",
+		features = {
+			{ kind = "belly", color = WHITE },
+			{ kind = "mask", color = WHITE },
+			{ kind = "snout", style = "beak", color = "#FF7A2E", color2 = "#E8253A", scale = 1.2 },
+			{ kind = "wings", style = "tiny", color = "#2B2D3A", scale = 1.2 },
+		},
+		toppings = {
+			{ kind = "swirlmark", on = "body", colors = { "#E8253A" } },
+			{ kind = "leaf", on = "head", colors = { "#2E8B57", "#1F6B3F" } },
+		},
+	},
+	candy_cane_chameleon = {
+		size = 2.6,
+		plan = "quadruped",
+		legs = 0.14,
+		body = { skin = "round", color = "#FFF6F2", w = 0.62, h = 0.46, d = 1 },
+		head = { skin = "round", color = "#FFF6F2", w = 0.6, h = 0.52, d = 0.64 },
+		face = { eyes = "big", mouth = "smile", cheeks = "#FF8FA8" },
+		limbs = "#E8253A",
+		features = {
+			{ kind = "stripes", style = "bands", n = 3, color = "#E8253A" },
+			{ kind = "crest", n = 3, color = "#E8253A", color2 = "#FFFFFF" },
+			{ kind = "tail", style = "curly", color = "#E8253A", color2 = "#FFF6F2" },
+		},
+		toppings = {
+			{ kind = "leaf", on = "head", colors = { "#2E8B57", "#1F6B3F" } },
+			{ kind = "balls", on = "body", colors = { "#2EB86B" }, n = 2, spread = 0.5 },
+		},
+	},
+	yule_log_yak = {
+		size = 2.25,
+		plan = "quadruped",
+		legs = 0.24,
+		body = { skin = "roll", color = "#5A3420", color2 = "#F6E7D2", color3 = "#7A4A2C", w = 0.92, h = 0.66, d = 1 },
+		head = { skin = "round", color = "#6B3E24", w = 0.66, h = 0.58, d = 0.62 },
+		face = { eyes = "round", mouth = "smile", cheeks = "#FF9F7A" },
+		limbs = "#4A2A18",
+		features = {
+			{ kind = "snout", style = "dog", color = "#8A5A3C", color2 = NOSE, scale = 1.1 },
+			{ kind = "horns", style = "curved", color = "#FFF4E2" },
+			{ kind = "mane", color = "#4A2A18" },
+			{ kind = "tail", style = "puff", color = "#4A2A18" },
+		},
+		toppings = {
+			{ kind = "crumbs", on = "body", colors = { WHITE }, n = 6, spread = 0.9 },
+			{ kind = "leaf", on = "body", colors = { "#2E8B57", "#1F6B3F" } },
+			{ kind = "cherry", on = "body", colors = { "#E8253A" } },
+		},
+	},
+	spun_sugar_stag = {
+		size = 2.6,
+		plan = "quadruped",
+		legs = 0.34,
+		neck = 0.2,
+		body = { skin = "round", color = "#F4F7FF", w = 0.72, h = 0.58, d = 1 },
+		head = { skin = "round", color = "#F4F7FF", w = 0.54, h = 0.52, d = 0.68 },
+		face = { eyes = "big", mouth = "smile", cheeks = "#FFB0D0" },
+		limbs = "#E4EAFF",
+		features = {
+			{ kind = "snout", style = "dog", color = "#FFFFFF", color2 = "#9FB4FF", scale = 1.05 },
+			{ kind = "horns", style = "antlers", color = "#BFE6FF", material = "Glass" },
+			{ kind = "ears", style = "pointy", color = "#F4F7FF", scale = 0.6 },
+			{ kind = "tail", style = "puff", color = WHITE },
+			{ kind = "spots", n = 4, color = "#CFE0FF" },
+		},
+		toppings = {
+			{ kind = "sprinkles", on = "body", colors = { WHITE, "#BFE6FF", "#FFD8F0" }, n = 8, spread = 0.9 },
 		},
 	},
 }

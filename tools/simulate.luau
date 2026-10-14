@@ -19,8 +19,11 @@
 	  * no stealing, no offline earnings, no daily rewards, no luck boosts (all of these only speed things up)
 	  * the main tables run with no LiveOps event; the "During an event" tables replay the free player with every
 	    spawn rolled as if the event ran for the whole session (event Snacklings and mutations eligible), with and
-	    without the event's luck weekend
+	    without the event's luck days. The event defaults to Halloween; another one is chosen by its ids:
+	        lune run tools/simulate.luau Winter2026 WinterLuck2026 "Christmas luck"
 ]]
+
+local process = require("@lune/process")
 
 local Creatures = require("../src/shared/Config/Creatures")
 local Mutations = require("../src/shared/Config/Mutations")
@@ -77,9 +80,10 @@ local SCENARIOS: { Scenario } = {
 	},
 }
 
--- The seasonal event the "During an event" tables simulate, and its luck weekend's multiplier (Config/LiveOps).
-local EVENT_ID = "Halloween2026"
-local EVENT_LUCK_ID = "HalloweenLuck2026"
+-- The seasonal event the "During an event" tables simulate, and its luck event's multiplier (Config/LiveOps).
+local EVENT_ID = process.args[1] or "Halloween2026"
+local EVENT_LUCK_ID = process.args[2] or "HalloweenLuck2026"
+local EVENT_LUCK_LABEL = process.args[3] or "luck weekend"
 local eventLuck = 1
 for _, event in LiveOps.events do
 	if event.id == EVENT_LUCK_ID then
@@ -90,7 +94,7 @@ end
 local EVENT_SCENARIOS: { Scenario } = {
 	{ name = `Free player, {EVENT_ID}`, multiplier = 1, extraPodiums = 0, events = { [EVENT_ID] = true } },
 	{
-		name = `Free player, {EVENT_ID} + {eventLuck}x luck weekend`,
+		name = `Free player, {EVENT_ID} + {eventLuck}x {EVENT_LUCK_LABEL}`,
 		multiplier = 1,
 		extraPodiums = 0,
 		events = { [EVENT_ID] = true, [EVENT_LUCK_ID] = true },

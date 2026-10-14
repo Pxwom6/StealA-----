@@ -325,7 +325,7 @@ function SceneryLayout.partEstimate(config: SceneryConfig, layout: Layout, map: 
 end
 
 -- Problems with Config/Scenery on this map (an empty list means valid). `avoid` lists decorations that must stay
--- clear (the Halloween props from Logic/SeasonRules).
+-- clear (every seasonal theme's props from Logic/SeasonRules).
 function SceneryLayout.validate(config: SceneryConfig, map: MapConfig, belt: BeltConfig, avoid: { Point }): { string }
 	local problems: { string } = {}
 	local function problem(message: string)
