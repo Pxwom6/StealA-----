@@ -2,7 +2,7 @@
 --[[
 	Weather for the current map theme (Config/MapThemes `weather`): particles drifting around this player's camera —
 	snow, embers, falling leaves, fireflies, candy sprinkles, desert dust, petals, stardust, pollen, feathers, bubbles,
-	chocolate shavings, confetti or rain. One invisible box follows the camera
+	chocolate shavings, confetti, lemonade fizz or rain. One invisible box follows the camera
 	(it lives under the Camera, so only this client has it) and its emitter fills the air around you, which is far
 	cheaper than covering the whole map.
 
@@ -317,6 +317,23 @@ local RECIPES: { [Types.WeatherKind]: Recipe } = {
 			Rotation = NumberRange.new(0, 360),
 			RotSpeed = NumberRange.new(-260, 260),
 			EmissionDirection = Enum.NormalId.Bottom,
+		},
+	},
+	-- Lemonade fizz: tiny bubbles rising everywhere, catching the sun.
+	fizz = {
+		boxSize = Vector3.new(100, 10, 100),
+		offset = Vector3.new(0, -4, 0),
+		props = {
+			Texture = SPARKLE,
+			Color = colours({ Color3.fromRGB(255, 250, 220), Color3.fromRGB(255, 233, 122) }),
+			LightEmission = 0.5,
+			Size = sequence({ { 0, 0.1 }, { 0.5, 0.22 }, { 1, 0 } }),
+			Speed = NumberRange.new(2, 4),
+			SpreadAngle = Vector2.new(15, 15),
+			Acceleration = Vector3.new(0.2, 1.2, 0.1),
+			Lifetime = NumberRange.new(3, 5),
+			Rate = 45,
+			EmissionDirection = Enum.NormalId.Top,
 		},
 	},
 	bubbles = {

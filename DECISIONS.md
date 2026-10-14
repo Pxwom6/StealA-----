@@ -804,3 +804,23 @@ it needs no new save data and starts and ends by itself.
 
 **Why:** more variety for the 20-minute rotation, and three more signature mutations to collect.
 **Reversal cost:** none — `weight = 0` keeps a map out of rotation; keep its mutation id.
+
+### 39. Three more maps: Rock Candy Caverns, Lemonade Lagoon, Bubblegum Bayou
+
+* **What:** **Rock Candy Caverns**: a cave at night with no stars and a low violet cloud roof, slate ground and marble
+  walkways, crystal clusters and sticks crusted with rock candy, split-open geodes glowing from inside and pink
+  rock-candy spires (the ice spire recoloured), stardust in the air. **Lemonade Lagoon**: lime grass around a lagoon of
+  lemonade, lemon trees and palms with lemons for coconuts, lemonade stands under striped awnings, giant lemon slices
+  and beach umbrellas, bright noon with fizz rising from the ground. **Bubblegum Bayou**: a swamp at a pink sunset,
+  muddy ground, boardwalks and wooden walls, swamp trees hung with bubblegum moss, stalks blowing bubbles, shacks on
+  stilts with a lit window and huge bubblegum bubbles floating overhead, fireflies. Signature mutations: Amethyst
+  (violet crystal with a glow and glitter), Zesty (sour sugar crust, lemon-lime, fizz) and Bubblegum (glossy pink,
+  bubbles).
+* **Same guarantees as #38:** 4 flora kinds, 5 landmark kinds, 1 weather kind and 2 particle presets, each counted in
+  MapThemeRules and built exactly (the smoke test builds and restyles all twenty maps). Rendered offline before
+  shipping: the lagoon's ground was too close to its lemonade (now greener, with a blue sky), the bayou moved from
+  after sunset to the sunset itself, lemons were pushed out of the tree canopy, and Zesty was moved away from Cheesy's
+  yellow (Salt material, a greener tint).
+
+**Why:** more variety for the rotation and three more mutations to collect; caves and swamps are moods no map had.
+**Reversal cost:** none — `weight = 0` keeps a map out of rotation; keep its mutation id.
