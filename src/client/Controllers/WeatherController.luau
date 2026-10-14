@@ -1,7 +1,8 @@
 --!strict
 --[[
 	Weather for the current map theme (Config/MapThemes `weather`): particles drifting around this player's camera —
-	snow, embers, falling leaves, fireflies, candy sprinkles, desert dust or petals. One invisible box follows the camera
+	snow, embers, falling leaves, fireflies, candy sprinkles, desert dust, petals, stardust, pollen, feathers, bubbles
+	or rain. One invisible box follows the camera
 	(it lives under the Camera, so only this client has it) and its emitter fills the air around you, which is far
 	cheaper than covering the whole map.
 
@@ -213,6 +214,76 @@ local RECIPES: { [Types.WeatherKind]: Recipe } = {
 			Lifetime = NumberRange.new(0.7, 0.9),
 			Rate = 320,
 			EmissionDirection = Enum.NormalId.Bottom,
+		},
+	},
+	-- Twinkling stars hanging all around (Cookie Moon).
+	stardust = {
+		boxSize = Vector3.new(100, 30, 100),
+		offset = Vector3.new(0, 10, 0),
+		props = {
+			Texture = SPARKLE,
+			Color = colours({ Color3.fromRGB(255, 255, 255), Color3.fromRGB(190, 200, 255) }),
+			LightEmission = 1,
+			Size = sequence({ { 0, 0 }, { 0.5, 0.32 }, { 1, 0 } }),
+			Speed = NumberRange.new(0.2, 0.6),
+			SpreadAngle = Vector2.new(180, 180),
+			Lifetime = NumberRange.new(3, 5),
+			Rate = 26,
+			EmissionDirection = Enum.NormalId.Top,
+		},
+	},
+	-- Golden pollen floating in warm air (Mango Rainforest).
+	pollen = {
+		boxSize = Vector3.new(90, 12, 90),
+		offset = Vector3.new(0, -1, 0),
+		props = {
+			Texture = SPARKLE,
+			Color = colours({ Color3.fromRGB(232, 242, 122), Color3.fromRGB(184, 224, 90) }),
+			LightEmission = 0.4,
+			Size = sequence({ { 0, 0 }, { 0.2, 0.24 }, { 0.8, 0.2 }, { 1, 0 } }),
+			Speed = NumberRange.new(0.3, 1),
+			SpreadAngle = Vector2.new(180, 180),
+			Acceleration = Vector3.new(0.6, 0.15, 0.3),
+			Drag = 0.4,
+			Lifetime = NumberRange.new(6, 9),
+			Rate = 18,
+			EmissionDirection = Enum.NormalId.Top,
+		},
+	},
+	-- Soft white feathers drifting down (Cloud Nine).
+	feathers = {
+		boxSize = Vector3.new(110, 1, 110),
+		offset = Vector3.new(0, 30, 0),
+		props = {
+			Texture = SPARKLE,
+			Color = colours({ Color3.fromRGB(255, 255, 255), Color3.fromRGB(255, 244, 200) }),
+			Size = sequence({ { 0, 0.5 }, { 1, 0.42 } }),
+			Transparency = sequence({ { 0, 0.05 }, { 0.85, 0.1 }, { 1, 1 } }),
+			Speed = NumberRange.new(1.5, 3),
+			SpreadAngle = Vector2.new(30, 30),
+			Acceleration = Vector3.new(0.8, -0.2, 0.4),
+			Lifetime = NumberRange.new(8, 10),
+			Rate = 12,
+			Rotation = NumberRange.new(0, 360),
+			RotSpeed = NumberRange.new(-60, 60),
+			EmissionDirection = Enum.NormalId.Bottom,
+		},
+	},
+	-- Bubbles rising from the sea floor (Sushi Reef).
+	bubbles = {
+		boxSize = Vector3.new(100, 1, 100),
+		offset = Vector3.new(0, -6, 0),
+		props = {
+			Texture = SMOKE,
+			Color = colours({ Color3.fromRGB(216, 246, 255) }),
+			Size = sequence({ { 0, 0.25 }, { 1, 0.45 } }),
+			Transparency = sequence({ { 0, 0.35 }, { 0.85, 0.45 }, { 1, 1 } }),
+			Speed = NumberRange.new(3, 5),
+			SpreadAngle = Vector2.new(10, 10),
+			Acceleration = Vector3.new(0.3, 0.5, 0.2),
+			Lifetime = NumberRange.new(6, 8),
+			Rate = 30,
+			EmissionDirection = Enum.NormalId.Top,
 		},
 	},
 	-- Glowing green spores floating up through the fog.

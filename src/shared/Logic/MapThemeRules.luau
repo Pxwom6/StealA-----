@@ -53,6 +53,18 @@ MapThemeRules.FLORA_PARTS = table.freeze({
 	crystal = 4,
 	mushroom = 5,
 	bush = 3,
+	blossomTree = 4,
+	bamboo = 4,
+	alienPlant = 4,
+	moonRock = 3,
+	jungleTree = 5,
+	fern = 4,
+	planterTree = 4,
+	streetLamp = 4,
+	cloudTree = 4,
+	cloudPillar = 3,
+	coral = 5,
+	kelp = 4,
 } :: { [string]: number })
 
 -- How far each flora kind reaches from its spot at scale 1 (studs). A kind may only stand on spots whose tree it fits
@@ -69,6 +81,18 @@ MapThemeRules.FLORA_RADIUS = table.freeze({
 	crystal = 3.4,
 	mushroom = 4.2,
 	bush = 3.4,
+	blossomTree = 4.2,
+	bamboo = 3.8,
+	alienPlant = 3.9,
+	moonRock = 4.2,
+	jungleTree = 4.4,
+	fern = 4.4,
+	planterTree = 2.8,
+	streetLamp = 3.1,
+	cloudTree = 4.1,
+	cloudPillar = 1.9,
+	coral = 2.7,
+	kelp = 3,
 } :: { [string]: number })
 
 -- Parts each landmark kind is built from (server/Services/ThemeProps).
@@ -90,6 +114,19 @@ MapThemeRules.LANDMARK_PARTS = table.freeze({
 	beachUmbrella = 4,
 	barn = 7,
 	hayBales = 4,
+	torii = 6,
+	pagoda = 8,
+	rocket = 8,
+	planet = 3,
+	satelliteDish = 5,
+	temple = 6,
+	giantFlower = 8,
+	skyscraper = 6,
+	neonSign = 6,
+	floatingIsland = 6,
+	skyCastle = 7,
+	shipwreck = 7,
+	giantClam = 4,
 } :: { [string]: number })
 
 MapThemeRules.WEATHER = table.freeze({
@@ -103,6 +140,10 @@ MapThemeRules.WEATHER = table.freeze({
 	petals = true,
 	rain = true,
 	spores = true,
+	stardust = true,
+	pollen = true,
+	feathers = true,
+	bubbles = true,
 } :: { [string]: boolean })
 
 -- Enum.Material names a map may use for its ground, walkway and boundary wall.
@@ -125,6 +166,11 @@ MapThemeRules.MATERIALS = table.freeze({
 	Ground = true,
 	Marble = true,
 	Fabric = true,
+	Asphalt = true,
+	LeafyGrass = true,
+	Pebble = true,
+	DiamondPlate = true,
+	Metal = true,
 } :: { [string]: boolean })
 
 local HEX_PATTERN = "^#%x%x%x%x%x%x$"

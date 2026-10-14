@@ -303,7 +303,7 @@ T.describe("Catalog mutations", function()
 		colon.mapTheme = "map:candy"
 		T.expect(#Catalog.validateMutations({ colon })).toBe(1)
 		local sparkly = F.mutation("sparkly", 1, 0.1)
-		sparkly.look = { material = "Neon", particles = "glitter" }
+		sparkly.look = { material = "Neon", particles = "confetti" }
 		T.expect(#Catalog.validateMutations({ sparkly })).toBe(1)
 		sparkly.look = { material = "CrackedLava", particles = "embers" }
 		T.expect(#Catalog.validateMutations({ sparkly })).toBe(0)

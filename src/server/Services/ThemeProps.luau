@@ -463,6 +463,395 @@ local flora: { [string]: FloraBuilder } = {
 			})
 		end
 	end,
+
+	-- A cherry tree: a dark trunk under three puffs of pink blossom.
+	blossomTree = function(base: CFrame, s: number, random: Random, spot: Spot, parent: Instance, kit: Kit)
+		core(spot, kit)({
+			Name = "Trunk",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(7 * s, 1.3 * s),
+			CFrame = base * CFrame.new(0, 3.5 * s, 0) * CFrame.Angles(0, 0, math.rad(4)) * UPRIGHT,
+			Color = world("treeTrunk"),
+			Material = Enum.Material.Wood,
+			Parent = parent,
+		})
+		for _, puff in
+			{
+				{ size = Vector3.new(6.2, 4.4, 6.2), at = Vector3.new(0, 8.2, 0), color = "blossom" },
+				{ size = Vector3.new(4.6, 3.6, 4.6), at = Vector3.new(1.5, 9.8, -1), color = "blossomLight" },
+				{ size = Vector3.new(4.2, 3.2, 4.2), at = Vector3.new(-1.6, 9.4, 1.2), color = "blossomDark" },
+			}
+		do
+			local blob = kit.decor({
+				Name = "Blossom",
+				Size = puff.size * s,
+				CFrame = base * CFrame.new(puff.at * s) * CFrame.Angles(0, random:NextNumber(0, math.pi), 0),
+				Color = world(puff.color),
+				Material = Enum.Material.Grass,
+				Parent = parent,
+			})
+			sphereMesh(blob)
+		end
+	end,
+
+	-- Three bamboo canes of different heights and a tuft of leaves.
+	bamboo = function(base: CFrame, s: number, random: Random, spot: Spot, parent: Instance, kit: Kit)
+		local turn = random:NextNumber(0, math.pi * 2)
+		local tops: { Vector3 } = {}
+		for i, cane in { { height = 11.5, r = 0 }, { height = 9.5, r = 1.3 }, { height = 8, r = 1.2 } } do
+			local yaw = turn + i * math.rad(130)
+			local foot = base * CFrame.new(math.cos(yaw) * cane.r * s, 0, math.sin(yaw) * cane.r * s)
+			local maker: (props: { [string]: any }) -> Part = if i == 1 then core(spot, kit) else kit.decor
+			maker({
+				Name = "Cane",
+				Shape = Enum.PartType.Cylinder,
+				Size = cylinderSize(cane.height * s, 0.7 * s),
+				CFrame = foot * CFrame.new(0, cane.height * s / 2, 0) * UPRIGHT,
+				Color = if i == 2 then world("bambooDark") else world("bamboo"),
+				Parent = parent,
+			})
+			table.insert(tops, (foot * CFrame.new(0, cane.height * s, 0)).Position)
+		end
+		kit.decor({
+			Name = "Leaves",
+			Size = Vector3.new(4.4, 0.4, 2) * s,
+			CFrame = CFrame.new(tops[1])
+				* CFrame.Angles(math.rad(-20), turn, math.rad(14))
+				* CFrame.new(1.4 * s, -0.6 * s, 0),
+			Color = world("leavesLight"),
+			Parent = parent,
+		})
+	end,
+
+	-- A glowing alien bulb on a curly stem, with two broad leaves.
+	alienPlant = function(base: CFrame, s: number, random: Random, spot: Spot, parent: Instance, kit: Kit)
+		core(spot, kit)({
+			Name = "Stem",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(6 * s, 0.8 * s),
+			CFrame = base * CFrame.new(0, 3 * s, 0) * UPRIGHT,
+			Color = world("alienStem"),
+			Parent = parent,
+		})
+		local bulb = kit.decor({
+			Name = "Bulb",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 2.8 * s,
+			CFrame = base * CFrame.new(0, 7 * s, 0),
+			Color = world("alienGlow"),
+			Material = Enum.Material.Neon,
+			CastShadow = false,
+			Parent = parent,
+		})
+		local turn = random:NextNumber(0, math.pi)
+		for _, side in { 0, math.pi } do
+			local leaf = kit.decor({
+				Name = "Leaf",
+				Size = Vector3.new(4.2, 0.5, 1.8) * s,
+				CFrame = base
+					* CFrame.Angles(0, turn + side, 0)
+					* CFrame.new(2 * s, 1.6 * s, 0)
+					* CFrame.Angles(0, 0, math.rad(28)),
+				Color = world("alienLeaf"),
+				Parent = parent,
+			})
+			sphereMesh(leaf)
+		end
+		if not spot.outside and spot.seed % 3 == 0 then
+			light(bulb, world("alienGlow"), 12, 1)
+		end
+	end,
+
+	-- A heap of chocolate-chip boulders.
+	moonRock = function(base: CFrame, s: number, random: Random, spot: Spot, parent: Instance, kit: Kit)
+		for i, chunk in
+			{
+				{ size = Vector3.new(3.6, 2.8, 3.2), at = Vector3.new(0, 1.2, 0) },
+				{ size = Vector3.new(2.4, 1.8, 2.2), at = Vector3.new(2.3, 0.8, 1) },
+				{ size = Vector3.new(2, 1.5, 1.8), at = Vector3.new(-1.9, 0.6, -1.3) },
+			}
+		do
+			local maker: (props: { [string]: any }) -> Part = if i == 1 then core(spot, kit) else kit.decor
+			maker({
+				Name = "Chunk",
+				Size = chunk.size * s,
+				CFrame = base * CFrame.new(chunk.at * s) * CFrame.Angles(
+					random:NextNumber(-0.3, 0.3),
+					random:NextNumber(0, math.pi),
+					random:NextNumber(-0.3, 0.3)
+				),
+				Color = world("moonRock"),
+				Material = Enum.Material.Slate,
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- A rainforest giant: a tall trunk, two broad flat canopies, a hanging vine and a mango.
+	jungleTree = function(base: CFrame, s: number, random: Random, spot: Spot, parent: Instance, kit: Kit)
+		core(spot, kit)({
+			Name = "Trunk",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(9.5 * s, 1.4 * s),
+			CFrame = base * CFrame.new(0, 4.75 * s, 0) * UPRIGHT,
+			Color = world("treeTrunk"),
+			Material = Enum.Material.Wood,
+			Parent = parent,
+		})
+		for _, layer in
+			{
+				{ size = Vector3.new(8.6, 2.6, 8.6), at = Vector3.new(0, 9.8, 0), color = "leavesDark" },
+				{ size = Vector3.new(6, 2.2, 6), at = Vector3.new(0.6, 11.6, -0.4), color = "leaves" },
+			}
+		do
+			local canopy = kit.decor({
+				Name = "Canopy",
+				Size = layer.size * s,
+				CFrame = base * CFrame.new(layer.at * s),
+				Color = world(layer.color),
+				Material = Enum.Material.Grass,
+				Parent = parent,
+			})
+			sphereMesh(canopy)
+		end
+		local yaw = random:NextNumber(0, math.pi * 2)
+		kit.decor({
+			Name = "Vine",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(4.6 * s, 0.3 * s),
+			CFrame = base * CFrame.new(math.cos(yaw) * 2.8 * s, 7.4 * s, math.sin(yaw) * 2.8 * s) * UPRIGHT,
+			Color = world("vine"),
+			CastShadow = false,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Mango",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(1, 1, 1) * s,
+			CFrame = base * CFrame.new(-math.cos(yaw) * 1.9 * s, 8.3 * s, -math.sin(yaw) * 1.9 * s),
+			Color = world("mango"),
+			CastShadow = false,
+			Parent = parent,
+		})
+	end,
+
+	-- Four fern fronds arching out of the ground.
+	fern = function(base: CFrame, s: number, random: Random, _spot: Spot, parent: Instance, kit: Kit)
+		local turn = random:NextNumber(0, math.pi * 2)
+		for i = 0, 3 do
+			local frond = kit.decor({
+				Name = "Frond",
+				Size = Vector3.new(5, 0.35, 1.6) * s,
+				CFrame = base
+					* CFrame.Angles(0, turn + i * math.rad(90), 0)
+					* CFrame.new(2.1 * s, 1.1 * s, 0)
+					* CFrame.Angles(0, 0, math.rad(26)),
+				Color = if i % 2 == 0 then world("leaves") else world("leavesLight"),
+				Parent = parent,
+			})
+			sphereMesh(frond)
+		end
+	end,
+
+	-- A concrete planter with a neon rim and a round little tree.
+	planterTree = function(base: CFrame, s: number, _random: Random, spot: Spot, parent: Instance, kit: Kit)
+		core(spot, kit)({
+			Name = "Planter",
+			Size = Vector3.new(3.6, 1.6, 3.6) * s,
+			CFrame = base * CFrame.new(0, 0.8 * s, 0),
+			Color = world("planter"),
+			Material = Enum.Material.Concrete,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Rim",
+			Size = Vector3.new(3.8, 0.16, 3.8) * s,
+			CFrame = base * CFrame.new(0, 1.62 * s, 0),
+			Color = if spot.seed % 2 == 0 then world("neonPink") else world("neonBlue"),
+			Material = Enum.Material.Neon,
+			CastShadow = false,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Trunk",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(4.6 * s, 0.6 * s),
+			CFrame = base * CFrame.new(0, 3.9 * s, 0) * UPRIGHT,
+			Color = world("treeTrunk"),
+			Material = Enum.Material.Wood,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Canopy",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 4.2 * s,
+			CFrame = base * CFrame.new(0, 7.2 * s, 0),
+			Color = world("hedge"),
+			Material = Enum.Material.Grass,
+			Parent = parent,
+		})
+	end,
+
+	-- A street lamp with a glowing head (every third one inside the wall lights the ground).
+	streetLamp = function(base: CFrame, s: number, _random: Random, spot: Spot, parent: Instance, kit: Kit)
+		kit.decor({
+			Name = "Foot",
+			Size = Vector3.new(1.3, 0.6, 1.3) * s,
+			CFrame = base * CFrame.new(0, 0.3 * s, 0),
+			Color = world("streetLamp"),
+			Parent = parent,
+		})
+		core(spot, kit)({
+			Name = "Pole",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(9.4 * s, 0.45 * s),
+			CFrame = base * CFrame.new(0, 4.7 * s, 0) * UPRIGHT,
+			Color = world("streetLamp"),
+			Material = Enum.Material.Metal,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Arm",
+			Size = Vector3.new(2.6, 0.3, 0.3) * s,
+			CFrame = base * CFrame.new(1.2 * s, 9.3 * s, 0),
+			Color = world("streetLamp"),
+			Material = Enum.Material.Metal,
+			Parent = parent,
+		})
+		local head = kit.decor({
+			Name = "Lamp",
+			Size = Vector3.new(1.4, 0.45, 0.9) * s,
+			CFrame = base * CFrame.new(2.3 * s, 9.05 * s, 0),
+			Color = world("lampLight"),
+			Material = Enum.Material.Neon,
+			CastShadow = false,
+			Parent = parent,
+		})
+		if not spot.outside and spot.seed % 3 == 0 then
+			light(head, world("lampLight"), 16, 1.2)
+		end
+	end,
+
+	-- A golden trunk holding up three puffs of cloud.
+	cloudTree = function(base: CFrame, s: number, _random: Random, spot: Spot, parent: Instance, kit: Kit)
+		core(spot, kit)({
+			Name = "Trunk",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(6.6 * s, 1.1 * s),
+			CFrame = base * CFrame.new(0, 3.3 * s, 0) * UPRIGHT,
+			Color = world("cloudTrunk"),
+			Material = Enum.Material.Marble,
+			Parent = parent,
+		})
+		for i, puff in
+			{
+				{ size = 5.4, at = Vector3.new(0, 8.4, 0) },
+				{ size = 4, at = Vector3.new(1.8, 7.9, 1) },
+				{ size = 3.6, at = Vector3.new(-1.6, 9.7, -0.8) },
+			}
+		do
+			kit.decor({
+				Name = "Cloud",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.one * puff.size * s,
+				CFrame = base * CFrame.new(puff.at * s),
+				Color = if i == 2 then world("cloudShade") else world("cloudPuff"),
+				Material = Enum.Material.Sand,
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- A white marble column with a little cloud resting on it.
+	cloudPillar = function(base: CFrame, s: number, _random: Random, spot: Spot, parent: Instance, kit: Kit)
+		core(spot, kit)({
+			Name = "Column",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(9 * s, 1.6 * s),
+			CFrame = base * CFrame.new(0, 4.5 * s, 0) * UPRIGHT,
+			Color = world("castleWall"),
+			Material = Enum.Material.Marble,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Capital",
+			Size = Vector3.new(2.6, 0.8, 2.6) * s,
+			CFrame = base * CFrame.new(0, 9.4 * s, 0),
+			Color = world("cloudTrunk"),
+			Material = Enum.Material.Marble,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Cloud",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 3.6 * s,
+			CFrame = base * CFrame.new(0, 11.2 * s, 0),
+			Color = world("cloudPuff"),
+			Material = Enum.Material.Sand,
+			Parent = parent,
+		})
+	end,
+
+	-- Branching coral in three reef colours, with a round tip.
+	coral = function(base: CFrame, s: number, random: Random, spot: Spot, parent: Instance, kit: Kit)
+		local first = random:NextInteger(1, 3)
+		core(spot, kit)({
+			Name = "Coral",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(5.4 * s, 1.2 * s),
+			CFrame = base * CFrame.new(0, 2.7 * s, 0) * UPRIGHT,
+			Color = world(`coral{first}`),
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Tip",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 1.5 * s,
+			CFrame = base * CFrame.new(0, 5.5 * s, 0),
+			Color = world(`coral{first}`),
+			Parent = parent,
+		})
+		local turn = random:NextNumber(0, math.pi * 2)
+		for i = 0, 2 do
+			local yaw = turn + i * math.rad(120)
+			local start = (base * CFrame.new(0, (1.8 + i * 0.9) * s, 0)).Position
+			local direction = Vector3.new(math.cos(yaw), 1.3, math.sin(yaw)).Unit
+			local length = (3.6 - i * 0.3) * s
+			kit.decor({
+				Name = "Branch",
+				Shape = Enum.PartType.Cylinder,
+				Size = cylinderSize(length, 0.8 * s),
+				CFrame = along(start, start + direction * length),
+				Color = world(`coral{(first + i) % 3 + 1}`),
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- Four kelp ribbons swaying up towards the light.
+	kelp = function(base: CFrame, s: number, random: Random, spot: Spot, parent: Instance, kit: Kit)
+		local turn = random:NextNumber(0, math.pi * 2)
+		for i, ribbon in
+			{
+				{ height = 12, r = 0 },
+				{ height = 10, r = 1.2 },
+				{ height = 8.6, r = 1.1 },
+				{ height = 7, r = 1.3 },
+			}
+		do
+			local yaw = turn + i * math.rad(95)
+			local maker: (props: { [string]: any }) -> Part = if i == 1 then core(spot, kit) else kit.decor
+			maker({
+				Name = "Kelp",
+				Size = Vector3.new(0.5, ribbon.height, 1.4) * s,
+				CFrame = base
+					* CFrame.new(math.cos(yaw) * ribbon.r * s, ribbon.height * s / 2, math.sin(yaw) * ribbon.r * s)
+					* CFrame.Angles(random:NextNumber(-0.12, 0.12), yaw, random:NextNumber(-0.14, 0.14)),
+				Color = if i % 2 == 0 then world("kelpDark") else world("kelp"),
+				Parent = parent,
+			})
+		end
+	end,
 }
 
 -- Builds one flora prop on a tree spot. `kind` must be a FloraKind.
@@ -1148,6 +1537,614 @@ local landmarks: { [string]: LandmarkBuilder } = {
 				Parent = parent,
 			})
 		end
+	end,
+
+	-- A red torii gate facing the map.
+	torii = function(base: CFrame, s: number, _spot: LandmarkSpot, parent: Instance, kit: Kit)
+		for _, side in { -1, 1 } do
+			kit.decor({
+				Name = "Pillar",
+				Shape = Enum.PartType.Cylinder,
+				Size = cylinderSize(26 * s, 2.4 * s),
+				CFrame = base * CFrame.new(side * 9 * s, 13 * s, 0) * UPRIGHT,
+				Color = world("torii"),
+				Parent = parent,
+			})
+		end
+		kit.decor({
+			Name = "TopBeam",
+			Size = Vector3.new(28, 2, 3.2) * s,
+			CFrame = base * CFrame.new(0, 27.4 * s, 0),
+			Color = world("toriiDark"),
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "UpperBeam",
+			Size = Vector3.new(24, 1.6, 2.6) * s,
+			CFrame = base * CFrame.new(0, 25.6 * s, 0),
+			Color = world("torii"),
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "TieBeam",
+			Size = Vector3.new(21, 1.4, 1.6) * s,
+			CFrame = base * CFrame.new(0, 21.2 * s, 0),
+			Color = world("torii"),
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Plaque",
+			Size = Vector3.new(2.6, 3.6, 0.6) * s,
+			CFrame = base * CFrame.new(0, 23.4 * s, -1 * s),
+			Color = world("toriiDark"),
+			Parent = parent,
+		})
+	end,
+
+	-- A three-tiered pagoda on a stone platform.
+	pagoda = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad(spot.index * 17), 0)
+		kit.decor({
+			Name = "Platform",
+			Size = Vector3.new(22, 2, 22) * s,
+			CFrame = frame * CFrame.new(0, 1 * s, 0),
+			Color = world("stoneLantern"),
+			Material = Enum.Material.Slate,
+			Parent = parent,
+		})
+		local y = 2
+		for _, tier in
+			{
+				{ body = 15, height = 8, roof = 22 },
+				{ body = 12, height = 7, roof = 18 },
+				{ body = 9, height = 6, roof = 14 },
+			}
+		do
+			kit.decor({
+				Name = "Storey",
+				Size = Vector3.new(tier.body, tier.height, tier.body) * s,
+				CFrame = frame * CFrame.new(0, (y + tier.height / 2) * s, 0),
+				Color = world("pagoda"),
+				Parent = parent,
+			})
+			y += tier.height
+			kit.decor({
+				Name = "Roof",
+				Size = Vector3.new(tier.roof, 1.6, tier.roof) * s,
+				CFrame = frame * CFrame.new(0, (y + 0.8) * s, 0),
+				Color = world("pagodaRoof"),
+				Parent = parent,
+			})
+			y += 1.6
+		end
+		kit.decor({
+			Name = "Spire",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(8 * s, 0.9 * s),
+			CFrame = frame * CFrame.new(0, (y + 4) * s, 0) * UPRIGHT,
+			Color = world("lantern"),
+			Material = Enum.Material.Metal,
+			Parent = parent,
+		})
+	end,
+
+	-- A rocket on its launch pad, nose to the sky.
+	rocket = function(base: CFrame, s: number, _spot: LandmarkSpot, parent: Instance, kit: Kit)
+		kit.decor({
+			Name = "Pad",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(2 * s, 24 * s),
+			CFrame = base * CFrame.new(0, 1 * s, 0) * UPRIGHT,
+			Color = world("launchPad"),
+			Material = Enum.Material.DiamondPlate,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Body",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(32 * s, 9 * s),
+			CFrame = base * CFrame.new(0, 18 * s, 0) * UPRIGHT,
+			Color = world("rocket"),
+			Parent = parent,
+		})
+		local nose = kit.decor({
+			Name = "Nose",
+			Size = Vector3.new(9, 14, 9) * s,
+			CFrame = base * CFrame.new(0, 34 * s, 0),
+			Color = world("rocketTrim"),
+			Parent = parent,
+		})
+		sphereMesh(nose)
+		kit.decor({
+			Name = "Stripe",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(2.4 * s, 9.3 * s),
+			CFrame = base * CFrame.new(0, 26 * s, 0) * UPRIGHT,
+			Color = world("rocketTrim"),
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Window",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(0.6 * s, 3.6 * s),
+			CFrame = base * CFrame.new(0, 21 * s, -4.4 * s) * CFrame.Angles(0, math.rad(90), 0),
+			Color = world("rocketWindow"),
+			Material = Enum.Material.Neon,
+			CastShadow = false,
+			Parent = parent,
+		})
+		for i = 0, 2 do
+			kit.decor({
+				Name = "Fin",
+				Size = Vector3.new(0.9, 10, 6) * s,
+				CFrame = base
+					* CFrame.Angles(0, math.rad(i * 120 + 30), 0)
+					* CFrame.new(0, 7 * s, -6.5 * s)
+					* CFrame.Angles(math.rad(-12), 0, 0),
+				Color = world("rocketTrim"),
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- A ringed planet and its little moon hanging in the sky.
+	planet = function(_base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local centre = CFrame.new(spot.x, spot.y + (95 + (spot.index % 3) * 15) * s, spot.z)
+			* CFrame.Angles(math.rad(18), math.rad(spot.index * 37), math.rad(-12))
+		kit.decor({
+			Name = "Planet",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 34 * s,
+			CFrame = centre,
+			Color = world("planet"),
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Ring",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(0.6 * s, 62 * s),
+			CFrame = centre * UPRIGHT,
+			Color = world("planetRing"),
+			Transparency = 0.25,
+			CastShadow = false,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Moon",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 8 * s,
+			CFrame = centre * CFrame.new(40 * s, 14 * s, 0),
+			Color = world("moonRock"):Lerp(Color3.new(1, 1, 1), 0.5),
+			Parent = parent,
+		})
+	end,
+
+	-- A radar dish listening to the stars.
+	satelliteDish = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad(spot.index * 31 - 60), 0)
+		kit.decor({
+			Name = "Base",
+			Size = Vector3.new(7, 4, 7) * s,
+			CFrame = frame * CFrame.new(0, 2 * s, 0),
+			Color = world("launchPad"),
+			Material = Enum.Material.DiamondPlate,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Mast",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(10 * s, 1.8 * s),
+			CFrame = frame * CFrame.new(0, 9 * s, 0) * UPRIGHT,
+			Color = world("dish"),
+			Material = Enum.Material.Metal,
+			Parent = parent,
+		})
+		local face = frame * CFrame.new(0, 16 * s, 0) * CFrame.Angles(math.rad(40), 0, 0)
+		local dish = kit.decor({
+			Name = "Dish",
+			Size = Vector3.new(16, 16, 3) * s,
+			CFrame = face,
+			Color = world("dish"),
+			Parent = parent,
+		})
+		sphereMesh(dish)
+		kit.decor({
+			Name = "Feed",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(6 * s, 0.5 * s),
+			CFrame = face * CFrame.new(0, 0, -4 * s) * CFrame.Angles(0, math.rad(90), 0),
+			Color = world("launchPad"),
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Beacon",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 1.6 * s,
+			CFrame = face * CFrame.new(0, 0, -7.2 * s),
+			Color = world("rocketTrim"),
+			Material = Enum.Material.Neon,
+			CastShadow = false,
+			Parent = parent,
+		})
+	end,
+
+	-- A stepped temple with a shrine on top and stairs down the side facing the map.
+	temple = function(base: CFrame, s: number, _spot: LandmarkSpot, parent: Instance, kit: Kit)
+		for i, width in { 40, 32, 24, 16 } do
+			kit.decor({
+				Name = "Tier",
+				Size = Vector3.new(width, 7, width) * s,
+				CFrame = base * CFrame.new(0, (3.5 + (i - 1) * 7) * s, 0),
+				Color = if i == 2 then world("templeMoss") else world("templeStone"),
+				Material = Enum.Material.Cobblestone,
+				Parent = parent,
+			})
+		end
+		kit.decor({
+			Name = "Shrine",
+			Size = Vector3.new(10, 8, 10) * s,
+			CFrame = base * CFrame.new(0, 32 * s, 0),
+			Color = world("templeStone"):Lerp(Color3.new(0, 0, 0), 0.2),
+			Material = Enum.Material.Cobblestone,
+			Parent = parent,
+		})
+		local foot = (base * CFrame.new(0, 0, -21 * s)).Position
+		local top = (base * CFrame.new(0, 28 * s, -8 * s)).Position
+		kit.decor({
+			Name = "Stairs",
+			Size = Vector3.new((top - foot).Magnitude, 1.4 * s, 6 * s),
+			CFrame = along(foot, top),
+			Color = world("templeStone"):Lerp(Color3.new(1, 1, 1), 0.12),
+			Material = Enum.Material.Slate,
+			Parent = parent,
+		})
+	end,
+
+	-- A flower as tall as a house, its head tipped towards the map.
+	giantFlower = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		kit.decor({
+			Name = "Stem",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(30 * s, 2.2 * s),
+			CFrame = base * CFrame.new(0, 15 * s, 0) * UPRIGHT,
+			Color = world("vine"),
+			Parent = parent,
+		})
+		for _, leaf in { { y = 9, side = 1 }, { y = 15, side = -1 } } do
+			local blade = kit.decor({
+				Name = "Leaf",
+				Size = Vector3.new(14, 1, 5) * s,
+				CFrame = base
+					* CFrame.new(leaf.side * 6 * s, leaf.y * s, 0)
+					* CFrame.Angles(0, 0, math.rad(leaf.side * 25)),
+				Color = world("leaves"),
+				Parent = parent,
+			})
+			sphereMesh(blade)
+		end
+		local head = base * CFrame.new(0, 31 * s, 0) * CFrame.Angles(math.rad(-30), 0, 0)
+		local petalColor = world(if spot.index % 2 == 0 then "petal" else "petalAlt")
+		for i = 0, 3 do
+			local petal = kit.decor({
+				Name = "Petal",
+				Size = Vector3.new(11, 6, 2) * s,
+				CFrame = head * CFrame.Angles(0, 0, math.rad(i * 90 + 45)) * CFrame.new(6 * s, 0, 0),
+				Color = petalColor,
+				Parent = parent,
+			})
+			sphereMesh(petal)
+		end
+		kit.decor({
+			Name = "Centre",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 7 * s,
+			CFrame = head * CFrame.new(0, 0, -0.6 * s),
+			Color = world("flowerCentre"),
+			Parent = parent,
+		})
+	end,
+
+	-- A dark skyscraper with lit windows and a neon band near the top.
+	skyscraper = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local height = (58 + (spot.index * 13) % 34) * s
+		local width = (18 + (spot.index % 3) * 3) * s
+		kit.decor({
+			Name = "Tower",
+			Size = Vector3.new(width, height, width),
+			CFrame = base * CFrame.new(0, height / 2, 0),
+			Color = world("tower"),
+			Material = Enum.Material.Glass,
+			Reflectance = 0.15,
+			Parent = parent,
+		})
+		for _, side in { -1, 1 } do
+			kit.decor({
+				Name = "Windows",
+				Size = Vector3.new(2.2 * s, height * 0.8, 0.4),
+				CFrame = base * CFrame.new(side * width * 0.24, height * 0.46, -width / 2 - 0.2),
+				Color = world("towerWindow"),
+				Material = Enum.Material.Neon,
+				CastShadow = false,
+				Parent = parent,
+			})
+		end
+		kit.decor({
+			Name = "NeonBand",
+			Size = Vector3.new(width + 0.6, 1.4 * s, width + 0.6),
+			CFrame = base * CFrame.new(0, height - 6 * s, 0),
+			Color = if spot.index % 2 == 0 then world("neonPink") else world("neonBlue"),
+			Material = Enum.Material.Neon,
+			CastShadow = false,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Top",
+			Size = Vector3.new(width * 0.6, 12 * s, width * 0.6),
+			CFrame = base * CFrame.new(0, height + 6 * s, 0),
+			Color = world("tower"),
+			Material = Enum.Material.Glass,
+			Reflectance = 0.15,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Antenna",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(14 * s, 0.6 * s),
+			CFrame = base * CFrame.new(0, height + 19 * s, 0) * UPRIGHT,
+			Color = world("streetLamp"),
+			Material = Enum.Material.Metal,
+			Parent = parent,
+		})
+	end,
+
+	-- A giant neon noodle-bar sign on two posts.
+	neonSign = function(base: CFrame, s: number, _spot: LandmarkSpot, parent: Instance, kit: Kit)
+		for _, side in { -1, 1 } do
+			kit.decor({
+				Name = "Post",
+				Shape = Enum.PartType.Cylinder,
+				Size = cylinderSize(24 * s, 1.6 * s),
+				CFrame = base * CFrame.new(side * 11 * s, 12 * s, 0) * UPRIGHT,
+				Color = world("streetLamp"),
+				Material = Enum.Material.Metal,
+				Parent = parent,
+			})
+		end
+		kit.decor({
+			Name = "Glow",
+			Size = Vector3.new(32, 18, 1) * s,
+			CFrame = base * CFrame.new(0, 31 * s, 0.4 * s),
+			Color = world("neonPink"),
+			Material = Enum.Material.Neon,
+			CastShadow = false,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Board",
+			Size = Vector3.new(30, 16, 1.6) * s,
+			CFrame = base * CFrame.new(0, 31 * s, -0.4 * s),
+			Color = world("tower"),
+			Parent = parent,
+		})
+		local bowl = kit.decor({
+			Name = "Bowl",
+			Size = Vector3.new(14, 7, 1) * s,
+			CFrame = base * CFrame.new(0, 28 * s, -1.4 * s),
+			Color = world("neonBlue"),
+			Material = Enum.Material.Neon,
+			CastShadow = false,
+			Parent = parent,
+		})
+		sphereMesh(bowl)
+		kit.decor({
+			Name = "Chopsticks",
+			Size = Vector3.new(0.9, 13, 0.6) * s,
+			CFrame = base * CFrame.new(3 * s, 34 * s, -1.6 * s) * CFrame.Angles(0, 0, math.rad(-24)),
+			Color = world("neonYellow"),
+			Material = Enum.Material.Neon,
+			CastShadow = false,
+			Parent = parent,
+		})
+	end,
+
+	-- An island floating in the sky, with a tree on its grassy top.
+	floatingIsland = function(_base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local top = CFrame.new(spot.x, spot.y + (62 + (spot.index % 3) * 12) * s, spot.z)
+			* CFrame.Angles(0, math.rad(spot.index * 47), 0)
+		for i, tier in { { d = 24, h = 5 }, { d = 17, h = 5 }, { d = 9, h = 5 } } do
+			kit.decor({
+				Name = "Rock",
+				Shape = Enum.PartType.Cylinder,
+				Size = cylinderSize(tier.h * s, tier.d * s),
+				CFrame = top * CFrame.new(0, -(1 + (i - 0.5) * tier.h) * s, 0) * UPRIGHT,
+				Color = world("islandRock"),
+				Material = Enum.Material.Slate,
+				Parent = parent,
+			})
+		end
+		kit.decor({
+			Name = "Grass",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(2 * s, 25 * s),
+			CFrame = top * UPRIGHT,
+			Color = world("islandGrass"),
+			Material = Enum.Material.Grass,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Trunk",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(8 * s, 1.6 * s),
+			CFrame = top * CFrame.new(3 * s, 5 * s, 2 * s) * UPRIGHT,
+			Color = world("treeTrunk"),
+			Material = Enum.Material.Wood,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Leaves",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 9 * s,
+			CFrame = top * CFrame.new(3 * s, 11 * s, 2 * s),
+			Color = world("islandGrass"),
+			Material = Enum.Material.Grass,
+			Parent = parent,
+		})
+	end,
+
+	-- A castle with two round towers, sitting on a cloud.
+	skyCastle = function(_base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local position = Vector3.new(spot.x, spot.y + (70 + (spot.index % 2) * 14) * s, spot.z)
+		local floor = CFrame.lookAt(position, Vector3.new(0, position.Y, 0))
+		for _, puff in
+			{
+				{ size = Vector3.new(34, 12, 28), at = Vector3.new(0, 1, 0) },
+				{ size = Vector3.new(22, 10, 18), at = Vector3.new(14, 0, 6) },
+			}
+		do
+			local cloud = kit.decor({
+				Name = "Cloud",
+				Size = puff.size * s,
+				CFrame = floor * CFrame.new(puff.at * s),
+				Color = world("cloudPuff"),
+				Material = Enum.Material.Sand,
+				CastShadow = false,
+				Parent = parent,
+			})
+			sphereMesh(cloud)
+		end
+		kit.decor({
+			Name = "Keep",
+			Size = Vector3.new(12, 14, 12) * s,
+			CFrame = floor * CFrame.new(0, 13 * s, 0),
+			Color = world("castleWall"),
+			Material = Enum.Material.Marble,
+			Parent = parent,
+		})
+		for _, side in { -1, 1 } do
+			kit.decor({
+				Name = "Tower",
+				Shape = Enum.PartType.Cylinder,
+				Size = cylinderSize(22 * s, 6 * s),
+				CFrame = floor * CFrame.new(side * 8.5 * s, 17 * s, 0) * UPRIGHT,
+				Color = world("castleWall"),
+				Material = Enum.Material.Marble,
+				Parent = parent,
+			})
+			local roof = kit.decor({
+				Name = "Roof",
+				Size = Vector3.new(7.4, 10, 7.4) * s,
+				CFrame = floor * CFrame.new(side * 8.5 * s, 30 * s, 0),
+				Color = world("castleRoof"),
+				Parent = parent,
+			})
+			sphereMesh(roof)
+		end
+	end,
+
+	-- A sunken ship, half buried and listing, its torn sail still up.
+	shipwreck = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base
+			* CFrame.Angles(0, math.rad(spot.index * 23 + 70), 0)
+			* CFrame.Angles(math.rad(-5), 0, math.rad(17))
+		kit.decor({
+			Name = "Hull",
+			Size = Vector3.new(14, 9, 38) * s,
+			CFrame = frame * CFrame.new(0, 3 * s, 0),
+			Color = world("shipWood"),
+			Material = Enum.Material.WoodPlanks,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Bow",
+			Size = Vector3.new(9.9, 9, 9.9) * s,
+			CFrame = frame * CFrame.new(0, 3 * s, -19 * s) * CFrame.Angles(0, math.rad(45), 0),
+			Color = world("shipWood"),
+			Material = Enum.Material.WoodPlanks,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Cabin",
+			Size = Vector3.new(10, 6, 9) * s,
+			CFrame = frame * CFrame.new(0, 10.5 * s, 12 * s),
+			Color = world("shipWood"):Lerp(Color3.new(0, 0, 0), 0.2),
+			Material = Enum.Material.WoodPlanks,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Mast",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(26 * s, 1.6 * s),
+			CFrame = frame * CFrame.new(0, 20 * s, -3 * s) * UPRIGHT,
+			Color = world("shipWood"),
+			Material = Enum.Material.Wood,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Sail",
+			Size = Vector3.new(13, 10, 0.4) * s,
+			CFrame = frame * CFrame.new(0, 24 * s, -3.6 * s) * CFrame.Angles(math.rad(6), 0, math.rad(4)),
+			Color = world("shipSail"),
+			Material = Enum.Material.Fabric,
+			Transparency = 0.1,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Flag",
+			Size = Vector3.new(4.4, 2.6, 0.2) * s,
+			CFrame = frame * CFrame.new(2.4 * s, 31.6 * s, -3 * s),
+			Color = world("hat"),
+			Material = Enum.Material.Fabric,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "BrokenMast",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(14 * s, 1.4 * s),
+			CFrame = base * CFrame.new(16 * s, 0.6 * s, -8 * s) * CFrame.Angles(0, math.rad(spot.index * 41), 0),
+			Color = world("shipWood"),
+			Material = Enum.Material.Wood,
+			Parent = parent,
+		})
+	end,
+
+	-- A giant clam, open, with a glowing pearl.
+	giantClam = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad(spot.index * 19 - 30), 0)
+		local bottom = kit.decor({
+			Name = "Shell",
+			Size = Vector3.new(26, 8, 20) * s,
+			CFrame = frame * CFrame.new(0, 3 * s, 0),
+			Color = world("clam"),
+			Parent = parent,
+		})
+		sphereMesh(bottom)
+		local lid = kit.decor({
+			Name = "Lid",
+			Size = Vector3.new(26, 8, 20) * s,
+			-- Hinged at the back (+Z), opened up towards the map.
+			CFrame = frame * CFrame.new(0, 5 * s, 9 * s) * CFrame.Angles(math.rad(40), 0, 0) * CFrame.new(0, 0, -9 * s),
+			Color = world("clam"),
+			Parent = parent,
+		})
+		sphereMesh(lid)
+		local mantle = kit.decor({
+			Name = "Mantle",
+			Size = Vector3.new(21, 3, 15) * s,
+			CFrame = frame * CFrame.new(0, 5.4 * s, 0),
+			Color = world("clamInner"),
+			Parent = parent,
+		})
+		sphereMesh(mantle)
+		local pearl = kit.decor({
+			Name = "Pearl",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 6 * s,
+			CFrame = frame * CFrame.new(0, 8.6 * s, -1 * s),
+			Color = world("pearl"),
+			Reflectance = 0.3,
+			Parent = parent,
+		})
+		light(pearl, world("pearl"), 22, 1.2)
 	end,
 }
 

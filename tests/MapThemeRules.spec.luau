@@ -71,13 +71,13 @@ T.describe("MapThemeRules: the real config", function()
 		end
 	end)
 
-	T.it("has eight maps, every one in the order once", function()
+	T.it("has fourteen maps, every one in the order once", function()
 		local count = 0
 		for _ in MapThemes.themes do
 			count += 1
 		end
-		T.expect(count).toBe(8)
-		T.expect(#MapThemes.order).toBe(8)
+		T.expect(count).toBe(14)
+		T.expect(#MapThemes.order).toBe(14)
 	end)
 
 	T.it("keeps every map's scenery under the part budget", function()

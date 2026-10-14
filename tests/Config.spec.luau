@@ -109,6 +109,12 @@ local RELEASED_MUTATION_IDS = {
 	"moonlit",
 	"pearl",
 	"candy_apple",
+	"blossom",
+	"lunar",
+	"mossy",
+	"cyber",
+	"angelic",
+	"abyssal",
 	-- weather (only while their server modifier runs)
 	"electric",
 	"galaxy",

@@ -176,6 +176,12 @@ the store stay exact. Golden Hour (a server modifier) is the only thing that mul
 | Electric | during Thunderstorm | 2% | 28.8 | x4 | x2.5 | x0.63 | spawn |
 | Galaxy | during Meteor Shower | 2% | 28.8 | x4 | x2.5 | x0.63 | spawn |
 | Toxic | during Toxic Fog | 2% | 28.8 | x4 | x2.5 | x0.63 | spawn |
+| Blossom | on Cherry Blossom Garden | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Lunar | on Cookie Moon | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Mossy | on Mango Rainforest | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Cyber | on Neon Noodle City | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Angelic | on Cloud Nine | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Abyssal | on Sushi Reef | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
 
 "Per server-hour" is while the mutation can roll. Any mutation on an ordinary spawn (the map's signature included,
 no modifier): 5.15% of spawns (74.2 per server-hour). Expected value of one spawn: income x1.0885, price x1.0435.
@@ -193,7 +199,7 @@ no modifier): 5.15% of spawns (74.2 per server-hour). Expected value of one spaw
 * **Map signatures** (`mapTheme`): each map has exactly one, only while it is up — about 6 in a 20-minute map. At
   x3 they sit between Golden and Diamond (rarer than Golden, weaker than Diamond; CI checks both), so a map is worth
   voting for (the vote buttons and the title card name its mutation) without making the permanent ones pointless.
-  Collectors chase all eight through the Snackdex, which shows a pip for each one owned.
+  Collectors chase all fourteen through the Snackdex, which shows a pip for each one owned.
 * **Weather mutations** (`modifierId`): only while their weather modifier runs (5 minutes, a few times a day per
   server), about 2–3 per storm, each announced to the whole server so everyone races to the belt. x4 like Diamond.
 * **Event-only mutations** (with an `eventId`) roll only while that LiveOps event runs.

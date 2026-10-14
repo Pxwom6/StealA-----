@@ -216,7 +216,81 @@ local MUTATION_PARTICLES: { [string]: { [string]: any } } = {
 		Lifetime = NumberRange.new(1, 1.6),
 		Rate = 6,
 	},
+	petals = { -- cherry blossom petals fluttering down
+		Texture = SPARKLE_TEXTURE,
+		Color = colours({ "#FFB7D0", "#FFFFFF" }),
+		Size = sequence({ { 0, 0.28 }, { 1, 0.22 } }),
+		Speed = NumberRange.new(0.5, 1.4),
+		SpreadAngle = Vector2.new(180, 180),
+		Acceleration = Vector3.new(0.5, -1.8, 0.3),
+		Lifetime = NumberRange.new(1.4, 2),
+		Rate = 5,
+		Rotation = NumberRange.new(0, 360),
+		RotSpeed = NumberRange.new(-160, 160),
+	},
+	glitter = { -- silver moon dust glinting
+		Texture = SPARKLE_TEXTURE,
+		Color = colours({ "#FFFFFF", "#D8DCE8" }),
+		LightEmission = 0.8,
+		Size = sequence({ { 0, 0 }, { 0.4, 0.26 }, { 1, 0 } }),
+		Speed = NumberRange.new(0.2, 0.6),
+		SpreadAngle = Vector2.new(180, 180),
+		Lifetime = NumberRange.new(0.8, 1.4),
+		Rate = 9,
+	},
+	pollen = { -- golden-green pollen drifting up
+		Texture = SPARKLE_TEXTURE,
+		Color = colours({ "#E8F27A", "#B8E05A" }),
+		LightEmission = 0.4,
+		Size = sequence({ { 0, 0.18 }, { 1, 0.1 } }),
+		Speed = NumberRange.new(0.3, 0.8),
+		SpreadAngle = Vector2.new(180, 180),
+		Acceleration = Vector3.new(0.3, 0.6, 0.2),
+		Drag = 0.6,
+		Lifetime = NumberRange.new(1.4, 2.2),
+		Rate = 6,
+	},
+	glitch = { -- pink and cyan pixels flickering off
+		Texture = SPARKLE_TEXTURE,
+		Color = colours({ "#FF2EA8", "#2EF0FF" }),
+		LightEmission = 1,
+		Size = sequence({ { 0, 0.3 }, { 0.5, 0.3 }, { 0.51, 0 }, { 0.7, 0 }, { 0.71, 0.3 }, { 1, 0 } }),
+		Speed = NumberRange.new(1.5, 3),
+		SpreadAngle = Vector2.new(180, 180),
+		Drag = 3,
+		Lifetime = NumberRange.new(0.3, 0.6),
+		Rate = 12,
+	},
+	feathers = { -- white feathers floating down
+		Texture = SPARKLE_TEXTURE,
+		Color = colours({ "#FFFFFF", "#FFF4C8" }),
+		LightEmission = 0.2,
+		Size = sequence({ { 0, 0.32 }, { 1, 0.26 } }),
+		Speed = NumberRange.new(0.4, 1),
+		SpreadAngle = Vector2.new(180, 180),
+		Acceleration = Vector3.new(0.3, -1.2, 0.2),
+		Drag = 0.5,
+		Lifetime = NumberRange.new(1.6, 2.4),
+		Rate = 4,
+		Rotation = NumberRange.new(0, 360),
+		RotSpeed = NumberRange.new(-90, 90),
+	},
+	biolume = { -- deep-sea glowing dots
+		Texture = SPARKLE_TEXTURE,
+		Color = colours({ "#2EF0E0", "#7CB8FF" }),
+		LightEmission = 1,
+		Size = sequence({ { 0, 0 }, { 0.3, 0.24 }, { 0.7, 0.24 }, { 1, 0 } }),
+		Speed = NumberRange.new(0.2, 0.6),
+		SpreadAngle = Vector2.new(180, 180),
+		Drag = 1,
+		Lifetime = NumberRange.new(1.4, 2.2),
+		Rate = 7,
+	},
 }
+
+-- The halo: a ring of glowing segments floating above the head (MutationLook.halo).
+local HALO_SEGMENTS = 8
+local HALO_COLOR = "#FFE066"
 
 -- Whether `name` is a particle preset this module can build (MutationLook.particles).
 function CreatureVisuals.hasParticles(name: string): boolean
@@ -459,6 +533,26 @@ local function addMutationLook(model: Model, mutation: Types.MutationDef)
 			(emitter :: any)[key] = value
 		end
 		emitter.Parent = body
+	end
+	local root = model.PrimaryPart
+	if look.halo and root ~= nil then
+		-- Above the model's top, sized to its width: a ring of short neon segments.
+		local cf, size = model:GetBoundingBox()
+		local radius = math.clamp(math.min(size.X, size.Z) * 0.28, 0.45, 1.6)
+		local centre = Vector3.new(root.Position.X, cf.Position.Y + size.Y / 2 + radius * 0.6, root.Position.Z)
+		local length = 2 * math.pi * radius / HALO_SEGMENTS * 1.08
+		for index = 1, HALO_SEGMENTS do
+			local angle = (index - 1) / HALO_SEGMENTS * math.pi * 2
+			local segment = newPart("Part", {
+				Name = "Halo",
+				Size = Vector3.new(length, radius * 0.16 + 0.05, radius * 0.16 + 0.05),
+				CFrame = CFrame.new(centre) * CFrame.Angles(0, -angle, 0) * CFrame.new(0, 0, -radius),
+				Color = UiTheme.color(HALO_COLOR),
+				Material = Enum.Material.Neon,
+			})
+			segment:SetAttribute("MutationSkip", true)
+			segment.Parent = model
+		end
 	end
 	if look.glow and body ~= nil and body:IsA("BasePart") then
 		local light = Instance.new("PointLight")

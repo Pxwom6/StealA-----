@@ -303,8 +303,9 @@ Two "come back tomorrow" loops (DECISIONS.md #24), both server-authoritative and
 
 ## 11. Map themes
 
-Eight dressings of the same map (DECISIONS.md #29): Sunny Meadow, Candy Kingdom, Frosty Peaks, Nacho Dunes, Hot Sauce
-Volcano, Midnight Market, Coconut Cove and Apple Pie Orchard (`Config/MapThemes`). Each changes the scenery's colours,
+Fourteen dressings of the same map (DECISIONS.md #29, #32): Sunny Meadow, Candy Kingdom, Frosty Peaks, Nacho Dunes,
+Hot Sauce Volcano, Midnight Market, Coconut Cove, Apple Pie Orchard, Cherry Blossom Garden, Cookie Moon, Mango
+Rainforest, Neon Noodle City, Cloud Nine and Sushi Reef (`Config/MapThemes`). Each changes the scenery's colours,
 the ground / walkway / wall materials, the lighting, what grows on the tree spots, ten big landmarks outside the wall
 and the weather around each player; plots, the belt and every gameplay position never move. A server starts on a
 random map and changes it every 20 minutes after a 40-second vote between three others (HUD top stack, `VoteMap`).
@@ -324,8 +325,9 @@ prices, hold time and tag reach. Studio: `/mod <id> [minutes]`, `/mod off`, `/mo
 
 ## 13. Map and weather mutations
 
-Eleven gated mutations (DECISIONS.md #31, `Config/Mutations`): one signature per map that only rolls on that map
-(Honey, Sprinkled, Frozen, Fossil, Molten, Moonlit, Pearl, Candy Apple; 1.2%, x3) and one per weather modifier that
+Seventeen gated mutations (DECISIONS.md #31, `Config/Mutations`): one signature per map that only rolls on that map
+(Honey, Sprinkled, Frozen, Fossil, Molten, Moonlit, Pearl, Candy Apple, Blossom, Lunar, Mossy, Cyber, Angelic,
+Abyssal; 1.2%, x3) and one per weather modifier that
 only rolls while it runs (Electric, Galaxy, Toxic; 2%, x4, announced). `BeltService.mutationConditions()` passes the
 running events, the map and the modifier into `MutationRules.roll`; permanent rolls never change. The vote buttons
 and the map title card name each map's mutation; the Snackdex shows a pip for each one owned. Mutation looks gained
