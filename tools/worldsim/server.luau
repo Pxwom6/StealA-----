@@ -231,12 +231,27 @@ local function scenario()
 	check(#aliceSession.data.creatures == 2, "nobody else gets it")
 
 	-- Coins rain on the walkways; walking through one collects it
+	-- (Bob still stands on the walkway by the crate, so a coin may land on him and be collected at once.)
+	local function coinsCollected(): number
+		local count = 0
+		for _, entry in Sim.received(1002, "Effect") do
+			if type(entry[1]) == "table" and entry[1].kind == "collect" then
+				count += 1
+			end
+		end
+		return count
+	end
+	local collectedBefore = coinsCollected()
 	Sim.chat(alice, "/mod coinRain")
 	task.wait(0.4)
 	Sim.advance(Modifiers.modifiers.coinRain.drops.firstSeconds + 0.5)
 	task.wait(0.4)
 	local _, coinCount = DropService.counts()
-	check(coinCount == Drops.coins.perWave, `Coin Rain: coins fall ({coinCount})`)
+	local landedOnBob = coinsCollected() - collectedBefore
+	check(
+		coinCount + landedOnBob == Drops.coins.perWave,
+		`Coin Rain: coins fall ({coinCount}, and {landedOnBob} on Bob)`
+	)
 	local coin = nil
 	for _, child in workspace.Drops:GetChildren() do
 		if child.Name == "Coin" then
