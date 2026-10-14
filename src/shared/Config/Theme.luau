@@ -479,6 +479,17 @@ local Theme = {
 		spinAnnounce = "🎰 {player} won {prize} on the Lucky Spin!",
 		spinOdds = "Odds",
 
+		-- Achievements (Config/Achievements): the Trophies tab and the toast
+		rewardsTabTrophies = "Trophies",
+		achievementDone = "{icon} Achievement: {title}! {prize}",
+		achievementsCount = "{done} / {total} achievements",
+		achievementReward = "Reward: {reward}",
+		achievementRewardSpins = "{count} Lucky Spins",
+		achievementRewardSpin = "1 Lucky Spin",
+		achievementRewardCreature = "a {luck}x Lucky Snackling",
+		achievementRewardMutated = "a {mutation} Snackling",
+		achievementLoading = "Loading...",
+
 		-- Redeem codes (server/Codes.luau): the Codes dialog (from Settings) and its answers
 		settingsCodes = "🎟️ Codes",
 		settingsCodesHint = "Got a code? Redeem it here",

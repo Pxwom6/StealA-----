@@ -35,6 +35,7 @@ export type ClientToServer =
 	| "RedeemCode"
 	| "ClaimGift"
 	| "Spin"
+	| "GetAchievements"
 
 export type ServerToClient =
 	"StateUpdate"
@@ -49,6 +50,7 @@ export type ServerToClient =
 	| "SnackdexSync"
 	| "CashOffer"
 	| "SpinResult"
+	| "AchievementSync"
 
 export type RemoteName = ClientToServer | ServerToClient
 
@@ -76,6 +78,7 @@ local CLIENT_TO_SERVER: { ClientToServer } = {
 	"RedeemCode",
 	"ClaimGift",
 	"Spin",
+	"GetAchievements",
 }
 
 local SERVER_TO_CLIENT: { ServerToClient } = {
@@ -91,6 +94,7 @@ local SERVER_TO_CLIENT: { ServerToClient } = {
 	"SnackdexSync",
 	"CashOffer",
 	"SpinResult",
+	"AchievementSync",
 }
 
 local FOLDER_NAME = "Remotes"

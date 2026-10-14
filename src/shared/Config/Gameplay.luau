@@ -147,6 +147,7 @@ local Gameplay = {
 		RedeemCode = { burst = 3, perSecond = 0.2 },
 		ClaimGift = { burst = 6, perSecond = 2 }, -- playtime gifts: each pays once a day (GiftRules.claim)
 		Spin = { burst = 2, perSecond = 0.5 }, -- the Lucky Spin (SpinService also waits for the reel)
+		GetAchievements = { burst = 3, perSecond = 0.5 }, -- the Trophies tab asking for progress
 	} :: { [string]: RateLimit },
 }
 

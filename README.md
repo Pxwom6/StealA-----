@@ -271,6 +271,19 @@ Lucky Spins, lucky Snacklings) and **Spin** (the Lucky Spin reel: a free spin ev
 both); BALANCE.md has the numbers. Studio: `/playtime <minutes>` unlocks gifts, `/spins <n>` banks spins and
 `/spins free` makes the free spin ready.
 
+### Achievements
+
+The Rewards panel's **Trophies** tab lists 25 achievements (buying, stealing, the Snackdex, rarities, mutations,
+earnings, rebirths, maps, the Lucky Spin) with progress bars. Each pays once per account the moment it is reached
+(cash sized from income, Lucky Spins or a lucky Snackling) with a toast; nothing to claim. They are counted from what
+the save already keeps, and marked with flags (`ach_<id>`, plus `map_<id>` for maps played on), so there is no
+save-format change.
+
+* **Add one** in `src/shared/Config/Achievements.luau`; CI checks it and keeps a list of shipped ids (never rename
+  one: it would pay again).
+* **Roblox badges:** create a badge in the Creator Hub (your experience > Associated Items > Badges), paste its id as
+  the achievement's `badgeId`, and publish: players get the badge when they reach it.
+
 ### Redeem codes
 
 Players redeem codes from the Settings dialog (🎟️ Codes row). The codes live in `src/server/Codes.luau`, which never
