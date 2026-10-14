@@ -6,7 +6,8 @@
 	Models are pooled per creature type and mutation (built once, reused forever) and each item gets a local "Buy"
 	prompt that sends the BuyBeltItem intent — the server re-validates price, range and space. A mutated item shows
 	the mutation's name in its colour, its mutated name ("Golden Pizza Pup") and its mutated price and income; a
-	limited-time (event) Snackling has a small "EVENT" tag in its event's colour on top.
+	limited-time (event) Snackling has a small "EVENT" tag in its event's colour on top. Prices follow a running server
+	modifier (Clearance Sale), worked out like the server does.
 
 	Items hop along (Logic/IdleMotion.belt): the hop and a little waddle are part of the per-frame move; the squash
 	and stretch of the body is only applied to items near the camera, about 30 times a second.
@@ -25,14 +26,18 @@ local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local CreatureVisuals = require(ReplicatedStorage.Shared.CreatureVisuals)
 local BeltMath = require(ReplicatedStorage.Shared.Logic.BeltMath)
 local IdleMotion = require(ReplicatedStorage.Shared.Logic.IdleMotion)
+local ModifierRules = require(ReplicatedStorage.Shared.Logic.ModifierRules)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local ClientSettings = require(script.Parent.ClientSettings)
+local ModifierController = require(script.Parent.ModifierController)
 local NotificationController = require(script.Parent.NotificationController)
 local SoundPlayer = require(script.Parent.SoundPlayer)
 local StateStore = require(script.Parent.StateStore)
 
 type Pooled = {
 	key: string, -- poolKey(creatureId, variant)
+	creatureId: string,
+	variant: string?,
 	model: Model,
 	prompt: ProximityPrompt,
 	priceLabel: TextLabel,
@@ -78,6 +83,19 @@ end
 
 local function poolKey(creatureId: string, variant: string?): string
 	return creatureId .. "|" .. (variant or "")
+end
+
+-- What the server charges for this item right now (a Clearance Sale modifier lowers it; ModifierRules.beltPrice).
+local function beltPrice(def: Types.CreatureDef, variant: string?): number
+	return ModifierRules.beltPrice(GameData.price(def, variant), ModifierController.effects())
+end
+
+local function priceText(def: Types.CreatureDef, variant: string?): string
+	return `{UiTheme.cash(beltPrice(def, variant))}  {UiTheme.perSecond(GameData.income(def, variant))}`
+end
+
+local function promptText(def: Types.CreatureDef, variant: string?): string
+	return `{GameData.displayName(def, variant)} - {UiTheme.cash(beltPrice(def, variant))}`
 end
 
 local function makeBillboard(
@@ -137,7 +155,7 @@ local function makeBillboard(
 		last = UiKit.label(props)
 	end
 	local price = last :: TextLabel
-	price.Text = `{UiTheme.cash(GameData.price(def, variant))}  {UiTheme.perSecond(GameData.income(def, variant))}`
+	price.Text = priceText(def, variant)
 	return price
 end
 
@@ -151,7 +169,7 @@ local function build(creatureId: string, variant: string?): Pooled
 	local priceLabel = makeBillboard(model, def, rarity, variant, height)
 	local prompt = UiKit.new("ProximityPrompt", {
 		ActionText = Theme.text.buyAction,
-		ObjectText = `{GameData.displayName(def, variant)} - {UiTheme.cash(GameData.price(def, variant))}`,
+		ObjectText = promptText(def, variant),
 		HoldDuration = 0,
 		MaxActivationDistance = Gameplay.belt.buyRange - 2,
 		RequiresLineOfSight = false,
@@ -161,6 +179,8 @@ local function build(creatureId: string, variant: string?): Pooled
 	model.Parent = folder
 	return {
 		key = poolKey(creatureId, variant),
+		creatureId = creatureId,
+		variant = variant,
 		model = model,
 		prompt = prompt,
 		priceLabel = priceLabel,
@@ -194,9 +214,32 @@ end
 local function refreshAffordability(cash: number)
 	for _, entry in active do
 		local def = GameData.catalog.creatures[entry.item.creatureId]
-		entry.pooled.priceLabel.TextColor3 = if cash >= GameData.price(def, entry.variant)
+		entry.pooled.priceLabel.TextColor3 = if cash >= beltPrice(def, entry.variant)
 			then UiTheme.palette("cash")
 			else UiTheme.palette("danger")
+	end
+end
+
+-- Every built model's price (on the belt and parked in the pools) after a modifier starts or ends.
+local function refreshPrices()
+	local function update(pooled: Pooled)
+		local def = GameData.catalog.creatures[pooled.creatureId]
+		if def then
+			pooled.priceLabel.Text = priceText(def, pooled.variant)
+			pooled.prompt.ObjectText = promptText(def, pooled.variant)
+		end
+	end
+	for _, entry in active do
+		update(entry.pooled)
+	end
+	for _, pool in pools do
+		for _, pooled in pool do
+			update(pooled)
+		end
+	end
+	local state = StateStore.get()
+	if state then
+		refreshAffordability(state.cash)
 	end
 end
 
@@ -353,6 +396,7 @@ function BeltController.start()
 	StateStore.onChange(function(state)
 		refreshAffordability(state.cash)
 	end)
+	ModifierController.onChanged(refreshPrices)
 	RunService.RenderStepped:Connect(step)
 end
 

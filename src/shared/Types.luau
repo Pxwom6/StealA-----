@@ -460,6 +460,46 @@ export type MapRotation = {
 	candidates: number, -- maps on the ballot (never the current one)
 }
 
+-- Config: server modifiers (Config/Modifiers): short random twists that change how the server plays -----------------
+
+-- What a modifier changes, as multipliers (1 = unchanged; a missing field is 1). Each stays inside
+-- Config/Modifiers.limits (Logic/ModifierRules.validate).
+export type ModifierEffects = {
+	spawnInterval: number?, -- × the belt's spawn interval (0.5 = twice as many Snacklings)
+	beltPrice: number?, -- × belt prices
+	mutationChance: number?, -- × every mutation's chance per spawn
+	luck: number?, -- × server luck (a LiveOps boost: it shows in the luck pill and is capped like the others)
+	income: number?, -- × everyone's income (capped with LiveOps cash events at limits.maxCashMultiplier)
+	walkSpeed: number?, -- × everyone's walking speed (carrying thieves too)
+	stealHold: number?, -- × the hold-to-steal time
+	lockDuration: number?, -- × base lock time (locks started while it runs)
+	tagRange: number?, -- × how far a tag reaches
+}
+
+export type ModifierDef = {
+	displayName: string,
+	icon: string, -- emoji on the HUD chip and the banner
+	description: string, -- the start banner and the chip's tap toast; keep it short
+	color: string, -- chip and banner colour
+	weight: number, -- how often it comes up; 0 = only by command
+	effects: ModifierEffects,
+}
+
+export type ModifierSchedule = {
+	enabled: boolean,
+	durationSeconds: number, -- how long each modifier runs
+	gapMinSeconds: number, -- a random break between two modifiers
+	gapMaxSeconds: number,
+	firstDelaySeconds: number, -- a new server waits this long before the first one
+}
+
+export type ModifiersConfig = {
+	modifiers: { [string]: ModifierDef },
+	order: { string }, -- every modifier id once (display order; ties in picks resolve by it)
+	schedule: ModifierSchedule,
+	limits: { [string]: { min: number, max: number } }, -- allowed range of each effect
+}
+
 export type MapThemesConfig = {
 	themes: { [string]: MapThemeDef },
 	order: { string }, -- every theme id once: display order, and ties in picks resolve by it

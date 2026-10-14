@@ -47,6 +47,7 @@ Studio test purchases, etc.).
 | `lune run tools/importParts.luau` | Import the polished Snackling models from `art/snackling-parts/` |
 | `lune run tools/worldsim/smoke.luau` | Build the map offline in every map theme and check it (CI runs this too) |
 | `lune run tools/worldsim/export.luau <mapId> [out.json]` | Dump one map theme's built world as JSON for a 3D preview |
+| `lune run tools/worldsim/server.luau` | Boot the whole server offline and play a short two-player session (CI runs this too) |
 | `stylua src tests tools` | Format |
 | `selene src tests tools` | Lint |
 | `rojo sourcemap default.project.json -o sourcemap.json` | Sourcemap for luau-lsp |
@@ -136,6 +137,13 @@ what grows on the tree spots, ten landmarks outside the wall and the weather; ga
   budget, and `lune run tools/worldsim/smoke.luau` builds every map offline.
 * **A new map:** copy a theme, give it a new id and add the id to `order`. New flora or landmark kinds are built in
   `src/server/Services/ThemeProps.luau` and counted in `src/shared/Logic/MapThemeRules.luau`.
+
+### Server modifiers
+
+Every 4-8 minutes a server runs a 5-minute twist (`src/shared/Config/Modifiers.luau`): Rush Hour, Clearance Sale,
+Golden Hour, Lucky Breeze, Cash Splash, Sugar Rush, Quick Hands, Fortress, Snack Patrol or the rare Snack Party. Change
+an effect, a name or the schedule there (CI keeps every effect inside `limits`); `schedule.enabled = false` turns them
+off and `weight = 0` keeps one for `/mod` only. BALANCE.md "Server modifiers" has the numbers.
 
 ### First-time tutorial
 
@@ -252,6 +260,8 @@ These work in Studio only (`src/server/Services/DevCommands.luau`):
 * `/gallery [mutationId|off]` (every Snackling in labelled rows past the north boundary wall, e.g. `/gallery golden`),
   `/sky <clockTime>` (preview another time of day, e.g. `/sky 18`; the next map or season change resets it)
 * `/map <id>`, `/map vote`, `/map list` (map themes; admins can use these in live servers too, that server only)
+* `/mod <id> [minutes]`, `/mod off`, `/mod list` (server modifiers, e.g. `/mod rushHour 2`; admins too, that server
+  only)
 
 To test a seasonal event in Studio: `/event Halloween2026 5` turns Halloween on for 5 minutes (decorations, dusk
 lighting, banner with countdown, event Snacklings and Haunted on the belt), and `/event off` ends it early.

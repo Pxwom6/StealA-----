@@ -603,3 +603,30 @@ recipe comes back.
 ranges or the anti-cheat, and the vote gives a server something to do together every 20 minutes.
 **Reversal cost:** low — `rotation.enabled = false` keeps a server on its first map, `firstMap = "meadow"` makes that
 the old look, and removing the map vote card is one controller.
+
+### 30. Server modifiers: short random twists, read where each system decides
+
+* **What:** every 4-8 minutes a server runs one of ten modifiers for 5 minutes (`Config/Modifiers`): Rush Hour
+  (faster belt), Clearance Sale (30% off), Golden Hour (3x mutations), Lucky Breeze (2x luck), Cash Splash (+50%
+  income), Sugar Rush (+25% speed), Quick Hands (half the steal hold), Fortress (1.5x locks), Snack Patrol (+50% tag
+  reach) and the rare Snack Party (faster belt + luck). A banner announces it and a chip in the HUD counts it down.
+  `/mod <id> [minutes]`, `/mod off`, `/mod list` in Studio (admins live).
+* **One source of truth:** `ModifierService` only keeps the schedule; every effect is a multiplier the system that
+  decides reads at that moment (`ModifierRules.effects`): BeltService (interval, capacity, prices, mutation
+  chances), EconomyService (income, folded into the LiveOps cash multiplier and capped with it), LockService (lock
+  length), StealService (hold, tag reach, speeds), PlayerLifecycle (new characters' speed). Luck is a LiveOps boost
+  with source "modifier", so it shows in the luck pill and is capped like the others. The client computes the same
+  effects from the published id for what it shows (belt prices, the steal prompt's hold, the TAG button's reach).
+* **Movement checks follow the speed:** `PositionTracker` and the carry budget use `walkSpeedAllowance()`: the
+  current multiplier, or the previous one for 4 s after a change if it was faster (a client keeps the old speed for
+  a round trip). Every effect is clamped by `limits` in CI, so the widest the checks ever get is 1.35x.
+* **Not modifiers on purpose:** gravity / jump height (players could clear plot walls, and the steal height checks
+  assume a normal jump) and belt travel speed (item positions are a function of spawn time; changing it would move
+  every item already on the belt).
+* **Checked offline:** `tools/worldsim/server.luau` boots the whole server in Lune and plays a session through the
+  real remotes and chat commands (buy at the sale price, Sugar Rush speeds, Fortress locks, Lucky Breeze luck, a
+  Quick Hands steal, a tag, a map change and vote, leaving with the save written). CI runs it.
+
+**Why:** the "something different is happening" feeling of event-driven brainrot games, without new content to make:
+ten knobs on systems that already exist, each bounded and visible.
+**Reversal cost:** none — `schedule.enabled = false` stops them; a modifier with `weight = 0` only runs by command.

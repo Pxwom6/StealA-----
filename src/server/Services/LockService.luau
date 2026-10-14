@@ -24,6 +24,7 @@ local LockRules = require(ReplicatedStorage.Shared.Logic.LockRules)
 local RebirthMath = require(ReplicatedStorage.Shared.Logic.RebirthMath)
 local StealRules = require(ReplicatedStorage.Shared.Logic.StealRules)
 local GameEvents = require(script.Parent.GameEvents)
+local ModifierService = require(script.Parent.ModifierService)
 local PlotService = require(script.Parent.PlotService)
 local PositionTracker = require(script.Parent.PositionTracker)
 local Remotes = require(script.Parent.Remotes)
@@ -55,12 +56,13 @@ local function now(): number
 	return workspace:GetServerTimeNow()
 end
 
+-- The lock length for this player: base + rebirth bonus + Longer Lock pass, times a running modifier (Fortress).
 function LockService.duration(session: Session): number
 	return LockRules.duration(
 		Gameplay.lock.durationSeconds,
 		RebirthMath.lockBonusFor(session.data.rebirths, Economy.rebirth),
 		if session.passes.LongerLock then Monetization.perks.longerLockSeconds else 0
-	)
+	) * ModifierService.effects().lockDuration
 end
 
 -- Sessions whose saved timers were restored on join. Only those may write timers back: a join that never got that
@@ -241,6 +243,12 @@ end
 
 function LockService.start()
 	Remotes.onIntent("LockBase", onLockBase)
+	-- A modifier changes the length of locks started from now on (a running lock keeps its end).
+	ModifierService.onChanged(function()
+		for _, session in Sessions.all() do
+			LockService.refresh(session)
+		end
+	end)
 
 	task.spawn(function()
 		while true do

@@ -74,9 +74,10 @@ function Sim.signal(): Signal
 	function signal.Wait(_self: any): ...any
 		error("Signal:Wait is not supported offline")
 	end
+	-- Like Roblox, each listener runs in its own thread: an error in one doesn't stop the others or the firer.
 	function signal.Fire(_self: any, ...: any)
 		for _, listener in table.clone(listeners) do
-			listener(...)
+			task.spawn(listener, ...)
 		end
 	end
 	return signal :: any
@@ -131,6 +132,45 @@ roblox.implementMethod("PVInstance", "PivotTo", function(self: any, target: any)
 	end
 end)
 
+-- A model's bounding box, axis-aligned in world space (Roblox orients it by the pivot; close enough offline).
+local function boundingBox(model: any): (any, any)
+	local min = roblox.Vector3.new(math.huge, math.huge, math.huge)
+	local max = roblox.Vector3.new(-math.huge, -math.huge, -math.huge)
+	local any = false
+	for _, descendant in model:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			any = true
+			local cf, size = descendant.CFrame, descendant.Size
+			for _, sx in { -0.5, 0.5 } do
+				for _, sy in { -0.5, 0.5 } do
+					for _, sz in { -0.5, 0.5 } do
+						local corner = cf * roblox.Vector3.new(size.X * sx, size.Y * sy, size.Z * sz)
+						min = roblox.Vector3.new(
+							math.min(min.X, corner.X),
+							math.min(min.Y, corner.Y),
+							math.min(min.Z, corner.Z)
+						)
+						max = roblox.Vector3.new(
+							math.max(max.X, corner.X),
+							math.max(max.Y, corner.Y),
+							math.max(max.Z, corner.Z)
+						)
+					end
+				end
+			end
+		end
+	end
+	if not any then
+		return roblox.CFrame.new(), roblox.Vector3.zero
+	end
+	return roblox.CFrame.new((min + max) / 2), max - min
+end
+roblox.implementMethod("Model", "GetBoundingBox", boundingBox)
+roblox.implementMethod("Model", "GetExtentsSize", function(self: any): any
+	local _, size = boundingBox(self)
+	return size
+end)
+
 -- Attribute / property signals: real objects, but nothing fires them offline.
 local attributeSignals: { [any]: { [string]: Signal } } = setmetatable({}, { __mode = "k" }) :: any
 roblox.implementMethod("Instance", "GetAttributeChangedSignal", function(self: any, name: string): any
@@ -138,6 +178,10 @@ roblox.implementMethod("Instance", "GetAttributeChangedSignal", function(self: a
 	attributeSignals[self] = byName
 	byName[name] = byName[name] or Sim.signal()
 	return byName[name]
+end)
+-- Everything exists already offline (nothing streams in), so waiting for a child is finding it.
+roblox.implementMethod("Instance", "WaitForChild", function(self: any, name: string, _timeout: number?): any
+	return self:FindFirstChild(name)
 end)
 roblox.implementMethod("Instance", "GetPropertyChangedSignal", function(_self: any, _name: string): any
 	return Sim.signal()
@@ -147,8 +191,36 @@ for _, event in { "Changed", "AncestryChanged", "Destroying", "ChildAdded", "Chi
 		return Sim.signal()
 	end)
 end
-roblox.implementProperty("TextChatCommand", "Triggered", function(_self: any): any
-	return Sim.signal()
+-- Events the game connects to and the offline server fires itself, one signal per instance and event.
+local instanceSignals: { [any]: { [string]: Signal } } = setmetatable({}, { __mode = "k" }) :: any
+local function instanceSignal(real: any, name: string): Signal
+	local byName = instanceSignals[real] or {}
+	instanceSignals[real] = byName
+	byName[name] = byName[name] or Sim.signal()
+	return byName[name]
+end
+for _, entry in
+	{
+		{ "TextChatCommand", "Triggered" },
+		{ "RemoteEvent", "OnServerEvent" },
+		{ "RemoteEvent", "OnClientEvent" },
+		{ "Player", "CharacterAdded" },
+		{ "Player", "CharacterRemoving" },
+		{ "Humanoid", "Died" },
+	}
+do
+	roblox.implementProperty(entry[1], entry[2], function(self: any): any
+		return instanceSignal(self, entry[2])
+	end)
+end
+
+-- What the server sent to clients: { remote = name, player = userId (0 = everyone), args = { ... } }.
+Sim.sent = {} :: { { remote: string, player: number, args: { any } } }
+roblox.implementMethod("RemoteEvent", "FireClient", function(self: any, player: any, ...: any)
+	table.insert(Sim.sent, { remote = self.Name, player = player.UserId, args = table.pack(...) :: any })
+end)
+roblox.implementMethod("RemoteEvent", "FireAllClients", function(self: any, ...: any)
+	table.insert(Sim.sent, { remote = self.Name, player = 0, args = table.pack(...) :: any })
 end)
 
 -- Instance wrappers ------------------------------------------------------------------------------------------------
@@ -370,17 +442,36 @@ function RunService.IsRunning(_self: any): boolean
 	return true
 end
 
-local Players = {
+-- Players: the real (Lune) Players service holds the fake players, so `player.Parent == Players` holds as in the game.
+local realPlayers = realGame:GetService("Players")
+local Players: any = {
 	PlayerAdded = Sim.signal(),
 	PlayerRemoving = Sim.signal(),
 	MaxPlayers = 8,
 	LocalPlayer = nil,
 }
 function Players.GetPlayers(_self: any): { any }
-	return {}
+	local list = {}
+	for _, child in realPlayers:GetChildren() do
+		if child:IsA("Player") then
+			table.insert(list, wrap(child))
+		end
+	end
+	return list
 end
-function Players.GetPlayerByUserId(_self: any, _userId: number): any
+function Players.GetPlayerByUserId(_self: any, userId: number): any
+	for _, child in realPlayers:GetChildren() do
+		if child:IsA("Player") and child.UserId == userId then
+			return wrap(child)
+		end
+	end
 	return nil
+end
+function Players.GetFriendsAsync(_self: any, _userId: number): any
+	error("Players.GetFriendsAsync is not available offline")
+end
+function Players.GetUserThumbnailAsync(_self: any, _userId: number, _type: any, _size: any): (string, boolean)
+	return "", true
 end
 
 local tagged: { [string]: { [any]: boolean } } = {}
@@ -426,9 +517,18 @@ function HttpService.GenerateGUID(_self: any, wrapInBraces: boolean?): string
 	return if wrapInBraces == false then id else `\{{id}\}`
 end
 
+-- A service the offline server can't provide: its events are quiet signals, its functions throw (the game pcalls
+-- every online call, so it carries on as it would during an outage), and plain fields can be assigned.
 local function unavailable(name: string): any
+	local signals: { [string]: Signal } = {}
 	return setmetatable({}, {
-		__index = function(_, key: string)
+		__index = function(_, key: string): any
+			for _, suffix in { "Finished", "Added", "Removed", "Changed", "Triggered", "Joined", "Left" } do
+				if string.sub(key, -#suffix) == suffix then
+					signals[key] = signals[key] or Sim.signal()
+					return signals[key]
+				end
+			end
 			return function()
 				error(`{name}.{key} is not available offline`)
 			end
@@ -448,6 +548,8 @@ local refMeta: any = {}
 -- once up front.
 local knownFiles: { [string]: boolean } = {}
 local knownDirs: { [string]: { string } } = {}
+-- Nested Rojo projects (Wally packages): a folder whose default.project.json points its root at one file.
+local nestedProjects: { [string]: string } = {}
 
 local function scan(dir: string)
 	if knownDirs[dir] or not fs.isDir(dir) then
@@ -456,6 +558,21 @@ local function scan(dir: string)
 	local entries = fs.readDir(dir)
 	table.sort(entries)
 	knownDirs[dir] = entries
+	local projectFile = `{dir}/default.project.json`
+	if fs.isFile(projectFile) then
+		local source = fs.readFile(projectFile)
+		local ok, project = pcall(function(): any
+			return serde.decode("json", source)
+		end)
+		local root = if ok
+				and type(project) == "table"
+				and type(project.tree) == "table"
+			then project.tree["$path"]
+			else nil
+		if type(root) == "string" and fs.isFile(`{dir}/{root}`) then
+			nestedProjects[dir] = `{dir}/{root}`
+		end
+	end
 	for _, entry in entries do
 		local path = `{dir}/{entry}`
 		if fs.isDir(path) then
@@ -474,15 +591,21 @@ local function isDir(path: string): boolean
 	return knownDirs[path] ~= nil
 end
 
-local SCRIPT_SUFFIXES = { ".luau", ".server.luau", ".client.luau" }
-local INIT_FILES = { "init.luau", "init.server.luau", "init.client.luau" }
+local SCRIPT_SUFFIXES = { ".luau", ".server.luau", ".client.luau", ".lua", ".server.lua", ".client.lua" }
+local INIT_FILES =
+	{ "init.luau", "init.server.luau", "init.client.luau", "init.lua", "init.server.lua", "init.client.lua" }
 
 local function makeRef(fsPath: string, dir: string?, name: string, parent: any): Ref
 	return setmetatable({ __fs = fsPath, __dir = dir, __name = name, __parent = parent }, refMeta) :: any
 end
 
--- A folder of the project: a script when it has an init file, else a plain folder (empty __fs).
+-- A folder of the project: a script when it has an init file (or is a nested project of one file), else a plain
+-- folder (empty __fs).
 local function dirRef(dir: string, name: string, parent: any): Ref
+	local nested = nestedProjects[dir]
+	if nested then
+		return makeRef(nested, nil, name, parent)
+	end
 	for _, init in INIT_FILES do
 		if isFile(`{dir}/{init}`) then
 			return makeRef(`{dir}/{init}`, dir, name, parent)
@@ -520,7 +643,7 @@ local function children(ref: Ref): { Ref }
 		if isDir(`{dir}/{entry}`) then
 			name = entry
 		else
-			for _, suffix in { ".server.luau", ".client.luau", ".luau" } do
+			for _, suffix in { ".server.luau", ".client.luau", ".luau", ".server.lua", ".client.lua", ".lua" } do
 				if string.sub(entry, -#suffix) == suffix and not string.match(entry, "^init%.") then
 					name = string.sub(entry, 1, -#suffix - 1)
 					break
@@ -538,7 +661,9 @@ local function children(ref: Ref): { Ref }
 end
 
 refMeta.__index = function(ref: Ref, key: string): any
-	if key == "Name" then
+	if string.sub(key, 1, 2) == "__" then
+		return nil -- a ref's own fields (__dir of a plain folder is nil)
+	elseif key == "Name" then
 		return ref.__name
 	elseif key == "Parent" then
 		return ref.__parent
@@ -638,6 +763,28 @@ local function readProject(): { [string]: { [string]: Ref } }
 					end
 					return refMeta.__index(ref, name)
 				end
+				-- A plain container holds only what the project puts in it (e.g. CreatureModels starts empty).
+				local findChild = function(_self: Ref, name: string): Ref?
+					return nested[name]
+				end
+				folderMeta.__index = function(ref: Ref, name: string): any
+					if string.sub(name, 1, 2) == "__" then
+						return nil
+					elseif nested[name] then
+						return nested[name]
+					elseif name == "FindFirstChild" or name == "WaitForChild" then
+						return findChild
+					elseif name == "GetChildren" then
+						return function(_self: Ref): { Ref }
+							local list = {}
+							for _, child in nested do
+								table.insert(list, child)
+							end
+							return list
+						end
+					end
+					return refMeta.__index(ref, name)
+				end
 				into[key] = setmetatable(folder :: any, folderMeta) :: any
 			end
 		end
@@ -654,6 +801,27 @@ end
 
 local projectChildren = readProject()
 
+-- The Players stub is the face of the real Players service (and falls back to its members).
+setmetatable(Players, {
+	__index = function(_, key: string): any
+		local value = wrap(realPlayers)[key]
+		return value
+	end,
+})
+wrappers[realPlayers] = Players
+reals[Players] = realPlayers
+
+-- Services that answer offline: nobody owns a pass, analytics go nowhere.
+local MarketplaceService: any = unavailable("MarketplaceService")
+function MarketplaceService.UserOwnsGamePassAsync(_self: any, _userId: number, _passId: number): boolean
+	return false
+end
+local AnalyticsService: any = setmetatable({}, {
+	__index = function(_, _key: string): any
+		return function() end
+	end,
+})
+
 local serviceStubs: { [string]: any } = {
 	TweenService = TweenService,
 	RunService = RunService,
@@ -662,11 +830,11 @@ local serviceStubs: { [string]: any } = {
 	HttpService = HttpService,
 	DataStoreService = unavailable("DataStoreService"),
 	MessagingService = unavailable("MessagingService"),
-	MarketplaceService = unavailable("MarketplaceService"),
+	MarketplaceService = MarketplaceService,
 	BadgeService = unavailable("BadgeService"),
 	SocialService = unavailable("SocialService"),
 	GroupService = unavailable("GroupService"),
-	AnalyticsService = unavailable("AnalyticsService"),
+	AnalyticsService = AnalyticsService,
 	TextService = unavailable("TextService"),
 }
 
@@ -678,13 +846,36 @@ local function getService(_self: any, name: string): any
 	end
 	local service = serviceStubs[name]
 	if service == nil then
-		local instance = wrap(realGame:GetService(name))
+		local real = realGame:GetService(name)
+		local instance = wrap(real)
 		local rojo = projectChildren[name]
-		service = if rojo then hybrid(instance, rojo) else instance
+		if rojo then
+			-- The service's one face for the game's code: parenting to it, comparing with it and reading it back all
+			-- give the same object.
+			service = hybrid(instance, rojo)
+			wrappers[real] = service
+			reals[service] = real
+		else
+			service = instance
+		end
 	end
 	services[name] = service
 	return service
 end
+
+-- DataModel properties a place file doesn't store (Lune can't read them): what a fresh Studio session would say.
+local GAME_PROPERTIES: { [string]: any } = {
+	PlaceId = 0,
+	GameId = 0,
+	CreatorId = 0,
+	PlaceVersion = 0,
+	JobId = "",
+	PrivateServerId = "",
+	PrivateServerOwnerId = 0,
+}
+
+-- Functions game:BindToClose registered (Sim.close runs them).
+local closeCallbacks: { () -> () } = {}
 
 local gameProxy = setmetatable({}, {
 	__index = function(_, key: string): any
@@ -696,6 +887,12 @@ local gameProxy = setmetatable({}, {
 			return function(): boolean
 				return true
 			end
+		elseif key == "BindToClose" then
+			return function(_self: any, callback: () -> ())
+				table.insert(closeCallbacks, callback)
+			end
+		elseif GAME_PROPERTIES[key] ~= nil then
+			return GAME_PROPERTIES[key]
 		end
 		return wrap(realGame)[key]
 	end,
@@ -768,8 +965,10 @@ local function requireString(from: Ref, target: string): any
 	local base = dirname(from.__fs)
 	local path = normalise(`{base}/{target}`)
 	local name = string.match(path, "[^/]+$") or path
-	if isFile(`{path}.luau`) then
-		return load(makeRef(`{path}.luau`, nil, name, nil))
+	for _, suffix in { ".luau", ".lua" } do
+		if isFile(`{path}{suffix}`) then
+			return load(makeRef(`{path}{suffix}`, nil, name, nil))
+		end
 	end
 	if isDir(path) then
 		return load(dirRef(path, name, nil))
@@ -830,6 +1029,104 @@ end
 
 function Sim.service(name: string): any
 	return getService(nil, name)
+end
+
+-- Replaces a module before anything requires it, e.g. ProfileStore with tools/worldsim/MockProfileStore.
+function Sim.mock(fsPath: string, value: any)
+	cache[fsPath] = value
+end
+
+-- Runs what game:BindToClose registered (a server shutting down).
+function Sim.close()
+	for _, callback in closeCallbacks do
+		callback()
+	end
+end
+
+-- Fake players -------------------------------------------------------------------------------------------------------
+
+-- A player joins (PlayerAdded fires; the game loads their save, gives them a plot...).
+function Sim.addPlayer(userId: number, name: string): any
+	local player = roblox.Instance.new("Player")
+	player.Name = name
+	pcall(function()
+		player.DisplayName = name
+	end)
+	player.UserId = userId
+	player.Parent = realPlayers
+	local wrapped = wrap(player)
+	Players.PlayerAdded:Fire(wrapped)
+	return wrapped
+end
+
+-- Gives a player a minimal character (root part, head, humanoid) at `position`, as if it just spawned.
+function Sim.spawnCharacter(player: any, position: any): any
+	local real = unwrap(player)
+	local model = roblox.Instance.new("Model")
+	model.Name = real.Name
+	local root = roblox.Instance.new("Part")
+	root.Name = "HumanoidRootPart"
+	root.Size = roblox.Vector3.new(2, 2, 1)
+	root.CFrame = roblox.CFrame.new(position)
+	root.Parent = model
+	local head = roblox.Instance.new("Part")
+	head.Name = "Head"
+	head.Size = roblox.Vector3.new(2, 1, 1)
+	head.CFrame = roblox.CFrame.new(position + roblox.Vector3.new(0, 1.5, 0))
+	head.Parent = model
+	local humanoid = roblox.Instance.new("Humanoid")
+	humanoid.MaxHealth = 100
+	humanoid.Health = 100
+	humanoid.WalkSpeed = 16
+	humanoid.Parent = model
+	model.PrimaryPart = root
+	model.Parent = realWorkspace
+	real.Character = model
+	instanceSignal(real, "CharacterAdded"):Fire(wrap(model))
+	return wrap(model)
+end
+
+-- Moves a player's character (as if they walked there).
+function Sim.moveCharacter(player: any, position: any)
+	local character = unwrap(player).Character
+	if character then
+		character:PivotTo(roblox.CFrame.new(position))
+	end
+end
+
+-- A player leaves.
+function Sim.removePlayer(player: any)
+	Players.PlayerRemoving:Fire(player)
+	unwrap(player).Parent = nil
+end
+
+-- A client intent: fires the remote's OnServerEvent as that player.
+function Sim.fireServer(player: any, remoteName: string, ...: any)
+	local remotes = realGame:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+	local remote = remotes and remotes:FindFirstChild(remoteName)
+	assert(remote, `no remote {remoteName}`)
+	instanceSignal(remote, "OnServerEvent"):Fire(player, ...)
+end
+
+-- A chat command typed by `player` (e.g. "/mod rushHour").
+function Sim.chat(player: any, text: string)
+	local alias = string.match(text, "^(%S+)")
+	for _, command in realGame:GetService("TextChatService"):GetDescendants() do
+		if command:IsA("TextChatCommand") and command.PrimaryAlias == alias then
+			instanceSignal(command, "Triggered"):Fire({ UserId = unwrap(player).UserId }, text)
+		end
+	end
+end
+
+-- Everything sent to `userId` (or to everyone) on `remote`, oldest first: each entry's args.
+function Sim.received(userId: number, remote: string): { { any } }
+	local list = {}
+	for _, entry in Sim.sent do
+		if entry.remote == remote and (entry.player == userId or entry.player == 0) then
+			table.insert(list, entry.args)
+		end
+	end
+	return list
 end
 
 -- Moves server time forward and lets anything task.delay / task.defer scheduled run.

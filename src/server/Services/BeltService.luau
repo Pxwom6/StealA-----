@@ -2,7 +2,8 @@
 --[[
 	The conveyor. Every `belt.spawnInterval` seconds a creature is rolled (weighted rarity × server luck, event
 	creatures only during their event), then its mutation (Logic/MutationRules: fixed chances, never luck), and it
-	is broadcast to clients as {id, creatureId, spawnAt, variant}. Items are not physics objects: position is a pure
+	is broadcast to clients as {id, creatureId, spawnAt, variant}. A server modifier (ModifierService) can speed up the
+	spawns (and let the belt hold more), multiply mutation chances, or change prices. Items are not physics objects: position is a pure
 	function of spawn time (Logic/BeltMath), clients render pooled models, and the server validates every purchase
 	against where the item really is.
 
@@ -18,6 +19,7 @@ local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local GameData = require(ReplicatedStorage.Shared.GameData)
 local BeltMath = require(ReplicatedStorage.Shared.Logic.BeltMath)
 local Guard = require(ReplicatedStorage.Shared.Logic.Guard)
+local ModifierRules = require(ReplicatedStorage.Shared.Logic.ModifierRules)
 local MutationRules = require(ReplicatedStorage.Shared.Logic.MutationRules)
 local RarityRoll = require(ReplicatedStorage.Shared.Logic.RarityRoll)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
@@ -27,6 +29,7 @@ local CashOfferService = require(script.Parent.CashOfferService)
 local EconomyService = require(script.Parent.EconomyService)
 local GameEvents = require(script.Parent.GameEvents)
 local LiveOpsService = require(script.Parent.LiveOpsService)
+local ModifierService = require(script.Parent.ModifierService)
 local PlotService = require(script.Parent.PlotService)
 local Remotes = require(script.Parent.Remotes)
 local Sessions = require(script.Parent.Sessions)
@@ -92,7 +95,8 @@ local function spawnOne(forcedId: string?, forcedVariant: string?)
 	for _ in items do
 		count += 1
 	end
-	if count >= Gameplay.belt.maxItems and forcedId == nil then
+	local effects = ModifierService.effects()
+	if count >= ModifierRules.beltCapacity(Gameplay.belt.maxItems, effects) and forcedId == nil then
 		return
 	end
 	local catalog = GameData.catalog
@@ -110,7 +114,7 @@ local function spawnOne(forcedId: string?, forcedVariant: string?)
 	end
 	local variant = if forcedId
 		then forcedVariant
-		else MutationRules.roll(catalog.mutationList, activeEvents, nextRandom)
+		else MutationRules.roll(catalog.mutationList, activeEvents, nextRandom, effects.mutationChance)
 	local item: BeltItem = { id = nextId, creatureId = creatureId, spawnAt = t, variant = variant }
 	nextId += 1
 	items[item.id] = item
@@ -163,7 +167,8 @@ local function onBuy(player: Player, idArg: unknown)
 	end
 	local def = GameData.catalog.creatures[item.creatureId]
 	local mutation = GameData.mutation(item.variant)
-	local price = GameData.price(def, item.variant)
+	-- A running modifier (Clearance Sale) changes belt prices; the client shows the same (ModifierRules.beltPrice).
+	local price = ModifierRules.beltPrice(GameData.price(def, item.variant), ModifierService.effects())
 	if not EconomyService.trySpend(session, price, "Shop", def.id) then
 		CashOfferService.notEnoughCash(session, price) -- "Need $X more?" offer, or the usual toast
 		return
@@ -230,7 +235,7 @@ function BeltService.start(beltDef: BeltMath.Belt)
 	task.spawn(function()
 		while true do
 			spawnOne()
-			task.wait(Gameplay.belt.spawnInterval)
+			task.wait(Gameplay.belt.spawnInterval * ModifierService.effects().spawnInterval) -- Rush Hour: faster
 		end
 	end)
 end

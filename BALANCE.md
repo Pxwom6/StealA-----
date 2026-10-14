@@ -247,6 +247,31 @@ after about 7½ minutes (a Candy Corn Cat).
 * **After the event** event Snacklings stop spawning but owned ones (and Haunted ones) keep earning forever, sell at
   their normal value and can still be stolen; nothing about them is saved differently (no save-format change).
 
+## Server modifiers
+
+A modifier runs for 5 minutes, then the server waits 4-8 minutes (6 on average) before the next one
+(`Config/Modifiers.luau` `schedule`), so one is running about **45% of the time**. Ten modifiers share the picks by
+weight (nine at 1, Snack Party at 0.5), never the same twice in a row: each regular one runs about **2.8 minutes per
+server-hour**, Snack Party about 1.4.
+
+| Modifier | Effect while it runs | Effect over a server-hour |
+| --- | --- | --- |
+| Rush Hour | belt spawns every 1.25 s instead of 2.5 (the belt holds 32 instead of 16) | about +5% Snacklings on the belt |
+| Clearance Sale | belt prices x0.7 (rounded to whole cash, at least 1) | about 1.5% off what an always-buying player spends |
+| Golden Hour | every mutation chance x3 (5.95% → 17.9% of spawns while Halloween runs) | about +9% mutations |
+| Lucky Breeze | 2x luck (a LiveOps boost: shows in the luck pill, capped with everything else at 6x) | rare odds doubled ~4.7% of the time |
+| Cash Splash | income x1.5 (with LiveOps cash events, capped at 3x) | about +2.3% income; cash packs and quest rewards are not inflated (they use the steady income) |
+| Sugar Rush | everyone walks (and carries) 25% faster | – |
+| Quick Hands | the steal hold is 0.75 s instead of 1.5 | – |
+| Fortress | locks started while it runs last 1.5x (the open window grows with them: at least half the lock) | – |
+| Snack Patrol | tag reach 13 → 19.5 studs | – |
+| Snack Party (rare) | spawns every 1.7 s and 2x luck | – |
+
+They are spice, not an economy change: the biggest, Golden Hour, adds under a tenth to a server's mutations per hour.
+Every effect is clamped by `limits` (CI), and a speed modifier widens the server's movement checks by exactly its own
+multiplier (and keeps the faster speed allowed for 4 s after it ends), so the anti-cheat never flags a player for
+running at a speed the server gave them.
+
 ## Other knobs
 
 **Podiums** (`Economy.podiumUpgrade`): 8 to start, then +1 at a time for
