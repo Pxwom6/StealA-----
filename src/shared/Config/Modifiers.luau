@@ -14,6 +14,9 @@
 	replaces the map's particles, `lighting` goes over the map's (and a seasonal theme's) like a seasonal overlay, and
 	`skyEffect` adds lightning flashes (off with Reduce effects) or shooting stars.
 
+	Drop modifiers (Supply Drop, Coin Rain) put crates or coins on the walkways while they run (`drops`; what they
+	hold is in Config/Drops).
+
 	Commands: /mod <id> [minutes], /mod off, /mod list (anyone in Studio; admins in live servers, that server only).
 	Balance notes: BALANCE.md "Server modifiers".
 ]]
@@ -173,6 +176,26 @@ local Modifiers: ModifiersConfig = {
 			weather = "spores",
 			lighting = TOXIC,
 		},
+
+		-- Drops on the walkways (Config/Drops).
+		supplyDrop = {
+			displayName = "Supply Drop",
+			icon = "📦",
+			description = "Crates are falling! Open one for a free Snackling!",
+			color = "#C9894A",
+			weight = 1,
+			effects = {},
+			drops = { kind = "crate", firstSeconds = 10, everySeconds = 75 }, -- 4 crates
+		},
+		coinRain = {
+			displayName = "Coin Rain",
+			icon = "🪙",
+			description = "Coins are raining on the walkways. Grab them!",
+			color = "#FFD23F",
+			weight = 1,
+			effects = {},
+			drops = { kind = "coins", firstSeconds = 3, everySeconds = 40 }, -- 8 showers
+		},
 	},
 
 	order = {
@@ -189,6 +212,8 @@ local Modifiers: ModifiersConfig = {
 		"thunderstorm",
 		"meteorShower",
 		"toxicFog",
+		"supplyDrop",
+		"coinRain",
 	},
 
 	schedule = {

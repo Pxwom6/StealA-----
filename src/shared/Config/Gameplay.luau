@@ -140,6 +140,9 @@ local Gameplay = {
 		DevGrantProduct = { burst = 3, perSecond = 1 },
 		ClaimQuest = { burst = 4, perSecond = 1 }, -- three quests a day; each claim pays once (QuestRules.claim)
 		VoteMap = { burst = 4, perSecond = 1 }, -- the map vote (MapThemeService): changing your mind is fine
+		-- Supply crates (DropService): a hold starting and completing; letting go and holding again is fine.
+		CrateBegin = { burst = 4, perSecond = 2 },
+		CrateOpen = { burst = 4, perSecond = 2 },
 	} :: { [string]: RateLimit },
 }
 

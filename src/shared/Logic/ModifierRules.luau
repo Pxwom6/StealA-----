@@ -7,6 +7,7 @@
 	publishes, so what a player sees is what the server checks.
 ]]
 
+local DropRules = require("./DropRules")
 local MapThemeRules = require("./MapThemeRules")
 local SeasonRules = require("./SeasonRules")
 local Types = require("../Types")
@@ -189,8 +190,13 @@ function ModifierRules.validate(
 				any = true
 			end
 		end
-		if not any and not (unlocks and unlocks[id]) then
+		if not any and not (unlocks and unlocks[id]) and def.drops == nil then
 			problem(`{name} changes nothing`)
+		end
+		if def.drops then
+			for _, message in DropRules.dropsProblems(def.drops, config.schedule.durationSeconds, name) do
+				problem(message)
+			end
 		end
 		if def.weather ~= nil and not MapThemeRules.WEATHER[def.weather] then
 			problem(`{name} weather {def.weather} is not a known kind`)

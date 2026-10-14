@@ -448,6 +448,16 @@ local Theme = {
 		modifierStarted = "{icon} {name}! {description}",
 		modifierChip = "{icon} {name} {time}",
 
+		-- Drops (Config/Drops): supply crates and coins on the walkways
+		crateAction = "Open",
+		crateObject = "Supply Crate",
+		crateMarker = "📦",
+		crateFalling = "📦 A Supply Crate is falling onto the walkway!",
+		crateOpened = "📦 {player} opened a Supply Crate: {rarity} {creature}!",
+		crateReward = "📦 {creature} is yours, plus {cash}!",
+		crateRewardFull = "📦 Base full: {creature} sold for you. +{cash}",
+		crateTaken = "Too slow! Someone opened that crate first.",
+
 		-- Map themes (Config/MapThemes): the vote for the next map and the change itself
 		mapVoteTitle = "Vote for the next map! {time}",
 		mapVoteCount = "{votes}", -- votes under each choice on the vote card

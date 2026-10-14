@@ -37,5 +37,6 @@ require("./RetentionConfig.spec")
 require("./CashOfferRules.spec")
 require("./MapThemeRules.spec")
 require("./ModifierRules.spec")
+require("./DropRules.spec")
 
 T.finish()

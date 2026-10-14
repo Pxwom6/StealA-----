@@ -194,6 +194,22 @@ T.describe("ModifierRules.validate", function()
 			.toBeTruthy()
 	end)
 
+	T.it("lets a drop modifier change nothing but what it drops", function()
+		T.expect(mentions(ModifierRules.validate(Modifiers, mutationTotal(), unlocks()), "supplyDrop")).toBe(false)
+		T.expect(mentions(
+			broken(function(config)
+				config.modifiers.coinRain.drops = nil
+			end),
+			"coinRain changes nothing"
+		)).toBeTruthy()
+		T.expect(mentions(
+			broken(function(config)
+				config.modifiers.supplyDrop.drops.kind = "pinata"
+			end),
+			"drops.kind"
+		)).toBeTruthy()
+	end)
+
 	T.it("checks the weather, the sky effect and the lighting", function()
 		T.expect(mentions(
 			broken(function(config)

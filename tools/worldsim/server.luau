@@ -197,6 +197,64 @@ local function scenario()
 	local mapLighting = MapThemes.themes[mapTheme].lighting
 	check(math.abs(Lighting.ClockTime - mapLighting.clockTime) < 1e-3, "and the map's sky comes back")
 
+	-- Drops: a supply crate parachutes onto the walkway and the first player to hold it open wins it ---------------------
+	local DropService = Sim.server("Services/DropService")
+	local Drops = Sim.shared("Config/Drops")
+	Sim.chat(alice, "/mod supplyDrop")
+	task.wait(0.4)
+	Sim.advance(Modifiers.modifiers.supplyDrop.drops.firstSeconds + 0.5)
+	task.wait(0.4)
+	check((DropService.counts()) == 1, "Supply Drop: a crate falls")
+	Sim.advance(Drops.crate.fallSeconds + 0.5)
+	task.wait(0.4)
+	local crateId, crate = next(DropService.crateModels())
+	check(crate ~= nil and crate:GetAttribute("Landed") == true, "the crate lands on the walkway")
+	local box = (crate :: any).Crate
+	check(math.abs(box.Position.Z) > Gameplay.belt.width / 2, "beside the belt, not on it")
+	teleport(bob, box.Position + roblox.Vector3.new(3, 1, 0))
+	local bobCreatures = #bobSession.data.creatures
+	local bobCash = bobSession.data.cash
+	Sim.fireServer(bob, "CrateOpen", crateId)
+	task.wait(0.1)
+	check((DropService.counts()) == 1, "it does not open without holding")
+	Sim.fireServer(bob, "CrateBegin", crateId)
+	task.wait(0.05)
+	Sim.advance(Drops.crate.holdSeconds)
+	Sim.fireServer(bob, "CrateOpen", crateId)
+	task.wait(0.1)
+	check((DropService.counts()) == 0, "holding it open takes the crate")
+	check(#bobSession.data.creatures == bobCreatures + 1, "a Snackling lands in the opener's base")
+	check(bobSession.data.cash > bobCash, "plus some cash")
+	Sim.fireServer(alice, "CrateOpen", crateId)
+	task.wait(0.1)
+	check(#aliceSession.data.creatures == 2, "nobody else gets it")
+
+	-- Coins rain on the walkways; walking through one collects it
+	Sim.chat(alice, "/mod coinRain")
+	task.wait(0.4)
+	Sim.advance(Modifiers.modifiers.coinRain.drops.firstSeconds + 0.5)
+	task.wait(0.4)
+	local _, coinCount = DropService.counts()
+	check(coinCount == Drops.coins.perWave, `Coin Rain: coins fall ({coinCount})`)
+	local coin = nil
+	for _, child in workspace.Drops:GetChildren() do
+		if child.Name == "Coin" then
+			coin = child
+		end
+	end
+	bobCash = bobSession.data.cash
+	teleport(bob, coin.Position - roblox.Vector3.new(0, Drops.coins.height - 2.5, 0))
+	task.wait(0.3)
+	local _, coinsLeft = DropService.counts()
+	check(coinsLeft < coinCount, "walking through a coin picks it up")
+	check(bobSession.data.cash > bobCash, "and pays")
+	Sim.advance(Drops.coins.lifetimeSeconds)
+	task.wait(0.4)
+	Sim.chat(alice, "/mod off")
+	task.wait(0.4)
+	_, coinsLeft = DropService.counts()
+	check(coinsLeft == 0, "uncollected coins disappear")
+
 	-- Stealing (with Quick Hands) and tagging --------------------------------------------------------------------------------
 	Sim.chat(bob, "/noshield")
 	local record = aliceSession.data.creatures[1]

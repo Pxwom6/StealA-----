@@ -277,18 +277,18 @@ after about 7½ minutes (a Candy Corn Cat).
 ## Server modifiers
 
 A modifier runs for 5 minutes, then the server waits 4-8 minutes (6 on average) before the next one
-(`Config/Modifiers.luau` `schedule`), so one is running about **45% of the time**. Thirteen modifiers share the picks
-by weight (twelve at 1, Snack Party at 0.5), never the same twice in a row: each regular one runs about **2.2 minutes
-per server-hour**, Snack Party about 1.1. A player in a 30-minute session sees about three, and a weather one about
-half the time.
+(`Config/Modifiers.luau` `schedule`), so one is running about **45% of the time**. Fifteen modifiers share the picks
+by weight (fourteen at 1, Snack Party at 0.5), never the same twice in a row: each regular one runs about **1.9
+minutes per server-hour**, Snack Party about 0.9. A player in a 30-minute session sees about three: a weather one
+about half the time, a drop one (crates or coins) about a third of the time.
 
 | Modifier | Effect while it runs | Effect over a server-hour |
 | --- | --- | --- |
-| Rush Hour | belt spawns every 1.25 s instead of 2.5 (the belt holds 32 instead of 16) | about +4.5% Snacklings on the belt (with Snack Party) |
+| Rush Hour | belt spawns every 1.25 s instead of 2.5 (the belt holds 32 instead of 16) | about +4% Snacklings on the belt (with Snack Party) |
 | Clearance Sale | belt prices x0.7 (rounded to whole cash, at least 1) | about 1% off what an always-buying player spends |
-| Golden Hour | every mutation chance x3 (5.15% → 15.5% of spawns; 7.15% → 21.5% while Halloween runs) | about +7% mutations |
-| Lucky Breeze | 2x luck (a LiveOps boost: shows in the luck pill, capped with everything else at 6x) | rare odds doubled ~5.5% of the time (with Snack Party) |
-| Cash Splash | income x1.5 (with LiveOps cash events, capped at 3x) | about +1.8% income; cash packs and quest rewards are not inflated (they use the steady income) |
+| Golden Hour | every mutation chance x3 (5.15% → 15.5% of spawns; 7.15% → 21.5% while Halloween runs) | about +6% mutations |
+| Lucky Breeze | 2x luck (a LiveOps boost: shows in the luck pill, capped with everything else at 6x) | rare odds doubled ~4.7% of the time (with Snack Party) |
+| Cash Splash | income x1.5 (with LiveOps cash events, capped at 3x) | about +1.6% income; cash packs and quest rewards are not inflated (they use the steady income) |
 | Sugar Rush | everyone walks (and carries) 25% faster | – |
 | Quick Hands | the steal hold is 0.75 s instead of 1.5 | – |
 | Fortress | locks started while it runs last 1.5x (the open window grows with them: at least half the lock) | – |
@@ -297,8 +297,24 @@ half the time.
 | Thunderstorm | rain, lightning and a dark sky; Electric Snacklings can roll (2% of spawns) | about 2–3 Electric per storm |
 | Meteor Shower | a starry midnight with shooting stars; Galaxy Snacklings can roll (2%) | about 2–3 Galaxy per shower |
 | Toxic Fog | green haze and glowing spores; Toxic Snacklings can roll (2%) | about 2–3 Toxic per fog |
+| Supply Drop | 4 crates parachute onto the walkways; hold one open (2.5 s) to win it | see below |
+| Coin Rain | 8 showers of 12 coins over the walkways; walk through them | see below |
 
 They are spice, not an economy change: the biggest, Golden Hour, adds under a tenth to a server's mutations per hour.
+
+**Drops** (`Config/Drops.luau`) are the exception that hands out something, so they are sized like cash packs, from
+the player's steady income:
+
+* **A supply crate** holds a Snackling rolled at 3x luck (and 2x mutation chance) plus 45 seconds of the opener's
+  income (at least $300); with a full base the Snackling is sold for its usual refund instead. At 3x luck a crate is
+  Common 42%, Uncommon 20%, Rare 26%, Epic 9.4%, Legendary 2.5%, Mythic 0.4%, Secret 0.04% (the belt: 56 / 27 / 11.5
+  / 4.2 / 1.1 / 0.18 / 0.02). A server sees about 1.5 crates an hour and only one player wins each, so a new player's
+  lucky Legendary is a story, not a shortcut everyone takes.
+* **Coins** pay 3 seconds of the collector's income each (at least $30); a whole Coin Rain is 96 coins, about 5
+  minutes of income shared by everyone in the server. A newcomer grabbing a dozen gets a few hundred dollars early on
+  (a Rare costs $4.5K); a big base gets a few seconds per coin.
+* Pickups are checked against the player's trusted position (no teleporting to coins) and a crate's hold is
+  re-checked like a steal's.
 The weather ones change only the sky (a lighting overlay above the map's and a seasonal theme's, the client's
 particles and sky effects) and unlock their mutation; lightning flashes are soft, at most two in a quarter second,
 and off with Reduce effects.
