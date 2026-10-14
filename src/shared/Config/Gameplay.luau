@@ -15,25 +15,25 @@ local Gameplay = {
 		plotCount = 8,
 		plotsPerSide = 4,
 		plotWidth = 56, -- along X
-		plotDepth = 78, -- along Z
-		plotGap = 10,
-		walkwayWidth = 22, -- distance from belt centre line to the plot entrance
+		plotDepth = 94, -- along Z: 10 podium rows 8 apart, the lock button in front and the upgrade pad behind
+		plotGap = 20, -- open grass between neighbouring bases (DECISIONS.md #27)
+		walkwayWidth = 30, -- distance from belt centre line to the plot entrance
 		wallHeight = 7,
 		entranceWidth = 18,
 		podiumColumns = 2,
 		podiumColumnOffset = 17, -- local X of each podium column
-		podiumRowSpacing = 6.6,
+		podiumRowSpacing = 8,
 		podiumFirstRowOffset = 11, -- distance from the entrance to the first podium row
 		maxPodiums = 20,
 		-- Where players appear before their base is assigned (a second or so on join): the spawn plaza past the belt's
 		-- east end (Config/Scenery.plaza), facing back along the belt (-X).
-		lobby = { x = 184, z = 0 },
+		lobby = { x = 199, z = 0 },
 	},
 
 	belt = {
 		spawnInterval = 2.5,
-		length = 260,
-		travelSeconds = 30,
+		length = 290, -- a little longer than the row of bases (x -142..142)
+		travelSeconds = 33.5, -- the same speed as before (about 8.7 studs/s) on the longer belt
 		width = 9,
 		surfaceY = 1.2, -- height of the belt surface items ride on
 		buyRange = 16,
@@ -42,9 +42,10 @@ local Gameplay = {
 	},
 
 	collect = {
-		-- How close (horizontally) the owner's root part must be to a collect pad's centre: roughly "standing on
-		-- the 4.2-stud pad". Must stay below half of map.podiumRowSpacing so neighbouring pads never overlap.
-		padRange = 3.2,
+		-- How close (horizontally) the owner's root part must be to a collect pad's centre: standing on the 2.8-stud pad
+		-- or right at its edge (MapBuilder PAD_SIZE). Must stay below half of map.podiumRowSpacing so neighbouring pads
+		-- never overlap.
+		padRange = 2.8,
 	},
 
 	steal = {

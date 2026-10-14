@@ -73,6 +73,12 @@ local MAP = Gameplay.map
 local FLOOR_TOP = 0.4
 local WALKWAY_TOP = 0.2
 local PODIUM_HEIGHT = 1.4
+-- Collect pads: a small glowing square right beside each podium on the aisle side, with a thin ring of the plot's
+-- colour around it (Gameplay.collect.padRange is sized to it). They were 4.2 studs with a 6.4 ring, 6.4 from the
+-- podium centre, which made each side of a base read as one block of neon tiles (DECISIONS.md #27).
+local PAD_SIZE = 2.8
+local PAD_RING = 3.8
+local PAD_OFFSET = 4.6 -- podium centre to pad centre: the podium's half width (2.5), a 0.7 gap, half the pad
 local LOBBY_TOP = 0.3 -- the spawn plaza's paving (SceneryBuilder)
 local SIGN_PIXELS_PER_STUD = 40
 local WHITE = Color3.new(1, 1, 1)
@@ -458,10 +464,10 @@ local function buildPlot(index: number, parent: Instance): PlotRefs
 			CastShadow = false,
 			Parent = podiumModel,
 		})
-		local padLocal = localPos + Vector3.new(towardAisle * 6.4, FLOOR_TOP + 0.15, 0)
+		local padLocal = localPos + Vector3.new(towardAisle * PAD_OFFSET, FLOOR_TOP + 0.15, 0)
 		local pad: BasePart = part({
 			Name = "Pad",
-			Size = Vector3.new(4.2, 0.3, 4.2),
+			Size = Vector3.new(PAD_SIZE, 0.3, PAD_SIZE),
 			CFrame = origin * CFrame.new(padLocal),
 			Color = UiTheme.world("collectPad"),
 			Material = Enum.Material.Neon,
@@ -471,7 +477,7 @@ local function buildPlot(index: number, parent: Instance): PlotRefs
 		})
 		local ring: BasePart = decor({
 			Name = "PadRing",
-			Size = cylinderSize(0.2, 6.4),
+			Size = cylinderSize(0.2, PAD_RING),
 			CFrame = origin * CFrame.new(padLocal.X, FLOOR_TOP + 0.1, padLocal.Z) * UPRIGHT,
 			Color = plotColor,
 			Material = Enum.Material.Neon,

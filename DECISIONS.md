@@ -512,3 +512,30 @@ problem, not the biggest).
 **Why:** a social nudge is worth keeping visible, but not at the cost of the play area, and never while a new
 player is learning the game.
 **Reversal cost:** low — `SocialController.place` decides corner or stack; forcing the stack restores the old pill.
+
+### 27. A roomier map and smaller collect pads
+
+* **Problem (owner playtest):** the map felt cluttered. Inside a base, each active podium had a 4.2-stud neon pad
+  6.4 studs from its centre with a 6.4-stud glow ring, and the rows were 6.6 apart, so the rings nearly touched and
+  each side of a base read as one block of neon tiles. Outside, bases stood 10 studs apart and 17 studs of walkway
+  separated their entrances from the belt rails.
+* **Pads:** 2.8 studs, a 3.8 ring, 4.6 from the podium centre (right beside the podium, 0.7 gap), in `MapBuilder`
+  (`PAD_SIZE`, `PAD_RING`, `PAD_OFFSET`). `Gameplay.collect.padRange` is 2.8 (was 3.2): standing on the pad or at its
+  edge, and still under half the row spacing.
+* **Bases:** podium rows 8 apart (was 6.6), so plots are 94 deep (was 78): 11 from the entrance to the first row,
+  10 rows, and room for the upgrade pad behind the last. 20 studs of grass between neighbouring bases (was 10), and
+  the walkway is 30 wide on each side of the belt's centre line (was 22). Plots now span x -142..142, |z| 30..124.
+* **Belt:** 290 long (was 260) so it still runs a little past the outer bases, at the same speed (33.5 s end to
+  end, was 30 s). The spawn interval is unchanged, so belt odds per hour (`BALANCE.md`) are too; about 13 items ride
+  at once (cap 16).
+* **Scenery** moved out with it (`Config/Scenery`): the factory and chute follow the belt ends, the plaza, archway,
+  leaderboards and lobby spawn move 15 east, trees behind the bases 24 out, the boundary wall to x -251..259,
+  |z| ≤ 160, and the rocks and lake just outside it. `SceneryLayout.validate` and the Halloween layout checks pass
+  unchanged; the Snackling size limit (6.6 wide) stays as it was, with more room around it now.
+* **Gameplay effect:** walks are a little longer: the back of a base is 24 studs further from the belt (about 1.5 s
+  at walk speed), and a thief carries a Snackling a little further home, which slightly favours defenders.
+
+**Why:** a calmer base where the pads read as small buttons beside each Snackling, and open space between bases
+that makes each one feel like its own place, at the cost of slightly longer walks.
+**Reversal cost:** low — data in `Config/Gameplay` and `Config/Scenery` plus the three pad constants; saves don't
+store positions.

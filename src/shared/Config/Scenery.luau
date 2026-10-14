@@ -8,9 +8,10 @@
 	on a plot, the belt, the walkway, the lobby spawn or a Halloween decoration, that the terrain stays outside the
 	boundary wall, and that the extra parts stay under `partBudget`.
 
-	Map reminder (studs): plots span x -127..127 and |z| 22..100, the belt runs along X through the middle
-	(x -136..136), the walkway is x -157..157, |z| < 22. The Snack Factory sits on the belt's west end, the chute on
-	its east end, and the spawn plaza past the chute (Gameplay.map.lobby is on it).
+	Map reminder (studs): plots span x -142..142 and |z| 30..124, the belt runs along X through the middle
+	(x -151..151), the walkway is x -172..172, |z| < 30 (DECISIONS.md #27 spaced the map out). The Snack Factory
+	sits on the belt's west end, the chute on its east end, and the spawn plaza past the chute (Gameplay.map.lobby
+	is on it).
 ]]
 
 local Types = require("../Types")
@@ -46,10 +47,10 @@ local Scenery: Types.SceneryConfig = {
 	},
 
 	boundary = {
-		minX = -236,
-		maxX = 244,
-		minZ = -136,
-		maxZ = 136,
+		minX = -251,
+		maxX = 259,
+		minZ = -160,
+		maxZ = 160,
 		wallHeight = 3,
 		wallThickness = 2.4,
 		barrierHeight = 20,
@@ -74,29 +75,29 @@ local Scenery: Types.SceneryConfig = {
 			{ x = -330, z = 470, radius = 80, height = 34 },
 		},
 		rocks = {
-			{ x = -262, z = 70, radius = 5 },
-			{ x = -290, z = -96, radius = 7 },
-			{ x = 282, z = -64, radius = 6 },
-			{ x = 268, z = 96, radius = 5 },
-			{ x = -96, z = 168, radius = 6 },
-			{ x = 84, z = -170, radius = 7 },
-			{ x = 196, z = 176, radius = 5 },
-			{ x = -186, z = -176, radius = 7 },
-			{ x = -30, z = -190, radius = 5 },
-			{ x = 40, z = 186, radius = 6 },
+			{ x = -277, z = 70, radius = 5 },
+			{ x = -305, z = -96, radius = 7 },
+			{ x = 297, z = -64, radius = 6 },
+			{ x = 283, z = 96, radius = 5 },
+			{ x = -96, z = 192, radius = 6 },
+			{ x = 84, z = -194, radius = 7 },
+			{ x = 196, z = 200, radius = 5 },
+			{ x = -186, z = -200, radius = 7 },
+			{ x = -30, z = -214, radius = 5 },
+			{ x = 40, z = 210, radius = 6 },
 		},
-		lake = { x = 330, z = 185, radius = 44, depth = 5 },
+		lake = { x = 345, z = 209, radius = 44, depth = 5 },
 	},
 
 	plaza = {
-		x = 200,
+		x = 215,
 		z = 0,
 		radius = 26,
 		fountainRadius = 8,
-		archX = 165,
+		archX = 180,
 		archSpan = 26,
 		pathWidth = 16,
-		boardX = 158,
+		boardX = 175,
 		boardZ = 36,
 		benchRadius = 17,
 		benchAngles = { 45, 90, 135, -45, -90, -135 },
@@ -105,8 +106,8 @@ local Scenery: Types.SceneryConfig = {
 		flowerRadius = 21,
 		flowerAngles = { 0, 22.5, -22.5 },
 		extraFlowerBeds = {
-			{ x = 165, z = 19, yaw = 90 }, -- at the foot of the archway
-			{ x = 165, z = -19, yaw = 90 },
+			{ x = 180, z = 19, yaw = 90 }, -- at the foot of the archway
+			{ x = 180, z = -19, yaw = 90 },
 		},
 		treeRadius = 33,
 		treeAngles = { 0, 36, 72, 108, 144, -36, -72, -108, -144 },
@@ -115,44 +116,44 @@ local Scenery: Types.SceneryConfig = {
 	-- Trees around the bases (behind the plots and at the map ends). Default kind "round", scale 1.
 	trees = {
 		-- behind the north row of plots
-		{ x = -214, z = 116 },
-		{ x = -176, z = 121, kind = "pine" },
-		{ x = -138, z = 117, scale = 1.15 },
-		{ x = -101, z = 120, kind = "pine" },
-		{ x = -64, z = 116 },
-		{ x = -27, z = 121, kind = "pine", scale = 1.1 },
-		{ x = 11, z = 117 },
-		{ x = 48, z = 120, kind = "pine" },
-		{ x = 86, z = 116, scale = 1.2 },
-		{ x = 123, z = 121, kind = "pine" },
-		{ x = 161, z = 117 },
-		{ x = 199, z = 121, kind = "pine", scale = 1.15 },
-		{ x = 230, z = 112, scale = 0.9 },
+		{ x = -229, z = 140 },
+		{ x = -191, z = 145, kind = "pine" },
+		{ x = -153, z = 141, scale = 1.15 },
+		{ x = -113, z = 144, kind = "pine" },
+		{ x = -72, z = 140 },
+		{ x = -30, z = 145, kind = "pine", scale = 1.1 },
+		{ x = 12, z = 141 },
+		{ x = 54, z = 144, kind = "pine" },
+		{ x = 96, z = 140, scale = 1.2 },
+		{ x = 138, z = 145, kind = "pine" },
+		{ x = 176, z = 141 },
+		{ x = 214, z = 145, kind = "pine", scale = 1.15 },
+		{ x = 245, z = 136, scale = 0.9 },
 		-- behind the south row
-		{ x = -222, z = -118, kind = "pine" },
-		{ x = -186, z = -114, scale = 1.1 },
-		{ x = -150, z = -120, kind = "pine" },
-		{ x = -112, z = -116 },
-		{ x = -75, z = -121, kind = "pine", scale = 1.15 },
-		{ x = -38, z = -115 },
-		{ x = 0, z = -119, kind = "pine" },
-		{ x = 37, z = -116, scale = 1.2 },
-		{ x = 74, z = -121, kind = "pine" },
-		{ x = 112, z = -115 },
-		{ x = 150, z = -119, kind = "pine", scale = 1.1 },
-		{ x = 188, z = -116 },
-		{ x = 226, z = -120, kind = "pine" },
+		{ x = -237, z = -142, kind = "pine" },
+		{ x = -201, z = -138, scale = 1.1 },
+		{ x = -165, z = -144, kind = "pine" },
+		{ x = -125, z = -140 },
+		{ x = -84, z = -145, kind = "pine", scale = 1.15 },
+		{ x = -42, z = -139 },
+		{ x = 0, z = -143, kind = "pine" },
+		{ x = 41, z = -140, scale = 1.2 },
+		{ x = 83, z = -145, kind = "pine" },
+		{ x = 125, z = -139 },
+		{ x = 165, z = -143, kind = "pine", scale = 1.1 },
+		{ x = 203, z = -140 },
+		{ x = 241, z = -144, kind = "pine" },
 		-- behind the Snack Factory
-		{ x = -205, z = -48 },
-		{ x = -212, z = 52, kind = "pine", scale = 1.2 },
-		{ x = -190, z = 84 },
-		{ x = -196, z = -86, kind = "pine" },
-		{ x = -184, z = 30, scale = 0.9 },
+		{ x = -220, z = -48 },
+		{ x = -227, z = 52, kind = "pine", scale = 1.2 },
+		{ x = -205, z = 84 },
+		{ x = -211, z = -86, kind = "pine" },
+		{ x = -199, z = 30, scale = 0.9 },
 		-- beside the plaza
-		{ x = 214, z = 64, kind = "pine" },
-		{ x = 224, z = -66 },
-		{ x = 186, z = 74, scale = 1.1 },
-		{ x = 190, z = -76, kind = "pine", scale = 1.15 },
+		{ x = 229, z = 64, kind = "pine" },
+		{ x = 239, z = -66 },
+		{ x = 201, z = 74, scale = 1.1 },
+		{ x = 205, z = -76, kind = "pine", scale = 1.15 },
 	},
 
 	treeLine = { count = 30, minDistance = 14, maxDistance = 40, seed = 17 },
