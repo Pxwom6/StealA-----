@@ -45,30 +45,31 @@ and Uncommons become less likely. The store shows these exact numbers before pur
 ## Time to reach each rarity (simulated)
 
 Median play time until the player owns their first Snackling of each rarity, over 60 simulated players, with a
-24 h cap. The model is pessimistic: no stealing, no offline earnings, no daily rewards, no luck boosts, and other
-players win 40% of the belt items this player wanted. Belt spawns roll mutations like the server does.
+24 h cap. The model is pessimistic: no stealing, no offline earnings, no daily rewards, no luck boosts, no server
+modifiers, and other players win 40% of the belt items this player wanted. Belt spawns roll mutations like the server
+does, with the map changing every 20 minutes (so its signature mutation can roll).
 
 | Rarity | Free player | 2x Cash pass | 2x Cash + VIP + Extra Podiums |
 | --- | --- | --- | --- |
 | Common | 7s | 7s | 7s |
 | Uncommon | 1m 52s | 1m 7s | 1m 2s |
 | Rare | 4m 52s | 2m 32s | 2m 25s |
-| Epic | 11m 5s | 6m 37s | 5m 52s |
-| Legendary | 30m 52s | 19m 42s | 17m 55s |
-| Mythic | 1h 57m | 1h 20m | 1h 8m |
+| Epic | 11m 5s | 6m 42s | 6m 2s |
+| Legendary | 30m 52s | 19m 52s | 18m 17s |
+| Mythic | 1h 57m | 1h 20m | 1h 7m |
 | Secret | 9h 35m | 5h 58m | 5h 49m |
-| First rebirth affordable | 1h 3m | 37m 52s | 33m 47s |
+| First rebirth affordable | 1h 2m | 37m 52s | 33m 47s |
 
 Median cash/sec after N minutes of play:
 
 | Play time | Free player | 2x Cash pass | 2x Cash + VIP + Extra Podiums |
 | --- | --- | --- | --- |
-| 10m | $976/s | $5.57K/s | $7.25K/s |
-| 30m | $8.44K/s | $31.8K/s | $39.2K/s |
-| 1h | $28.1K/s | $76.4K/s | $94.4K/s |
-| 3h | $167K/s | $389K/s | $484K/s |
-| 8h | $532K/s | $1.62M/s | $1.88M/s |
-| 24h | $2.17M/s | $4.71M/s | $5.84M/s |
+| 10m | $1.01K/s | $5.64K/s | $7.25K/s |
+| 30m | $8.68K/s | $30.3K/s | $39.2K/s |
+| 1h | $31.5K/s | $79.3K/s | $99.2K/s |
+| 3h | $173K/s | $389K/s | $496K/s |
+| 8h | $568K/s | $1.62M/s | $1.89M/s |
+| 24h | $2.26M/s | $4.83M/s | $5.84M/s |
 
 Reading it: a free player gets a Legendary in their first session, a Mythic within a couple of sessions and a
 Secret over a few days — and can shortcut any of it by stealing. A 2× Cash owner gets there roughly 35–45% sooner.
@@ -157,28 +158,48 @@ belt is a little cheaper and earns a little less): the same curve, with three ti
 
 Every belt spawn, after its creature is rolled, gets at most one mutation (`Config/Mutations.luau`). Chances are
 per spawn, the same for every rarity, and **never changed by luck** (DECISIONS.md #18), so the Server Luck odds in
-the store stay exact.
+the store stay exact. Golden Hour (a server modifier) is the only thing that multiplies them.
 
-| Mutation | Chance per spawn | Per server-hour | Income | Price | Payback vs plain | Announced |
-| --- | --- | --- | --- | --- | --- | --- |
-| Golden | 3% | 43.2 | x2 | x1.5 | x0.75 | no |
-| Diamond | 0.8% | 11.5 | x4 | x2.5 | x0.63 | no |
-| Rainbow | 0.15% | 2.2 | x8 | x4 | x0.5 | spawn, buy, steal |
+| Mutation | When | Chance per spawn | Per server-hour | Income | Price | Payback vs plain | Announced |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Golden | always | 3% | 43.2 | x2 | x1.5 | x0.75 | no |
+| Diamond | always | 0.8% | 11.5 | x4 | x2.5 | x0.63 | no |
+| Rainbow | always | 0.15% | 2.2 | x8 | x4 | x0.5 | spawn, buy, steal |
+| Honey | on Sunny Meadow | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Sprinkled | on Candy Kingdom | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Frozen | on Frosty Peaks | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Fossil | on Nacho Dunes | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Molten | on Hot Sauce Volcano | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Moonlit | on Midnight Market | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Pearl | on Coconut Cove | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Candy Apple | on Apple Pie Orchard | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Electric | during Thunderstorm | 2% | 28.8 | x4 | x2.5 | x0.63 | spawn |
+| Galaxy | during Meteor Shower | 2% | 28.8 | x4 | x2.5 | x0.63 | spawn |
+| Toxic | during Toxic Fog | 2% | 28.8 | x4 | x2.5 | x0.63 | spawn |
 
-Any mutation: 3.95% of spawns (56.9 per server-hour). Expected value of one spawn: income x1.0645, price x1.0315.
+"Per server-hour" is while the mutation can roll. Any mutation on an ordinary spawn (the map's signature included,
+no modifier): 5.15% of spawns (74.2 per server-hour). Expected value of one spawn: income x1.0885, price x1.0435.
 
 * **A mutation is always a lucky find:** income grows faster than price (CI checks `incomeMultiplier >=
   priceMultiplier`), so a mutated Snackling pays itself back sooner than the plain one, and sells for the mutated
   price × the normal refund.
 * **It doesn't move the chase.** Compared with the same simulation without mutations, the time to each rarity
-  changes by at most ~4% (Legendary 32m 12s → 30m 52s free, first rebirth 1h 5m → 1h 3m), because rarity is still
+  changes by at most ~4% (Legendary 32m 12s → 30m 52s free, first rebirth 1h 5m → 1h 2m), because rarity is still
   gated by the belt and by base prices. Steady income rises by ~5–10% in most cells (the expected x1.06 per spawn), up
   to ~16–18% in a few (around 8 h), where one lucky Diamond or Rainbow high-tier Snackling is a big share of a base
   (more variance, not a faster chase).
 * **Rainbow is a server moment** (about twice per server-hour, announced like a Mythic) and a prime steal target;
   Golden and Diamond are personal surprises.
-* **Event-only mutations** (with an `eventId`) roll only while that LiveOps event runs; keep every chance together,
-  events included, well under 10% (CI requires the total to stay below 1).
+* **Map signatures** (`mapTheme`): each map has exactly one, only while it is up — about 6 in a 20-minute map. At
+  x3 they sit between Golden and Diamond (rarer than Golden, weaker than Diamond; CI checks both), so a map is worth
+  voting for (the vote buttons and the title card name its mutation) without making the permanent ones pointless.
+  Collectors chase all eight through the Snackdex, which shows a pip for each one owned.
+* **Weather mutations** (`modifierId`): only while their weather modifier runs (5 minutes, a few times a day per
+  server), about 2–3 per storm, each announced to the whole server so everyone races to the belt. x4 like Diamond.
+* **Event-only mutations** (with an `eventId`) roll only while that LiveOps event runs.
+* **The worst case stays small.** Only one map and one modifier are ever live, so CI checks every event plus the
+  strongest map and modifier together (`MutationRules.worstCaseTotal`, today 9.15%) against 10%, and the total
+  with Golden Hour on any map against 30%.
 * Want mutations rarer or stronger? Change `chance` (how often) or `incomeMultiplier` (how much) and re-run the
   simulation; keep `incomeMultiplier >= priceMultiplier`.
 
@@ -199,9 +220,9 @@ Any mutation: 3.95% of spawns (56.9 per server-hour). Expected value of one spaw
 | Haunted (event only) | 2% | 28.8 | x3 | x2 | x0.67 | no |
 
 Haunted is rarer than Golden (2% vs 3%) and stronger (x3 vs x2), so it is the event's chase without making Golden
-feel worthless while it runs. With Haunted, any mutation is 5.95% of spawns (85.7 per server-hour; CI keeps all
-chances together below 10%), and one spawn's expected value is income x1.1045, price x1.0515 (x1.0645 / x1.0315
-without the event).
+feel worthless while it runs. With Haunted (and the map's signature), any mutation is 7.15% of spawns (103 per
+server-hour; CI keeps the worst case below 10%), and one spawn's expected value is income x1.1285, price x1.0635
+(x1.0885 / x1.0435 without the event).
 
 Time to reach each rarity and income for a **new free player whose whole session is inside the event** (same model as
 above; the last column has the luck weekend on for the whole session too):
@@ -210,23 +231,23 @@ above; the last column has the luck weekend on for the whole session too):
 | --- | --- | --- | --- |
 | Common | 7s | 7s | 7s |
 | Uncommon | 1m 52s | 1m 52s | 2m 2s |
-| Rare | 4m 52s | 4m 52s | 4m 32s |
-| Epic | 11m 5s | 10m 50s | 10m 22s |
-| Legendary | 30m 52s | 30m 52s | 26m 47s |
-| Mythic | 1h 57m | 1h 53m | 1h 29m |
+| Rare | 4m 52s | 4m 50s | 4m 37s |
+| Epic | 11m 5s | 10m 52s | 10m 20s |
+| Legendary | 30m 52s | 30m 45s | 26m 40s |
+| Mythic | 1h 57m | 1h 50m | 1h 28m |
 | Secret | 9h 35m | 9h 22m | 5h 41m |
-| First rebirth affordable | 1h 3m | 1h 0m | 54m 52s |
+| First rebirth affordable | 1h 2m | 59m 12s | 54m 32s |
 
 | Play time | No event | Halloween | Halloween + 2x luck weekend |
 | --- | --- | --- | --- |
-| 10m | $976/s | $1.03K/s | $1.36K/s |
-| 30m | $8.44K/s | $9.55K/s | $14.4K/s |
-| 1h | $28.1K/s | $32.7K/s | $50.6K/s |
-| 3h | $167K/s | $191K/s | $295K/s |
-| 8h | $532K/s | $608K/s | $1.09M/s |
-| 24h | $2.17M/s | $2.4M/s | $3.56M/s |
+| 10m | $1.01K/s | $1.13K/s | $1.53K/s |
+| 30m | $8.68K/s | $10K/s | $14.9K/s |
+| 1h | $31.5K/s | $33.6K/s | $51.9K/s |
+| 3h | $173K/s | $200K/s | $308K/s |
+| 8h | $568K/s | $624K/s | $1.11M/s |
+| 24h | $2.26M/s | $2.45M/s | $3.6M/s |
 
-A free player buys a median of 28 event Snacklings in 24 hours of event play (29 with the luck weekend), the first
+A free player buys a median of 28 event Snacklings in 24 hours of event play (30 with the luck weekend), the first
 after about 7½ minutes (a Candy Corn Cat).
 
 * **Normal progression outside the event is untouched.** Event Snacklings are listed after every regular one and
@@ -250,24 +271,31 @@ after about 7½ minutes (a Candy Corn Cat).
 ## Server modifiers
 
 A modifier runs for 5 minutes, then the server waits 4-8 minutes (6 on average) before the next one
-(`Config/Modifiers.luau` `schedule`), so one is running about **45% of the time**. Ten modifiers share the picks by
-weight (nine at 1, Snack Party at 0.5), never the same twice in a row: each regular one runs about **2.8 minutes per
-server-hour**, Snack Party about 1.4.
+(`Config/Modifiers.luau` `schedule`), so one is running about **45% of the time**. Thirteen modifiers share the picks
+by weight (twelve at 1, Snack Party at 0.5), never the same twice in a row: each regular one runs about **2.2 minutes
+per server-hour**, Snack Party about 1.1. A player in a 30-minute session sees about three, and a weather one about
+half the time.
 
 | Modifier | Effect while it runs | Effect over a server-hour |
 | --- | --- | --- |
-| Rush Hour | belt spawns every 1.25 s instead of 2.5 (the belt holds 32 instead of 16) | about +5% Snacklings on the belt |
-| Clearance Sale | belt prices x0.7 (rounded to whole cash, at least 1) | about 1.5% off what an always-buying player spends |
-| Golden Hour | every mutation chance x3 (5.95% → 17.9% of spawns while Halloween runs) | about +9% mutations |
-| Lucky Breeze | 2x luck (a LiveOps boost: shows in the luck pill, capped with everything else at 6x) | rare odds doubled ~4.7% of the time |
-| Cash Splash | income x1.5 (with LiveOps cash events, capped at 3x) | about +2.3% income; cash packs and quest rewards are not inflated (they use the steady income) |
+| Rush Hour | belt spawns every 1.25 s instead of 2.5 (the belt holds 32 instead of 16) | about +4.5% Snacklings on the belt (with Snack Party) |
+| Clearance Sale | belt prices x0.7 (rounded to whole cash, at least 1) | about 1% off what an always-buying player spends |
+| Golden Hour | every mutation chance x3 (5.15% → 15.5% of spawns; 7.15% → 21.5% while Halloween runs) | about +7% mutations |
+| Lucky Breeze | 2x luck (a LiveOps boost: shows in the luck pill, capped with everything else at 6x) | rare odds doubled ~5.5% of the time (with Snack Party) |
+| Cash Splash | income x1.5 (with LiveOps cash events, capped at 3x) | about +1.8% income; cash packs and quest rewards are not inflated (they use the steady income) |
 | Sugar Rush | everyone walks (and carries) 25% faster | – |
 | Quick Hands | the steal hold is 0.75 s instead of 1.5 | – |
 | Fortress | locks started while it runs last 1.5x (the open window grows with them: at least half the lock) | – |
 | Snack Patrol | tag reach 13 → 19.5 studs | – |
 | Snack Party (rare) | spawns every 1.7 s and 2x luck | – |
+| Thunderstorm | rain, lightning and a dark sky; Electric Snacklings can roll (2% of spawns) | about 2–3 Electric per storm |
+| Meteor Shower | a starry midnight with shooting stars; Galaxy Snacklings can roll (2%) | about 2–3 Galaxy per shower |
+| Toxic Fog | green haze and glowing spores; Toxic Snacklings can roll (2%) | about 2–3 Toxic per fog |
 
 They are spice, not an economy change: the biggest, Golden Hour, adds under a tenth to a server's mutations per hour.
+The weather ones change only the sky (a lighting overlay above the map's and a seasonal theme's, the client's
+particles and sky effects) and unlock their mutation; lightning flashes are soft, at most two in a quarter second,
+and off with Reduce effects.
 Every effect is clamped by `limits` (CI), and a speed modifier widens the server's movement checks by exactly its own
 multiplier (and keeps the faster speed allowed for 4 s after it ends), so the anti-cheat never flags a player for
 running at a speed the server gave them.

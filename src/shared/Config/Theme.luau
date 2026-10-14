@@ -395,6 +395,9 @@ local Theme = {
 		mapChanged = "{icon} Welcome to {map}!",
 		mapNext = "Next map in {time}",
 		mapCardSubtitle = "NEW MAP",
+		-- Each map's signature mutation (Config/Mutations mapTheme): on its vote button and its title card
+		mapVoteMutation = "✨ {mutation}",
+		mapCardMutation = "✨ {mutation} Snacklings appear on this map!",
 	},
 
 	-- Store copy per item key (see Config/Monetization). Available placeholders: {vipBonus} {extraPodiums}

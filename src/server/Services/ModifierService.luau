@@ -13,6 +13,10 @@
 	Movement checks never trust a speed the client might not have yet: walkSpeedAllowance() is the larger of the
 	current and the previous multiplier for a few seconds after every change.
 
+	Weather modifiers (Thunderstorm, Meteor Shower, Toxic Fog) unlock a mutation while they run (BeltService passes
+	the running id into the mutation roll) and put their lighting over the map's through WorldLighting (above a
+	seasonal theme's). Their particles and sky effects are client-side (WeatherController).
+
 	Clients read workspace attributes Modifier (id, "" = none), ModifierEndsAt and ModifierNextAt, and work out the same
 	effects from the id.
 
@@ -31,9 +35,11 @@ local Mutations = require(ReplicatedStorage.Shared.Config.Mutations)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local ModifierRules = require(ReplicatedStorage.Shared.Logic.ModifierRules)
+local MutationRules = require(ReplicatedStorage.Shared.Logic.MutationRules)
 local Announcer = require(script.Parent.Announcer)
 local LiveOpsService = require(script.Parent.LiveOpsService)
 local Remotes = require(script.Parent.Remotes)
+local WorldLighting = require(script.Parent.WorldLighting)
 
 local ModifierService = {}
 
@@ -41,6 +47,10 @@ local ModifierService = {}
 -- a round trip; this is generous).
 local SPEED_GRACE_SECONDS = 4
 local LUCK_SOURCE = "modifier"
+-- The weather's lighting layer: above a seasonal theme's (SeasonService uses 10), so a storm darkens Halloween too.
+local LIGHTING_LAYER = "modifier"
+local LIGHTING_PRIORITY = 20
+local LIGHTING_SECONDS = 4
 
 local random = Random.new()
 local current: string? = nil
@@ -115,6 +125,7 @@ function ModifierService.startModifier(id: string, seconds: number, announce: bo
 	if effects.luck > 1 then
 		LiveOpsService.addLuckBoost(seconds, effects.luck, LUCK_SOURCE, true)
 	end
+	WorldLighting.setOverlay(LIGHTING_LAYER, def.lighting, LIGHTING_PRIORITY, LIGHTING_SECONDS)
 	publish()
 	if announce then
 		Announcer.broadcast({
@@ -138,6 +149,7 @@ function ModifierService.stopModifier()
 	current = nil
 	nextAt = now() + ModifierRules.gap(Modifiers.schedule, nextRandom)
 	setEffects(nil)
+	WorldLighting.setOverlay(LIGHTING_LAYER, nil, LIGHTING_PRIORITY, LIGHTING_SECONDS)
 	publish()
 end
 
@@ -221,11 +233,13 @@ local function addCommand()
 end
 
 function ModifierService.start()
-	local total = 0
+	local unlocks: { [string]: boolean } = {}
 	for _, mutation in Mutations do
-		total += mutation.chance
+		if mutation.modifierId then
+			unlocks[mutation.modifierId] = true
+		end
 	end
-	for _, problem in ModifierRules.validate(Modifiers, total) do
+	for _, problem in ModifierRules.validate(Modifiers, MutationRules.worstCaseTotal(Mutations), unlocks) do
 		warn(`[Modifiers] config problem: {problem}`)
 	end
 	nextAt = now() + Modifiers.schedule.firstDelaySeconds

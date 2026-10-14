@@ -9,6 +9,11 @@
 	moment after), and prices, hold times and tag reach are worked out the same way on the client
 	(Logic/ModifierRules.effects).
 
+	Weather modifiers (Thunderstorm, Meteor Shower, Toxic Fog) change nothing but the sky, and unlock a mutation that
+	only rolls while they run (Config/Mutations `modifierId`): Electric, Galaxy and Toxic Snacklings. Their `weather`
+	replaces the map's particles, `lighting` goes over the map's (and a seasonal theme's) like a seasonal overlay, and
+	`skyEffect` adds lightning flashes (off with Reduce effects) or shooting stars.
+
 	Commands: /mod <id> [minutes], /mod off, /mod list (anyone in Studio; admins in live servers, that server only).
 	Balance notes: BALANCE.md "Server modifiers".
 ]]
@@ -16,6 +21,42 @@
 local Types = require("../Types")
 
 export type ModifiersConfig = Types.ModifiersConfig
+
+-- A dark, rainy afternoon.
+local STORM: Types.SeasonLighting = {
+	clockTime = 15,
+	brightness = 1.2,
+	ambient = "#56607A",
+	outdoorAmbient = "#7A849A",
+	colorShiftTop = "#A8B4CC",
+	atmosphere = { density = 0.42, offset = 0.1, color = "#8A94A8", decay = "#3E4658", glare = 0, haze = 2.2 },
+	colorCorrection = { tint = "#DCE4F4", brightness = -0.02, contrast = 0.12, saturation = -0.3 },
+	clouds = { cover = 0.92, density = 0.85, color = "#5E6678" },
+}
+
+-- A clear, starry midnight (brighter than a plain night: every map has to stay playable).
+local STARRY: Types.SeasonLighting = {
+	clockTime = 0.4,
+	brightness = 2,
+	ambient = "#6C6CA4",
+	outdoorAmbient = "#9494D0",
+	colorShiftTop = "#A8B0FF",
+	atmosphere = { density = 0.22, offset = 0.1, color = "#3A3A72", decay = "#1A1A44", glare = 0, haze = 0.6 },
+	colorCorrection = { tint = "#ECEAFF", brightness = 0.06, contrast = 0.1, saturation = 0.1 },
+	clouds = { cover = 0.15, density = 0.4, color = "#6A6A9A" },
+}
+
+-- A thick green haze.
+local TOXIC: Types.SeasonLighting = {
+	clockTime = 16.5,
+	brightness = 1.5,
+	ambient = "#4E6A44",
+	outdoorAmbient = "#7E9A6A",
+	colorShiftTop = "#C8FF9A",
+	atmosphere = { density = 0.48, offset = 0.05, color = "#9AD878", decay = "#3E6A2E", glare = 0.2, haze = 2.6 },
+	colorCorrection = { tint = "#E4FFD8", brightness = 0, contrast = 0.08, saturation = -0.05 },
+	clouds = { cover = 0.7, density = 0.7, color = "#8AA86A" },
+}
 
 local Modifiers: ModifiersConfig = {
 	modifiers = {
@@ -99,6 +140,39 @@ local Modifiers: ModifiersConfig = {
 			weight = 0.5, -- the rare double
 			effects = { spawnInterval = 0.67, luck = 2 },
 		},
+
+		-- Weather: each unlocks a mutation (Config/Mutations modifierId) and changes the sky.
+		thunderstorm = {
+			displayName = "Thunderstorm",
+			icon = "⛈️",
+			description = "Electric Snacklings can appear on the belt!",
+			color = "#5CD2FF",
+			weight = 1,
+			effects = {},
+			weather = "rain",
+			lighting = STORM,
+			skyEffect = "lightning",
+		},
+		meteorShower = {
+			displayName = "Meteor Shower",
+			icon = "☄️",
+			description = "Galaxy Snacklings can appear on the belt!",
+			color = "#9C7BFF",
+			weight = 1,
+			effects = {},
+			lighting = STARRY,
+			skyEffect = "meteors",
+		},
+		toxicFog = {
+			displayName = "Toxic Fog",
+			icon = "☢️",
+			description = "Toxic Snacklings can appear on the belt!",
+			color = "#7CFF4D",
+			weight = 1,
+			effects = {},
+			weather = "spores",
+			lighting = TOXIC,
+		},
 	},
 
 	order = {
@@ -112,6 +186,9 @@ local Modifiers: ModifiersConfig = {
 		"fortress",
 		"snackPatrol",
 		"snackParty",
+		"thunderstorm",
+		"meteorShower",
+		"toxicFog",
 	},
 
 	schedule = {

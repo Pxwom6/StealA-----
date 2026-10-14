@@ -3,10 +3,11 @@
 	Map themes on the client (the server side is MapThemeService):
 
 	  * The vote card, in the HUD's top stack while a vote runs: "Vote for the next map! 0:32" over one button per
-	    candidate (icon, name, votes so far). Tapping one sends the VoteMap intent; the player's pick is outlined and can
-	    be changed until the vote ends.
-	  * The title card when the map changes: the map's icon, name and tagline drop in under the top stack for a few
-	    seconds (the server's "Welcome to ..." announcement goes to chat only; see NotificationController).
+	    candidate (icon, name, its signature mutation, votes so far). Tapping one sends the VoteMap intent; the player's
+	    pick is outlined and can be changed until the vote ends.
+	  * The title card when the map changes: the map's icon, name, tagline and signature mutation ("Molten Snacklings
+	    appear on this map!") drop in under the top stack for a few seconds (the server's "Welcome to ..."
+	    announcement goes to chat only; see NotificationController).
 
 	Everything comes from workspace attributes (MapTheme, MapVoteEndsAt, MapVoteCandidates, MapVoteCounts). The vote card
 	stays hidden during the first-time tutorial.
@@ -16,10 +17,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local MapThemes = require(ReplicatedStorage.Shared.Config.MapThemes)
+local Mutations = require(ReplicatedStorage.Shared.Config.Mutations)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local Net = require(ReplicatedStorage.Shared.Net)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
+local MutationRules = require(ReplicatedStorage.Shared.Logic.MutationRules)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local HudController = require(script.Parent.HudController)
 local SoundPlayer = require(script.Parent.SoundPlayer)
@@ -28,7 +31,7 @@ local StateStore = require(script.Parent.StateStore)
 local MapThemeController = {}
 
 local CARD_WIDTH = 290
-local CHOICE_HEIGHT = 54
+local CHOICE_HEIGHT = 68
 local CHOICE_GAP = 6
 local TITLE_SECONDS = 4
 
@@ -114,6 +117,16 @@ local function buildChoices(candidates: { string })
 			Position = UDim2.fromOffset(0, 26),
 			Parent = button,
 		})
+		local signature = MutationRules.forMap(Mutations, id)
+		if signature then
+			UiKit.label({
+				Name = "Mutation",
+				Text = Format.template(Theme.text.mapVoteMutation, { mutation = signature.displayName }),
+				Size = UDim2.new(1, -6, 0, 16),
+				Position = UDim2.fromOffset(3, 46),
+				Parent = button,
+			})
+		end
 		local badge = UiKit.new("Frame", {
 			Name = "Votes",
 			AnchorPoint = Vector2.new(1, 0),
@@ -194,12 +207,13 @@ local function showTitleCard(themeId: string)
 		return
 	end
 	local accent = UiTheme.color(theme.accentColor)
+	local signature = MutationRules.forMap(Mutations, themeId)
 	local screen = HudController.screen()
 	local titleCard = UiKit.panel({
 		Name = "MapTitleCard",
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, 150),
-		Size = UDim2.fromOffset(400, 96),
+		Size = UDim2.fromOffset(400, if signature then 120 else 96),
 		BackgroundColor3 = accent,
 		Parent = screen,
 	})
@@ -231,6 +245,16 @@ local function showTitleCard(themeId: string)
 		Position = UDim2.fromOffset(10, 68),
 		Parent = titleCard,
 	})
+	if signature then
+		UiKit.label({
+			Name = "Mutation",
+			Text = Format.template(Theme.text.mapCardMutation, { mutation = signature.displayName }),
+			Size = UDim2.new(1, -20, 0, 20),
+			Position = UDim2.fromOffset(10, 92),
+			TextColor3 = UiTheme.palette("gold"),
+			Parent = titleCard,
+		})
+	end
 	UiKit.popIn(titleCard)
 	SoundPlayer.world("mapChange")
 	task.delay(TITLE_SECONDS, function()

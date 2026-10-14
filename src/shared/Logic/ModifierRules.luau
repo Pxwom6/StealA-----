@@ -7,6 +7,8 @@
 	publishes, so what a player sees is what the server checks.
 ]]
 
+local MapThemeRules = require("./MapThemeRules")
+local SeasonRules = require("./SeasonRules")
 local Types = require("../Types")
 
 type ModifiersConfig = Types.ModifiersConfig
@@ -38,6 +40,9 @@ ModifierRules.EFFECT_KEYS = table.freeze({
 	"lockDuration",
 	"tagRange",
 })
+
+-- Effects in the sky a weather modifier may use (the client builds them: WeatherController).
+ModifierRules.SKY_EFFECTS = table.freeze({ lightning = true, meteors = true } :: { [string]: boolean })
 
 local HEX_PATTERN = "^#%x%x%x%x%x%x$"
 
@@ -126,9 +131,15 @@ function ModifierRules.maxWalkSpeed(config: ModifiersConfig): number
 	return best
 end
 
--- Problems with Config/Modifiers (an empty list means valid). `mutationChanceTotal` is the sum of every mutation's
--- chance per spawn (event ones included): even multiplied by the strongest mutation modifier it must stay well below 1.
-function ModifierRules.validate(config: ModifiersConfig, mutationChanceTotal: number): { string }
+-- Problems with Config/Modifiers (an empty list means valid). `mutationChanceTotal` is the most mutation chance per
+-- spawn that can be live at once (MutationRules.worstCaseTotal): even multiplied by the strongest mutation modifier it
+-- must stay well below 1. `unlocks`: the modifiers a mutation is gated on (Config/Mutations modifierId); such a
+-- modifier may have no other effect.
+function ModifierRules.validate(
+	config: ModifiersConfig,
+	mutationChanceTotal: number,
+	unlocks: { [string]: boolean }?
+): { string }
 	local problems: { string } = {}
 	local function problem(message: string)
 		table.insert(problems, message)
@@ -178,8 +189,19 @@ function ModifierRules.validate(config: ModifiersConfig, mutationChanceTotal: nu
 				any = true
 			end
 		end
-		if not any then
+		if not any and not (unlocks and unlocks[id]) then
 			problem(`{name} changes nothing`)
+		end
+		if def.weather ~= nil and not MapThemeRules.WEATHER[def.weather] then
+			problem(`{name} weather {def.weather} is not a known kind`)
+		end
+		if def.skyEffect ~= nil and not ModifierRules.SKY_EFFECTS[def.skyEffect] then
+			problem(`{name} skyEffect {def.skyEffect} is not a known effect`)
+		end
+		if def.lighting then
+			for _, message in SeasonRules.lightingProblems(def.lighting, name) do
+				problem(message)
+			end
 		end
 		local chance = ModifierRules.effects(config, id).mutationChance
 		if mutationChanceTotal * chance >= 0.5 then

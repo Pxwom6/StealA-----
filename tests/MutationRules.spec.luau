@@ -275,6 +275,137 @@ T.describe("Catalog mutations", function()
 		local tooMuch = { F.mutation("a", 1, 0.6), F.mutation("b", 2, 0.5, "Halloween") }
 		T.expect(#Catalog.validateMutations(tooMuch)).toBe(1)
 	end)
+	T.it("counts only one map and one modifier towards the total", function()
+		local list = { F.mutation("a", 1, 0.5) }
+		for index, theme in { "candy", "winter", "desert" } do
+			local m = F.mutation(`map{index}`, 1 + index, 0.3)
+			m.mapTheme = theme
+			table.insert(list, m)
+		end
+		local storm = F.mutation("storm", 9, 0.15)
+		storm.modifierId = "thunderstorm"
+		table.insert(list, storm)
+		-- 0.5 + one map's 0.3 + one modifier's 0.15 = 0.95 (the plain sum would be 1.55)
+		T.expect(#Catalog.validateMutations(list)).toBe(0)
+		local second = F.mutation("storm2", 10, 0.1)
+		second.modifierId = "thunderstorm" -- the same modifier: both roll together
+		table.insert(list, second)
+		T.expect(#Catalog.validateMutations(list)).toBe(1)
+	end)
+	T.it("refuses more than one gate, empty gates and unknown particle presets", function()
+		local both = F.mutation("both", 1, 0.1, "Halloween")
+		both.mapTheme = "candy"
+		T.expect(#Catalog.validateMutations({ both })).toBe(1)
+		local empty = F.mutation("empty", 1, 0.1)
+		empty.modifierId = ""
+		T.expect(#Catalog.validateMutations({ empty })).toBe(1)
+		local colon = F.mutation("colon", 1, 0.1)
+		colon.mapTheme = "map:candy"
+		T.expect(#Catalog.validateMutations({ colon })).toBe(1)
+		local sparkly = F.mutation("sparkly", 1, 0.1)
+		sparkly.look = { material = "Neon", particles = "glitter" }
+		T.expect(#Catalog.validateMutations({ sparkly })).toBe(1)
+		sparkly.look = { material = "CrackedLava", particles = "embers" }
+		T.expect(#Catalog.validateMutations({ sparkly })).toBe(0)
+	end)
+end)
+
+T.describe("MutationRules gates: map themes and server modifiers", function()
+	local molten = F.mutation("molten", 5, 0.04)
+	molten.mapTheme = "volcano"
+	local frozen = F.mutation("frozen", 6, 0.04)
+	frozen.mapTheme = "winter"
+	local electric = F.mutation("electric", 7, 0.05)
+	electric.modifierId = "thunderstorm"
+	local all = table.clone(mutations)
+	for _, m in { molten, frozen, electric } do
+		table.insert(all, m)
+	end
+
+	local function ids(active: { [string]: boolean }): { string }
+		local list: { string } = {}
+		for _, entry in MutationRules.odds(all, active) do
+			table.insert(list, entry.id)
+		end
+		return list
+	end
+
+	T.it("builds the condition keys from the events, the map and the modifier", function()
+		local events = { Halloween = true, Old = false }
+		local active = MutationRules.conditions(events, "volcano", "thunderstorm")
+		T.expect(active).toEqual({ Halloween = true, ["map:volcano"] = true, ["modifier:thunderstorm"] = true })
+		T.expect(events).toEqual({ Halloween = true, Old = false }) -- not changed
+		T.expect(MutationRules.conditions({}, nil, nil)).toEqual({})
+		T.expect(MutationRules.mapKey("candy")).toBe("map:candy")
+		T.expect(MutationRules.modifierKey("toxicFog")).toBe("modifier:toxicFog")
+	end)
+
+	T.it("rolls a map's mutation only on that map, and a modifier's only while it runs", function()
+		T.expect(ids({})).toEqual({ "golden", "diamond", "rainbow" })
+		T.expect(ids(MutationRules.conditions({}, "volcano", nil)))
+			.toEqual({ "golden", "diamond", "rainbow", "molten" })
+		T.expect(ids(MutationRules.conditions({}, "winter", nil))).toEqual({ "golden", "diamond", "rainbow", "frozen" })
+		T.expect(ids(MutationRules.conditions({}, "meadow", "thunderstorm"))).toEqual({
+			"golden",
+			"diamond",
+			"rainbow",
+			"electric",
+		})
+		T.expect(ids(MutationRules.conditions({ Halloween = true }, "volcano", "thunderstorm"))).toEqual({
+			"golden",
+			"diamond",
+			"rainbow",
+			"haunted",
+			"molten",
+			"electric",
+		})
+		-- A plain event id that happens to equal a map or modifier id opens nothing else.
+		T.expect(ids({ volcano = true, thunderstorm = true })).toEqual({ "golden", "diamond", "rainbow" })
+	end)
+
+	T.it("never changes a permanent roll, whatever map or modifier is up", function()
+		local index = byId(all)
+		local a, b = T.seededRandom(11), T.seededRandom(11)
+		local active = MutationRules.conditions({ Halloween = true }, "volcano", "thunderstorm")
+		for _ = 1, 5000 do
+			local during = MutationRules.roll(all, active, a)
+			local plain = MutationRules.roll(all, {}, b)
+			local def = MutationRules.find(index, during)
+			if def == nil or MutationRules.gate(def) == nil then
+				T.expect(during).toBe(plain)
+			end
+		end
+	end)
+
+	T.it("names each mutation's gate", function()
+		T.expect(MutationRules.gate(mutations[2])).toBeNil()
+		T.expect(MutationRules.gate(mutations[4])).toBe("event")
+		T.expect(MutationRules.gate(molten)).toBe("map")
+		T.expect(MutationRules.gate(electric)).toBe("modifier")
+	end)
+
+	T.it("finds a map's signature mutation and a modifier's", function()
+		T.expect((MutationRules.forMap(all, "volcano") :: Types.MutationDef).id).toBe("molten")
+		T.expect(MutationRules.forMap(all, "meadow")).toBeNil()
+		T.expect((MutationRules.forModifier(all, "thunderstorm") :: Types.MutationDef).id).toBe("electric")
+		T.expect(MutationRules.forModifier(all, "fortress")).toBeNil()
+	end)
+
+	T.it("adds up the worst case: everything permanent and every event, plus one map and one modifier", function()
+		-- 0.1 + 0.02 + 0.005 + 0.05 (haunted) + 0.04 (one map) + 0.05 (the modifier)
+		T.expect(MutationRules.worstCaseTotal(all)).toBeNear(0.265)
+		local worst = 0
+		for _, map in { "volcano", "winter", "meadow" } do
+			for _, modifier in { "thunderstorm", "fortress" } do
+				local total = 0
+				for _, entry in MutationRules.odds(all, MutationRules.conditions({ Halloween = true }, map, modifier)) do
+					total += entry.chance
+				end
+				worst = math.max(worst, total)
+			end
+		end
+		T.expect(worst).toBeNear(MutationRules.worstCaseTotal(all))
+	end)
 end)
 
 return nil

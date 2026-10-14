@@ -6,8 +6,9 @@
 	* Panel: a tab per rarity tier (its regular Snacklings, "3/4", a tick when complete) and an "Event" tab for
 	  limited-time Snacklings (they never block a tier); a line with the tier's reward (or "Complete!") and the
 	  collection bonus; then a page of cards. Discovered: a live 3D preview (the CreatureVisuals model in a ViewportFrame,
-	  gently swaying), name, income and a pip per mutation (filled once owned with it). Undiscovered: the same model as a
-	  black silhouette and "???". Everything comes from the creature list, so new Snacklings need no change here.
+	  gently swaying), name, income and a pip per mutation (filled once owned with it; event, map and weather ones
+	  appear once owned). Undiscovered: the same model as a black silhouette and "???". Everything comes from the
+	  creature list, so new Snacklings need no change here.
 	* Cheap: models are built only for the visible page (5 cards), destroyed on every page / tab change and when the
 	  panel closes, and the sway runs only while it is open.
 	* Feedback: a "NEW! ..." toast per discovery (and a NEW tag on its card until the panel is next closed); a completed
@@ -26,6 +27,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local Types = require(ReplicatedStorage.Shared.Types)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
+local MutationRules = require(ReplicatedStorage.Shared.Logic.MutationRules)
 local SnackdexRules = require(ReplicatedStorage.Shared.Logic.SnackdexRules)
 local Modal = require(script.Parent.Parent.UI.Modal)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
@@ -168,16 +170,16 @@ end
 
 -- Cards ---------------------------------------------------------------------------------------------------------------
 
-local function newPip(color: Color3, filled: boolean, order: number, parent: Instance)
+local function newPip(color: Color3, filled: boolean, order: number, size: number, parent: Instance)
 	local pip = UiKit.new("Frame", {
 		LayoutOrder = order,
-		Size = UDim2.fromOffset(PIP_SIZE, PIP_SIZE),
+		Size = UDim2.fromOffset(size, size),
 		BackgroundColor3 = if filled then color else UiTheme.palette("panel"),
 		BackgroundTransparency = if filled then 0 else 0.2,
 		Parent = parent,
 	})
-	UiKit.corner(PIP_SIZE // 2).Parent = pip
-	UiKit.stroke(2, if filled then UiTheme.palette("stroke") else color).Parent = pip
+	UiKit.corner(size // 2).Parent = pip
+	UiKit.stroke(if size >= 10 then 2 else 1, if filled then UiTheme.palette("stroke") else color).Parent = pip
 end
 
 -- One card: discovered → live preview, name, income and mutation pips; undiscovered → black silhouette and "???".
@@ -272,6 +274,18 @@ local function buildCard(def: Types.CreatureDef, order: number, width: number, h
 			TextColor3 = UiTheme.palette("cash"),
 			Parent = frame,
 		})
+		-- Permanent mutations always show, as goals; event, map and weather ones once owned. Many owned ones shrink
+		-- the pips so the row still fits the card.
+		local variants = ownedVariants[def.id] or {}
+		local shown: { Types.MutationDef } = {}
+		for _, mutation in catalog.mutationList do
+			if variants[mutation.id] == true or MutationRules.gate(mutation) == nil then
+				table.insert(shown, mutation)
+			end
+		end
+		local available = width - 12
+		local gap = if #shown > 8 then 3 else 5
+		local size = math.clamp(math.floor((available + gap) / math.max(1, #shown)) - gap, 6, PIP_SIZE)
 		local pips = UiKit.new("Frame", {
 			Name = "Mutations",
 			Position = UDim2.fromOffset(6, previewHeight + 64),
@@ -282,17 +296,13 @@ local function buildCard(def: Types.CreatureDef, order: number, width: number, h
 		UiKit.new("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
 			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
 			SortOrder = Enum.SortOrder.LayoutOrder,
-			Padding = UDim.new(0, 5),
+			Padding = UDim.new(0, gap),
 			Parent = pips,
 		})
-		local variants = ownedVariants[def.id] or {}
-		for _, mutation in catalog.mutationList do
-			local has = variants[mutation.id] == true
-			-- Event-only mutations (e.g. Haunted) show once owned; the permanent ones always, as goals.
-			if has or mutation.eventId == nil then
-				newPip(UiTheme.color(mutation.color), has, mutation.order, pips)
-			end
+		for _, mutation in shown do
+			newPip(UiTheme.color(mutation.color), variants[mutation.id] == true, mutation.order, size, pips)
 		end
 	end
 	if newIds[def.id] then

@@ -353,6 +353,8 @@ local Instance = {
 		return wrap(real)
 	end,
 }
+-- The game's Instance.new, for tests that make instances of their own (wrapped like the game's).
+Sim.Instance = Instance
 
 -- Globals ----------------------------------------------------------------------------------------------------------
 

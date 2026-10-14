@@ -314,9 +314,19 @@ whatever map is on. Studio: `/map <id>`, `/map vote`, `/map list`. Offline: `lun
 
 ## 12. Server modifiers
 
-Every 4-8 minutes a server runs one of ten modifiers for 5 minutes (DECISIONS.md #30, `Config/Modifiers`): Rush Hour,
-Clearance Sale, Golden Hour, Lucky Breeze, Cash Splash, Sugar Rush, Quick Hands, Fortress, Snack Patrol and the rare
-Snack Party. A banner announces it, a chip beside the luck chip counts it down (tap it for the description), and
+Every 4-8 minutes a server runs one of thirteen modifiers for 5 minutes (DECISIONS.md #30, `Config/Modifiers`): Rush
+Hour, Clearance Sale, Golden Hour, Lucky Breeze, Cash Splash, Sugar Rush, Quick Hands, Fortress, Snack Patrol, the rare
+Snack Party, and three weathers (Thunderstorm, Meteor Shower, Toxic Fog) that change the sky and unlock a mutation
+(DECISIONS.md #31). A banner announces it, a chip beside the luck chip counts it down (tap it for the description), and
 each system applies the effect where it decides (belt, economy, locks, steals, movement), the client showing the same
 prices, hold time and tag reach. Studio: `/mod <id> [minutes]`, `/mod off`, `/mod list`. Offline:
 `lune run tools/worldsim/server.luau` (CI) boots the server and plays a session that checks them.
+
+## 13. Map and weather mutations
+
+Eleven gated mutations (DECISIONS.md #31, `Config/Mutations`): one signature per map that only rolls on that map
+(Honey, Sprinkled, Frozen, Fossil, Molten, Moonlit, Pearl, Candy Apple; 1.2%, x3) and one per weather modifier that
+only rolls while it runs (Electric, Galaxy, Toxic; 2%, x4, announced). `BeltService.mutationConditions()` passes the
+running events, the map and the modifier into `MutationRules.roll`; permanent rolls never change. The vote buttons
+and the map title card name each map's mutation; the Snackdex shows a pip for each one owned. Mutation looks gained
+particle presets (`MutationLook.particles`, built by `CreatureVisuals`).

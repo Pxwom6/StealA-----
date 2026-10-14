@@ -136,14 +136,25 @@ what grows on the tree spots, ten landmarks outside the wall and the weather; ga
 * **Tune a map:** edit its palette / lighting / flora / landmarks; CI checks colours, materials, kinds and the part
   budget, and `lune run tools/worldsim/smoke.luau` builds every map offline.
 * **A new map:** copy a theme, give it a new id and add the id to `order`. New flora or landmark kinds are built in
-  `src/server/Services/ThemeProps.luau` and counted in `src/shared/Logic/MapThemeRules.luau`.
+  `src/server/Services/ThemeProps.luau` and counted in `src/shared/Logic/MapThemeRules.luau`. Every map needs a
+  signature mutation too (CI checks): add one to `src/shared/Config/Mutations.luau` with `mapTheme = "<id>"`.
+* **Signature mutations:** each map has one that only rolls while it is up (Honey, Sprinkled, Frozen, Fossil,
+  Molten, Moonlit, Pearl, Candy Apple), named on its vote button and title card.
 
 ### Server modifiers
 
 Every 4-8 minutes a server runs a 5-minute twist (`src/shared/Config/Modifiers.luau`): Rush Hour, Clearance Sale,
-Golden Hour, Lucky Breeze, Cash Splash, Sugar Rush, Quick Hands, Fortress, Snack Patrol or the rare Snack Party. Change
-an effect, a name or the schedule there (CI keeps every effect inside `limits`); `schedule.enabled = false` turns them
-off and `weight = 0` keeps one for `/mod` only. BALANCE.md "Server modifiers" has the numbers.
+Golden Hour, Lucky Breeze, Cash Splash, Sugar Rush, Quick Hands, Fortress, Snack Patrol, the rare Snack Party, or
+weather: a Thunderstorm (rain, lightning, Electric Snacklings), a Meteor Shower (a starry night with shooting stars,
+Galaxy Snacklings) or Toxic Fog (green haze, Toxic Snacklings). Change an effect, a name or the schedule there (CI
+keeps every effect inside `limits`); `schedule.enabled = false` turns them off and `weight = 0` keeps one for `/mod`
+only. BALANCE.md "Server modifiers" has the numbers.
+
+* **A new weather:** a modifier with `weather` (particles), `lighting` (an overlay like a seasonal one) and/or
+  `skyEffect` (`lightning`, `meteors`), and a mutation with `modifierId = "<its id>"` (its description should name
+  the mutation; CI checks).
+* **Thunder:** `world.thunder` in `src/shared/Config/Sounds.luau` is a slowed-down whoosh for now; paste a real
+  thunder clap from the sound library there when you find one you like.
 
 ### First-time tutorial
 
@@ -177,7 +188,7 @@ kind is listed at the top of `src/shared/Logic/CreatureRecipe.luau`.
   `/gallery`. CI keeps every model and recipe valid, inside its rarity's part budget (40 Common / Uncommon, 50 Rare /
   Epic, 60 Legendary and up), standing on its feet and narrow enough for the podiums.
 * **Faces stay readable:** eyes, mouths and cheeks are never restyled by mutations (Golden, Diamond, Rainbow,
-  Haunted).
+  Haunted, the map and weather ones).
 * **They feel alive:** Snacklings near your camera bob, squash and sway on their podiums, and hop along the belt
   (client-only, `IdleController` / `BeltController`).
 ### Snackdex and daily quests
@@ -222,7 +233,7 @@ load in Studio (October 2026):
 | `15675055424` Roblox_UI_Cute_Pop | Roblox | buying from the belt, Common / Uncommon spawn |
 | `15675085146` Roblox_UI_Indicator | Roblox | locking your base |
 | `15675046931` Roblox_UI_Sweep | Roblox | unlocking |
-| `15675024286` Roblox_UI_Whoosh_01 | Roblox | starting a steal |
+| `15675024286` Roblox_UI_Whoosh_01 | Roblox | starting a steal; slowed right down, thunder (Thunderstorm) |
 | `15675012262` Roblox_UI_Whoosh_04 | Roblox | announcement banners |
 | `15675043410` Roblox_UI_Tonal_Stinger | Roblox | steal success, Epic spawn |
 | `15675062723` Roblox_UI_Whistle_Low | Roblox | tagging a thief |
@@ -252,16 +263,16 @@ particles, the belt / factory animations, Bloom and SunRays on that device; clie
 These work in Studio only (`src/server/Services/DevCommands.luau`):
 
 * `/cash <amount>`, `/noshield` (end every new-player shield), `/friends <n|off>` (pretend friends are here)
-* `/spawn <creatureId> [mutationId]` (e.g. `/spawn pizza_pup rainbow`; also event Snacklings and event mutations when
-  their event isn't running, e.g. `/spawn candy_corn_cat haunted`)
+* `/spawn <creatureId> [mutationId]` (e.g. `/spawn pizza_pup rainbow`; also event Snacklings and event, map and
+  weather mutations when they couldn't roll, e.g. `/spawn candy_corn_cat haunted`, `/spawn pizza_pup molten`)
 * `/tutorial` (start the first-time tutorial again), `/quests reset` (re-roll today's quests),
   `/dex fill <rarity|event>` (discover every Snackling of a tier but one, e.g. `/dex fill common`; the toast names the
   missing one to `/spawn`)
 * `/gallery [mutationId|off]` (every Snackling in labelled rows past the north boundary wall, e.g. `/gallery golden`),
   `/sky <clockTime>` (preview another time of day, e.g. `/sky 18`; the next map or season change resets it)
 * `/map <id>`, `/map vote`, `/map list` (map themes; admins can use these in live servers too, that server only)
-* `/mod <id> [minutes]`, `/mod off`, `/mod list` (server modifiers, e.g. `/mod rushHour 2`; admins too, that server
-  only)
+* `/mod <id> [minutes]`, `/mod off`, `/mod list` (server modifiers, e.g. `/mod rushHour 2`, `/mod thunderstorm`;
+  admins too, that server only)
 
 To test a seasonal event in Studio: `/event Halloween2026 5` turns Halloween on for 5 minutes (decorations, dusk
 lighting, banner with countdown, event Snacklings and Haunted on the belt), and `/event off` ends it early.

@@ -6,7 +6,8 @@
 	Boots src/server/init.server.luau in the Roblox stand-in (tools/worldsim/Sim) with ProfileStore replaced by an
 	in-memory store, then plays a short session with two fake players through the real remotes and chat commands:
 	join, buy from the belt, every server modifier's effect where it applies (belt prices, speed, locks, steals),
-	a map change and a map vote, a base lock, and leaving with the save written. It fails on any error, any
+	weather (the sky and the mutation it unlocks), a map change and a map vote, a base lock, and leaving with the save
+	written. It fails on any error, any
 	unexpected warning, or any check below. Server time only moves when the test moves it (Sim.advance).
 ]]
 
@@ -66,6 +67,8 @@ local ModifierService = Sim.server("Services/ModifierService")
 local GameData = Sim.shared("GameData")
 local Gameplay = Sim.shared("Config/Gameplay")
 local MapThemes = Sim.shared("Config/MapThemes")
+local Modifiers = Sim.shared("Config/Modifiers")
+local MutationRules = Sim.shared("Logic/MutationRules")
 local workspace = Sim.workspace()
 
 local function sessionOf(player: any): any
@@ -170,6 +173,29 @@ local function scenario()
 	task.wait(1.2)
 	check(workspace:GetAttribute("LuckMultiplier") == 1, "the luck goes when it ends")
 	check(aliceSession.lockDuration == Gameplay.lock.durationSeconds, "lock length back to normal")
+
+	-- Weather: a storm darkens the sky and lets Electric Snacklings roll; the map's own mutation always can.
+	local BeltService = Sim.server("Services/BeltService")
+	local Lighting = Sim.service("Lighting")
+	local mapTheme = workspace:GetAttribute("MapTheme")
+	local mapKey = MutationRules.mapKey(mapTheme)
+	local stormKey = MutationRules.modifierKey("thunderstorm")
+	check(BeltService.mutationConditions()[mapKey] == true, `the map's signature mutation can roll ({mapTheme})`)
+	check(BeltService.mutationConditions()[stormKey] == nil, "no storm, no Electric Snacklings")
+	Sim.chat(alice, "/mod thunderstorm")
+	task.wait(0.1)
+	check(BeltService.mutationConditions()[stormKey] == true, "a storm lets Electric Snacklings roll")
+	local storm = Modifiers.modifiers.thunderstorm.lighting
+	check(math.abs(Lighting.ClockTime - storm.clockTime) < 1e-3, `the storm changes the sky ({Lighting.ClockTime})`)
+	Sim.chat(alice, "/spawn pizza_pup electric")
+	task.wait(0.1)
+	local electric = lastBeltItem("pizza_pup")
+	check(electric ~= nil and electric.variant == "electric", "an Electric Snackling rides the belt")
+	Sim.chat(alice, "/mod off")
+	task.wait(0.1)
+	check(BeltService.mutationConditions()[stormKey] == nil, "the storm's mutation goes with it")
+	local mapLighting = MapThemes.themes[mapTheme].lighting
+	check(math.abs(Lighting.ClockTime - mapLighting.clockTime) < 1e-3, "and the map's sky comes back")
 
 	-- Stealing (with Quick Hands) and tagging --------------------------------------------------------------------------------
 	Sim.chat(bob, "/noshield")

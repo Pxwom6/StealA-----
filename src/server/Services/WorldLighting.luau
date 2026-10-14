@@ -1,9 +1,10 @@
 --!strict
 --[[
 	The world's lighting, in layers: the current map's preset at the bottom (Config/MapThemes, set by MapBuilder when it
-	builds or restyles the map), and overlays on top (a seasonal theme's mood, set by SeasonService). The
-	highest-priority overlay decides every value it has (time of day, brightness, ambient colours, haze, colour
-	grading); the rest always comes from the map. Every change tweens over a few seconds.
+	builds or restyles the map), and overlays on top (a seasonal theme's mood, set by SeasonService; a weather
+	modifier's sky, set by ModifierService, above it). The highest-priority overlay decides every value it has (time of
+	day, brightness, ambient colours, haze, colour grading, and the clouds if it has them); the rest always comes from
+	the map. Every change tweens over a few seconds.
 
 	This module owns the lighting instances: Lighting's own properties, its Atmosphere, Sky, Bloom, ColorCorrection and
 	SunRays children (created once, named World*), and the terrain's Clouds. Nothing else should change them, except
@@ -154,12 +155,13 @@ function WorldLighting.apply(seconds: number)
 	sky.MoonAngularSize = preset.sky.moonAngularSize
 	sky.StarCount = preset.sky.starCount
 
+	local cloudLook = mood.clouds or preset.clouds
 	local clouds = owned("Clouds", "WorldClouds", workspace.Terrain) :: Clouds
 	clouds.Enabled = true
 	set(clouds, {
-		Cover = preset.clouds.cover,
-		Density = preset.clouds.density,
-		Color = UiTheme.color(preset.clouds.color),
+		Cover = cloudLook.cover,
+		Density = cloudLook.density,
+		Color = UiTheme.color(cloudLook.color),
 	}, seconds)
 end
 

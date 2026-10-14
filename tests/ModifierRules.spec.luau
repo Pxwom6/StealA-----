@@ -1,16 +1,24 @@
 --!strict
 local T = require("./TestKit")
 local ModifierRules = require("../src/shared/Logic/ModifierRules")
+local MutationRules = require("../src/shared/Logic/MutationRules")
 local Modifiers = require("../src/shared/Config/Modifiers")
 local Mutations = require("../src/shared/Config/Mutations")
 local Types = require("../src/shared/Types")
 
 local function mutationTotal(): number
-	local total = 0
+	return MutationRules.worstCaseTotal(Mutations)
+end
+
+-- The modifiers a mutation waits for (Config/Mutations modifierId).
+local function unlocks(): { [string]: boolean }
+	local set: { [string]: boolean } = {}
 	for _, mutation in Mutations do
-		total += mutation.chance
+		if mutation.modifierId then
+			set[mutation.modifierId] = true
+		end
 	end
-	return total
+	return set
 end
 
 local function copy(value: any): any
@@ -41,7 +49,7 @@ end
 
 T.describe("ModifierRules: the real config", function()
 	T.it("is valid", function()
-		local problems = ModifierRules.validate(Modifiers, mutationTotal())
+		local problems = ModifierRules.validate(Modifiers, mutationTotal(), unlocks())
 		T.expect(#problems).toBe(0)
 		if #problems > 0 then
 			print(table.concat(problems, "\n"))
@@ -146,7 +154,7 @@ T.describe("ModifierRules.validate", function()
 	local function broken(edit: (config: any) -> ()): { string }
 		local config = copy(Modifiers)
 		edit(config)
-		return ModifierRules.validate(config :: Types.ModifiersConfig, mutationTotal())
+		return ModifierRules.validate(config :: Types.ModifiersConfig, mutationTotal(), unlocks())
 	end
 
 	T.it("refuses effects outside their limits", function()
@@ -176,6 +184,40 @@ T.describe("ModifierRules.validate", function()
 				config.modifiers.fortress.effects = { lockDuration = 1 }
 			end),
 			"changes nothing"
+		)).toBeTruthy()
+	end)
+
+	T.it("lets a weather modifier change only the sky when it unlocks a mutation", function()
+		T.expect(#ModifierRules.validate(Modifiers, mutationTotal(), unlocks())).toBe(0)
+		-- without its mutation, a storm changes nothing
+		T.expect(mentions(ModifierRules.validate(Modifiers, mutationTotal(), {}), "thunderstorm changes nothing"))
+			.toBeTruthy()
+	end)
+
+	T.it("checks the weather, the sky effect and the lighting", function()
+		T.expect(mentions(
+			broken(function(config)
+				config.modifiers.thunderstorm.weather = "hail"
+			end),
+			"weather hail"
+		)).toBeTruthy()
+		T.expect(mentions(
+			broken(function(config)
+				config.modifiers.meteorShower.skyEffect = "aurora"
+			end),
+			"skyEffect aurora"
+		)).toBeTruthy()
+		T.expect(mentions(
+			broken(function(config)
+				config.modifiers.toxicFog.lighting.atmosphere.density = 2
+			end),
+			"atmosphere.density"
+		)).toBeTruthy()
+		T.expect(mentions(
+			broken(function(config)
+				config.modifiers.thunderstorm.lighting.clouds.color = "grey"
+			end),
+			"clouds.color"
 		)).toBeTruthy()
 	end)
 

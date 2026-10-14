@@ -8,8 +8,13 @@
 	holding an id that was removed by mistake keeps it and earns normally again once the id is restored.
 
 	Mutation chances are absolute (per spawn) and never scaled by luck; only a server modifier (Config/Modifiers
-	`mutationChance`, e.g. Golden Hour) multiplies them while it runs. Pure: no Roblox APIs; the RNG, the active-event
-	set and that multiplier are passed in.
+	`mutationChance`, e.g. Golden Hour) multiplies them while it runs. Pure: no Roblox APIs; the RNG, the active
+	conditions and that multiplier are passed in.
+
+	Gates: a mutation may only roll during a LiveOps event (`eventId`), on one map theme (`mapTheme`, the map's
+	signature mutation) or while one server modifier runs (`modifierId`). The roll takes one set of active condition
+	keys (`conditions`): LiveOps event ids as they are, plus mapKey(theme) and modifierKey(id). Event ids never contain
+	a colon, so the three kinds never clash.
 ]]
 
 local Format = require("./Format")
@@ -22,22 +27,125 @@ export type Odds = { id: string, chance: number }
 
 local MutationRules = {}
 
-function MutationRules.isEligible(mutation: MutationDef, activeEvents: { [string]: boolean }): boolean
-	return mutation.eventId == nil or activeEvents[mutation.eventId] == true
+-- The condition key of map theme `themeId` / server modifier `modifierId` (see the header).
+function MutationRules.mapKey(themeId: string): string
+	return `map:{themeId}`
+end
+
+function MutationRules.modifierKey(modifierId: string): string
+	return `modifier:{modifierId}`
+end
+
+-- The active condition keys: the running LiveOps events (a set of ids), the current map theme and the running server
+-- modifier (nil: none). A new table; `events` is not changed.
+function MutationRules.conditions(
+	events: { [string]: boolean },
+	mapTheme: string?,
+	modifierId: string?
+): { [string]: boolean }
+	local active: { [string]: boolean } = {}
+	for id, on in events do
+		if on then
+			active[id] = true
+		end
+	end
+	if mapTheme then
+		active[MutationRules.mapKey(mapTheme)] = true
+	end
+	if modifierId then
+		active[MutationRules.modifierKey(modifierId)] = true
+	end
+	return active
+end
+
+-- What a mutation waits for: "event", "map", "modifier", or nil when it can roll on any spawn (a permanent one).
+function MutationRules.gate(mutation: MutationDef): string?
+	if mutation.eventId ~= nil then
+		return "event"
+	elseif mutation.mapTheme ~= nil then
+		return "map"
+	elseif mutation.modifierId ~= nil then
+		return "modifier"
+	end
+	return nil
+end
+
+-- Whether the mutation can roll under the active conditions (MutationRules.conditions; a plain set of event ids
+-- works for event gates).
+function MutationRules.isEligible(mutation: MutationDef, active: { [string]: boolean }): boolean
+	if mutation.eventId ~= nil and active[mutation.eventId] ~= true then
+		return false
+	end
+	if mutation.mapTheme ~= nil and active[MutationRules.mapKey(mutation.mapTheme)] ~= true then
+		return false
+	end
+	if mutation.modifierId ~= nil and active[MutationRules.modifierKey(mutation.modifierId)] ~= true then
+		return false
+	end
+	return true
+end
+
+-- The highest total mutation chance per spawn that can ever be live at once: every permanent and event mutation
+-- (events may overlap), plus the strongest single map's signature mutations (one map at a time) and the strongest
+-- single modifier's (one modifier at a time). Validation keeps this well below 1.
+function MutationRules.worstCaseTotal(mutations: { MutationDef }): number
+	local total = 0
+	local byMap: { [string]: number } = {}
+	local byModifier: { [string]: number } = {}
+	for _, mutation in mutations do
+		local chance = math.max(0, mutation.chance)
+		if mutation.mapTheme ~= nil then
+			byMap[mutation.mapTheme] = (byMap[mutation.mapTheme] or 0) + chance
+		elseif mutation.modifierId ~= nil then
+			byModifier[mutation.modifierId] = (byModifier[mutation.modifierId] or 0) + chance
+		else
+			total += chance
+		end
+	end
+	local bestMap, bestModifier = 0, 0
+	for _, chance in byMap do
+		bestMap = math.max(bestMap, chance)
+	end
+	for _, chance in byModifier do
+		bestModifier = math.max(bestModifier, chance)
+	end
+	return total + bestMap + bestModifier
+end
+
+-- The signature mutation of map theme `themeId` (the first by order), or nil.
+function MutationRules.forMap(mutations: { MutationDef }, themeId: string): MutationDef?
+	local found: MutationDef? = nil
+	for _, mutation in mutations do
+		if mutation.mapTheme == themeId and (found == nil or mutation.order < found.order) then
+			found = mutation
+		end
+	end
+	return found
+end
+
+-- The mutation server modifier `modifierId` unlocks (the first by order), or nil.
+function MutationRules.forModifier(mutations: { MutationDef }, modifierId: string): MutationDef?
+	local found: MutationDef? = nil
+	for _, mutation in mutations do
+		if mutation.modifierId == modifierId and (found == nil or mutation.order < found.order) then
+			found = mutation
+		end
+	end
+	return found
 end
 
 -- The eligible mutations in roll order (by `order`), each with its exact chance per spawn: the configured chance times
 -- `chanceMultiplier` (default 1). Catalog.validateMutations and ModifierRules.validate keep the total well below 1 (it
--- is clamped here as a last resort).
+-- is clamped here as a last resort). `active`: the active condition keys (MutationRules.conditions).
 function MutationRules.odds(
 	mutations: { MutationDef },
-	activeEvents: { [string]: boolean },
+	active: { [string]: boolean },
 	chanceMultiplier: number?
 ): { Odds }
 	local multiplier = math.max(0, chanceMultiplier or 1)
 	local eligible: { MutationDef } = {}
 	for _, mutation in mutations do
-		if MutationRules.isEligible(mutation, activeEvents) and mutation.chance > 0 then
+		if MutationRules.isEligible(mutation, active) and mutation.chance > 0 then
 			table.insert(eligible, mutation)
 		end
 	end
@@ -58,13 +166,13 @@ end
 -- number from `rng` (which returns numbers in [0, 1)), so a seeded roll sequence stays reproducible.
 function MutationRules.roll(
 	mutations: { MutationDef },
-	activeEvents: { [string]: boolean },
+	active: { [string]: boolean },
 	rng: () -> number,
 	chanceMultiplier: number?
 ): string?
 	local r = rng()
 	local running = 0
-	for _, entry in MutationRules.odds(mutations, activeEvents, chanceMultiplier) do
+	for _, entry in MutationRules.odds(mutations, active, chanceMultiplier) do
 		running += entry.chance
 		if r < running then
 			return entry.id
@@ -132,16 +240,13 @@ function MutationRules.banner(rarityAnnounces: boolean, mutation: MutationDef?, 
 end
 
 -- Expected income and price multiplier of one belt spawn (for BALANCE.md): 1 + sum of chance × (multiplier - 1).
-function MutationRules.expectedMultipliers(
-	mutations: { MutationDef },
-	activeEvents: { [string]: boolean }
-): (number, number)
+function MutationRules.expectedMultipliers(mutations: { MutationDef }, active: { [string]: boolean }): (number, number)
 	local byId: { [string]: MutationDef } = {}
 	for _, mutation in mutations do
 		byId[mutation.id] = mutation
 	end
 	local income, price = 1, 1
-	for _, entry in MutationRules.odds(mutations, activeEvents) do
+	for _, entry in MutationRules.odds(mutations, active) do
 		local mutation = byId[entry.id]
 		income += entry.chance * (mutation.incomeMultiplier - 1)
 		price += entry.chance * (mutation.priceMultiplier - 1)

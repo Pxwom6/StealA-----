@@ -630,3 +630,33 @@ the old look, and removing the map vote card is one controller.
 **Why:** the "something different is happening" feeling of event-driven brainrot games, without new content to make:
 ten knobs on systems that already exist, each bounded and visible.
 **Reversal cost:** none — `schedule.enabled = false` stops them; a modifier with `weight = 0` only runs by command.
+
+### 31. Map and weather mutations: rolls gated on the map and the running modifier
+
+* **What:** each map theme has one signature mutation that only rolls while that map is up (`mapTheme` in
+  `Config/Mutations`): Honey (meadow), Sprinkled (candy), Frozen (winter), Fossil (desert), Molten (volcano), Moonlit
+  (night), Pearl (beach), Candy Apple (autumn), 1.2% and x3. Three weather modifiers (Thunderstorm, Meteor Shower,
+  Toxic Fog) each unlock one (`modifierId`): Electric, Galaxy, Toxic, 2% and x4, announced on spawn. The weather also
+  changes the sky: a lighting overlay above the map's and a seasonal theme's (`WorldLighting`, priority 20 over the
+  season's 10, clouds included), rain or glowing spores instead of the map's particles, and lightning (a far bolt, a
+  soft screen flash, thunder) or shooting stars.
+* **One set of conditions:** `MutationRules.conditions(events, map, modifier)` turns what is live into one set of
+  keys (event ids as they are, `map:<id>`, `modifier:<id>`), and `isEligible` checks a mutation's single gate
+  against it; at most one gate per mutation (CI). Gated mutations roll after the permanent ones (higher `order`), so
+  a permanent roll is identical on every map, in every weather (CI replays rolls to prove it).
+* **Totals:** only one map and one modifier are ever live, so validation uses `MutationRules.worstCaseTotal` (every
+  permanent and event mutation, plus the strongest single map and modifier) instead of the plain sum: 9.15% today,
+  under 10% in CI; with Golden Hour on any map under 30%.
+* **Why maps get one each:** the vote needed a reason beyond looks. A mutation you can only get on the volcano makes
+  "vote volcano!" a real conversation, and collecting all eight brings players back across rotations. They sit
+  between Golden and Diamond (CI checks both) so the permanent mutations stay worth having.
+* **Why weather is a modifier:** it reuses the schedule, the banner and the HUD chip, and the 5-minute window turns a
+  mutation into a server moment (everyone watches the belt for the announced Electric spawn).
+* **Accessibility:** lightning flashes are a gentle colour-correction lift, at most two pulses a quarter second apart
+  every 6-14 s (well under three flashes a second), and Reduce effects turns flashes, bolts and shooting stars off
+  (thunder stays).
+
+**Why:** more to collect and more reasons to care which map and which modifier come next, with no new systems:
+two optional fields on mutations and three on modifiers.
+**Reversal cost:** low — set a mutation's `chance` tiny or give it a gate that never opens (never remove a shipped
+id); give a weather modifier `weight = 0` to keep it for `/mod` only.

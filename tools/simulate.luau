@@ -10,7 +10,9 @@
 	  * the player stands at the belt and collects continuously (real players walk back to collect pads)
 	  * every belt spawn is considered; other players compete, so a wanted item is won with p = CONTEST_WIN
 	  * every spawn rolls its mutation like the server (own RNG stream, so the creature rolls match a run without
-	    mutations); mutated items cost and earn their mutated price and income
+	    mutations); mutated items cost and earn their mutated price and income. The map changes every
+	    `rotation.mapSeconds` in Config/MapThemes order, so its signature mutation can roll; weather modifiers (and
+	    every other server modifier) are left out
 	  * an item is affordable if cash + LOOKAHEAD seconds of income covers it (items take 30s to cross the belt)
 	  * free podium → buy anything affordable; full base → buy only upgrades over the worst Snackling, selling it
 	  * podiums are bought when full and the next one costs at most half of current cash
@@ -27,6 +29,8 @@ local Economy = require("../src/shared/Config/Economy")
 local Gameplay = require("../src/shared/Config/Gameplay")
 local Monetization = require("../src/shared/Config/Monetization")
 local LiveOps = require("../src/shared/Config/LiveOps")
+local MapThemes = require("../src/shared/Config/MapThemes")
+local Modifiers = require("../src/shared/Config/Modifiers")
 local Types = require("../src/shared/Types")
 local Catalog = require("../src/shared/Logic/Catalog")
 local EconomyMath = require("../src/shared/Logic/EconomyMath")
@@ -139,6 +143,11 @@ local function simulate(scenario: Scenario, seed: number): RunResult
 
 	local events = scenario.events or {}
 	local luck = scenario.luck or 1
+	-- The mutation conditions on each map (the events plus that map's signature), worked out once.
+	local onMap: { { [string]: boolean } } = {}
+	for index, themeId in MapThemes.order do
+		onMap[index] = MutationRules.conditions(events, themeId, nil)
+	end
 	local eventBought = 0
 	local firstEventAt: number? = nil
 	local currentIncome = 0
@@ -155,7 +164,8 @@ local function simulate(scenario: Scenario, seed: number): RunResult
 		end
 
 		local id = RarityRoll.roll(catalog.rarityList, catalog.creatureList, luck, events, rng)
-		local variant = MutationRules.roll(catalog.mutationList, events, mutationRng)
+		local map = math.floor(t / MapThemes.rotation.mapSeconds) % #MapThemes.order + 1
+		local variant = MutationRules.roll(catalog.mutationList, onMap[map], mutationRng)
 		local def = if id then catalog.creatures[id] else nil
 		local item: Owned? = if def
 			then {
@@ -300,10 +310,35 @@ local function perHour(chance: number): number
 	return math.floor(chance * spawnsPerHour * 10 + 0.5) / 10
 end
 
+-- When a mutation can roll, for the table.
+local function whenText(mutation: Types.MutationDef): string
+	if mutation.eventId then
+		return `during {mutation.eventId}`
+	elseif mutation.mapTheme then
+		local theme = MapThemes.themes[mutation.mapTheme]
+		return `on {if theme then theme.displayName else mutation.mapTheme}`
+	elseif mutation.modifierId then
+		local modifier = Modifiers.modifiers[mutation.modifierId]
+		return `during {if modifier then modifier.displayName else mutation.modifierId}`
+	end
+	return "always"
+end
+
+-- Every mutation that can roll with `events` running, on any map and under any modifier: the chance is per spawn
+-- while it can roll ("Per server-hour" too). The summary line is for an ordinary spawn: the events, the map's own
+-- signature mutation, no modifier.
 local function printMutations(events: { [string]: boolean })
-	print("| Mutation | Chance per spawn | Per server-hour | Income | Price | Payback vs plain | Announced |")
-	print("| --- | --- | --- | --- | --- | --- | --- |")
-	for _, entry in MutationRules.odds(catalog.mutationList, events) do
+	print("| Mutation | When | Chance per spawn | Per server-hour | Income | Price | Payback vs plain | Announced |")
+	print("| --- | --- | --- | --- | --- | --- | --- | --- |")
+	local everything = table.clone(events)
+	for _, mutation in catalog.mutationList do
+		if mutation.mapTheme then
+			everything[MutationRules.mapKey(mutation.mapTheme)] = true
+		elseif mutation.modifierId then
+			everything[MutationRules.modifierKey(mutation.modifierId)] = true
+		end
+	end
+	for _, entry in MutationRules.odds(catalog.mutationList, everything) do
 		local mutation = catalog.mutations[entry.id]
 		local announced: { string } = {}
 		if mutation.announceOnSpawn then
@@ -316,21 +351,22 @@ local function printMutations(events: { [string]: boolean })
 			table.insert(announced, "steal")
 		end
 		print(
-			`| {mutation.displayName} | {Format.percent(entry.chance)} | {perHour(entry.chance)} `
+			`| {mutation.displayName} | {whenText(mutation)} | {Format.percent(entry.chance)} | {perHour(entry.chance)} `
 				.. `| x{mutation.incomeMultiplier} | x{mutation.priceMultiplier} `
 				.. `| x{math.floor(mutation.priceMultiplier / mutation.incomeMultiplier * 100 + 0.5) / 100} `
 				.. `| {if #announced > 0 then table.concat(announced, ", ") else "no"} |`
 		)
 	end
-	local expectedIncome, expectedPrice = MutationRules.expectedMultipliers(catalog.mutationList, events)
+	local ordinary = MutationRules.conditions(events, MapThemes.order[1], nil)
+	local expectedIncome, expectedPrice = MutationRules.expectedMultipliers(catalog.mutationList, ordinary)
 	local anyChance = 0
-	for _, entry in MutationRules.odds(catalog.mutationList, events) do
+	for _, entry in MutationRules.odds(catalog.mutationList, ordinary) do
 		anyChance += entry.chance
 	end
 	print(
-		`\nAny mutation: {Format.percent(anyChance)} of spawns ({perHour(anyChance)} per `
-			.. `server-hour). Expected value of one spawn: income x{math.floor(expectedIncome * 10000 + 0.5) / 10000}, `
-			.. `price x{math.floor(expectedPrice * 10000 + 0.5) / 10000}.`
+		`\nAny mutation on an ordinary spawn (the map's signature included, no modifier): {Format.percent(anyChance)} `
+			.. `of spawns ({perHour(anyChance)} per server-hour). Expected value of one spawn: income `
+			.. `x{math.floor(expectedIncome * 10000 + 0.5) / 10000}, price x{math.floor(expectedPrice * 10000 + 0.5) / 10000}.`
 	)
 end
 
