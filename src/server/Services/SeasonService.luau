@@ -2,7 +2,7 @@
 --[[
 	Seasonal themes (Config/Seasons): while a LiveOps event mapped to a theme is active, the map gets code-built
 	decorations (pumpkins, string lights, lamps, bats, ghosts) and a lighting mood; when it ends, they go away and the
-	original lighting comes back. Which theme is on is decided by Logic/SeasonRules.activeTheme from the active
+	map's own lighting comes back. Which theme is on is decided by Logic/SeasonRules.activeTheme from the active
 	event ids, and LiveOpsService tells this service whenever those change (events start and end by date while the
 	server runs, remote config, `/event <id>` and `/event off`).
 
@@ -11,15 +11,12 @@
 	layout (Logic/SeasonRules.layout) keeps them out of plots, off the belt and off the lobby spawn; a prop that
 	would still land inside a plot (e.g. after a map change) is skipped with a warning.
 
-	Lighting: the original values of every property a theme changes are saved when a theme first turns on, tweened
-	to the theme's values, and tweened back (then set exactly) when no theme is on. An Atmosphere that already
-	exists is restyled and restored; one this service had to create is removed again, like its ColorCorrection.
+	Lighting: a theme's mood is an overlay in WorldLighting, above the map theme's own lighting: it fades in when the
+	theme turns on and back out to the map's lighting when it ends (whatever map is on by then).
 	The current theme id is mirrored to workspace attribute SeasonTheme ("" = none) for clients.
 ]]
 
-local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 
 local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
 local Seasons = require(ReplicatedStorage.Shared.Config.Seasons)
@@ -28,46 +25,17 @@ local Types = require(ReplicatedStorage.Shared.Types)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local LiveOpsService = require(script.Parent.LiveOpsService)
 local MapBuilder = require(script.Parent.MapBuilder)
+local WorldLighting = require(script.Parent.WorldLighting)
 
 local SeasonService = {}
 
-local CREATED_ATMOSPHERE = "SeasonAtmosphere"
-local CREATED_CORRECTION = "SeasonColorCorrection"
-
-type AtmosphereValues = {
-	Density: number,
-	Offset: number,
-	Color: Color3,
-	Decay: Color3,
-	Glare: number,
-	Haze: number,
-}
-
-type LightingSnapshot = {
-	ClockTime: number,
-	Brightness: number,
-	Ambient: Color3,
-	OutdoorAmbient: Color3,
-	ColorShift_Top: Color3,
-	atmosphere: AtmosphereValues?, -- values of an Atmosphere that existed before the theme
-}
+-- The seasonal mood sits above the map's lighting (WorldLighting overlays: highest priority wins).
+local LIGHTING_LAYER = "season"
+local LIGHTING_PRIORITY = 10
 
 local world: MapBuilder.World
 local currentTheme: string? = nil
 local decor: Folder? = nil
-local original: LightingSnapshot? = nil
-local generation = 0 -- bumped on every lighting change, so a stale restore never finishes over a newer theme
-local running: { Tween } = {}
-
--- No atmosphere: what a created Atmosphere fades in from and out to.
-local CLEAR_ATMOSPHERE: AtmosphereValues = {
-	Density = 0,
-	Offset = 0,
-	Color = Color3.fromRGB(199, 199, 199),
-	Decay = Color3.fromRGB(106, 112, 125),
-	Glare = 0,
-	Haze = 0,
-}
 
 -- Decorations ----------------------------------------------------------------------------------------------------
 
@@ -308,165 +276,6 @@ local function buildDecorations(themeId: string, theme: Types.SeasonTheme)
 	decor = folder
 end
 
--- Lighting -------------------------------------------------------------------------------------------------------
-
-local function stopTweens()
-	for _, tween in running do
-		tween:Cancel()
-	end
-	running = {}
-end
-
-local function tween(instance: Instance, goals: { [string]: any })
-	local info = TweenInfo.new(Seasons.transitionSeconds, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
-	local t = TweenService:Create(instance, info, goals)
-	table.insert(running, t)
-	t:Play()
-end
-
-local function atmosphereValues(atmosphere: Atmosphere): AtmosphereValues
-	return {
-		Density = atmosphere.Density,
-		Offset = atmosphere.Offset,
-		Color = atmosphere.Color,
-		Decay = atmosphere.Decay,
-		Glare = atmosphere.Glare,
-		Haze = atmosphere.Haze,
-	}
-end
-
--- The Atmosphere we may restyle: one that was there before the theme (not ours), or nil.
-local function foreignAtmosphere(): Atmosphere?
-	for _, child in Lighting:GetChildren() do
-		if child:IsA("Atmosphere") and child.Name ~= CREATED_ATMOSPHERE then
-			return child
-		end
-	end
-	return nil
-end
-
-local function snapshot(): LightingSnapshot
-	local atmosphere = foreignAtmosphere()
-	return {
-		ClockTime = Lighting.ClockTime,
-		Brightness = Lighting.Brightness,
-		Ambient = Lighting.Ambient,
-		OutdoorAmbient = Lighting.OutdoorAmbient,
-		ColorShift_Top = Lighting.ColorShift_Top,
-		atmosphere = if atmosphere then atmosphereValues(atmosphere) else nil,
-	}
-end
-
-local function lightingGoals(values: LightingSnapshot): { [string]: any }
-	return {
-		ClockTime = values.ClockTime,
-		Brightness = values.Brightness,
-		Ambient = values.Ambient,
-		OutdoorAmbient = values.OutdoorAmbient,
-		ColorShift_Top = values.ColorShift_Top,
-	}
-end
-
-local function applyLighting(lighting: Types.SeasonLighting)
-	generation += 1
-	stopTweens()
-	if original == nil then
-		original = snapshot()
-	end
-	tween(Lighting, {
-		ClockTime = lighting.clockTime,
-		Brightness = lighting.brightness,
-		Ambient = UiTheme.color(lighting.ambient),
-		OutdoorAmbient = UiTheme.color(lighting.outdoorAmbient),
-		ColorShift_Top = UiTheme.color(lighting.colorShiftTop),
-	})
-
-	local atmosphere = foreignAtmosphere()
-	if atmosphere == nil then
-		local created = Lighting:FindFirstChild(CREATED_ATMOSPHERE) :: Atmosphere?
-		if created == nil then
-			local newAtmosphere = Instance.new("Atmosphere")
-			newAtmosphere.Name = CREATED_ATMOSPHERE
-			for key, value in CLEAR_ATMOSPHERE :: any do
-				(newAtmosphere :: any)[key] = value
-			end
-			newAtmosphere.Parent = Lighting
-			created = newAtmosphere
-		end
-		atmosphere = created
-	end
-	local a = lighting.atmosphere
-	tween(atmosphere :: Atmosphere, {
-		Density = a.density,
-		Offset = a.offset,
-		Color = UiTheme.color(a.color),
-		Decay = UiTheme.color(a.decay),
-		Glare = a.glare,
-		Haze = a.haze,
-	})
-
-	local correction = Lighting:FindFirstChild(CREATED_CORRECTION) :: ColorCorrectionEffect?
-	if correction == nil then
-		local newCorrection = Instance.new("ColorCorrectionEffect")
-		newCorrection.Name = CREATED_CORRECTION
-		newCorrection.Parent = Lighting
-		correction = newCorrection
-	end
-	local c = lighting.colorCorrection
-	tween(correction :: ColorCorrectionEffect, {
-		TintColor = UiTheme.color(c.tint),
-		Brightness = c.brightness,
-		Contrast = c.contrast,
-		Saturation = c.saturation,
-	})
-end
-
-local function restoreLighting()
-	local saved = original
-	if saved == nil then
-		return
-	end
-	generation += 1
-	local thisGeneration = generation
-	stopTweens()
-	tween(Lighting, lightingGoals(saved))
-	local atmosphere = foreignAtmosphere()
-	if atmosphere and saved.atmosphere then
-		tween(atmosphere, saved.atmosphere :: any)
-	end
-	local created = Lighting:FindFirstChild(CREATED_ATMOSPHERE)
-	if created then
-		tween(created, CLEAR_ATMOSPHERE :: any)
-	end
-	local correction = Lighting:FindFirstChild(CREATED_CORRECTION)
-	if correction then
-		tween(correction, { TintColor = Color3.new(1, 1, 1), Brightness = 0, Contrast = 0, Saturation = 0 })
-	end
-
-	task.delay(Seasons.transitionSeconds + 0.1, function()
-		if thisGeneration ~= generation then
-			return -- a theme came back meanwhile: it owns the lighting now
-		end
-		running = {}
-		for key, value in lightingGoals(saved) do
-			(Lighting :: any)[key] = value
-		end
-		local current = foreignAtmosphere()
-		if current and saved.atmosphere then
-			for key, value in saved.atmosphere :: any do
-				(current :: any)[key] = value
-			end
-		end
-		for _, name in { CREATED_ATMOSPHERE, CREATED_CORRECTION } do
-			local instance = Lighting:FindFirstChild(name)
-			if instance then
-				instance:Destroy()
-			end
-		end
-		original = nil
-	end)
-end
-
 -- Theme switching -------------------------------------------------------------------------------------------------
 
 local function refresh(activeEventIds: { [string]: boolean })
@@ -477,18 +286,14 @@ local function refresh(activeEventIds: { [string]: boolean })
 	currentTheme = themeId
 	if themeId == nil then
 		clearDecorations()
-		restoreLighting()
+		WorldLighting.setOverlay(LIGHTING_LAYER, nil, LIGHTING_PRIORITY, Seasons.transitionSeconds)
 		workspace:SetAttribute("SeasonTheme", "")
 		print("[Seasons] theme off")
 		return
 	end
 	local theme = Seasons.themes[themeId]
 	buildDecorations(themeId, theme)
-	if theme.lighting then
-		applyLighting(theme.lighting)
-	else
-		restoreLighting()
-	end
+	WorldLighting.setOverlay(LIGHTING_LAYER, theme.lighting, LIGHTING_PRIORITY, Seasons.transitionSeconds)
 	workspace:SetAttribute("SeasonTheme", themeId)
 	print(`[Seasons] theme on: {themeId}`)
 end

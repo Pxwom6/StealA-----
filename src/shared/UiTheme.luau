@@ -30,8 +30,16 @@ function UiTheme.palette(key: string): Color3
 	return UiTheme.color(hex or "#FF00FF")
 end
 
+-- The current map's colours (Config/MapThemes palette), on top of Config/Theme.world. Server only: MapBuilder sets
+-- them before it builds or restyles the map.
+local worldOverrides: { [string]: string } = {}
+
+function UiTheme.setWorldOverrides(palette: { [string]: string })
+	worldOverrides = palette
+end
+
 function UiTheme.world(key: string): Color3
-	local hex = ((Theme.world :: any) :: { [string]: string })[key]
+	local hex = worldOverrides[key] or ((Theme.world :: any) :: { [string]: string })[key]
 	return UiTheme.color(hex or "#FF00FF")
 end
 

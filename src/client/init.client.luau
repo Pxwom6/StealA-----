@@ -35,6 +35,8 @@ local MusicController = require(Controllers.MusicController)
 local WorldFxController = require(Controllers.WorldFxController)
 local SnackdexController = require(Controllers.SnackdexController)
 local CashOfferController = require(Controllers.CashOfferController)
+local MapThemeController = require(Controllers.MapThemeController)
+local WeatherController = require(Controllers.WeatherController)
 
 StateStore.start()
 ClientSettings.start() -- saved settings (music, sound effects, reduce effects) arrive with the first state
@@ -58,5 +60,7 @@ MusicController.start()
 WorldFxController.start() -- belt chevrons, factory cog; Reduce effects
 SnackdexController.start() -- side button LayoutOrder 4, under Rewards
 CashOfferController.start() -- "Need $X more?" card when a purchase fails for lack of cash
+MapThemeController.start() -- the vote for the next map (top stack) and the new map's title card
+WeatherController.start() -- the map theme's snow / embers / leaves... around the camera
 
 Net.get("ClientReady"):FireServer()

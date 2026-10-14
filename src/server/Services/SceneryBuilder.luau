@@ -1,11 +1,16 @@
 --!strict
 --[[
-	Everything around the gameplay geometry, built once at server start (MapBuilder.build calls it): the afternoon
-	lighting, the terrain outside the boundary (grass, hills, rocks, a lake), the boundary wall, the spawn plaza (the
-	"Steal a Snackling" archway, a fountain with a giant cupcake Snackling, benches, lamps, flower beds), the Snack
-	Factory on the belt's west end (items appear in its intake), the chute on its east end, and trees. Positions come
-	from Logic/SceneryLayout (Config/Scenery), colours from Config/Theme.world. No external assets: parts, terrain and
-	textures that ship with Roblox only.
+	Everything around the gameplay geometry (MapBuilder.build calls it at server start, MapBuilder.restyle when the map
+	theme changes): the terrain outside the boundary (grass, hills, rocks, a lake), the boundary wall, the spawn plaza
+	(the "Steal a Snackling" archway, a fountain with a giant cupcake Snackling, benches, lamps, flower beds), the Snack
+	Factory on the belt's west end (items appear in its intake), the chute on its east end, what grows on the tree
+	spots, and the map theme's landmarks outside the wall. Positions come from Logic/SceneryLayout (Config/Scenery),
+	colours from Config/Theme.world with the current map's palette on top (UiTheme.world), the theme's flora and
+	landmarks from server/Services/ThemeProps, and the lighting from WorldLighting. No external assets: parts, terrain
+	and textures that ship with Roblox only.
+
+	The terrain's shape is filled once; a new map only recolours it (Terrain:SetMaterialColor, water colour), which is
+	instant and costs no replication of voxels.
 
 	Nothing here changes how the game plays. Decoration is anchored with CanCollide / CanTouch / CanQuery off; the few
 	solid pieces (boundary wall and its invisible barrier, the factory and chute bodies, archway pillars, fountain,
@@ -15,20 +20,18 @@
 	Client-side animation (belt chevrons, the factory cog) and the "Reduce effects" setting live in WorldFxController.
 ]]
 
-local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
 local Scenery = require(ReplicatedStorage.Shared.Config.Scenery)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
+local Types = require(ReplicatedStorage.Shared.Types)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
+local MapThemeRules = require(ReplicatedStorage.Shared.Logic.MapThemeRules)
 local SceneryLayout = require(ReplicatedStorage.Shared.Logic.SceneryLayout)
+local ThemeProps = require(script.Parent.ThemeProps)
 
 local SceneryBuilder = {}
-
--- Names SeasonService uses for what it creates; never restyle those as ours.
-local SEASON_ATMOSPHERE = "SeasonAtmosphere"
-local SEASON_CORRECTION = "SeasonColorCorrection"
 
 local SPARKLE_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds"
 local SMOKE_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
@@ -114,97 +117,26 @@ local function emitter(parent: Attachment, props: { [string]: any }): ParticleEm
 	return e
 end
 
--- Lighting ---------------------------------------------------------------------------------------------------------
-
--- The first child of `className` that SeasonService didn't create, or a new one named `name`.
-local function lightingChild(className: string, name: string, skipName: string?): Instance
-	for _, child in Lighting:GetChildren() do
-		if child.ClassName == className and child.Name ~= skipName then
-			return child
-		end
-	end
-	local created = Instance.new(className)
-	created.Name = name
-	created.Parent = Lighting
-	return created
-end
-
--- The everyday look: a bright, warm afternoon. Applied before SeasonService starts, so a seasonal theme fades from
--- these values and restores them (and restyles / restores this Atmosphere) when it ends.
-function SceneryBuilder.applyLighting()
-	local L = Scenery.lighting
-	Lighting.ClockTime = L.clockTime
-	Lighting.GeographicLatitude = L.geographicLatitude
-	Lighting.Brightness = L.brightness
-	Lighting.ExposureCompensation = L.exposureCompensation
-	Lighting.Ambient = UiTheme.color(L.ambient)
-	Lighting.OutdoorAmbient = UiTheme.color(L.outdoorAmbient)
-	Lighting.ColorShift_Top = UiTheme.color(L.colorShiftTop)
-	Lighting.ColorShift_Bottom = UiTheme.color(L.colorShiftBottom)
-	Lighting.EnvironmentDiffuseScale = L.environmentDiffuseScale
-	Lighting.EnvironmentSpecularScale = L.environmentSpecularScale
-	Lighting.ShadowSoftness = L.shadowSoftness
-	Lighting.GlobalShadows = true
-
-	local atmosphere = lightingChild("Atmosphere", "WorldAtmosphere", SEASON_ATMOSPHERE) :: Atmosphere
-	atmosphere.Density = L.atmosphere.density
-	atmosphere.Offset = L.atmosphere.offset
-	atmosphere.Color = UiTheme.color(L.atmosphere.color)
-	atmosphere.Decay = UiTheme.color(L.atmosphere.decay)
-	atmosphere.Glare = L.atmosphere.glare
-	atmosphere.Haze = L.atmosphere.haze
-
-	-- Roblox's own skybox textures (a new Sky starts with them); only the sun, moon and stars are tuned.
-	local sky = lightingChild("Sky", "WorldSky") :: Sky
-	sky.CelestialBodiesShown = true
-	sky.SunAngularSize = L.sky.sunAngularSize
-	sky.MoonAngularSize = L.sky.moonAngularSize
-	sky.StarCount = L.sky.starCount
-
-	local bloom = lightingChild("BloomEffect", "WorldBloom") :: BloomEffect
-	bloom.Intensity = L.bloom.intensity
-	bloom.Size = L.bloom.size
-	bloom.Threshold = L.bloom.threshold
-
-	local correction =
-		lightingChild("ColorCorrectionEffect", "WorldColorCorrection", SEASON_CORRECTION) :: ColorCorrectionEffect
-	correction.TintColor = UiTheme.color(L.colorCorrection.tint)
-	correction.Brightness = L.colorCorrection.brightness
-	correction.Contrast = L.colorCorrection.contrast
-	correction.Saturation = L.colorCorrection.saturation
-
-	local sunRays = lightingChild("SunRaysEffect", "WorldSunRays") :: SunRaysEffect
-	sunRays.Intensity = L.sunRays.intensity
-	sunRays.Spread = L.sunRays.spread
-
-	local terrain = workspace.Terrain
-	local clouds = terrain:FindFirstChildOfClass("Clouds")
-	if clouds == nil then
-		local newClouds = Instance.new("Clouds")
-		newClouds.Parent = terrain
-		clouds = newClouds
-	end
-	local c = clouds :: Clouds
-	c.Cover = L.clouds.cover
-	c.Density = L.clouds.density
-	c.Color = UiTheme.color(L.clouds.color)
-	c.Enabled = true
-end
-
 -- Terrain ----------------------------------------------------------------------------------------------------------
 
-local function buildTerrain()
+-- The terrain's colours and water for this map (instant: no voxels change).
+local function paintTerrain(theme: Types.MapThemeDef)
 	local terrain = workspace.Terrain
-	local T = Scenery.terrain
-	local b = Scenery.boundary
 	terrain:SetMaterialColor(Enum.Material.Grass, world("terrainGrass"))
 	terrain:SetMaterialColor(Enum.Material.Sand, world("terrainSand"))
 	terrain:SetMaterialColor(Enum.Material.Rock, world("terrainRock"))
 	terrain.WaterColor = world("terrainWater")
-	terrain.WaterTransparency = 0.55
-	terrain.WaterReflectance = 0.6
+	terrain.WaterTransparency = theme.water.transparency
+	terrain.WaterReflectance = theme.water.reflectance
 	terrain.WaterWaveSize = 0.08
 	terrain.WaterWaveSpeed = 6
+end
+
+-- The terrain's shape: grass all round the boundary, hills, rocks and the lake. Once per server.
+local function fillTerrain()
+	local terrain = workspace.Terrain
+	local T = Scenery.terrain
+	local b = Scenery.boundary
 
 	-- Flat grass all around the boundary, starting under the wall's outer half (the play area keeps its Ground part).
 	local edge = b.wallThickness / 2
@@ -257,8 +189,9 @@ end
 
 -- A low stone wall with a slate cap on the play area's edge, and an invisible barrier above it (transparent parts
 -- don't block the camera), so the view reaches the hills but nobody jumps out.
-local function buildBoundary(parent: Instance)
+local function buildBoundary(parent: Instance, theme: Types.MapThemeDef)
 	local b = Scenery.boundary
+	local wallMaterial = (Enum.Material :: any)[theme.boundaryMaterial] or Enum.Material.Cobblestone
 	local t = b.wallThickness
 	local cx, cz = (b.minX + b.maxX) / 2, (b.minZ + b.maxZ) / 2
 	local width, depth = b.maxX - b.minX, b.maxZ - b.minZ
@@ -274,7 +207,7 @@ local function buildBoundary(parent: Instance)
 			Size = Vector3.new(side.size.X, b.wallHeight, side.size.Y),
 			CFrame = CFrame.new(side.at.X, b.wallHeight / 2, side.at.Y),
 			Color = world("stoneWall"),
-			Material = Enum.Material.Cobblestone,
+			Material = wallMaterial,
 			Parent = parent,
 		})
 		decor({
@@ -298,68 +231,26 @@ end
 
 -- Trees ------------------------------------------------------------------------------------------------------------
 
--- Low-poly trees: a trunk and three tilted canopy blocks (round) or three stacked tiers (pine). Trunks inside the
--- boundary are solid; everything else is decoration.
-local function buildTree(tree: SceneryLayout.TreeSpot, parent: Instance)
-	local s = tree.scale
-	local random = Random.new(tree.seed)
-	local base = CFrame.new(tree.x, tree.y - (if tree.outside then 0.6 else 0), tree.z)
-		* CFrame.Angles(0, random:NextNumber(0, math.pi * 2), 0)
-	local trunk: (props: { [string]: any }) -> Part = if tree.outside then decor else solid
-	local function tilt(): CFrame
-		return CFrame.Angles(
-			random:NextNumber(-0.25, 0.25),
-			random:NextNumber(0, math.pi),
-			random:NextNumber(-0.25, 0.25)
-		)
+-- Part makers for ThemeProps: same rules (and part count) as everything else here.
+local function wedge(props: { [string]: any }): WedgePart
+	local w = Instance.new("WedgePart")
+	w.Anchored = true
+	w.CanCollide = false
+	w.CanTouch = false
+	w.CanQuery = false
+	w.Material = Enum.Material.SmoothPlastic
+	for key, value in props do
+		(w :: any)[key] = value
 	end
-	if tree.kind == "pine" then
-		trunk({
-			Name = "Trunk",
-			Size = cylinderSize(4 * s, 1.2 * s),
-			CFrame = base * CFrame.new(0, 2 * s, 0) * UPRIGHT,
-			Color = world("treeTrunk"),
-			Material = Enum.Material.Wood,
-			Parent = parent,
-		})
-		local tiers = {
-			{ size = Vector3.new(7, 3, 7), y = 5, color = "pine", turn = 45 },
-			{ size = Vector3.new(5.2, 2.8, 5.2), y = 7.6, color = "leavesDark", turn = 0 },
-			{ size = Vector3.new(3.2, 2.6, 3.2), y = 9.9, color = "pine", turn = 45 },
-		}
-		for _, tier in tiers do
-			decor({
-				Name = "Leaves",
-				Size = tier.size * s,
-				CFrame = base * CFrame.new(0, tier.y * s, 0) * CFrame.Angles(0, math.rad(tier.turn), 0),
-				Color = world(tier.color),
-				Parent = parent,
-			})
-		end
-	else
-		trunk({
-			Name = "Trunk",
-			Size = cylinderSize(7 * s, 1.5 * s),
-			CFrame = base * CFrame.new(0, 3.5 * s, 0) * UPRIGHT,
-			Color = world("treeTrunk"),
-			Material = Enum.Material.Wood,
-			Parent = parent,
-		})
-		local blobs = {
-			{ size = Vector3.new(6.4, 5.6, 6.4), at = Vector3.new(0, 8.6, 0), color = "leaves" },
-			{ size = Vector3.new(4.8, 4.4, 4.8), at = Vector3.new(1.2, 11, -0.8), color = "leavesDark" },
-			{ size = Vector3.new(3.6, 3.4, 3.6), at = Vector3.new(-1.4, 10.4, 1.4), color = "leavesLight" },
-		}
-		for _, blob in blobs do
-			decor({
-				Name = "Leaves",
-				Size = blob.size * s,
-				CFrame = base * CFrame.new(blob.at * s) * tilt(),
-				Color = world(blob.color),
-				Parent = parent,
-			})
-		end
-	end
+	partCount += 1
+	return w
+end
+
+local kit: ThemeProps.Kit
+
+-- What grows on a tree spot on this map (a round tree, a lollipop, a palm...): ThemeProps builds it.
+local function buildTree(tree: SceneryLayout.TreeSpot, theme: Types.MapThemeDef, parent: Instance)
+	ThemeProps.flora(MapThemeRules.floraFor(theme, tree.kind), tree, parent, kit)
 end
 
 -- Spawn plaza ------------------------------------------------------------------------------------------------------
@@ -405,6 +296,7 @@ local function buildLamp(spot: SceneryLayout.Spot, parent: Instance)
 	local base = CFrame.new(spot.x, groundAt(spot.x, spot.z), spot.z)
 	decor({
 		Name = "LampPost",
+		Shape = Enum.PartType.Cylinder,
 		Size = cylinderSize(8, 0.5),
 		CFrame = base * CFrame.new(0, 4, 0) * UPRIGHT,
 		Color = world("lampPost"),
@@ -423,6 +315,7 @@ local function buildLamp(spot: SceneryLayout.Spot, parent: Instance)
 	})
 	decor({
 		Name = "LampCap",
+		Shape = Enum.PartType.Cylinder,
 		Size = cylinderSize(0.35, 1.8),
 		CFrame = base * CFrame.new(0, 9.45, 0) * UPRIGHT,
 		Color = world("lampPost"),
@@ -478,6 +371,7 @@ end
 local function buildStatue(top: CFrame, parent: Instance)
 	solid({
 		Name = "StatueWrapper",
+		Shape = Enum.PartType.Cylinder,
 		Size = cylinderSize(3.4, 6),
 		CFrame = top * CFrame.new(0, 1.7, 0) * UPRIGHT,
 		Color = world("statueWrapper"),
@@ -573,6 +467,7 @@ local function buildFountain(parent: Instance)
 	local basinHeight = 1.4
 	solid({
 		Name = "FountainBasin",
+		Shape = Enum.PartType.Cylinder,
 		Size = cylinderSize(basinHeight, P.fountainRadius * 2),
 		CFrame = center * CFrame.new(0, basinHeight / 2, 0) * UPRIGHT,
 		Color = world("fountain"),
@@ -581,6 +476,7 @@ local function buildFountain(parent: Instance)
 	})
 	decor({
 		Name = "FountainWater",
+		Shape = Enum.PartType.Cylinder,
 		Size = cylinderSize(0.2, P.fountainRadius * 2 - 1.4),
 		CFrame = center * CFrame.new(0, basinHeight + 0.05, 0) * UPRIGHT,
 		Color = world("water"),
@@ -593,6 +489,7 @@ local function buildFountain(parent: Instance)
 	local pedestalTop = basinHeight + 3.6
 	solid({
 		Name = "FountainPedestal",
+		Shape = Enum.PartType.Cylinder,
 		Size = cylinderSize(3.6, 4.6),
 		CFrame = center * CFrame.new(0, basinHeight + 1.8, 0) * UPRIGHT,
 		Color = world("fountain"),
@@ -605,6 +502,7 @@ local function buildFountain(parent: Instance)
 		local r = P.fountainRadius - 1.6
 		local spout = decor({
 			Name = "Spout",
+			Shape = Enum.PartType.Cylinder,
 			Size = cylinderSize(1, 0.8),
 			CFrame = center * CFrame.new(math.cos(a) * r, basinHeight + 0.5, math.sin(a) * r) * UPRIGHT,
 			Color = world("fountain"),
@@ -653,6 +551,7 @@ local function buildArch(parent: Instance)
 		})
 		solid({
 			Name = "ArchPillar",
+			Shape = Enum.PartType.Cylinder,
 			Size = cylinderSize(pillarHeight, 3.6),
 			CFrame = base * CFrame.new(0, pillarHeight / 2, 0) * UPRIGHT,
 			Color = world("archPillar"),
@@ -661,6 +560,7 @@ local function buildArch(parent: Instance)
 		for band = 1, 4 do
 			decor({
 				Name = "ArchStripe",
+				Shape = Enum.PartType.Cylinder,
 				Size = cylinderSize(1.2, 3.8),
 				CFrame = base
 					* CFrame.new(0, band * 4 - 1, 0)
@@ -716,6 +616,7 @@ local function buildPlazaGround(parent: Instance)
 	local P = Scenery.plaza
 	decor({
 		Name = "PlazaBorder",
+		Shape = Enum.PartType.Cylinder,
 		Size = cylinderSize(0.16, P.radius * 2 + 3),
 		CFrame = CFrame.new(P.x, 0.08, P.z) * UPRIGHT,
 		Color = world("plazaBorder"),
@@ -725,6 +626,7 @@ local function buildPlazaGround(parent: Instance)
 	})
 	solid({
 		Name = "PlazaPaving",
+		Shape = Enum.PartType.Cylinder,
 		Size = cylinderSize(PLAZA_TOP, P.radius * 2),
 		CFrame = CFrame.new(P.x, PLAZA_TOP / 2, P.z) * UPRIGHT,
 		Color = world("plaza"),
@@ -760,6 +662,7 @@ local function buildPlazaGround(parent: Instance)
 	local lobby = Gameplay.map.lobby
 	decor({
 		Name = "SpawnRing",
+		Shape = Enum.PartType.Cylinder,
 		Size = cylinderSize(0.1, 12),
 		CFrame = CFrame.new(lobby.x, PLAZA_TOP + 0.03, lobby.z) * UPRIGHT,
 		Color = world("spawnRing"),
@@ -882,6 +785,7 @@ local function buildFactory(parent: Instance)
 	local chimneyHeight = 18
 	decor({
 		Name = "Chimney",
+		Shape = Enum.PartType.Cylinder,
 		Size = cylinderSize(chimneyHeight, 4.4),
 		CFrame = CFrame.new(chimneyX, hallHeight + chimneyHeight / 2, chimneyZ) * UPRIGHT,
 		Color = world("chimney"),
@@ -890,6 +794,7 @@ local function buildFactory(parent: Instance)
 	})
 	local chimneyTop = decor({
 		Name = "ChimneyBand",
+		Shape = Enum.PartType.Cylinder,
 		Size = cylinderSize(1.2, 5),
 		CFrame = CFrame.new(chimneyX, hallHeight + chimneyHeight - 0.6, chimneyZ) * UPRIGHT,
 		Color = world("factoryTrim"),
@@ -928,6 +833,7 @@ local function buildFactory(parent: Instance)
 	local cogCenter = CFrame.new(ix, 4.2, intake.maxZ + 0.4) * CFrame.Angles(0, math.rad(90), 0)
 	local disc = decor({
 		Name = "CogDisc",
+		Shape = Enum.PartType.Cylinder,
 		Size = cylinderSize(0.8, 6),
 		CFrame = cogCenter,
 		Color = world("factoryCog"),
@@ -936,6 +842,7 @@ local function buildFactory(parent: Instance)
 	})
 	decor({
 		Name = "CogHub",
+		Shape = Enum.PartType.Cylinder,
 		Size = cylinderSize(1.2, 2),
 		CFrame = cogCenter,
 		Color = world("factoryRoof"),
@@ -1018,17 +925,17 @@ local function buildChute(parent: Instance)
 	end
 end
 
--- Builds everything around the gameplay geometry under workspace.Map.Scenery. Returns how many parts it created.
-function SceneryBuilder.build(map: Instance): number
+-- Everything but the terrain, in a new Scenery folder under `map`. Returns how many parts it created.
+local function buildScenery(map: Instance, theme: Types.MapThemeDef): number
 	partCount = 0
+	kit = { decor = decor, solid = solid, wedge = wedge, emitter = emitter }
 	local folder = Instance.new("Folder")
 	folder.Name = "Scenery"
 
-	buildTerrain()
 	local boundary = Instance.new("Folder")
 	boundary.Name = "Boundary"
 	boundary.Parent = folder
-	buildBoundary(boundary)
+	buildBoundary(boundary, theme)
 
 	local plaza = Instance.new("Folder")
 	plaza.Name = "Plaza"
@@ -1060,11 +967,47 @@ function SceneryBuilder.build(map: Instance): number
 	trees.Name = "Trees"
 	trees.Parent = folder
 	for _, tree in layout.trees do
-		buildTree(tree, trees)
+		buildTree(tree, theme, trees)
 	end
 
+	-- The map's landmarks, well outside the wall.
+	local landmarks = Instance.new("Folder")
+	landmarks.Name = "Landmarks"
+	landmarks.Parent = folder
+	for index, spot in Scenery.landmarkSpots do
+		local kind = MapThemeRules.landmarkFor(theme, index)
+		if kind then
+			ThemeProps.landmark(kind, {
+				x = spot.x,
+				y = SceneryLayout.groundHeight(Scenery.terrain, spot.x, spot.z),
+				z = spot.z,
+				scale = spot.scale or 1,
+				index = index,
+			}, landmarks, kit)
+		end
+	end
+
+	folder:SetAttribute("MapTheme", theme.displayName)
+	local old = map:FindFirstChild("Scenery")
+	if old then
+		old:Destroy()
+	end
 	folder.Parent = map
 	return partCount
+end
+
+-- Builds everything around the gameplay geometry under workspace.Map.Scenery, terrain included, for this map theme.
+-- Returns how many parts it created.
+function SceneryBuilder.build(map: Instance, theme: Types.MapThemeDef): number
+	fillTerrain()
+	paintTerrain(theme)
+	return buildScenery(map, theme)
+end
+
+-- Rebuilds the scenery for another map theme (the terrain only changes colour). Returns how many parts it created.
+function SceneryBuilder.restyle(map: Instance, theme: Types.MapThemeDef): number
+	paintTerrain(theme)
+	return buildScenery(map, theme)
 end
 
 -- Config problems on this map (logged at start; CI fails on them too).

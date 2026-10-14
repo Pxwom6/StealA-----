@@ -16,6 +16,7 @@ local LeaderboardService = require(Services.LeaderboardService)
 local LiveOpsService = require(Services.LiveOpsService)
 local LockService = require(Services.LockService)
 local MapBuilder = require(Services.MapBuilder)
+local MapThemeService = require(Services.MapThemeService)
 local MonetizationService = require(Services.MonetizationService)
 local PlayerLifecycle = require(Services.PlayerLifecycle)
 local PlotService = require(Services.PlotService)
@@ -35,12 +36,14 @@ local TutorialService = require(Services.TutorialService)
 Remotes.start()
 DataService.start()
 
-local world = MapBuilder.build()
+local firstMap = MapThemeService.firstMap() -- a random map theme (Config/MapThemes); the map is built dressed as it
+local world = MapBuilder.build(firstMap)
 PlotService.start(world)
 
 Analytics.start()
 LiveOpsService.start()
 SeasonService.start(world) -- seasonal decorations + lighting follow the active LiveOps events
+MapThemeService.start(firstMap) -- the map changes every so often, after a vote
 Replication.start()
 PositionTracker.start()
 EconomyService.start()

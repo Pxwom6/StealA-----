@@ -377,6 +377,9 @@ export type SceneryPlaza = {
 export type TreeKind = "round" | "pine"
 export type TreeDef = { x: number, z: number, scale: number?, kind: TreeKind? }
 
+-- A spot for a map's landmark, well outside the boundary wall (out of reach): `scale` sizes what stands there.
+export type LandmarkSpot = { x: number, z: number, scale: number? }
+
 export type SceneryConfig = {
 	lighting: SceneryLighting,
 	boundary: SceneryBoundary,
@@ -384,8 +387,85 @@ export type SceneryConfig = {
 	plaza: SceneryPlaza,
 	trees: { TreeDef }, -- inside the boundary (around the bases)
 	treeLine: { count: number, minDistance: number, maxDistance: number, seed: number }, -- outside the wall
+	landmarkSpots: { LandmarkSpot }, -- each map's big props (Config/MapThemes landmarks) stand here
 	chevronSpacing: number, -- belt markings
 	partBudget: number, -- every part MapBuilder + SceneryBuilder add on top of the gameplay geometry
+}
+
+-- Config: map themes (Config/MapThemes): the world's look changes, the gameplay geometry never does ------------------
+
+-- What grows on the tree spots. Each map picks one kind for the spots the default map fills with round trees and one
+-- for its pines; every kind fits inside the footprint of the tree it replaces (Logic/MapThemeRules.FLORA_RADIUS), so
+-- the scenery checks hold on every map.
+export type FloraKind =
+	"round"
+	| "pine"
+	| "snowyPine"
+	| "lollipop"
+	| "gumdropTree"
+	| "palm"
+	| "cactus"
+	| "deadTree"
+	| "crystal"
+	| "mushroom"
+	| "bush"
+
+-- Big props on Config/Scenery.landmarkSpots, outside the boundary wall (decoration only). Floating kinds (balloons,
+-- clouds, lanterns) hang in the sky above their spot.
+export type LandmarkKind =
+	"balloon"
+	| "windmill"
+	| "giantLollipop"
+	| "candyCane"
+	| "cottonCloud"
+	| "iceSpire"
+	| "snowman"
+	| "mesa"
+	| "giantCactus"
+	| "volcano"
+	| "lavaPillar"
+	| "giantMushroom"
+	| "skyLantern"
+	| "lighthouse"
+	| "beachUmbrella"
+	| "barn"
+	| "hayBales"
+
+-- Particles drifting around each player's camera (client, WeatherController; off with Reduce effects).
+export type WeatherKind = "none" | "snow" | "embers" | "leaves" | "fireflies" | "sprinkles" | "dust" | "petals"
+
+export type MapThemeDef = {
+	displayName: string,
+	icon: string, -- emoji on the vote buttons and the title card
+	tagline: string, -- one line under the title card
+	accentColor: string, -- vote button, title card and announcement
+	weight: number, -- how often it comes up (first map, vote candidates); 0 = only by command
+	-- Config/Theme.world colours this map changes. Scenery only: plots, podiums, pads, the lock button and the belt
+	-- keep their colours on every map (Logic/MapThemeRules.FIXED_KEYS).
+	palette: { [string]: string },
+	lighting: SceneryLighting,
+	groundMaterial: string, -- Enum.Material name: the play area's ground part
+	walkwayMaterial: string, -- the walkway between the plots and the belt
+	boundaryMaterial: string, -- the boundary wall
+	water: { transparency: number, reflectance: number }, -- terrain water (colour: palette.terrainWater)
+	flora: { round: FloraKind, pine: FloraKind },
+	landmarks: { LandmarkKind }, -- cycled over Config/Scenery.landmarkSpots
+	weather: WeatherKind,
+}
+
+export type MapRotation = {
+	enabled: boolean, -- false: a server keeps its first map
+	mapSeconds: number, -- how long each map stays
+	voteSeconds: number, -- the vote for the next map runs this long, ending as the map changes
+	candidates: number, -- maps on the ballot (never the current one)
+}
+
+export type MapThemesConfig = {
+	themes: { [string]: MapThemeDef },
+	order: { string }, -- every theme id once: display order, and ties in picks resolve by it
+	firstMap: string, -- "random" (weighted) or a theme id: the map a new server starts on
+	rotation: MapRotation,
+	transitionSeconds: number, -- lighting fades between maps over this long
 }
 
 -- Config: sounds (Config/Sounds) -----------------------------------------------------------------------------------

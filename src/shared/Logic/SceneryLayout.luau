@@ -528,6 +528,22 @@ function SceneryLayout.validate(config: SceneryConfig, map: MapConfig, belt: Bel
 		problem("terrain.depth must be at least 4")
 	end
 
+	-- Landmark spots (each map theme's big props): well outside the wall, off the lake, on the terrain.
+	for i, spot in config.landmarkSpots do
+		if SceneryLayout.rectDistance(boundary, spot.x, spot.z) < 60 then
+			problem(`landmark spot {i} is closer than 60 studs to the boundary`)
+		end
+		if lake and math.sqrt((spot.x - lake.x) ^ 2 + (spot.z - lake.z) ^ 2) < lake.radius + 40 then
+			problem(`landmark spot {i} is too close to the lake`)
+		end
+		if math.max(math.abs(spot.x), math.abs(spot.z)) + 40 > terrain.extent then
+			problem(`landmark spot {i} runs off the terrain`)
+		end
+		if spot.scale ~= nil and not (spot.scale > 0 and spot.scale <= 2) then
+			problem(`landmark spot {i} scale must be above 0 and at most 2`)
+		end
+	end
+
 	-- Lighting stays in Roblox's ranges.
 	local lighting = config.lighting
 	range(lighting.clockTime, 0, 24, "lighting.clockTime")

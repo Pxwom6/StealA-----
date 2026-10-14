@@ -57,8 +57,9 @@ HudController.TOP_ORDER = table.freeze({
 	income = 2,
 	tutorial = 3, -- right under the cash: where a new player looks first
 	liveOps = 4, -- event banner + countdown, server luck
-	lock = 5,
-	social = 6,
+	mapVote = 5, -- the vote for the next map (MapThemeController), only while it runs
+	lock = 6,
+	social = 7,
 })
 
 -- Container below the cash readout for status pills (luck, lock...). Children sort by LayoutOrder (TOP_ORDER).

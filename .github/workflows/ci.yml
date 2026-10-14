@@ -55,3 +55,6 @@ jobs:
 
       - name: Lune unit tests
         run: lune run tests/run.luau
+
+      - name: World smoke test (builds every map theme offline)
+        run: lune run tools/worldsim/smoke.luau

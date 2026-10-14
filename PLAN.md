@@ -60,16 +60,15 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | Gameplay events | `GameEvents` (buy / acquired / collect / sell / lock / steal / discover, emitted by the services that applied them) | – | – |
 | Social | `Announcer` (server-wide banners), `SocialService` (friends in server, group membership, welcome gift) | `NotificationController`, `ChatTagController`, `SocialController` (👥 Friends button, invite / join group panel) | `SocialRules` |
 | LiveOps | `LiveOpsService` (scheduled events, luck boosts, admin commands, cross-server, active-event change listeners) | event pill (banner + countdown), luck pill | `LiveOpsRules` |
-| Seasonal events | `SeasonService` (theme decorations + lighting while a themed event runs, restored after) | event pill colour, "EVENT" tag on event Snacklings' billboards | `SeasonRules` |
+| Seasonal events | `SeasonService` (theme decorations + a lighting overlay in `WorldLighting` while a themed event runs) | event pill colour, "EVENT" tag on event Snacklings' billboards | `SeasonRules` |
 | First-time tutorial | `TutorialService` (steps finished by real purchases / collects / locks / steals, timeouts, one-time reward, existing players skipped) | `TutorialController` (banner under the cash, beam + bouncing arrow + highlight on the target, Skip) | `TutorialRules` |
 | Analytics | `Analytics` (onboarding funnel following the tutorial, store funnel, economy events) | sends whitelisted `store_opened` | – |
 | State sync | `Replication` (dirty-flag batching, 5 Hz) | `StateStore` | – |
 | Snackling models | podium models built by `PlotService` through `CreatureVisuals` | belt models (`BeltController`), idle bob / squash / sway (`IdleController`) | `CreatureRecipe` (recipe → parts), `IdleMotion` |
-| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends`, `/tutorial`, `/gallery [mutationId]` via `DevGallery`); LiveOps `/event <id> [minutes]`, `/event off` (anyone in Studio, local only) | – | – |
-| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends`, `/tutorial`, `/sky <clockTime>`); LiveOps `/event <id> [minutes]`, `/event off` (anyone in Studio, local only) | – | – |
-| World & scenery | `MapBuilder` (plot decor, belt chevrons, boards, lobby spawn), `SceneryBuilder` (lighting, spawn plaza, Snack Factory, chute, trees, boundary wall, terrain) | `WorldFxController` (belt chevrons, factory cog, blinking lights; Reduce effects) | `SceneryLayout` |
+| World & scenery | `MapBuilder` (plot decor, belt chevrons, boards, lobby spawn; `restyle` for a new map theme), `SceneryBuilder` (spawn plaza, Snack Factory, chute, flora, landmarks, boundary wall, terrain), `ThemeProps` (each theme's flora and landmarks), `WorldLighting` (map lighting + seasonal overlay) | `WorldFxController` (belt chevrons, factory cog, blinking lights; Reduce effects) | `SceneryLayout` |
+| Map themes | `MapThemeService` (first map, 20-minute rotation, the vote, `/map`) | `MapThemeController` (vote card in the top stack, new-map title card), `WeatherController` (snow / embers / leaves... around the camera) | `MapThemeRules` |
+| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends <n\|off>`, `/tutorial`, `/gallery [mutationId\|off]` via `DevGallery`, `/sky <clockTime>`, `/quests reset`, `/dex fill <rarity\|event>`); `/map <id\|vote\|list>` (MapThemeService); LiveOps `/event <id> [minutes]`, `/event off`, `/luck`, `/announce` (anyone in Studio, local only) | – | – |
 | Settings & audio | `SettingsService` (SetSetting → `settings_<key>` flags) | `ClientSettings`, `SettingsController` (top-right gear), `SoundPlayer`, `MusicController` (looping, crossfade) | `SettingsRules`, `ScreenLayout` |
-| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends`, `/tutorial`, `/quests reset`, `/dex fill <rarity\|event>`); LiveOps `/event <id> [minutes]`, `/event off` (anyone in Studio, local only) | – | – |
 
 ## 3. Module list
 
@@ -88,7 +87,8 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | `LiveOps` | admin user IDs, scheduled events (luck / cash multipliers, banner, countdown title; Halloween 2026 and its luck weekend), luck-boost limits |
 | `Seasons` | seasonal themes keyed by LiveOps event id (`Halloween2026` → `halloween`): lighting mood, decoration counts, colours, part budget |
 | `Sounds` | sound effects `{ id, volume, pitch }` (built-in `rbxasset://sounds/` files), music tracks (**empty, TODO**) and the crossfade time |
-| `Scenery` | the world's look: afternoon lighting, boundary wall, terrain (hills, rocks, lake), spawn plaza layout, trees, belt chevron spacing, part budget |
+| `Scenery` | the world's layout: default lighting, boundary wall, terrain (hills, rocks, lake), spawn plaza layout, tree spots, landmark spots, belt chevron spacing, part budget |
+| `MapThemes` | the eight map themes (palette over `Theme.world`, lighting, materials, flora, landmarks, weather), the first map, the rotation and vote timings |
 | `Social` | friend bonus (+10% per friend in the server, max 3), group id (**placeholder 0 = off**), group bonus, one-time welcome gift |
 | `Tutorial` | first-time tutorial: on/off, steps in order (buy, collect, lock, steal) with their automatic endings, one-time reward, belt-target tuning |
 | `Snackdex` | collection book rewards: one-time cash per completed rarity tier (steady income, minimum), permanent income bonus per tier and its cap |
@@ -124,7 +124,8 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `TutorialRules` | tutorial progress in `flags` (current step, early actions, resume), existing-player detection, automatic step endings, one-time reward, guide targets (belt item, collect pad), config validation |
 | `CreatureRecipe` | Snackling recipe or imported model → plain part list (shape, size, CFrame numbers, colour, role): plans, food skins, faces, features, toppings placed by ray casts on the real shapes; imported-model conversion and checks; part budgets per rarity, recipe validation |
 | `IdleMotion` | idle animation curves: podium breathing bob with squash & stretch and sway, belt hop with landing squash and waddle |
-| `SceneryLayout` | where the scenery goes (plaza props, trees, tree line), factory / chute footprints, terrain heights, validation against plots, belt, walkway, lobby spawn and Halloween props, part estimate |
+| `SceneryLayout` | where the scenery goes (plaza props, trees, tree line, landmark spots), factory / chute footprints, terrain heights, validation against plots, belt, walkway, lobby spawn and Halloween props, part estimate |
+| `MapThemeRules` | first map, vote candidates, vote counting and the winner, flora / landmark part counts and footprints, which colours maps may change, `Config/MapThemes` validation |
 | `SettingsRules` | player settings as `settings_<key>` flags: keys, read, apply |
 | `ScreenLayout` | HUD placement around Roblox's player list (top-right gear, tutorial banner limit) |
 | `SnackdexRules` | discovery of Snacklings and (Snackling, mutation) pairs, tier progress over regular Snacklings (Event section apart), claim-once tier rewards, capped collection bonus, client view, config validation |
@@ -138,13 +139,12 @@ aura, then the mutation look, which skips the face; tags anchored models for the
 
 ### `src/server`
 `init.server.luau` bootstraps in order:
-`Remotes → DataService → MapBuilder → PlotService → Analytics → LiveOpsService → SeasonService → Replication →
-EconomyService → BeltService → LockService → StealService → RebirthService → MonetizationService →
-RetentionService → SocialService → TutorialService → LeaderboardService → SettingsService → DevCommands → PlayerLifecycle`
-(MapBuilder also runs `SceneryBuilder`: lighting first, then the scenery), and wires
-RetentionService → SocialService → TutorialService → SnackdexService → QuestService → LeaderboardService →
-DevCommands → PlayerLifecycle`, and wires
-cross-service join/leave steps through `PlayerLifecycle.hooks()` (keeps services free of circular requires). `Sessions` holds per-player state.
+`Remotes → DataService → MapThemeService.firstMap → MapBuilder (+ SceneryBuilder, WorldLighting) → PlotService → Analytics →
+LiveOpsService → SeasonService → MapThemeService → Replication → PositionTracker → EconomyService → BeltService →
+LockService → StealService → RebirthService → MonetizationService → RetentionService → SocialService →
+TutorialService → SnackdexService → QuestService → LeaderboardService → SettingsService → DevCommands →
+PlayerLifecycle`, and wires cross-service join/leave steps through `PlayerLifecycle.hooks()` (keeps services free of
+circular requires). `Sessions` holds per-player state.
 
 `PlayerLifecycle` owns join/leave ordering: load profile → assign plot → check passes → offline earnings →
 spawn creatures → send initial state; on leave: cancel steals involving the player → auto-collect stored cash →
@@ -152,13 +152,11 @@ release plot → release profile.
 
 ### `src/client`
 `init.client.luau` waits for `game:IsLoaded()` then starts controllers:
-`StateStore, HudController, NotificationController, BeltController, PlotController, InteractionController,
-StealController, LockController, RebirthController, StoreController, ChatTagController, RewardsController,
-MutationFxController, SocialController, TutorialController, IdleController`
-MutationFxController, SocialController, TutorialController, SnackdexController`
+`StateStore, ClientSettings, HudController, NotificationController, BeltController, PlotController,
+InteractionController, StealController, LockController, RebirthController, StoreController, ChatTagController,
+RewardsController, MutationFxController, SocialController, TutorialController, IdleController, SettingsController,
+MusicController, WorldFxController, SnackdexController, CashOfferController, MapThemeController, WeatherController`
 (UI helpers: `UI/UiKit`, `UI/Modal`; audio: `SoundPlayer`).
-MutationFxController, SocialController, TutorialController, SettingsController, MusicController, WorldFxController`
-(`ClientSettings` starts right after `StateStore`; UI helpers: `UI/UiKit`, `UI/Modal`; audio: `SoundPlayer`).
 
 ## 4. Remotes (all in `ReplicatedStorage.Remotes`, created by the server)
 
@@ -182,14 +180,14 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `SkipTutorial` | – | a tutorial is running → it ends with no reward (steps themselves only finish from gameplay the server saw) |
 | `SetSetting` | `key: string, on: boolean` | key is a known setting (`SettingsRules.KEYS`), value a boolean → `settings_<key>` flag |
 | `ClaimQuest` | `slot: int` | today's quest `slot` is finished and not claimed (`QuestRules.claim`; a stale day is paid automatically instead) |
+| `VoteMap` | `themeId: string` | a map vote is running and `themeId` is on its ballot (one vote per player, changeable) |
 | `DevGrantProduct` | `key: string` | **Studio only** – runs the real receipt path with a fake receipt |
 
 Server → client:
 
 | Remote | Payload |
 | --- | --- |
-| `StateUpdate` | batched partial player state (cash, cash/sec, rebirths, multiplier, podium cap, lock, passes, carry, social bonus, tutorial step, settings…) |
-| `StateUpdate` | batched partial player state (cash, cash/sec, rebirths, multiplier, podium cap, lock, passes, carry, social bonus, tutorial step, today's quests…) |
+| `StateUpdate` | batched partial player state (cash, cash/sec, rebirths, multiplier, podium cap, lock, passes, carry, social bonus, tutorial step, settings, today's quests…) |
 | `BeltSnapshot` / `BeltSpawn` / `BeltRemove` | conveyor items `{id, creatureId, spawnAt, variant?}` (variant = mutation id) |
 | `Notify` | toast `{kind, text}` |
 | `Announce` | server-wide banner `{text, rarity, color?}` (color: a mutation's own banner) |
@@ -204,7 +202,9 @@ World state the client reads from **attributes** (replicated automatically): plo
 (mutation and multipliers included), `BeingStolen`; player `Carrying`, `VIP`. Rainbow parts carry the
 CollectionService tag `MutationRainbow`. LiveOps state is on `workspace`: `LuckMultiplier`, `LuckEndsAt` (when the
 luck next changes), `PurchasedLuckEndsAt`, `CashMultiplier`, `ActiveEventIds`, `EventBanner`, `EventBannerId`,
-`EventTitle`, `EventEndsAt`, and `SeasonTheme` (the seasonal theme on, "" for none).
+`EventTitle`, `EventEndsAt`, and `SeasonTheme` (the seasonal theme on, "" for none). The map theme is there too:
+`MapTheme` (id), `MapThemeEndsAt` (the next change), `MapVoteEndsAt` (0 = no vote), `MapVoteCandidates`,
+`MapVoteCounts`.
 
 ## 5. Data schema (version 3)
 
@@ -295,3 +295,14 @@ Two "come back tomorrow" loops (DECISIONS.md #24), both server-authoritative and
   sized from steady income; claimed in the Rewards panel's Quests tab, or paid automatically at the day change.
 * Studio: `/quests reset` re-rolls today's quests; `/dex fill <rarity|event>` discovers all but one Snackling of a
   section so completion is one purchase away.
+
+## 11. Map themes
+
+Eight dressings of the same map (DECISIONS.md #29): Sunny Meadow, Candy Kingdom, Frosty Peaks, Nacho Dunes, Hot Sauce
+Volcano, Midnight Market, Coconut Cove and Apple Pie Orchard (`Config/MapThemes`). Each changes the scenery's colours,
+the ground / walkway / wall materials, the lighting, what grows on the tree spots, ten big landmarks outside the wall
+and the weather around each player; plots, the belt and every gameplay position never move. A server starts on a
+random map and changes it every 20 minutes after a 40-second vote between three others (HUD top stack, `VoteMap`).
+`MapBuilder.restyle` swaps the scenery in about 30 ms; `WorldLighting` keeps a seasonal mood (Halloween) on top of
+whatever map is on. Studio: `/map <id>`, `/map vote`, `/map list`. Offline: `lune run tools/worldsim/smoke.luau`
+(CI) builds and restyles every map; `lune run tools/worldsim/export.luau <id>` writes one as JSON for a 3D preview.

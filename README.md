@@ -45,6 +45,8 @@ Studio test purchases, etc.).
 | `lune run tests/run.luau` | Unit tests for all pure game logic (no Studio needed) |
 | `lune run tools/simulate.luau` | Economy simulation used to write `BALANCE.md` |
 | `lune run tools/importParts.luau` | Import the polished Snackling models from `art/snackling-parts/` |
+| `lune run tools/worldsim/smoke.luau` | Build the map offline in every map theme and check it (CI runs this too) |
+| `lune run tools/worldsim/export.luau <mapId> [out.json]` | Dump one map theme's built world as JSON for a 3D preview |
 | `stylua src tests tools` | Format |
 | `selene src tests tools` | Lint |
 | `rojo sourcemap default.project.json -o sourcemap.json` | Sourcemap for luau-lsp |
@@ -63,7 +65,7 @@ src/shared          small Roblox helpers shared by server & client (remotes, cre
 src/server          server bootstrap + services (authoritative)
 src/client          client bootstrap + controllers (UI, rendering, intents)
 tests               Lune unit tests for src/shared/Logic and config integrity
-tools               Lune scripts (balance simulation)
+tools               Lune scripts (balance simulation, model import, worldsim: the map code run offline)
 ```
 
 ### Before publishing
@@ -111,7 +113,8 @@ change:
 
 * **Change the dates:** edit `startsAt` / `endsAt` (Unix seconds, UTC; e.g. `date -u -d "2026-10-23 17:00" +%s`)
   in `LiveOps.luau` and publish. Running servers pick up the start and end on their own (checked every second): the
-  decorations appear, the lighting fades to dusk, and at the end everything is removed and the lighting restored.
+  decorations appear, the lighting fades to dusk, and at the end everything is removed and the lighting fades back to
+  the current map's own.
 * **Run Halloween again next year:** add an event (e.g. `Halloween2027`, new dates) to `LiveOps.luau`, map it in
   `Seasons.luau` (`Halloween2027 = "halloween"`), and give new event Snacklings that `eventId`. Owned 2026 Snacklings
   keep working; to bring a 2026 Snackling back, change its `eventId` to the new event (never its `id`).
@@ -120,6 +123,19 @@ change:
   `src/server/Services/SeasonService.luau` and laid out in `src/shared/Logic/SeasonRules.luau`.
 * New creature / mutation ids must be appended to the released lists in `tests/Config.spec.luau`, and the
   simulation's `EVENT_ID` (`tools/simulate.luau`) shows the event's balance effect (see BALANCE.md "Halloween").
+
+### Map themes
+
+The same bases and belt in eight worlds (`src/shared/Config/MapThemes.luau`): Sunny Meadow, Candy Kingdom, Frosty
+Peaks, Nacho Dunes, Hot Sauce Volcano, Midnight Market, Coconut Cove and Apple Pie Orchard. A server starts on a random
+one and changes every 20 minutes after a 40-second vote in the HUD. Each map sets scenery colours, materials, lighting,
+what grows on the tree spots, ten landmarks outside the wall and the weather; gameplay positions never change.
+
+* **Stay on one map:** `rotation.enabled = false` (and `firstMap = "meadow"` for the original look).
+* **Tune a map:** edit its palette / lighting / flora / landmarks; CI checks colours, materials, kinds and the part
+  budget, and `lune run tools/worldsim/smoke.luau` builds every map offline.
+* **A new map:** copy a theme, give it a new id and add the id to `order`. New flora or landmark kinds are built in
+  `src/server/Services/ThemeProps.luau` and counted in `src/shared/Logic/MapThemeRules.luau`.
 
 ### First-time tutorial
 
@@ -225,16 +241,17 @@ particles, the belt / factory animations, Bloom and SunRays on that device; clie
 
 ### Studio test commands
 
-`/cash <amount>`, `/spawn <creatureId> [mutationId]` (e.g. `/spawn pizza_pup rainbow`), `/noshield`,
-`/friends <n|off>`, `/tutorial` (start the first-time tutorial again) and `/gallery [mutationId]` (every Snackling in
-labelled rows past the north boundary wall, e.g. `/gallery golden`; `/gallery off` removes it) work in Studio only
-`/friends <n|off>`, `/tutorial` (start the first-time tutorial again) and `/sky <clockTime>` (preview the lighting at
-another time of day, e.g. `/sky 18`; `/sky 14.6` is the normal afternoon) work in Studio only
-(`src/server/Services/DevCommands.luau`). `/spawn` also puts event Snacklings
-`/friends <n|off>`, `/tutorial` (start the first-time tutorial again), `/quests reset` (re-roll today's quests) and
-`/dex fill <rarity|event>` (discover every Snackling of a tier but one, e.g. `/dex fill common`; the toast names the
-missing one to `/spawn`) work in Studio only (`src/server/Services/DevCommands.luau`). `/spawn` also puts event Snacklings
-and event mutations on the belt when their event isn't running (e.g. `/spawn candy_corn_cat haunted`).
+These work in Studio only (`src/server/Services/DevCommands.luau`):
+
+* `/cash <amount>`, `/noshield` (end every new-player shield), `/friends <n|off>` (pretend friends are here)
+* `/spawn <creatureId> [mutationId]` (e.g. `/spawn pizza_pup rainbow`; also event Snacklings and event mutations when
+  their event isn't running, e.g. `/spawn candy_corn_cat haunted`)
+* `/tutorial` (start the first-time tutorial again), `/quests reset` (re-roll today's quests),
+  `/dex fill <rarity|event>` (discover every Snackling of a tier but one, e.g. `/dex fill common`; the toast names the
+  missing one to `/spawn`)
+* `/gallery [mutationId|off]` (every Snackling in labelled rows past the north boundary wall, e.g. `/gallery golden`),
+  `/sky <clockTime>` (preview another time of day, e.g. `/sky 18`; the next map or season change resets it)
+* `/map <id>`, `/map vote`, `/map list` (map themes; admins can use these in live servers too, that server only)
 
 To test a seasonal event in Studio: `/event Halloween2026 5` turns Halloween on for 5 minutes (decorations, dusk
 lighting, banner with countdown, event Snacklings and Haunted on the belt), and `/event off` ends it early.

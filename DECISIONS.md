@@ -567,3 +567,39 @@ store positions.
 and they keep every system built on the recipe models (mutations, faces, idle animation, belt, gallery).
 **Reversal cost:** low — delete an entry from `Config/CreatureParts` (re-run the tool without its batch) and the
 recipe comes back.
+
+### 29. Map themes: eight dressings of the same map, changed by a vote
+
+* **What:** eight map themes (`Config/MapThemes`: Sunny Meadow, Candy Kingdom, Frosty Peaks, Nacho Dunes, Hot Sauce
+  Volcano, Midnight Market, Coconut Cove, Apple Pie Orchard). A server starts on a random one; every 20 minutes the
+  map changes, after a 40-second vote between three others shown in the HUD's top stack (`VoteMap` intent, one vote
+  per player, ties and empty votes settled at random, `Logic/MapThemeRules`). Studio and admins: `/map <id|vote|list>`.
+* **Only the look changes:** a theme recolours the scenery (a palette over `Config/Theme.world`; plots, podiums,
+  pads, the lock button and the belt are on a fixed list maps can't touch), changes the ground, walkway and boundary
+  materials, the lighting, what grows on the tree spots (lollipops, palms, cacti, glowing mushrooms...: each kind
+  fits inside the footprint of the tree it replaces, so `SceneryLayout.validate` still holds), the landmarks on ten
+  spots outside the wall (`Config/Scenery.landmarkSpots`) and the client-side weather. Plots, the belt, the walkway,
+  the plaza layout and every gameplay position stay exactly where they are; nobody is moved when the map changes.
+* **How a change happens:** `MapBuilder.restyle` recolours the painted parts it built (ground, walkway, lobby,
+  leaderboard frames), rebuilds the `Scenery` folder (about 550-750 parts, ~30 ms offline) and recolours the terrain
+  with `Terrain:SetMaterialColor` and the water colour, which costs no voxel replication: the terrain's shape is filled
+  once per server. `WorldFxController` finds the new factory cog and chute lights itself.
+* **Lighting in layers:** `WorldLighting` owns every lighting instance. The map's preset is the bottom layer and a
+  seasonal theme's mood (Config/Seasons) is an overlay on top, so Halloween still turns the sky to dusk on any map
+  and ends back on whatever map is on then. `SeasonService` no longer snapshots and restores lighting (DECISIONS #20's
+  "restored after" now means "the overlay is removed").
+* **Weather is client-only:** one invisible box under the Camera follows each player, its emitter fills the air
+  around them (cheaper than covering the map), and Reduce effects switches it off.
+* **Checked offline:** `tools/worldsim` runs the real MapBuilder / SceneryBuilder / WorldLighting code in Lune with a
+  small stand-in for the Roblox API (Lune's own roblox library plus terrain, pivots, services). CI's world smoke test
+  builds the map, restyles it through every theme and back, and fails on any error or warning, a part budget
+  overflow, a flora or landmark builder making a different number of parts than `MapThemeRules` counts, a gameplay
+  part moved by a restyle, or the seasonal overlay not winning / leaving. `tools/worldsim/export.luau` dumps a map
+  as JSON for a 3D preview (how the maps were reviewed without Studio).
+* **Also fixed:** the scenery's round pieces (plaza paving, fountain, arch pillars, lamp posts, trunks, chimney,
+  cog...) were sized as cylinders but built as blocks (a Part's Shape defaults to Block); they are now cylinders.
+
+**Why:** many maps for the price of one: no new geometry for the services to trust, no change to steal / lock / tag
+ranges or the anti-cheat, and the vote gives a server something to do together every 20 minutes.
+**Reversal cost:** low — `rotation.enabled = false` keeps a server on its first map, `firstMap = "meadow"` makes that
+the old look, and removing the map vote card is one controller.
