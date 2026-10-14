@@ -27,6 +27,7 @@ local Seasons: SeasonsConfig = {
 	eventThemes = {
 		Halloween2026 = "halloween",
 		Winter2026 = "winter",
+		Valentine2027 = "valentine",
 	},
 
 	themes = {
@@ -117,9 +118,54 @@ local Seasons: SeasonsConfig = {
 				snowflake = "#DDF0FF",
 			},
 		},
+
+		valentine = {
+			displayName = "Valentine's",
+			accentColor = "#FF4F8B",
+			priority = 1,
+			weather = "petals",
+			lighting = {
+				clockTime = 16.8, -- a rosy late afternoon
+				brightness = 2.1,
+				ambient = "#7A5A6A",
+				outdoorAmbient = "#C89AAA",
+				colorShiftTop = "#FFB8C8",
+				atmosphere = {
+					density = 0.28, -- a soft pink haze: the whole map stays readable
+					offset = 0.12,
+					color = "#FFD6E2",
+					decay = "#C88AA8",
+					glare = 0.3,
+					haze = 1.5,
+				},
+				colorCorrection = { tint = "#FFF0F4", brightness = 0.02, contrast = 0.06, saturation = 0.1 },
+				clouds = { cover = 0.45, density = 0.45, color = "#FFE0EA" },
+			},
+			decorations = {
+				rosesPerPlot = 2,
+				beltRosesPerSide = 3,
+				bulbsPerPlot = 8,
+				lampsBetweenPlots = true,
+				heartBalloons = 14,
+				giantHearts = 4,
+			},
+			palette = {
+				bulbs = { "#FF4F8B", "#FFFFFF", "#E8204F", "#FFB0CC" },
+				lampPost = "#6A2A44",
+				lampLight = "#FF9AC0",
+				pot = "#F2B8C6",
+				leaves = "#3F8F4A",
+				roses = { "#E8204F", "#FF5C8A", "#FFFFFF", "#FF9AB8" },
+				balloons = { "#FF4F8B", "#E8204F", "#FF9AC0", "#FFFFFF" },
+				balloonString = "#FFFFFF",
+				heart = "#E8204F",
+				pedestal = "#FFF4F8",
+				arrow = "#F2C14E",
+			},
+		},
 	},
 
-	maxParts = 400, -- Halloween builds 220, Winter 380 (DECISIONS.md #37)
+	maxParts = 400, -- Halloween builds 220, Winter 380 (DECISIONS.md #37), Valentine's 280 (#41)
 	transitionSeconds = 4,
 }
 

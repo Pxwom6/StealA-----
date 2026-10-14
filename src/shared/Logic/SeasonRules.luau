@@ -7,12 +7,13 @@
 	depend on MapBuilder and tests can check that nothing lands inside a plot, on the belt or on the lobby spawn.
 
 	Where each prop goes (every theme uses the same spots, so a new theme is only data):
-	  beside each plot entrance   pumpkins, then presents (alternating sides, stepping outwards)
+	  beside each plot entrance   pumpkins, then presents, then potted roses (alternating sides, stepping outwards)
 	  the plot's front wall       string-light bulbs hanging under its top; snowdrifts at its ends, on the walkway
 	  between neighbouring plots  lamp posts at the walkway; trees a little back, in the grass gap
-	  along both belt rails       small pumpkins, then small presents
-	  above the walkway           bats; snowflakes a little higher and closer to the belt
-	  past both belt ends         ghosts; snowmen at the corners, a little closer in
+	  along both belt rails       small pumpkins, then small presents, then small roses
+	  above the walkway           bats; snowflakes a little higher and closer to the belt; heart balloons lower and
+	                              a little closer in
+	  past both belt ends         ghosts; snowmen at the corners, a little closer in, then giant hearts
 ]]
 
 local MapThemeRules = require("./MapThemeRules")
@@ -34,6 +35,9 @@ export type PropKind =
 	| "snowman"
 	| "snowflake"
 	| "snowPile"
+	| "rosePot"
+	| "heartBalloon"
+	| "giantHeart"
 
 -- One decoration to build. (faceX, faceZ) is the horizontal direction its front looks at.
 export type Prop = {
@@ -45,8 +49,9 @@ export type Prop = {
 	faceX: number,
 	faceZ: number,
 	scale: number,
-	color: string?, -- bulbs: their colour (palette.bulbs); presents: the wrapping (palette.presents)
-	color2: string?, -- presents: the ribbon (palette.ribbons)
+	color: string?, -- bulbs: their colour (palette.bulbs); presents: the wrapping (palette.presents); roses and
+	-- balloons: their colour (palette.roses, palette.balloons)
+	color2: string?, -- presents: the ribbon (palette.ribbons); roses: the middle bloom
 }
 
 -- A plot entrance: the centre of its front wall's outer face, and the unit direction pointing out of the plot.
@@ -77,6 +82,9 @@ SeasonRules.PARTS_PER = {
 	snowman = 12, -- three snowballs, two eyes, nose, hat brim and crown, scarf and its tail, two stick arms
 	snowflake = 3, -- three crossed bars
 	snowPile = 1,
+	rosePot = 5, -- pot, bush, three blooms
+	heartBalloon = 4, -- two lobes, the point, the string
+	giantHeart = 8, -- pedestal, two lobes and the point, the arrow's shaft, tip and two feathers
 } :: { [PropKind]: number }
 
 -- The palette colours each prop kind is built with: a theme that places a kind must define these (lists need at
@@ -92,6 +100,9 @@ SeasonRules.PALETTE_KEYS = {
 	snowman = { "snow", "carrot", "coal", "scarf", "hat", "wood" },
 	snowflake = { "snowflake" },
 	snowPile = { "snow" },
+	rosePot = { "pot", "leaves", "roses" },
+	heartBalloon = { "balloons", "balloonString" },
+	giantHeart = { "heart", "pedestal", "arrow" },
 } :: { [PropKind]: { string } }
 
 -- Every palette key and whether it holds a list of colours.
@@ -116,6 +127,14 @@ local PALETTE_LISTS: { [string]: boolean } = {
 	scarf = false,
 	hat = false,
 	snowflake = false,
+	roses = true,
+	balloons = true,
+	pot = false,
+	leaves = false,
+	balloonString = false,
+	heart = false,
+	pedestal = false,
+	arrow = false,
 }
 
 local COUNT_KEYS = {
@@ -129,6 +148,10 @@ local COUNT_KEYS = {
 	"snowmen",
 	"snowflakes",
 	"snowPilesPerPlot",
+	"rosesPerPlot",
+	"beltRosesPerSide",
+	"heartBalloons",
+	"giantHearts",
 }
 
 local HEX_PATTERN = "^#%x%x%x%x%x%x$"
@@ -219,7 +242,9 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: SeasonPalet
 
 	local pumpkinsPerPlot = count(decorations.pumpkinsPerPlot)
 	local presentsPerPlot = count(decorations.presentsPerPlot)
+	local rosesPerPlot = count(decorations.rosesPerPlot)
 	local presentIndex = 0
+	local roseIndex = 0
 	for _, entrance in map.entrances do
 		-- "Right" along the front wall (any perpendicular works: props are placed on both sides).
 		local rightX, rightZ = entrance.outZ, -entrance.outX
@@ -262,6 +287,23 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: SeasonPalet
 				scale = PRESENT_SCALES[(presentIndex - 1) % #PRESENT_SCALES + 1],
 				color = cycle(palette.presents, presentIndex),
 				color2 = cycle(palette.ribbons, presentIndex),
+			})
+		end
+
+		-- Potted rose bushes in the spots after those, facing the walkway, their blooms in cycling colours.
+		for k = pumpkinsPerPlot + presentsPerPlot, pumpkinsPerPlot + presentsPerPlot + rosesPerPlot - 1 do
+			roseIndex += 1
+			local x, z = at(slot(k), 1.8)
+			add({
+				kind = "rosePot",
+				x = x,
+				y = map.groundY,
+				z = z,
+				faceX = entrance.outX,
+				faceZ = entrance.outZ,
+				scale = 1,
+				color = cycle(palette.roses, roseIndex),
+				color2 = cycle(palette.roses, roseIndex + 1),
 			})
 		end
 
@@ -333,25 +375,43 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: SeasonPalet
 		end
 	end
 
-	-- Small pumpkins, then small presents, along both belt rails, facing away from the belt.
+	-- Small pumpkins, then small presents, then small roses, along both belt rails, facing away from the belt.
 	local beltPumpkins = count(decorations.beltPumpkinsPerSide)
 	local beltPresents = count(decorations.beltPresentsPerSide)
-	local beltTotal = beltPumpkins + beltPresents
+	local beltRoses = count(decorations.beltRosesPerSide)
+	local beltTotal = beltPumpkins + beltPresents + beltRoses
 	for sideIndex, side in { -1, 1 } do
 		for i = 1, beltTotal do
-			local isPumpkin = i <= beltPumpkins
-			local n = (sideIndex - 1) * beltPresents + (i - beltPumpkins)
-			add({
-				kind = if isPumpkin then "pumpkin" else "present",
-				x = (i - (beltTotal + 1) / 2) * (map.beltLength / beltTotal),
-				y = map.groundY,
-				z = side * (map.beltWidth / 2 + 2.2),
-				faceX = 0,
-				faceZ = side,
-				scale = 0.7,
-				color = if isPumpkin then nil else cycle(palette.presents, n + 2),
-				color2 = if isPumpkin then nil else cycle(palette.ribbons, n + 1),
-			})
+			local x = (i - (beltTotal + 1) / 2) * (map.beltLength / beltTotal)
+			local z = side * (map.beltWidth / 2 + 2.2)
+			if i <= beltPumpkins + beltPresents then
+				local isPumpkin = i <= beltPumpkins
+				local n = (sideIndex - 1) * beltPresents + (i - beltPumpkins)
+				add({
+					kind = if isPumpkin then "pumpkin" else "present",
+					x = x,
+					y = map.groundY,
+					z = z,
+					faceX = 0,
+					faceZ = side,
+					scale = 0.7,
+					color = if isPumpkin then nil else cycle(palette.presents, n + 2),
+					color2 = if isPumpkin then nil else cycle(palette.ribbons, n + 1),
+				})
+			else
+				local n = (sideIndex - 1) * beltRoses + (i - beltPumpkins - beltPresents)
+				add({
+					kind = "rosePot",
+					x = x,
+					y = map.groundY,
+					z = z,
+					faceX = 0,
+					faceZ = side,
+					scale = 0.7,
+					color = cycle(palette.roses, n + 1),
+					color2 = cycle(palette.roses, n + 2),
+				})
+			end
 		end
 	end
 
@@ -386,6 +446,24 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: SeasonPalet
 		})
 	end
 
+	-- Heart balloons floating over the walkway, lower than the bats and a little closer to the belt, turned to face
+	-- across it (a little off square, so a row of them doesn't look stamped out).
+	local balloons = count(decorations.heartBalloons)
+	for i = 1, balloons do
+		local zSide = if i % 2 == 0 then 1 else -1
+		local turn = ((i % 3) - 1) * 0.35
+		add({
+			kind = "heartBalloon",
+			x = (i - 0.5 - balloons / 2) * (map.beltLength * 0.9 / balloons),
+			y = 12 + (i % 3) * 2,
+			z = zSide * map.walkwayWidth * 0.48,
+			faceX = math.sin(turn),
+			faceZ = -zSide * math.cos(turn),
+			scale = 1,
+			color = cycle(palette.balloons, i),
+		})
+	end
+
 	-- Ghosts floating past the belt's end arches, looking back at the belt.
 	for i = 1, count(decorations.ghosts) do
 		local endSide = if i % 2 == 1 then -1 else 1
@@ -402,13 +480,31 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: SeasonPalet
 		})
 	end
 
-	-- Snowmen at the corners of both belt ends (clear of the factory and the chute), looking along the walkway.
-	for i = 1, count(decorations.snowmen) do
+	-- Snowmen at the corners of both belt ends (clear of the factory and the chute), looking along the walkway; giant
+	-- hearts in the next spots out.
+	local snowmen = count(decorations.snowmen)
+	local function corner(i: number): (number, number, number)
 		local endSide = if i % 2 == 1 then -1 else 1
 		local zSide = if ((i - 1) // 2) % 2 == 0 then -1 else 1
 		local row = (i - 1) // 4
+		return endSide, zSide, row
+	end
+	for i = 1, snowmen do
+		local endSide, zSide, row = corner(i)
 		add({
 			kind = "snowman",
+			x = endSide * (map.beltLength / 2 + 8 + row * 7),
+			y = map.groundY,
+			z = zSide * (12 + row * 2),
+			faceX = -endSide,
+			faceZ = 0,
+			scale = 1,
+		})
+	end
+	for i = 1, count(decorations.giantHearts) do
+		local endSide, zSide, row = corner(snowmen + i)
+		add({
+			kind = "giantHeart",
 			x = endSide * (map.beltLength / 2 + 8 + row * 7),
 			y = map.groundY,
 			z = zSide * (12 + row * 2),

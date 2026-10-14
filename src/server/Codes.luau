@@ -35,6 +35,11 @@ local Codes = {
 		reward = { kind = "cash", incomeSeconds = 300, minimum = 5000 },
 		expiresAt = 1799366400, -- 2027-01-08 00:00 UTC
 	},
+	-- Valentine's 2027: a Sweetheart Candy Heart Hamster until the event ends.
+	LOVE27 = {
+		reward = { kind = "creature", creatureId = "candy_heart_hamster", variant = "sweetheart" },
+		expiresAt = 1802764800, -- 2027-02-16 08:00 UTC
+	},
 }
 
 return Codes

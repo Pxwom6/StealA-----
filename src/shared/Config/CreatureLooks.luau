@@ -1268,6 +1268,81 @@ local CreatureLooks: { [string]: CreatureLook } = {
 			{ kind = "sprinkles", on = "body", colors = { WHITE, "#BFE6FF", "#FFD8F0" }, n = 8, spread = 0.9 },
 		},
 	},
+
+	-- Valentine's 2027 (recipe fallbacks: the polished models are in Config/CreatureParts)
+	candy_heart_hamster = {
+		size = 2.3,
+		plan = "biped",
+		arms = true,
+		body = { skin = "round", color = "#FFD2B3", w = 0.86, h = 0.72 },
+		head = { skin = "round", color = "#FFD2B3", w = 0.8, h = 0.66 },
+		face = { eyes = "big", mouth = "smile", cheeks = "#FF9DB6", nose = "#FF6F8F" },
+		limbs = "#FFBE96",
+		features = {
+			{ kind = "belly", color = "#FFF6EE" },
+			{ kind = "ears", style = "round", color = "#FFBE96", color2 = "#FF9DB6" },
+			{ kind = "whiskers", color = "#E8C8B0" },
+		},
+		toppings = {
+			{ kind = "balls", on = "body", colors = { "#C9A8FF", "#9EF0C6", "#FFB0CC" }, n = 3, spread = 0.6 },
+		},
+	},
+	cherry_cordial_kitten = {
+		size = 2.4,
+		plan = "biped",
+		arms = false,
+		body = { skin = "round", color = "#4A2818", w = 0.78, h = 0.7 },
+		head = { skin = "round", color = "#4A2818", w = 0.76, h = 0.64 },
+		face = { eyes = "big", mouth = "cat", cheeks = "#FF86A6", nose = "#FF86A6" },
+		limbs = "#8A5A3A",
+		features = {
+			{ kind = "ears", style = "pointy", color = "#4A2818", color2 = "#FF86A6" },
+			{ kind = "whiskers", color = "#F6E7D2" },
+			{ kind = "tail", style = "curly", color = "#4A2818" },
+		},
+		toppings = {
+			{ kind = "cherry", on = "head", colors = { "#D61F3C" } },
+			{ kind = "zigzag", on = "body", colors = { "#F3E3CF" } },
+		},
+	},
+	red_velvet_raccoon = {
+		size = 2.4,
+		plan = "quadruped",
+		legs = 0.22,
+		body = { skin = "round", color = "#B0173A", w = 0.78, h = 0.62, d = 1, material = "Sand" },
+		head = { skin = "round", color = "#B0173A", w = 0.66, h = 0.58, d = 0.6 },
+		face = { eyes = "big", mouth = "smile", cheeks = "#FF8FA8", patches = "#4A0A1A" },
+		limbs = "#8E1030",
+		features = {
+			{ kind = "snout", style = "dog", color = "#FFF7EE", color2 = "#2A0A12" },
+			{ kind = "ears", style = "round", color = "#8E1030", color2 = "#FFF7EE" },
+			{ kind = "tail", style = "ringed", color = "#B0173A", color2 = "#FFF7EE" },
+		},
+		toppings = {
+			{ kind = "swirl", on = "body", colors = { "#FFF7EE" } },
+			{ kind = "sprinkles", on = "body", colors = { "#E8253A", "#FF7BB0", WHITE }, n = 6, spread = 0.7 },
+		},
+	},
+	rose_petal_pegasus = {
+		size = 2.6,
+		plan = "quadruped",
+		legs = 0.34,
+		neck = 0.2,
+		body = { skin = "round", color = "#FFE4EE", w = 0.7, h = 0.56, d = 1 },
+		head = { skin = "round", color = "#FFE4EE", w = 0.52, h = 0.5, d = 0.66 },
+		face = { eyes = "big", mouth = "smile", cheeks = "#FF9AB8" },
+		limbs = "#FFE4EE",
+		features = {
+			{ kind = "snout", style = "dog", color = "#FFF2F6", color2 = "#D88AA6", scale = 1.05 },
+			{ kind = "ears", style = "pointy", color = "#FFE4EE", scale = 0.6 },
+			{ kind = "wings", style = "feather", color = "#FF5C8A", color2 = "#FF9AB8" },
+			{ kind = "mane", color = "#E8265E" },
+			{ kind = "tail", style = "puff", color = "#FF5C8A" },
+		},
+		toppings = {
+			{ kind = "balls", on = "head", colors = { "#E8265E" }, n = 1, spread = 0.2 },
+		},
+	},
 }
 
 return CreatureLooks

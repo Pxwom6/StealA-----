@@ -2,7 +2,8 @@
 --[[
 	Seasonal themes (Config/Seasons): while a LiveOps event mapped to a theme is active, the map gets code-built
 	decorations (Halloween: pumpkins, string lights, lamps, bats, ghosts; Winter: presents, decorated trees, string
-	lights, snowmen, snowflakes, snowdrifts) and a lighting mood; when it ends, they go away and the map's own lighting
+	lights, snowmen, snowflakes, snowdrifts; Valentine's: potted roses, heart balloons, giant hearts pierced by Cupid's
+	arrow, string lights, lamps) and a lighting mood; when it ends, they go away and the map's own lighting
 	comes back. Which theme is on is decided by Logic/SeasonRules.activeTheme from the active event ids, and
 	LiveOpsService tells this service whenever those change (events start and end by date while the server runs,
 	remote config, `/event <id>` and `/event off`).
@@ -57,6 +58,14 @@ local FALLBACK_COLORS: { [string]: string } = {
 	present = "#D7263D",
 	ribbon = "#FFD23F",
 	ornament = "#FF3B3B",
+	pot = "#E8B0A0",
+	leaves = "#3F8F4A",
+	rose = "#E8204F",
+	balloon = "#FF4F8B",
+	balloonString = "#FFFFFF",
+	heart = "#E8204F",
+	pedestal = "#FFF4F8",
+	arrow = "#F2C14E",
 }
 
 local world: MapBuilder.World
@@ -131,6 +140,32 @@ local TREE_TIERS = {
 	{ w = 2.4, h = 2.6, y = 11.3, turn = 0 },
 }
 local BAUBLE_CORNERS = { { { 1, 1 }, { -1, -1 } }, { { 1, -1 }, { -1, 1 } }, { { -1, 1 }, { 1, -1 } } }
+
+-- A heart in the XY plane of `frame` (its face looks along the frame's front), `width` studs wide and `depth` thick:
+-- two lobes on the upper edges of a square turned 45 degrees. Balls make a puffy balloon; cylinders a flat sculpture.
+-- Three parts, all in `parent`; returns the middle one.
+local function heart(frame: CFrame, width: number, depth: number, puffy: boolean, props: { [string]: any }): Part
+	local side = width / (math.sqrt(0.5) + 1) -- the square's side
+	local shift = side * (0.5 + math.sqrt(0.5) / 2 - math.sqrt(0.5)) / 2 -- centres the heart on the frame
+	local lobeX = side * math.sqrt(0.5) / 2
+	for _, x in { -lobeX, lobeX } do
+		local at = frame * CFrame.new(x, lobeX - shift, 0)
+		local lobe = part(props)
+		if puffy then
+			lobe.Shape = Enum.PartType.Ball
+			lobe.Size = Vector3.one * side
+			lobe.CFrame = at
+		else
+			lobe.Shape = Enum.PartType.Cylinder
+			lobe.Size = Vector3.new(depth, side, side)
+			lobe.CFrame = at * CFrame.Angles(0, math.rad(90), 0) -- a Roblox cylinder runs along X: turn it along Z
+		end
+	end
+	local point = part(props)
+	point.Size = Vector3.new(side, side, if puffy then side * 0.8 else depth)
+	point.CFrame = frame * CFrame.new(0, -shift, 0) * CFrame.Angles(0, 0, math.rad(45))
+	return point
+end
 
 -- Each builder makes exactly SeasonRules.PARTS_PER[kind] parts. `base` stands on the prop's position, front (-Z)
 -- towards its face direction.
@@ -472,6 +507,120 @@ local builders: { [string]: Builder } = {
 				Color = color,
 				Material = Enum.Material.Neon,
 				Transparency = 0.1,
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- A rose bush in a pot, three blooms on the side facing the walkway.
+	rosePot = function(base, prop, palette, parent)
+		local s = prop.scale
+		local pot = part({
+			Name = "RosePot",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(1.3 * s, 1.7 * s, 1.7 * s),
+			CFrame = base * CFrame.new(0, 0.65 * s, 0) * UPRIGHT,
+			Color = paletteColor(palette, "pot"),
+			Parent = parent,
+		})
+		pot.Material = Enum.Material.Sandstone
+		ellipsoid({
+			Name = "RoseBush",
+			Size = Vector3.new(2.3 * s, 2.1 * s, 2.3 * s),
+			CFrame = base * CFrame.new(0, 2.2 * s, 0),
+			Color = paletteColor(palette, "leaves"),
+			Material = Enum.Material.Grass,
+			Parent = parent,
+		})
+		local bloom = UiTheme.color(prop.color or FALLBACK_COLORS.rose)
+		local middle = UiTheme.color(prop.color2 or prop.color or FALLBACK_COLORS.rose)
+		for i, spot in { Vector3.new(-0.6, 2.5, -0.85), Vector3.new(0.05, 3.15, -0.55), Vector3.new(0.65, 2.3, -0.8) } do
+			part({
+				Name = "Rose",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.one * (if i == 2 then 0.85 else 0.72) * s,
+				CFrame = base * CFrame.new(spot * s),
+				Color = if i == 2 then middle else bloom,
+				Material = Enum.Material.Fabric,
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- A glossy heart balloon on a string.
+	heartBalloon = function(base, prop, palette, parent)
+		local s = prop.scale
+		local width = 3.2 * s
+		heart(base, width, 0, true, {
+			Name = "HeartBalloon",
+			Color = UiTheme.color(prop.color or FALLBACK_COLORS.balloon),
+			Reflectance = 0.15,
+			Parent = parent,
+		})
+		local bottom = width * 0.45 -- the heart's point, below its middle
+		part({
+			Name = "BalloonString",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(5 * s, 0.12, 0.12),
+			CFrame = base * CFrame.new(0, -bottom - 2.5 * s, 0) * UPRIGHT,
+			Color = paletteColor(palette, "balloonString"),
+			Parent = parent,
+		})
+	end,
+
+	-- A big candy-red heart on a pedestal, pierced by a golden arrow, glowing softly.
+	giantHeart = function(base, prop, palette, parent)
+		local s = prop.scale
+		local red = paletteColor(palette, "heart")
+		part({
+			Name = "Pedestal",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(1.2 * s, 4.4 * s, 4.4 * s),
+			CFrame = base * CFrame.new(0, 0.6 * s, 0) * UPRIGHT,
+			Color = paletteColor(palette, "pedestal"),
+			Material = Enum.Material.Marble,
+			Parent = parent,
+		})
+		local width = 6.5 * s
+		-- standing on its point, just planted in the pedestal
+		local centre = base * CFrame.new(0, 1.2 * s + width * 0.45, 0)
+		local middle = heart(centre, width, 1.6 * s, false, {
+			Name = "GiantHeart",
+			Color = red,
+			Reflectance = 0.12,
+			Parent = parent,
+		})
+		light(middle, red:Lerp(Color3.new(1, 1, 1), 0.4), 16, 1.2)
+		-- the arrow: through the heart, rising to the right, its tip out one side and its feathers out the other
+		local gold = paletteColor(palette, "arrow")
+		local tilt = CFrame.Angles(0, 0, math.rad(25))
+		local shaftLength = 8 * s
+		part({
+			Name = "ArrowShaft",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(shaftLength, 0.32 * s, 0.32 * s),
+			CFrame = centre * tilt,
+			Color = gold,
+			Material = Enum.Material.Metal,
+			Parent = parent,
+		})
+		part({
+			Name = "ArrowTip",
+			Size = Vector3.new(0.9 * s, 0.9 * s, 0.25 * s),
+			CFrame = centre * tilt * CFrame.new(shaftLength / 2 + 0.2 * s, 0, 0) * CFrame.Angles(0, 0, math.rad(45)),
+			Color = gold,
+			Material = Enum.Material.Metal,
+			Parent = parent,
+		})
+		for _, side in { -1, 1 } do
+			part({
+				Name = "ArrowFeather",
+				Size = Vector3.new(1.1 * s, 0.45 * s, 0.12 * s),
+				CFrame = centre
+					* tilt
+					* CFrame.new(-shaftLength / 2 + 0.6 * s, side * 0.3 * s, 0)
+					* CFrame.Angles(0, 0, math.rad(side * 30)),
+				Color = Color3.new(1, 1, 1),
 				Parent = parent,
 			})
 		end

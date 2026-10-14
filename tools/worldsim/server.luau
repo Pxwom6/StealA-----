@@ -459,23 +459,33 @@ local function scenario()
 	-- can spawn, and `/event off` takes it all away again ------------------------------------------------------------
 	local Seasons = Sim.shared("Config/Seasons")
 	local mapNow = workspace:GetAttribute("MapTheme")
-	Sim.chat(alice, "/event Winter2026 5")
-	task.wait(1.2)
-	check(workspace:GetAttribute("SeasonTheme") == "winter", "/event Winter2026 switches the winter theme on")
-	local decor = workspace:FindFirstChild("SeasonDecor")
-	local decorParts, inTheWay = 0, 0
-	local byName: { [string]: number } = {}
-	if decor then
-		for _, descendant in decor:GetDescendants() do
-			if descendant:IsA("BasePart") then
-				decorParts += 1
-				byName[descendant.Name] = (byName[descendant.Name] or 0) + 1
-				if descendant.CanCollide or descendant.CanTouch or descendant.CanQuery or not descendant.Anchored then
-					inTheWay += 1
+	-- The seasonal decorations: how many parts, how many could get in anyone's way, and how many of each name.
+	local function decorCounts(): (number, number, { [string]: number })
+		local decor = workspace:FindFirstChild("SeasonDecor")
+		local parts, inTheWay = 0, 0
+		local names: { [string]: number } = {}
+		if decor then
+			for _, descendant in decor:GetDescendants() do
+				if descendant:IsA("BasePart") then
+					parts += 1
+					names[descendant.Name] = (names[descendant.Name] or 0) + 1
+					if
+						descendant.CanCollide
+						or descendant.CanTouch
+						or descendant.CanQuery
+						or not descendant.Anchored
+					then
+						inTheWay += 1
+					end
 				end
 			end
 		end
+		return parts, inTheWay, names
 	end
+	Sim.chat(alice, "/event Winter2026 5")
+	task.wait(1.2)
+	check(workspace:GetAttribute("SeasonTheme") == "winter", "/event Winter2026 switches the winter theme on")
+	local decorParts, inTheWay, byName = decorCounts()
 	-- 24 presents by the bases + 6 at the belt, 6 trees, 4 snowmen, 8 snowflakes, 16 drifts, 64 bulbs: 380 parts
 	-- (tests/SeasonRules.spec.luau pins the same layout)
 	check(decorParts == 380, `the winter decorations are built ({decorParts} parts)`)
@@ -498,6 +508,34 @@ local function scenario()
 	check(BeltService.mutationConditions().Winter2026 == nil, "and the Festive mutation with it")
 	local mapSky = MapThemes.themes[mapNow].lighting
 	check(math.abs(Lighting.ClockTime - mapSky.clockTime) < 1e-3, "the map's own sky comes back")
+
+	Sim.chat(alice, "/event Valentine2027 5")
+	task.wait(1.2)
+	check(workspace:GetAttribute("SeasonTheme") == "valentine", "/event Valentine2027 switches the valentine theme on")
+	decorParts, inTheWay, byName = decorCounts()
+	-- 16 rose pots by the bases + 6 at the belt, 64 bulbs, 6 lamps, 14 heart balloons, 4 giant hearts: 280 parts
+	-- (tests/SeasonRules.spec.luau pins the same layout)
+	check(decorParts == 280, `the valentine decorations are built ({decorParts} parts)`)
+	check(
+		byName.RosePot == 22
+			and byName.Rose == 66
+			and byName.HeartBalloon == 42
+			and byName.GiantHeart == 12
+			and byName.ArrowShaft == 4,
+		"roses, heart balloons and giant hearts, each built from the parts the budget counts"
+	)
+	check(inTheWay == 0, "and none of them gets in anyone's way")
+	local valentineLighting = Seasons.themes.valentine.lighting
+	check(math.abs(Lighting.ClockTime - valentineLighting.clockTime) < 1e-3, "the rosy mood lights the map")
+	Sim.chat(alice, "/spawn rose_petal_pegasus sweetheart")
+	task.wait(0.1)
+	local sweetheart = lastBeltItem("rose_petal_pegasus")
+	check(sweetheart ~= nil and sweetheart.variant == "sweetheart", "a Sweetheart Rose Petal Pegasus rides the belt")
+	check(BeltService.mutationConditions().Valentine2027 == true, "Sweetheart Snacklings can roll while it runs")
+	Sim.chat(alice, "/event off")
+	task.wait(1.2)
+	check(workspace:FindFirstChild("SeasonDecor") == nil, "/event off takes the hearts and roses away")
+	check(BeltService.mutationConditions().Valentine2027 == nil, "and the Sweetheart mutation with them")
 
 	-- Leaving -------------------------------------------------------------------------------------------------------------
 	local owned = #aliceSession.data.creatures

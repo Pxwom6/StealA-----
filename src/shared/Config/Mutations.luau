@@ -595,6 +595,31 @@ local Mutations: { MutationDef } = {
 		},
 		modifierId = "heatwave",
 	},
+
+	-- Valentine's 2027: candy-apple red with a pink glow and little hearts floating up. Rolls only while LiveOps event
+	-- "Valentine2027" runs; like Haunted and Festive, rarer than Golden and stronger (order 31: rolled after every
+	-- other one, so no existing roll changes).
+	{
+		id = "sweetheart",
+		displayName = "Sweetheart",
+		color = "#FF4F8B",
+		order = 31,
+		chance = 0.02,
+		incomeMultiplier = 3,
+		priceMultiplier = 2,
+		announceOnSpawn = false,
+		announceOnBuy = false,
+		announceOnSteal = false,
+		look = {
+			material = "SmoothPlastic",
+			tint = "#E31B4F",
+			tintStrength = 0.6,
+			reflectance = 0.15,
+			glow = "#FF7AA8",
+			particles = "hearts",
+		},
+		eventId = "Valentine2027",
+	},
 }
 
 return Mutations
