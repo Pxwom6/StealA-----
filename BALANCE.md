@@ -322,6 +322,32 @@ Every effect is clamped by `limits` (CI), and a speed modifier widens the server
 multiplier (and keeps the faster speed allowed for 4 s after it ends), so the anti-cheat never flags a player for
 running at a speed the server gave them.
 
+## Playtime gifts and the Lucky Spin
+
+**Gifts** (`Config/Gifts.luau`) unlock with time in game each UTC day: 5 min 30 s of income (at least $150), 10 min a
+Lucky Spin, 15 min 60 s of income (at least $400), 25 min a Snackling at 2x luck, 40 min two spins, 60 min a Snackling
+at 4x luck. An hour of play collects all six: 90 seconds of income, three spins and two lucky Snacklings. Unclaimed
+gifts that were unlocked are paid at midnight, so nobody loses one by logging off.
+
+**The Lucky Spin** (`Config/Spin.luau`): a free spin every 12 hours (a new player's first is ready at once) plus the
+banked ones from gifts (up to 20; more are paid as a minute of income each).
+
+| Prize | Chance | What it pays |
+| --- | --- | --- |
+| Cash | 30% | 30 s of income (at least $200) |
+| Big Cash | 25% | 90 s (at least $600) |
+| Snackling | 18% | a Snackling at 2x luck |
+| Huge Cash | 14% | 5 min (at least $2,000) |
+| Golden! | 8% | a Golden Snackling at 2x luck |
+| Diamond! | 3.5% | a Diamond Snackling at 2x luck (announced) |
+| JACKPOT | 1.5% | 20 min of income (at least $10K; announced) |
+
+One spin is worth about 90 seconds of income in cash on average, plus a 30% chance of a Snackling. At 2x luck a
+Snackling is Common 48%, Uncommon 23%, Rare 20%, Epic 7.2%, Legendary 1.9%, Mythic 0.31%, Secret 0.03%; at 4x (the
+last gift) Rare 30%, Epic 11%, Legendary 2.9%, Mythic 0.48%. A player who plays an hour a day and spins twice gets
+roughly 9 minutes of extra income a day from gifts and spins, about +15% for that hour: a reason to come back and stay,
+not a new economy. Every prize scales with steady income like a cash pack, and the server decides every spin.
+
 ## Other knobs
 
 **Podiums** (`Economy.podiumUpgrade`): 8 to start, then +1 at a time for

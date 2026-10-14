@@ -145,6 +145,8 @@ local Gameplay = {
 		CrateOpen = { burst = 4, perSecond = 2 },
 		-- Redeem codes (CodeService): a few tries, then one every 5 s, so codes can't be guessed by brute force.
 		RedeemCode = { burst = 3, perSecond = 0.2 },
+		ClaimGift = { burst = 6, perSecond = 2 }, -- playtime gifts: each pays once a day (GiftRules.claim)
+		Spin = { burst = 2, perSecond = 0.5 }, -- the Lucky Spin (SpinService also waits for the reel)
 	} :: { [string]: RateLimit },
 }
 

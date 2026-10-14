@@ -448,6 +448,37 @@ local Theme = {
 		modifierStarted = "{icon} {name}! {description}",
 		modifierChip = "{icon} {name} {time}",
 
+		-- Prizes from gifts, the Lucky Spin and codes (PrizeService)
+		prizeCash = "+{amount}!",
+		prizeSpin = "+1 Lucky Spin!",
+		prizeSpins = "+{count} Lucky Spins!",
+		prizeSpinsFull = "Spin bank full: +{amount} instead!",
+		prizeCreature = "{rarity} {creature} joined your base!",
+		prizeCreatureSold = "Base full: {creature} sold for {amount}",
+
+		-- Playtime gifts (Config/Gifts): the Rewards panel's Gifts tab
+		rewardsTabGifts = "Gifts",
+		giftsTitle = "Free gifts for playing today",
+		giftReady = "Claim!",
+		giftClaimed = "✓",
+		giftSpin = "1 Spin",
+		giftSpins = "{count} Spins",
+		giftCreature = "Lucky Snackling",
+		giftCreatureLucky = "{luck}x Lucky Snackling",
+		giftsResetIn = "New gifts in {time}",
+		minutesShort = "{minutes} min",
+
+		-- The Lucky Spin (Config/Spin): the Rewards panel's Spin tab
+		rewardsTabSpin = "Spin",
+		spinTitle = "Lucky Spin",
+		spinButton = "SPIN!",
+		spinButtonBanked = "SPIN! ({count} left)",
+		spinFreeIn = "Free spin in {time}",
+		spinBanked = "{count} spins saved",
+		spinNotReady = "No spins yet: one is free every 12 hours, and gifts give more.",
+		spinAnnounce = "🎰 {player} won {prize} on the Lucky Spin!",
+		spinOdds = "Odds",
+
 		-- Redeem codes (server/Codes.luau): the Codes dialog (from Settings) and its answers
 		settingsCodes = "🎟️ Codes",
 		settingsCodesHint = "Got a code? Redeem it here",

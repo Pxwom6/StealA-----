@@ -14,6 +14,7 @@ local DataService = require(Services.DataService)
 local DevCommands = require(Services.DevCommands)
 local DropService = require(Services.DropService)
 local EconomyService = require(Services.EconomyService)
+local GiftService = require(Services.GiftService)
 local LeaderboardService = require(Services.LeaderboardService)
 local LiveOpsService = require(Services.LiveOpsService)
 local LockService = require(Services.LockService)
@@ -33,6 +34,7 @@ local SeasonService = require(Services.SeasonService)
 local SettingsService = require(Services.SettingsService)
 local SnackdexService = require(Services.SnackdexService)
 local SocialService = require(Services.SocialService)
+local SpinService = require(Services.SpinService)
 local StealService = require(Services.StealService)
 local TutorialService = require(Services.TutorialService)
 
@@ -65,6 +67,8 @@ QuestService.start()
 LeaderboardService.start(world)
 SettingsService.start() -- music / sound effects / reduce effects, saved in flags
 CodeService.start() -- redeem codes (server/Codes.luau), once per account, saved in flags
+GiftService.start() -- playtime gifts: a daily ladder that unlocks with time in game
+SpinService.start() -- the Lucky Spin: a free spin every 12 hours, plus spins from gifts
 DevCommands.start() -- Studio only
 
 local hooks = PlayerLifecycle.hooks()

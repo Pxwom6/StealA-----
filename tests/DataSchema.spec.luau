@@ -222,7 +222,7 @@ T.describe("DataSchema", function()
 		T.expect(back.quarantine[1].uid).toBe("31")
 	end)
 
-	T.it("migrates version 2 saves to 3: the Snackdex is backfilled from podiums and quarantine", function()
+	T.it("migrates version 2 saves on: the Snackdex is backfilled from podiums and quarantine", function()
 		local v2: any = {
 			version = 2,
 			creatures = {
@@ -236,7 +236,7 @@ T.describe("DataSchema", function()
 			quarantine = { { uid = "6", id = "retired_pup", podium = 6, acquiredAt = 5, stored = 0, variant = "old" } },
 		}
 		local raw = DataSchema.migrate(v2)
-		T.expect(raw.version).toBe(3)
+		T.expect(raw.version).toBe(DataSchema.VERSION)
 		T.expect(raw.snackdex.creatures).toEqual({ pizza_pup = true, donut_dragon = true, retired_pup = true })
 		T.expect(raw.snackdex.variants).toEqual({
 			pizza_pup = { golden = true },
@@ -253,6 +253,36 @@ T.describe("DataSchema", function()
 		-- A save with nothing owned starts with an empty Snackdex; so does an unversioned one.
 		T.expect(DataSchema.migrate({ version = 2 }).snackdex).toEqual({ creatures = {}, variants = {}, tiers = {} })
 		T.expect(DataSchema.migrate({}).quests).toEqual({ day = -1, list = {}, bonusClaimed = false })
+	end)
+
+	T.it("migrates version 3 saves to 4: empty playtime gifts and a free spin ready", function()
+		local v3: any = DataSchema.template(100)
+		v3.version = 3
+		v3.gifts = nil
+		v3.spin = nil
+		v3.cash = 1234
+		local raw = DataSchema.migrate(v3)
+		T.expect(raw.version).toBe(4)
+		T.expect(raw.gifts).toEqual({ day = -1, seconds = 0, claimed = {} })
+		T.expect(raw.spin).toEqual({ nextFreeAt = 0, spins = 0, total = 0 })
+		T.expect(raw.cash).toBe(1234)
+		local clean = DataSchema.sanitise(raw, 100, rules)
+		T.expect(clean.gifts).toEqual({ day = -1, seconds = 0, claimed = {} })
+		T.expect(clean.spin).toEqual({ nextFreeAt = 0, spins = 0, total = 0 })
+	end)
+
+	T.it("repairs broken gifts and spins", function()
+		local raw: any = DataSchema.template(100)
+		raw.gifts = { day = "today", seconds = 1e9, claimed = { 1, 1, 0, 2.5, 99, "x" :: any, 3 } }
+		raw.spin = { nextFreeAt = 0 / 0, spins = -5, total = math.huge }
+		local clean = DataSchema.sanitise(raw, 100, rules)
+		T.expect(clean.gifts).toEqual({ day = -1, seconds = 86400, claimed = { 1, 3 } })
+		T.expect(clean.spin.nextFreeAt).toBe(0)
+		T.expect(clean.spin.spins).toBe(0)
+		T.expect(clean.spin.total).toBe(0)
+		raw.spin = { nextFreeAt = 1800000000, spins = 1e9, total = 12.7 }
+		clean = DataSchema.sanitise(raw, 100, rules)
+		T.expect(clean.spin).toEqual({ nextFreeAt = 1800000000, spins = 1000, total = 12 })
 	end)
 
 	T.it("backfills even when ProfileStore's Reconcile already added the empty v3 tables", function()

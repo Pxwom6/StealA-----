@@ -716,3 +716,22 @@ where everyone already is, and they make the belt area busier (more steals, more
 **Why:** codes are how Roblox games reward followers of their group and updates; it costs nothing to run and gives
 Leo something to post.
 **Reversal cost:** none — remove a code (or give it an `expiresAt` in the past) and publish.
+
+### 35. Playtime gifts and the Lucky Spin (save schema v4)
+
+* **What:** six gifts a day that unlock with time in game (5 to 60 minutes: cash, Lucky Spins, lucky Snacklings) and
+  a Lucky Spin reel (a free spin every 12 hours, plus spins from gifts), as two new tabs in the Rewards panel.
+* **Saved, not session-only:** `data.gifts` (today's seconds and claims) and `data.spin` (next free spin, banked
+  spins) are new save keys, so schema v4 (migration adds empty ones; a new save starts with its free spin ready;
+  sanitise clamps seconds to a day, claims to unique valid indices, banked spins to 1000). Rejoining keeps today's
+  progress.
+* **Server decides, client shows:** time counts on the server (capped per step, so a stalled server never grants a
+  burst); a claim and a spin are re-checked and paid at once (`PrizeService`, shared with supply crates); the reel only
+  animates to the segment the server sent. The client counts the gift countdowns on itself from the last state.
+* **Prizes scale with income** like cash packs; Snacklings are rolled at extra luck (2x, 4x) or with a set mutation
+  (Golden, Diamond) and sold for their refund when the base is full; the odds are shown in the tab.
+
+**Why:** the standard Roblox retention pair (a reason to stay a bit longer, a reason to come back twice a day) built
+on systems the game already has.
+**Reversal cost:** low — empty the ladder's later gifts or lengthen `freeEverySeconds`; the v4 keys must stay (a save
+schema never goes back).

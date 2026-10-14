@@ -24,24 +24,19 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Drops = require(ReplicatedStorage.Shared.Config.Drops)
-local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
 local Modifiers = require(ReplicatedStorage.Shared.Config.Modifiers)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local GameData = require(ReplicatedStorage.Shared.GameData)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local DropRules = require(ReplicatedStorage.Shared.Logic.DropRules)
-local EconomyMath = require(ReplicatedStorage.Shared.Logic.EconomyMath)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local Guard = require(ReplicatedStorage.Shared.Logic.Guard)
-local MutationRules = require(ReplicatedStorage.Shared.Logic.MutationRules)
-local RarityRoll = require(ReplicatedStorage.Shared.Logic.RarityRoll)
 local Announcer = require(script.Parent.Announcer)
-local BeltService = require(script.Parent.BeltService)
 local EconomyService = require(script.Parent.EconomyService)
-local LiveOpsService = require(script.Parent.LiveOpsService)
 local ModifierService = require(script.Parent.ModifierService)
 local PositionTracker = require(script.Parent.PositionTracker)
+local PrizeService = require(script.Parent.PrizeService)
 local Remotes = require(script.Parent.Remotes)
 local Sessions = require(script.Parent.Sessions)
 
@@ -214,38 +209,24 @@ end
 
 -- What is inside: a Snackling rolled with the crate's extra luck and mutation chance, and some cash.
 local function open(session: Session, crate: Crate)
-	local catalog = GameData.catalog
-	local creatureId = RarityRoll.roll(
-		catalog.rarityList,
-		catalog.creatureList,
-		LiveOpsService.luckMultiplier() * Drops.crate.luck,
-		LiveOpsService.activeEventIds(),
-		nextRandom
-	)
-	local variant = MutationRules.roll(
-		catalog.mutationList,
-		BeltService.mutationConditions(),
-		nextRandom,
-		ModifierService.effects().mutationChance * Drops.crate.mutationChance
-	)
+	local def, variant = PrizeService.rollCreature(Drops.crate.luck, Drops.crate.mutationChance, nil)
 	local cash = DropRules.amount(Drops.crate.cash, session.packIncome)
-	local def = if creatureId then catalog.creatures[creatureId] else nil
 	local player = session.player
 	if def then
 		local name = GameData.displayName(def, variant)
-		local rarity = catalog.rarities[def.rarity]
-		if EconomyService.giveCreature(session, def.id, variant) then
+		local rarity = GameData.catalog.rarities[def.rarity]
+		-- A full base: the Snackling is sold for its usual refund instead.
+		local given, refund = PrizeService.giveOrSell(session, def, variant, "SupplyCrate")
+		if given then
 			Remotes.notify(
 				player,
 				Format.template(Theme.text.crateReward, { creature = name, cash = UiTheme.cash(cash) }),
 				"success"
 			)
 		else
-			-- A full base: the Snackling is sold for its usual refund instead.
-			cash += EconomyMath.sellValue(GameData.price(def, variant), Economy.sellRefund)
 			Remotes.notify(
 				player,
-				Format.template(Theme.text.crateRewardFull, { creature = name, cash = UiTheme.cash(cash) }),
+				Format.template(Theme.text.crateRewardFull, { creature = name, cash = UiTheme.cash(cash + refund) }),
 				"success"
 			)
 		end

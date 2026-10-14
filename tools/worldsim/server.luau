@@ -309,6 +309,39 @@ local function scenario()
 		"a Snackling code puts a Golden Snackling in the base"
 	)
 
+	-- Playtime gifts and the Lucky Spin -----------------------------------------------------------------------------------
+	local Gifts = Sim.shared("Config/Gifts")
+	check(#Sim.received(1001, "StateUpdate") > 0, "gifts: the state carries them")
+	Sim.fireServer(alice, "ClaimGift", 1)
+	task.wait(0.1)
+	check(#aliceSession.data.gifts.claimed == 0, "a gift stays locked before its time")
+	Sim.chat(alice, `/playtime {Gifts.ladder[2].minutes}`)
+	task.wait(0.1)
+	cash = aliceSession.data.cash
+	Sim.fireServer(alice, "ClaimGift", 1)
+	task.wait(0.1)
+	check(aliceSession.data.cash > cash, "the first gift pays once its minutes are played")
+	Sim.fireServer(alice, "ClaimGift", 1)
+	Sim.fireServer(alice, "ClaimGift", 2)
+	task.wait(0.1)
+	check(#aliceSession.data.gifts.claimed == 2, "each gift pays once")
+	check(aliceSession.data.spin.spins == 1, "the second gift banks a Lucky Spin")
+
+	-- A brand-new player's free spin is ready, then the banked one; then none.
+	local spinCash, spinCreatures = aliceSession.data.cash, #aliceSession.data.creatures
+	Sim.fireServer(alice, "Spin")
+	task.wait(0.1)
+	local results = Sim.received(1001, "SpinResult")
+	check(#results == 1 and type(results[1][1].index) == "number", "the free spin turns the reel")
+	check(
+		aliceSession.data.cash > spinCash or #aliceSession.data.creatures > spinCreatures,
+		"and pays its prize at once"
+	)
+	check(aliceSession.data.spin.nextFreeAt > os.time(), "the next free spin waits")
+	Sim.fireServer(alice, "Spin")
+	task.wait(0.1)
+	check(#Sim.received(1001, "SpinResult") == 1, "one spin at a time while the reel runs")
+
 	-- Locking -------------------------------------------------------------------------------------------------------------
 	local lockButton = PlotService.refs(aliceSession.plot).lockButton
 	Sim.moveCharacter(alice, lockButton.Position + roblox.Vector3.new(0, 3, 0))

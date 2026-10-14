@@ -13,7 +13,7 @@
 	podium is invalid or taken: it moves to the lowest free podium within the base capacity, or waits in quarantine
 	until a later load finds a free podium. Snackdex and quest ids the config doesn't know are kept too (bounded).
 	Version history: v1 initial; v2 lock timers, quarantine, cash pack quotes; v3 Snackdex (backfilled from what the
-	player owns) and daily quests.
+	player owns) and daily quests; v4 playtime gifts and the Lucky Spin (a new save starts with its free spin ready).
 	Pure: no Roblox APIs.
 ]]
 
@@ -27,6 +27,8 @@ export type PlayerData = Types.PlayerData
 export type Snackdex = Types.Snackdex
 export type QuestState = Types.QuestState
 export type QuestSlot = Types.QuestSlot
+export type GiftState = Types.GiftState
+export type SpinState = Types.SpinState
 
 export type SanitiseRules = {
 	isValidCreature: (id: string) -> boolean,
@@ -38,7 +40,7 @@ export type SanitiseRules = {
 	maxHistory: number,
 }
 
-local SCHEMA_VERSION = 3
+local SCHEMA_VERSION = 4
 
 -- Bounds for the Snackdex and quest lists (far above any real config; they only stop a corrupted save from growing).
 local MAX_ID_LENGTH = 64
@@ -46,6 +48,9 @@ local MAX_DEX_CREATURES = 1024
 local MAX_DEX_VARIANTS = 32 -- mutations per creature
 local MAX_DEX_TIERS = 64
 local MAX_QUESTS = 8
+local MAX_GIFTS = 32 -- gift ladder indices
+local MAX_BANKED_SPINS = 1000
+local SECONDS_PER_DAY = 86400
 
 local DataSchema = {}
 DataSchema.VERSION = SCHEMA_VERSION
@@ -80,6 +85,8 @@ function DataSchema.template(startingCash: number): PlayerData
 		lastSeen = 0,
 		snackdex = { creatures = {}, variants = {}, tiers = {} },
 		quests = { day = -1, list = {}, bonusClaimed = false },
+		gifts = { day = -1, seconds = 0, claimed = {} },
+		spin = { nextFreeAt = 0, spins = 0, total = 0 },
 	}
 end
 
@@ -154,6 +161,15 @@ function DataSchema.migrate(raw: { [string]: any }): { [string]: any }
 			raw.quests = { day = -1, list = {}, bonusClaimed = false }
 		end
 		version = 3
+	end
+	if version < 4 then -- v4: playtime gifts and the Lucky Spin (everyone starts with the free spin ready)
+		if type(raw.gifts) ~= "table" then
+			raw.gifts = { day = -1, seconds = 0, claimed = {} }
+		end
+		if type(raw.spin) ~= "table" then
+			raw.spin = { nextFreeAt = 0, spins = 0, total = 0 }
+		end
+		version = 4
 	end
 	raw.version = version
 	return raw
@@ -426,6 +442,33 @@ function DataSchema.sanitise(
 		bonusClaimed = rawQuests.bonusClaimed == true,
 	}
 
+	-- Playtime gifts: a day's seconds can't exceed a day; claimed indices are unique and in range.
+	local rawGifts = if type(raw.gifts) == "table" then raw.gifts else {}
+	local claimedGifts: { number } = {}
+	if type(rawGifts.claimed) == "table" then
+		local seen: { [number]: boolean } = {}
+		for _, index in rawGifts.claimed do
+			local value = finite(index, 0)
+			if value >= 1 and value <= MAX_GIFTS and value % 1 == 0 and not seen[value] then
+				seen[value] = true
+				table.insert(claimedGifts, value)
+			else
+				fix("gift claim out of range or repeated")
+			end
+		end
+	end
+	local gifts: GiftState = {
+		day = math.max(-1, math.floor(finite(rawGifts.day, -1))),
+		seconds = math.clamp(finite(rawGifts.seconds, 0), 0, SECONDS_PER_DAY),
+		claimed = claimedGifts,
+	}
+	local rawSpin = if type(raw.spin) == "table" then raw.spin else {}
+	local spin: SpinState = {
+		nextFreeAt = math.max(0, finite(rawSpin.nextFreeAt, 0)),
+		spins = wholeInRange(rawSpin.spins, 0, MAX_BANKED_SPINS, 0),
+		total = math.max(0, math.floor(finite(rawSpin.total, 0))),
+	}
+
 	local data: PlayerData = {
 		version = SCHEMA_VERSION,
 		cash = math.max(0, cash),
@@ -453,6 +496,8 @@ function DataSchema.sanitise(
 		lastSeen = finite(raw.lastSeen, 0),
 		snackdex = snackdex,
 		quests = quests,
+		gifts = gifts,
+		spin = spin,
 	}
 	return data, fixes
 end
