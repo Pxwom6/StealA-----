@@ -50,6 +50,7 @@ Catalog.MUTATION_MATERIALS = {
 	"Limestone",
 	"Basalt",
 	"Salt",
+	"Grass",
 }
 
 -- Particle presets a mutation look may add around the body (MutationLook.particles; built by CreatureVisuals).
@@ -65,6 +66,12 @@ Catalog.MUTATION_PARTICLES = {
 	"sparks",
 	"stars",
 	"ooze",
+	"petals",
+	"glitter",
+	"pollen",
+	"glitch",
+	"feathers",
+	"biolume",
 }
 
 local HEX_PATTERN = "^#%x%x%x%x%x%x$"

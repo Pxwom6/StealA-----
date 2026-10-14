@@ -209,6 +209,7 @@ export type MutationLook = {
 	rainbow: boolean?, -- hue-cycling colours (animated on the client) and rainbow particles
 	glow: string?, -- "#RRGGBB": a soft point light in this colour (ghostly / glowing looks)
 	particles: string?, -- a particle preset around the body (Logic/Catalog.MUTATION_PARTICLES: "snow", "embers"...)
+	halo: boolean?, -- a glowing golden ring floating above the head
 }
 
 export type MutationDef = {
@@ -414,6 +415,18 @@ export type FloraKind =
 	| "crystal"
 	| "mushroom"
 	| "bush"
+	| "blossomTree"
+	| "bamboo"
+	| "alienPlant"
+	| "moonRock"
+	| "jungleTree"
+	| "fern"
+	| "planterTree"
+	| "streetLamp"
+	| "cloudTree"
+	| "cloudPillar"
+	| "coral"
+	| "kelp"
 
 -- Big props on Config/Scenery.landmarkSpots, outside the boundary wall (decoration only). Floating kinds (balloons,
 -- clouds, lanterns) hang in the sky above their spot.
@@ -435,6 +448,19 @@ export type LandmarkKind =
 	| "beachUmbrella"
 	| "barn"
 	| "hayBales"
+	| "torii"
+	| "pagoda"
+	| "rocket"
+	| "planet"
+	| "satelliteDish"
+	| "temple"
+	| "giantFlower"
+	| "skyscraper"
+	| "neonSign"
+	| "floatingIsland"
+	| "skyCastle"
+	| "shipwreck"
+	| "giantClam"
 
 -- Particles drifting around each player's camera (client, WeatherController; off with Reduce effects).
 export type WeatherKind =
@@ -448,6 +474,10 @@ export type WeatherKind =
 	| "petals"
 	| "rain"
 	| "spores"
+	| "stardust"
+	| "pollen"
+	| "feathers"
+	| "bubbles"
 
 export type MapThemeDef = {
 	displayName: string,

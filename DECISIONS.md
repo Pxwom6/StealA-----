@@ -660,3 +660,24 @@ ten knobs on systems that already exist, each bounded and visible.
 two optional fields on mutations and three on modifiers.
 **Reversal cost:** low — set a mutation's `chance` tiny or give it a gate that never opens (never remove a shipped
 id); give a weather modifier `weight = 0` to keep it for `/mod` only.
+
+### 32. Six more maps, built from the same pieces
+
+* **What:** Cherry Blossom Garden (blossom trees, bamboo, torii gates, pagodas, petals), Cookie Moon (a cookie-dough
+  moon with chocolate-chip boulders, glowing alien plants, rockets, radar dishes, ringed planets in a starry sky, a
+  lake of milk), Mango Rainforest (rainforest giants, ferns, stepped temples, giant flowers, golden pollen), Neon Noodle
+  City (planters with neon rims, street lamps, skyscrapers, a noodle-bar sign, rain at night), Cloud Nine (cloud trees,
+  marble columns, sky castles and floating islands, drifting feathers) and Sushi Reef (coral, kelp, shipwrecks, giant
+  clams with glowing pearls, rising bubbles). Each has its own signature mutation: Blossom, Lunar, Mossy, Cyber,
+  Angelic (with a halo) and Abyssal. Fourteen maps in all.
+* **Nothing new to play around:** they are only palettes, lighting, materials, 12 flora kinds and 13 landmark kinds
+  (ThemeProps), 4 weather kinds and 6 mutation particle presets. Flora stays inside the footprint of the tree it
+  replaces and every kind builds exactly the parts MapThemeRules counts (the smoke test builds all fourteen maps), so
+  the part budget and the gameplay geometry checks hold on every map.
+* **Checked by eye offline:** every new map and landmark was rendered from the worldsim export before shipping;
+  Studio still has the final say on materials and lighting.
+
+**Why:** "a ton of extra maps" — and with a 20-minute rotation and three on each ballot, fourteen maps means a server
+rarely sees the same one twice in an evening.
+**Reversal cost:** none — a map with `weight = 0` never comes up on its own (its mutation then can't roll either, so
+keep its id in the config).

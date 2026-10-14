@@ -127,9 +127,10 @@ change:
 
 ### Map themes
 
-The same bases and belt in eight worlds (`src/shared/Config/MapThemes.luau`): Sunny Meadow, Candy Kingdom, Frosty
-Peaks, Nacho Dunes, Hot Sauce Volcano, Midnight Market, Coconut Cove and Apple Pie Orchard. A server starts on a random
-one and changes every 20 minutes after a 40-second vote in the HUD. Each map sets scenery colours, materials, lighting,
+The same bases and belt in fourteen worlds (`src/shared/Config/MapThemes.luau`): Sunny Meadow, Candy Kingdom, Frosty
+Peaks, Nacho Dunes, Hot Sauce Volcano, Midnight Market, Coconut Cove, Apple Pie Orchard, Cherry Blossom Garden, Cookie
+Moon, Mango Rainforest, Neon Noodle City, Cloud Nine and Sushi Reef. A server starts on a random one and changes every
+20 minutes after a 40-second vote in the HUD. Each map sets scenery colours, materials, lighting,
 what grows on the tree spots, ten landmarks outside the wall and the weather; gameplay positions never change.
 
 * **Stay on one map:** `rotation.enabled = false` (and `firstMap = "meadow"` for the original look).
@@ -139,7 +140,9 @@ what grows on the tree spots, ten landmarks outside the wall and the weather; ga
   `src/server/Services/ThemeProps.luau` and counted in `src/shared/Logic/MapThemeRules.luau`. Every map needs a
   signature mutation too (CI checks): add one to `src/shared/Config/Mutations.luau` with `mapTheme = "<id>"`.
 * **Signature mutations:** each map has one that only rolls while it is up (Honey, Sprinkled, Frozen, Fossil,
-  Molten, Moonlit, Pearl, Candy Apple), named on its vote button and title card.
+  Molten, Moonlit, Pearl, Candy Apple, Blossom, Lunar, Mossy, Cyber, Angelic with its halo, Abyssal), named on its
+  vote button and title card.
+* **Preview offline:** `lune run tools/worldsim/export.luau <id> out.json` writes any map as JSON for a 3D preview.
 
 ### Server modifiers
 
