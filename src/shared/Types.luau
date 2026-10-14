@@ -456,6 +456,10 @@ export type FloraKind =
 	| "balloonBunch"
 	| "oliveTree"
 	| "cypress"
+	| "rockCandyStick"
+	| "lemonTree"
+	| "gumTree"
+	| "bubblePlant"
 
 -- Big props on Config/Scenery.landmarkSpots, outside the boundary wall (decoration only). Floating kinds (balloons,
 -- clouds, lanterns) hang in the sky above their spot.
@@ -495,6 +499,11 @@ export type LandmarkKind =
 	| "circusTent"
 	| "leaningTower"
 	| "pizzaOven"
+	| "geode"
+	| "lemonadeStand"
+	| "giantLemonSlice"
+	| "stiltHouse"
+	| "giantBubble"
 
 -- Particles drifting around each player's camera (client, WeatherController; off with Reduce effects).
 export type WeatherKind =
@@ -514,6 +523,7 @@ export type WeatherKind =
 	| "bubbles"
 	| "shavings"
 	| "confetti"
+	| "fizz"
 
 export type MapThemeDef = {
 	displayName: string,

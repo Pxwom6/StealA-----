@@ -1066,6 +1066,143 @@ local flora: { [string]: FloraBuilder } = {
 		})
 		sphereMesh(tip)
 	end,
+	-- A wooden stick crusted with chunks of rock candy in three colours.
+	rockCandyStick = function(base: CFrame, s: number, random: Random, spot: Spot, parent: Instance, kit: Kit)
+		core(spot, kit)({
+			Name = "Stick",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(7 * s, 0.5 * s),
+			CFrame = base * CFrame.new(0, 3.5 * s, 0) * UPRIGHT,
+			Color = world("candyStickWood"),
+			Material = Enum.Material.Wood,
+			Parent = parent,
+		})
+		local first = random:NextInteger(0, 2)
+		for i, chunk in
+			{
+				{ size = Vector3.new(2.4, 2.8, 2.4), y = 6.6, turn = 0.4 },
+				{ size = Vector3.new(2, 2.4, 2), y = 8.6, turn = 1.3 },
+				{ size = Vector3.new(1.8, 2.2, 1.8), y = 4.9, turn = 2.2 },
+			}
+		do
+			local crystal = kit.decor({
+				Name = "RockCandy",
+				Size = chunk.size * s,
+				CFrame = base
+					* CFrame.new(0, chunk.y * s, 0)
+					* CFrame.Angles(random:NextNumber(-0.3, 0.3), chunk.turn, random:NextNumber(0.5, 0.9)),
+				Color = world(`rockCandy{(first + i) % 3 + 1}`),
+				Material = Enum.Material.Glass,
+				Transparency = 0.2,
+				Parent = parent,
+			})
+			crystal.Reflectance = 0.15
+		end
+	end,
+
+	-- A lemon tree: a round canopy dotted with lemons.
+	lemonTree = function(base: CFrame, s: number, random: Random, spot: Spot, parent: Instance, kit: Kit)
+		core(spot, kit)({
+			Name = "Trunk",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(5.4 * s, 1.1 * s),
+			CFrame = base * CFrame.new(0, 2.7 * s, 0) * UPRIGHT,
+			Color = world("treeTrunk"),
+			Material = Enum.Material.Wood,
+			Parent = parent,
+		})
+		local canopy = kit.decor({
+			Name = "Leaves",
+			Size = Vector3.new(6.6, 5.4, 6.6) * s,
+			CFrame = base * CFrame.new(0, 8 * s, 0),
+			Color = world("lemonLeaf"),
+			Parent = parent,
+		})
+		sphereMesh(canopy)
+		local top = kit.decor({
+			Name = "Leaves",
+			Size = Vector3.new(4.4, 3.6, 4.4) * s,
+			CFrame = base * CFrame.new(1 * s, 10.2 * s, -0.6 * s),
+			Color = world("lemonLeaf"):Lerp(Color3.new(0, 0, 0), 0.12),
+			Parent = parent,
+		})
+		sphereMesh(top)
+		local turn = random:NextNumber(0, math.pi * 2)
+		for i = 0, 2 do
+			local yaw = turn + i * 2.1
+			local lemon = kit.decor({
+				Name = "Lemon",
+				Size = Vector3.new(1.2, 1.5, 1.2) * s,
+				CFrame = base
+					* CFrame.new(math.cos(yaw) * 3.4 * s, (6.8 + i * 0.8) * s, math.sin(yaw) * 3.4 * s)
+					* CFrame.Angles(0, yaw, 0.3),
+				Color = world("lemon"),
+				Parent = parent,
+			})
+			sphereMesh(lemon)
+		end
+	end,
+
+	-- A swamp tree with pink bubblegum moss hanging from its branches.
+	gumTree = function(base: CFrame, s: number, random: Random, spot: Spot, parent: Instance, kit: Kit)
+		core(spot, kit)({
+			Name = "Trunk",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(6.6 * s, 1.3 * s),
+			CFrame = base * CFrame.new(0, 3.3 * s, 0) * UPRIGHT,
+			Color = world("swampTrunk"),
+			Material = Enum.Material.Wood,
+			Parent = parent,
+		})
+		local canopy = kit.decor({
+			Name = "Leaves",
+			Size = Vector3.new(7.6, 3.4, 7.6) * s,
+			CFrame = base * CFrame.new(0, 8.2 * s, 0),
+			Color = world("swampLeaf"),
+			Parent = parent,
+		})
+		sphereMesh(canopy)
+		local turn = random:NextNumber(0, math.pi * 2)
+		for i = 0, 1 do
+			local yaw = turn + i * math.pi
+			local moss = kit.decor({
+				Name = "Moss",
+				Size = Vector3.new(1.4, 4.6, 1.1) * s,
+				CFrame = base * CFrame.new(math.cos(yaw) * 2.6 * s, 5.8 * s, math.sin(yaw) * 2.6 * s),
+				Color = if i == 0 then world("gumPink") else world("gumPinkLight"),
+				Material = Enum.Material.Fabric,
+				Parent = parent,
+			})
+			sphereMesh(moss)
+		end
+	end,
+
+	-- A stalk blowing three glossy bubblegum bubbles.
+	bubblePlant = function(base: CFrame, s: number, random: Random, spot: Spot, parent: Instance, kit: Kit)
+		core(spot, kit)({
+			Name = "Stalk",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(5 * s, 0.6 * s),
+			CFrame = base * CFrame.new(0, 2.5 * s, 0) * UPRIGHT,
+			Color = world("swampLeaf"),
+			Parent = parent,
+		})
+		local turn = random:NextNumber(0, math.pi * 2)
+		for i, bubble in { { d = 3.6, r = 0, y = 6.6 }, { d = 2.4, r = 1.5, y = 8.6 }, { d = 1.7, r = 1.2, y = 5.3 } } do
+			local yaw = turn + i * 2.3
+			local part = kit.decor({
+				Name = "Bubble",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.one * bubble.d * s,
+				CFrame = base * CFrame.new(math.cos(yaw) * bubble.r * s, bubble.y * s, math.sin(yaw) * bubble.r * s),
+				Color = if i == 2 then world("gumPinkLight") else world("gumPink"),
+				Material = Enum.Material.Glass,
+				Transparency = 0.25,
+				Parent = parent,
+			})
+			part.Reflectance = 0.2
+		end
+	end,
 }
 
 -- Builds one flora prop on a tree spot. `kind` must be a FloraKind.
@@ -2636,6 +2773,232 @@ local landmarks: { [string]: LandmarkBuilder } = {
 			CFrame = base * CFrame.new(3.2 * s, 12.5 * s, 2.5 * s) * UPRIGHT,
 			Color = world("ovenDome"),
 			Material = Enum.Material.Brick,
+			Parent = parent,
+		})
+	end,
+	-- A giant geode split open towards the map, glowing crystals inside.
+	geode = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad(spot.index * 13 - 20), 0)
+		local rock = kit.decor({
+			Name = "Rock",
+			Size = Vector3.new(30, 24, 26) * s,
+			CFrame = frame * CFrame.new(0, 9 * s, 2 * s),
+			Color = world("geodeRock"),
+			Material = Enum.Material.Slate,
+			Parent = parent,
+		})
+		sphereMesh(rock)
+		local inside = kit.decor({
+			Name = "Hollow",
+			Size = Vector3.new(22, 17, 8) * s,
+			CFrame = frame * CFrame.new(0, 10 * s, -9.6 * s),
+			Color = world("geodeInner"),
+			Material = Enum.Material.Glass,
+			Parent = parent,
+		})
+		sphereMesh(inside)
+		for i, shard in
+			{
+				{ at = Vector3.new(-5, 8, -12), size = Vector3.new(3, 8, 3), roll = -20 },
+				{ at = Vector3.new(0, 12, -12.5), size = Vector3.new(3.4, 10, 3.4), roll = 5 },
+				{ at = Vector3.new(5, 8.5, -12), size = Vector3.new(2.8, 7, 2.8), roll = 24 },
+				{ at = Vector3.new(-2.5, 4.6, -12.4), size = Vector3.new(2.4, 5, 2.4), roll = -40 },
+				{ at = Vector3.new(3, 14.6, -11.8), size = Vector3.new(2.2, 5, 2.2), roll = 150 },
+			}
+		do
+			local crystal = kit.decor({
+				Name = "Crystal",
+				Size = shard.size * s,
+				CFrame = frame
+					* CFrame.new(shard.at * s)
+					* CFrame.Angles(math.rad(-30), math.rad(45), math.rad(shard.roll)),
+				Color = world(`rockCandy{i % 3 + 1}`),
+				Material = Enum.Material.Neon,
+				Transparency = 0.15,
+				Parent = parent,
+			})
+			if i == 2 then
+				light(crystal, world("geodeInner"), 30, 1.4)
+			end
+		end
+	end,
+
+	-- A lemonade stand under a striped awning, a giant jug on its counter.
+	lemonadeStand = function(base: CFrame, size: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local s = size * 1.5
+		local frame = base * CFrame.Angles(0, math.rad(spot.index * 11 - 15), 0)
+		kit.decor({
+			Name = "Counter",
+			Size = Vector3.new(16, 6, 7) * s,
+			CFrame = frame * CFrame.new(0, 3 * s, 0),
+			Color = world("standWood"),
+			Material = Enum.Material.WoodPlanks,
+			Parent = parent,
+		})
+		for _, side in { -1, 1 } do
+			kit.decor({
+				Name = "Post",
+				Shape = Enum.PartType.Cylinder,
+				Size = cylinderSize(8 * s, 0.7 * s),
+				CFrame = frame * CFrame.new(side * 7.4 * s, 10 * s, 2.6 * s) * UPRIGHT,
+				Color = world("awning2"),
+				Parent = parent,
+			})
+		end
+		for i = 0, 3 do
+			kit.decor({
+				Name = "Awning",
+				Size = Vector3.new(4.2, 0.4, 9) * s,
+				CFrame = frame
+					* CFrame.new((-6.3 + i * 4.2) * s, 13.6 * s, -0.4 * s)
+					* CFrame.Angles(math.rad(-18), 0, 0),
+				Color = if i % 2 == 0 then world("awning1") else world("awning2"),
+				Material = Enum.Material.Fabric,
+				Parent = parent,
+			})
+		end
+		kit.decor({
+			Name = "Jug",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(4.4 * s, 3.4 * s),
+			CFrame = frame * CFrame.new(-3.4 * s, 8.2 * s, 0) * UPRIGHT,
+			Color = world("lemonade"),
+			Material = Enum.Material.Glass,
+			Transparency = 0.2,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Lemon",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 2 * s,
+			CFrame = frame * CFrame.new(2.6 * s, 7 * s, -0.6 * s),
+			Color = world("lemon"),
+			Parent = parent,
+		})
+	end,
+
+	-- A giant lemon slice standing on its rind, leaning back.
+	giantLemonSlice = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base
+			* CFrame.new(0, 12 * s, 0)
+			* CFrame.Angles(0, math.rad(spot.index * 23 - 40), 0)
+			* CFrame.Angles(math.rad(-14), 0, 0)
+		-- the slice's faces look along its front (-Z): a cylinder along Z
+		local flat = CFrame.Angles(0, math.rad(90), 0)
+		for _, layer in
+			{
+				{ name = "Rind", d = 30, h = 3, color = "lemonRind" },
+				{ name = "Pith", d = 28, h = 3.3, color = "lemonPith" },
+				{ name = "Flesh", d = 25.5, h = 3.6, color = "lemonFlesh" },
+			}
+		do
+			kit.decor({
+				Name = layer.name,
+				Shape = Enum.PartType.Cylinder,
+				Size = cylinderSize(layer.h * s, layer.d * s),
+				CFrame = frame * flat,
+				Color = world(layer.color),
+				Parent = parent,
+			})
+		end
+		for i = 0, 3 do
+			kit.decor({
+				Name = "Segment",
+				Size = Vector3.new(0.6 * s, 25 * s, 3.8 * s),
+				CFrame = frame * CFrame.Angles(0, 0, i * math.pi / 4),
+				Color = world("lemonPith"),
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- A bayou shack on stilts, its window lit.
+	stiltHouse = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad(spot.index * 17 - 25), 0)
+		for _, corner in { { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } } do
+			kit.decor({
+				Name = "Stilt",
+				Shape = Enum.PartType.Cylinder,
+				Size = cylinderSize(9 * s, 1.2 * s),
+				CFrame = frame * CFrame.new(corner[1] * 9 * s, 4.5 * s, corner[2] * 7 * s) * UPRIGHT,
+				Color = world("swampTrunk"),
+				Material = Enum.Material.Wood,
+				Parent = parent,
+			})
+		end
+		kit.decor({
+			Name = "Deck",
+			Size = Vector3.new(22, 1, 18) * s,
+			CFrame = frame * CFrame.new(0, 9.5 * s, 0),
+			Color = world("shackWood"),
+			Material = Enum.Material.WoodPlanks,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Shack",
+			Size = Vector3.new(15, 9, 11) * s,
+			CFrame = frame * CFrame.new(0, 14.5 * s, 1.5 * s),
+			Color = world("shackWood"),
+			Material = Enum.Material.WoodPlanks,
+			Parent = parent,
+		})
+		for _, side in { -1, 1 } do
+			kit.wedge({
+				Name = "Roof",
+				Size = Vector3.new(17, 5, 6.5) * s,
+				-- the tall face of each half meets the other at the ridge
+				CFrame = frame
+					* CFrame.new(0, 21.5 * s, (1.5 + side * 3.25) * s)
+					* CFrame.Angles(0, if side == 1 then math.pi else 0, 0),
+				Color = world("shackRoof"),
+				Material = Enum.Material.WoodPlanks,
+				Parent = parent,
+			})
+		end
+		kit.decor({
+			Name = "Door",
+			Size = Vector3.new(3.4, 6, 0.6) * s,
+			CFrame = frame * CFrame.new(-3.5 * s, 13 * s, -4.1 * s),
+			Color = world("swampTrunk"),
+			Parent = parent,
+		})
+		local window = kit.decor({
+			Name = "Window",
+			Size = Vector3.new(3.4, 3, 0.5) * s,
+			CFrame = frame * CFrame.new(3.6 * s, 15 * s, -4.1 * s),
+			Color = world("shackWindow"),
+			Material = Enum.Material.Neon,
+			CastShadow = false,
+			Parent = parent,
+		})
+		light(window, world("shackWindow"), 18, 1.2)
+	end,
+
+	-- A huge bubblegum bubble floating above the swamp, with a shine.
+	giantBubble = function(_base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local diameter = (20 + (spot.index % 3) * 5) * s
+		local centre = CFrame.new(spot.x, spot.y + (26 + (spot.index % 2) * 14) * s, spot.z)
+		local bubble = kit.decor({
+			Name = "Bubble",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * diameter,
+			CFrame = centre,
+			Color = world("gumPink"),
+			Material = Enum.Material.Glass,
+			Transparency = 0.3,
+			CastShadow = false,
+			Parent = parent,
+		})
+		bubble.Reflectance = 0.2
+		kit.decor({
+			Name = "Shine",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * diameter * 0.18,
+			CFrame = centre * CFrame.new(-diameter * 0.22, diameter * 0.26, -diameter * 0.22),
+			Color = Color3.new(1, 1, 1),
+			Material = Enum.Material.Neon,
+			Transparency = 0.2,
+			CastShadow = false,
 			Parent = parent,
 		})
 	end,

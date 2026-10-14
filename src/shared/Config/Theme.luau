@@ -246,6 +246,31 @@ local Theme = {
 		ovenBase = "#C8B898",
 		ovenDome = "#C0603E",
 		ovenFire = "#FF8A2A",
+		-- Rock Candy Caverns
+		rockCandy1 = "#FF8FE0",
+		rockCandy2 = "#8FD8FF",
+		rockCandy3 = "#C88BFF",
+		candyStickWood = "#C8A070",
+		geodeRock = "#5A4E66",
+		geodeInner = "#B87AFF",
+		-- Lemonade Lagoon
+		lemon = "#FFE14D",
+		lemonRind = "#FFC83D",
+		lemonPith = "#FFF8E0",
+		lemonFlesh = "#FFEB80",
+		lemonLeaf = "#4FA84A",
+		standWood = "#C8A06A",
+		awning1 = "#FFD23F",
+		awning2 = "#FFFFFF",
+		lemonade = "#FFE97A",
+		-- Bubblegum Bayou
+		gumPink = "#FF7FC0",
+		gumPinkLight = "#FFB0DC",
+		swampTrunk = "#4A3A30",
+		swampLeaf = "#4A6A3A",
+		shackWood = "#8A6A4A",
+		shackRoof = "#5A4A6A",
+		shackWindow = "#FFD27A",
 	},
 
 	-- One colour per plot (index = plot number).

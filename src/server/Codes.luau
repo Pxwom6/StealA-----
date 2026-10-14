@@ -19,6 +19,8 @@ local Codes = {
 	SNACKTIME = { reward = { kind = "creature", creatureId = "pizza_pup", variant = "golden" } },
 	FOURTEENMAPS = { reward = { kind = "cash", incomeSeconds = 180, minimum = 1000 } },
 	STORMCHASER = { reward = { kind = "creature", creatureId = "pretzel_pal", variant = "electric" } },
+	-- Twenty maps: a Gummy Grub with Bubblegum Bayou's signature mutation.
+	TWENTYMAPS = { reward = { kind = "creature", creatureId = "gummy_grub", variant = "bubblegum" } },
 	-- Halloween 2026: a Haunted Candy Corn Cat until the event ends.
 	SPOOKY26 = {
 		reward = { kind = "creature", creatureId = "candy_corn_cat", variant = "haunted" },

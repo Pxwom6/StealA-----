@@ -129,6 +129,9 @@ local RELEASED_MUTATION_IDS = {
 	"fudge",
 	"balloon",
 	"cheesy",
+	"amethyst",
+	"zesty",
+	"bubblegum",
 }
 
 T.describe("Config integrity", function()

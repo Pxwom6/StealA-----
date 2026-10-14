@@ -76,6 +76,8 @@ Catalog.MUTATION_PARTICLES = {
 	"chocolate",
 	"confetti",
 	"cheese",
+	"fizz",
+	"gumBubbles",
 }
 
 local HEX_PATTERN = "^#%x%x%x%x%x%x$"

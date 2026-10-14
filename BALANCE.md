@@ -185,6 +185,9 @@ the store stay exact. Golden Hour (a server modifier) is the only thing that mul
 | Fudge | on Cocoa Canyon | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
 | Balloon | on Cotton Candy Carnival | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
 | Cheesy | on Pizza Piazza | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Amethyst | on Rock Candy Caverns | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Zesty | on Lemonade Lagoon | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Bubblegum | on Bubblegum Bayou | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
 
 "Per server-hour" is while the mutation can roll. Any mutation on an ordinary spawn (the map's signature included,
 no modifier): 5.15% of spawns (74.2 per server-hour). Expected value of one spawn: income x1.0885, price x1.0435.
@@ -202,7 +205,7 @@ no modifier): 5.15% of spawns (74.2 per server-hour). Expected value of one spaw
 * **Map signatures** (`mapTheme`): each map has exactly one, only while it is up — about 6 in a 20-minute map. At
   x3 they sit between Golden and Diamond (rarer than Golden, weaker than Diamond; CI checks both), so a map is worth
   voting for (the vote buttons and the title card name its mutation) without making the permanent ones pointless.
-  Collectors chase all seventeen through the Snackdex, which shows a pip for each one owned.
+  Collectors chase all twenty through the Snackdex, which shows a pip for each one owned.
 * **Weather mutations** (`modifierId`): only while their weather modifier runs (5 minutes, a few times a day per
   server), about 2–3 per storm, each announced to the whole server so everyone races to the belt. x4 like Diamond.
 * **Event-only mutations** (with an `eventId`) roll only while that LiveOps event runs.
