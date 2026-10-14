@@ -575,6 +575,16 @@ local Theme = {
 		runawayCaught = "🏃 {player} caught a runaway {rarity} {creature}!",
 		runawayReward = "🏃 You caught {creature}! It's in your base.",
 		runawayRewardFull = "🏃 Base full: {creature} sold for you. +{cash}",
+		-- Snack Attack (Config/Boss): a giant Snackling over the belt
+		bossName = "Giant {creature}",
+		bossHint = "Tap to hit!",
+		bossAppeared = "👾 A giant {creature} is raiding the belt! Tap it together to take it down!",
+		bossDefeated = "👾 The giant {creature} is down! {player} hit hardest and won a {rarity} {prize}!",
+		bossDown = "👾 The giant {creature} is down!",
+		bossEscaped = "👾 The giant {creature} got away...",
+		bossReward = "👾 You helped take it down: +{cash}",
+		bossPrize = "👾 Top hitter! {creature} is yours!",
+		bossPrizeFull = "👾 Top hitter! Base full: {creature} sold for you. +{cash}",
 
 		-- Map themes (Config/MapThemes): the vote for the next map and the change itself
 		mapVoteTitle = "Vote for the next map! {time}",

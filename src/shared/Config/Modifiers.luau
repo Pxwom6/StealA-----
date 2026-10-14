@@ -16,7 +16,8 @@
 	shooting stars or the shimmering curtains of an aurora.
 
 	Drop modifiers (Supply Drop, Coin Rain, Great Escape) put crates, coins or runaway Snacklings on the walkways while
-	they run (`drops`; what they hold is in Config/Drops).
+	they run (`drops`; what they hold is in Config/Drops). Snack Attack sends giant Snacklings over the belt for
+	everyone to tap together (`drops.kind = "boss"`, Config/Boss).
 
 	Commands: /mod <id> [minutes], /mod off, /mod list (anyone in Studio; admins in live servers, that server only).
 	Balance notes: BALANCE.md "Server modifiers".
@@ -258,6 +259,15 @@ local Modifiers: ModifiersConfig = {
 			effects = {},
 			drops = { kind = "runaway", firstSeconds = 6, everySeconds = 50 }, -- 6 runaways
 		},
+		snackAttack = {
+			displayName = "Snack Attack",
+			icon = "👾",
+			description = "Giant Snacklings raid the belt! Tap them together!",
+			color = "#FF5C5C",
+			weight = 1,
+			effects = {},
+			drops = { kind = "boss", firstSeconds = 8, everySeconds = 100 }, -- 3 giants (Config/Boss)
+		},
 	},
 
 	order = {
@@ -280,6 +290,7 @@ local Modifiers: ModifiersConfig = {
 		"supplyDrop",
 		"coinRain",
 		"greatEscape",
+		"snackAttack",
 	},
 
 	schedule = {

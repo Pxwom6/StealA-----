@@ -403,18 +403,19 @@ ValentineLuck2027 "Valentine's luck"`.
 ## Server modifiers
 
 A modifier runs for 5 minutes, then the server waits 4-8 minutes (6 on average) before the next one
-(`Config/Modifiers.luau` `schedule`), so one is running about **45% of the time**. Nineteen modifiers share the picks
-by weight (seventeen at 1, Snack Party at 0.5, Jackpot at 0.35), never the same twice in a row: each regular one runs
-about **1.5 minutes per server-hour**, Snack Party about 0.8 and Jackpot about 0.5. A player in a 30-minute session
-sees about three: a weather one more often than not, a drop one (crates, coins or runaways) about two times in five.
+(`Config/Modifiers.luau` `schedule`), so one is running about **45% of the time**. Twenty modifiers share the picks
+by weight (eighteen at 1, Snack Party at 0.5, Jackpot at 0.35), never the same twice in a row: each regular one runs
+about **1.45 minutes per server-hour**, Snack Party about 0.7 and Jackpot about 0.5. A player in a 30-minute session
+sees about three: a weather one more often than not, a drop one (crates, coins, runaways or a Snack Attack) about
+half the time.
 
 | Modifier | Effect while it runs | Effect over a server-hour |
 | --- | --- | --- |
 | Rush Hour | belt spawns every 1.25 s instead of 2.5 (the belt holds 32 instead of 16) | about +3% Snacklings on the belt (with Snack Party) |
 | Clearance Sale | belt prices x0.7 (rounded to whole cash, at least 1) | about 1% off what an always-buying player spends |
 | Golden Hour | every mutation chance x3 (5.15% → 15.5% of spawns; 7.15% → 21.5% while Halloween runs) | about +5% mutations |
-| Lucky Breeze | 2x luck (a LiveOps boost: shows in the luck pill, capped with everything else at 6x) | rare odds doubled ~3.8% of the time (with Snack Party) |
-| Cash Splash | income x1.5 (with LiveOps cash events, capped at 3x) | about +1.3% income; cash packs and quest rewards are not inflated (they use the steady income) |
+| Lucky Breeze | 2x luck (a LiveOps boost: shows in the luck pill, capped with everything else at 6x) | rare odds doubled ~3.6% of the time (with Snack Party) |
+| Cash Splash | income x1.5 (with LiveOps cash events, capped at 3x) | about +1.2% income; cash packs and quest rewards are not inflated (they use the steady income) |
 | Sugar Rush | everyone walks (and carries) 25% faster | – |
 | Quick Hands | the steal hold is 0.75 s instead of 1.5 | – |
 | Fortress | locks started while it runs last 1.5x (the open window grows with them: at least half the lock) | – |
@@ -429,6 +430,7 @@ sees about three: a weather one more often than not, a drop one (crates, coins o
 | Supply Drop | 4 crates parachute onto the walkways; hold one open (2.5 s) to win it | see below |
 | Coin Rain | 8 showers of 12 coins over the walkways; walk through them | see below |
 | Great Escape | 6 Snacklings break out (one every 50 s) and run along the walkways; walk into one to catch it | see below |
+| Snack Attack | 3 giant Snacklings (one every 100 s) hover over the belt; everyone taps them down together | see below |
 
 They are spice, not an economy change: the biggest, Golden Hour, adds under a tenth to a server's mutations per hour.
 
@@ -448,8 +450,14 @@ the player's steady income:
   two an hour, and only the first player to reach each one gets it. It runs slower than players (9 studs/s wandering,
   14.5 while someone is within 40 studs; players walk at 16), so it is always catchable: in offline chases with these
   numbers one player catches it in about 15 s (mostly running to it), four in about 4 s, well inside its 45 seconds.
-* Pickups and catches are checked against the player's trusted position (no teleporting to coins or runaways) and a
-  crate's hold is re-checked like a steal's.
+* **A Snack Attack giant** (`Config/Boss.luau`) has 90 health per player in the server (at least 120) and the server
+  counts at most 5 taps a second from each player, so everyone tapping flat out takes about 18-24 seconds whatever
+  the server size; it flies off after 75 seconds. Everyone who landed 5 taps or more gets their own income x (20 s +
+  120 s x their share of the taps): four even helpers get about 50 seconds of income each, a solo takedown 140
+  seconds. The top hitter also wins a Snackling rolled like a crate's (3x luck, 2x mutation chance). A server sees
+  about one giant an hour.
+* Pickups, catches and taps are checked against the player's trusted position (no teleporting to coins, runaways or
+  the giant) and a crate's hold is re-checked like a steal's.
 The weather ones change only the sky (a lighting overlay above the map's and a seasonal theme's, the client's
 particles and sky effects) and unlock their mutation; lightning flashes are soft, at most two in a quarter second,
 and off with Reduce effects.

@@ -878,3 +878,24 @@ happens.
 **Why:** an event between Winter and the spring, with Snacklings and a mutation players can only get then.
 **Reversal cost:** none — move the dates, or drop the `Valentine2027` line from Config/Seasons to keep the
 Snacklings without the decorations. Never remove the creature or mutation ids (they are in players' saves).
+
+### 42. Snack Attack: a giant Snackling the whole server taps down together
+
+* **What:** a new modifier (`drops.kind = "boss"`, Config/Boss, BossService, BossController): three times in its 5
+  minutes a regular Legendary or Mythic Snackling, built 3.2 times its podium size, hovers over the middle of the
+  belt, where both walkways can reach it, slowly turning, with a health bar and a timer. Everyone taps it (a
+  ClickDetector, so mouse and touch both work). Taken down within 75 seconds, it pays everyone who landed 5 taps:
+  their own income x (20 s + 120 s x their share), and the top hitter wins a Snackling rolled like a crate's.
+  Announced when it arrives, when it goes down (naming the top hitter and their prize) and when it gets away.
+* **Fair at any size:** its health is 90 per player in the server when it appears (at least 120), and the server
+  counts at most 5 taps a second per player (a burst of 8), so flat out it takes 18-24 seconds with any number of
+  players and an auto-clicker gains nothing. Taps only count from within reach of its middle at a trusted position.
+* **Cheap:** the giant is one model built once; health goes out as one attribute ten times a second; the bob, turn
+  and flinch are drawn on each client.
+* **Tests:** BossRules (health, shares, pay, validation) is pure and tested; the server test sends one, checks the
+  reach and the tap limit, lets it fly off unpaid, then taps a small one (`/boss 20`) down and checks that only the
+  helper is paid.
+
+**Why:** the modifiers so far are races between players; this one has the whole server work together on something
+big in the middle of the map, which is where the steals happen.
+**Reversal cost:** none — `weight = 0` keeps it for `/mod` only.

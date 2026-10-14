@@ -65,6 +65,8 @@ local Sounds = {
 		thunder = { id = WHOOSH, volume = 0.6, pitch = 0.5 },
 		crateLand = { id = PAPER, volume = 0.5, pitch = 0.6 }, -- a supply crate thuds onto the walkway
 		crateOpen = { id = STINGER, volume = 0.55, pitch = 1.2 }, -- you opened a supply crate
+		bossHit = { id = POP, volume = 0.3, pitch = 0.75 }, -- you tapped the Snack Attack giant
+		bossDown = { id = TOY_RACE_STING, volume = 0.55 }, -- the giant is taken down
 	} :: { [string]: SoundSlot },
 	-- Played when a creature of this rarity appears on the belt near you / lands in your base.
 	rarity = {

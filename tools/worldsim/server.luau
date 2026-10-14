@@ -231,12 +231,27 @@ local function scenario()
 	check(#aliceSession.data.creatures == 2, "nobody else gets it")
 
 	-- Coins rain on the walkways; walking through one collects it
+	-- (Bob still stands on the walkway by the crate, so a coin may land on him and be collected at once.)
+	local function coinsCollected(): number
+		local count = 0
+		for _, entry in Sim.received(1002, "Effect") do
+			if type(entry[1]) == "table" and entry[1].kind == "collect" then
+				count += 1
+			end
+		end
+		return count
+	end
+	local collectedBefore = coinsCollected()
 	Sim.chat(alice, "/mod coinRain")
 	task.wait(0.4)
 	Sim.advance(Modifiers.modifiers.coinRain.drops.firstSeconds + 0.5)
 	task.wait(0.4)
 	local _, coinCount = DropService.counts()
-	check(coinCount == Drops.coins.perWave, `Coin Rain: coins fall ({coinCount})`)
+	local landedOnBob = coinsCollected() - collectedBefore
+	check(
+		coinCount + landedOnBob == Drops.coins.perWave,
+		`Coin Rain: coins fall ({coinCount}, and {landedOnBob} on Bob)`
+	)
 	local coin = nil
 	for _, child in workspace.Drops:GetChildren() do
 		if child.Name == "Coin" then
@@ -304,6 +319,57 @@ local function scenario()
 	end
 	_, _, runawayCount = DropService.counts()
 	check(runawayCount == 0, "an uncaught one gets away in the end")
+
+	-- Snack Attack: a giant Snackling over the belt; tapping it together takes it down and pays everyone who helped
+	local BossService = Sim.server("Services/BossService")
+	local Boss = Sim.shared("Config/Boss")
+	Sim.chat(alice, "/mod snackAttack")
+	task.wait(0.4)
+	Sim.advance(Modifiers.modifiers.snackAttack.drops.firstSeconds + 0.5)
+	task.wait(0.4)
+	local giant = BossService.current()
+	check(giant ~= nil, "Snack Attack: a giant Snackling appears")
+	local maxHp = giant:GetAttribute("MaxHP")
+	check(maxHp == math.max(Boss.minHp, Boss.hpPerPlayer * 2), `with health for the two players here ({maxHp})`)
+	check(giant:GetPivot().Position.Y > Gameplay.belt.surfaceY + 4, "hovering over the belt")
+	local clicker = giant:FindFirstChildOfClass("ClickDetector")
+	check(clicker ~= nil and clicker.MaxActivationDistance == Boss.reach, "anyone in reach can tap it")
+	-- Bob walks right under it; Alice stays far away at her base
+	teleport(bob, roblox.Vector3.new(6, 3, 16))
+	local bobBeforeBoss = bobSession.data.cash
+	local aliceBeforeBoss = aliceSession.data.cash
+	Sim.click(alice, clicker)
+	check(BossService.hitsBy(alice) == 0, "a tap from out of reach doesn't count")
+	for _ = 1, 40 do
+		Sim.click(bob, clicker)
+	end
+	check(
+		BossService.hitsBy(bob) <= Boss.burst + 1,
+		`taps beyond the rate limit don't count ({BossService.hitsBy(bob)})`
+	)
+	Sim.chat(alice, "/mod off")
+	task.wait(0.2)
+	for _ = 1, 4 do
+		Sim.advance(Boss.lifetimeSeconds / 4)
+		task.wait(0.15)
+	end
+	check(BossService.current() == nil, "not taken down in time, it flies off")
+	check(bobSession.data.cash == bobBeforeBoss, "and nobody is paid")
+	-- a small one (/boss 20): Bob taps at the rate the server counts until it goes down
+	Sim.chat(alice, "/boss 20")
+	task.wait(0.2)
+	giant = BossService.current()
+	clicker = if giant then giant:FindFirstChildOfClass("ClickDetector") else nil
+	check(clicker ~= nil and giant:GetAttribute("MaxHP") == 20, "/boss 20 sends a quick one")
+	local rounds = 0
+	while BossService.current() ~= nil and rounds < 60 do
+		rounds += 1
+		Sim.click(bob, clicker)
+		task.wait(1 / Boss.hitsPerSecond + 0.01)
+	end
+	check(BossService.current() == nil, `tapping it takes it down ({rounds} taps)`)
+	check(bobSession.data.cash > bobBeforeBoss, "the helper is paid")
+	check(aliceSession.data.cash == aliceBeforeBoss, "and the one who never hit it is not")
 
 	-- Northern Lights and Heatwave: their skies, and their mutations only while they run
 	for _, id in { "northernLights", "heatwave" } do

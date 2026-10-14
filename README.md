@@ -176,10 +176,12 @@ Every 4-8 minutes a server runs a 5-minute twist (`src/shared/Config/Modifiers.l
 Golden Hour, Lucky Breeze, Cash Splash, Sugar Rush, Quick Hands, Fortress, Snack Patrol, the rare Snack Party and
 Jackpot (double cash), weather (a Thunderstorm with rain, lightning and Electric Snacklings; a Meteor Shower with
 shooting stars and Galaxy Snacklings; Toxic Fog with Toxic Snacklings; Northern Lights with an aurora and Aurora
-Snacklings; a Heatwave with Toasted Snacklings) or drops (a Supply Drop of crates to race for, a Coin Rain, or a Great
-Escape: Snacklings break out of the factory and run along the walkways, and whoever catches one keeps it). Change an
-effect, a name or the schedule there (CI keeps every effect inside `limits`); `schedule.enabled = false` turns them
-off and `weight = 0` keeps one for `/mod` only. BALANCE.md "Server modifiers" has the numbers.
+Snacklings; a Heatwave with Toasted Snacklings), drops (a Supply Drop of crates to race for, a Coin Rain, or a Great
+Escape: Snacklings break out of the factory and run along the walkways, and whoever catches one keeps it) or a Snack
+Attack (giant Snacklings hover over the belt and everyone taps them down together for a share of the reward; the top
+hitter wins a Snackling). Change an effect, a name or the schedule there (CI keeps every effect inside `limits`);
+`schedule.enabled = false` turns them off and `weight = 0` keeps one for `/mod` only. BALANCE.md "Server modifiers"
+has the numbers.
 
 * **A new weather:** a modifier with `weather` (particles), `lighting` (an overlay like a seasonal one) and/or
   `skyEffect` (`lightning`, `meteors`, `aurora`), and a mutation with `modifierId = "<its id>"` (its description
@@ -189,6 +191,8 @@ off and `weight = 0` keeps one for `/mod` only. BALANCE.md "Server modifiers" ha
 * **Drops:** what crates and coins pay, how long crates take to fall and to open, where they land, and how fast and
   how cleverly a runaway runs are in `src/shared/Config/Drops.luau`; how often they come is the modifier's `drops` (CI
   checks both). In Studio, `/runaway` lets one out now and `/runaway here` right beside you.
+* **Snack Attack:** the giants' health, tap rate, reach, rewards and how long they stay are in
+  `src/shared/Config/Boss.luau` (CI checks it); `/boss` sends one in Studio (`/boss 20` for a quick one).
 
 ### First-time tutorial
 
@@ -354,6 +358,7 @@ These work in Studio only (`src/server/Services/DevCommands.luau`):
 * `/mod <id> [minutes]`, `/mod off`, `/mod list` (server modifiers, e.g. `/mod rushHour 2`, `/mod thunderstorm`,
   `/mod supplyDrop` (first crate after 10 s); admins too, that server only)
 * `/runaway` (a Snackling escapes now, as in Great Escape), `/runaway here` (right beside you, to try catching it)
+* `/boss [hp]` (a Snack Attack giant over the belt now; tap it, e.g. `/boss 20` for a quick one)
 
 To test a seasonal event in Studio: `/event Halloween2026 5` turns Halloween on for 5 minutes (decorations, dusk
 lighting, banner with countdown, event Snacklings and Haunted on the belt), and `/event off` ends it early.

@@ -10,6 +10,7 @@ local Services = script.Services
 local AchievementService = require(Services.AchievementService)
 local Analytics = require(Services.Analytics)
 local BeltService = require(Services.BeltService)
+local BossService = require(Services.BossService)
 local CodeService = require(Services.CodeService)
 local DataService = require(Services.DataService)
 local DevCommands = require(Services.DevCommands)
@@ -55,7 +56,8 @@ Replication.start()
 PositionTracker.start()
 EconomyService.start()
 BeltService.start(world.belt)
-DropService.start(world.walkwayY) -- crates and coins on the walkways while a drop modifier runs
+DropService.start(world.walkwayY) -- crates, coins and runaways on the walkways while a drop modifier runs
+BossService.start(world.walkwayY) -- Snack Attack: giant Snacklings over the belt for everyone to tap together
 LockService.start()
 StealService.start()
 RebirthService.start()

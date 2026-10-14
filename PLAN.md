@@ -345,11 +345,12 @@ whatever map is on. Studio: `/map <id>`, `/map vote`, `/map list`. Offline: `lun
 
 ## 12. Server modifiers
 
-Every 4-8 minutes a server runs one of nineteen modifiers for 5 minutes (DECISIONS.md #30, `Config/Modifiers`): Rush
+Every 4-8 minutes a server runs one of twenty modifiers for 5 minutes (DECISIONS.md #30, `Config/Modifiers`): Rush
 Hour, Clearance Sale, Golden Hour, Lucky Breeze, Cash Splash, Sugar Rush, Quick Hands, Fortress, Snack Patrol, the rare
 Snack Party and Jackpot, five weathers (Thunderstorm, Meteor Shower, Toxic Fog, Northern Lights, Heatwave) that change
-the sky and unlock a mutation (DECISIONS.md #31, #40), and three drops (Supply Drop, Coin Rain, Great Escape;
-DropService, `Config/Drops`, DECISIONS.md #33, #40). A banner announces it, a chip beside the luck chip counts it down (tap it for the description), and
+the sky and unlock a mutation (DECISIONS.md #31, #40), three drops (Supply Drop, Coin Rain, Great Escape;
+DropService, `Config/Drops`, DECISIONS.md #33, #40) and Snack Attack (giant Snacklings over the belt that everyone taps
+together; BossService, `Config/Boss`, DECISIONS.md #42). A banner announces it, a chip beside the luck chip counts it down (tap it for the description), and
 each system applies the effect where it decides (belt, economy, locks, steals, movement), the client showing the same
 prices, hold time and tag reach. Studio: `/mod <id> [minutes]`, `/mod off`, `/mod list`. Offline:
 `lune run tools/worldsim/server.luau` (CI) boots the server and plays a session that checks them.

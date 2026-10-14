@@ -19,7 +19,7 @@ type ModifierDrops = Types.ModifierDrops
 
 local DropRules = {}
 
-DropRules.KINDS = table.freeze({ crate = true, coins = true, runaway = true } :: { [string]: boolean })
+DropRules.KINDS = table.freeze({ crate = true, coins = true, runaway = true, boss = true } :: { [string]: boolean })
 
 -- A horizontal position (world X, Z).
 export type Point = { x: number, z: number }
@@ -340,7 +340,7 @@ end
 function DropRules.dropsProblems(drops: ModifierDrops, duration: number, name: string): { string }
 	local problems: { string } = {}
 	if not DropRules.KINDS[drops.kind] then
-		table.insert(problems, `{name} drops.kind {drops.kind} is not crate, coins or runaway`)
+		table.insert(problems, `{name} drops.kind {drops.kind} is not crate, coins, runaway or boss`)
 	end
 	if not (drops.firstSeconds >= 0 and drops.firstSeconds < duration) then
 		table.insert(problems, `{name} drops.firstSeconds must be at least 0 and before the modifier ends`)

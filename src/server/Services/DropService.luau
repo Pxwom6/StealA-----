@@ -519,9 +519,9 @@ local function step()
 			spawnCrate(t)
 		elseif drops.kind == "runaway" then
 			spawnRunaway(t)
-		else
+		elseif drops.kind == "coins" then
 			spawnCoins(t)
-		end
+		end -- "boss": BossService
 	end
 	for _, crate in crates do
 		if not crate.landed and t >= crate.landsAt then
