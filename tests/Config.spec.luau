@@ -132,6 +132,9 @@ local RELEASED_MUTATION_IDS = {
 	"amethyst",
 	"zesty",
 	"bubblegum",
+	-- weather modifiers added later
+	"aurora",
+	"toasted",
 }
 
 T.describe("Config integrity", function()

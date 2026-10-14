@@ -43,7 +43,7 @@ ModifierRules.EFFECT_KEYS = table.freeze({
 })
 
 -- Effects in the sky a weather modifier may use (the client builds them: WeatherController).
-ModifierRules.SKY_EFFECTS = table.freeze({ lightning = true, meteors = true } :: { [string]: boolean })
+ModifierRules.SKY_EFFECTS = table.freeze({ lightning = true, meteors = true, aurora = true } :: { [string]: boolean })
 
 local HEX_PATTERN = "^#%x%x%x%x%x%x$"
 

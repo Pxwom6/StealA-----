@@ -256,6 +256,68 @@ local function scenario()
 	_, coinsLeft = DropService.counts()
 	check(coinsLeft == 0, "uncollected coins disappear")
 
+	-- Great Escape: a Snackling escapes far from everyone and runs; walking into one catches it
+	Sim.chat(alice, "/mod greatEscape")
+	task.wait(0.4)
+	Sim.advance(Modifiers.modifiers.greatEscape.drops.firstSeconds + 0.5)
+	task.wait(0.4)
+	local _, _, runawayCount = DropService.counts()
+	check(runawayCount == 1, "Great Escape: a Snackling escapes")
+	local runner = nil
+	for _, child in workspace.Drops:GetChildren() do
+		if child:GetAttribute("RunawayId") ~= nil then
+			runner = child
+		end
+	end
+	check(runner ~= nil and type(runner:GetAttribute("Leg")) == "string", "its run is published as one attribute")
+	local startedAt = DropService.runawayPosition(runner)
+	local nearestPlayer = math.huge
+	for _, player in { alice, bob } do
+		local root = (player.Character :: any).HumanoidRootPart
+		local offset = root.Position - startedAt
+		nearestPlayer = math.min(nearestPlayer, roblox.Vector3.new(offset.X, 0, offset.Z).Magnitude)
+	end
+	check(nearestPlayer > 25, `it appears far from everyone ({math.floor(nearestPlayer)} studs)`)
+	for _ = 1, 12 do
+		Sim.advance(0.5)
+		task.wait(0.12)
+	end
+	local nowAt = DropService.runawayPosition(runner)
+	check(nowAt ~= nil and (nowAt - startedAt).Magnitude > 2, "it runs off")
+	check(math.abs(nowAt.X) <= Drops.area.maxX + 1e-6, "and stays along the walkways")
+	local bobRoot = (bob.Character :: any).HumanoidRootPart
+	local bobBefore = #bobSession.data.creatures
+	local bobCashBefore = bobSession.data.cash
+	DropService.releaseRunaway(bobRoot.Position + roblox.Vector3.new(2, 0, 1))
+	task.wait(0.3)
+	_, _, runawayCount = DropService.counts()
+	check(
+		#bobSession.data.creatures == bobBefore + 1 or bobSession.data.cash > bobCashBefore,
+		"walking into a runaway catches it"
+	)
+	check(runawayCount == 1, "and only that one")
+	Sim.chat(alice, "/mod off")
+	task.wait(0.2)
+	for _ = 1, 4 do
+		Sim.advance(Drops.runaway.lifetimeSeconds / 4)
+		task.wait(0.15)
+	end
+	_, _, runawayCount = DropService.counts()
+	check(runawayCount == 0, "an uncaught one gets away in the end")
+
+	-- Northern Lights and Heatwave: their skies, and their mutations only while they run
+	for _, id in { "northernLights", "heatwave" } do
+		local key = MutationRules.modifierKey(id)
+		Sim.chat(alice, `/mod {id}`)
+		task.wait(0.1)
+		check(BeltService.mutationConditions()[key] == true, `{id} lets its mutation roll`)
+		local sky = Modifiers.modifiers[id].lighting
+		check(math.abs(Lighting.ClockTime - sky.clockTime) < 1e-3, `{id} changes the sky ({Lighting.ClockTime})`)
+		Sim.chat(alice, "/mod off")
+		task.wait(0.1)
+		check(BeltService.mutationConditions()[key] == nil, `and its mutation goes with it`)
+	end
+
 	-- Stealing (with Quick Hands) and tagging --------------------------------------------------------------------------------
 	Sim.chat(bob, "/noshield")
 	local record = aliceSession.data.creatures[1]

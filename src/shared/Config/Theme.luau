@@ -570,6 +570,11 @@ local Theme = {
 		crateReward = "📦 {creature} is yours, plus {cash}!",
 		crateRewardFull = "📦 Base full: {creature} sold for you. +{cash}",
 		crateTaken = "Too slow! Someone opened that crate first.",
+		runawayMarker = "🏃 Catch me!",
+		runawayEscaped = "🏃 A {rarity} {creature} escaped! Catch it on the walkways!",
+		runawayCaught = "🏃 {player} caught a runaway {rarity} {creature}!",
+		runawayReward = "🏃 You caught {creature}! It's in your base.",
+		runawayRewardFull = "🏃 Base full: {creature} sold for you. +{cash}",
 
 		-- Map themes (Config/MapThemes): the vote for the next map and the change itself
 		mapVoteTitle = "Vote for the next map! {time}",

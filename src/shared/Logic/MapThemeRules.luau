@@ -177,6 +177,7 @@ MapThemeRules.WEATHER = table.freeze({
 	shavings = true,
 	confetti = true,
 	fizz = true,
+	heat = true,
 } :: { [string]: boolean })
 
 -- Enum.Material names a map may use for its ground, walkway and boundary wall.

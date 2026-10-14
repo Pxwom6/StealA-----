@@ -170,19 +170,22 @@ what grows on the tree spots, ten landmarks outside the wall and the weather; ga
 ### Server modifiers
 
 Every 4-8 minutes a server runs a 5-minute twist (`src/shared/Config/Modifiers.luau`): Rush Hour, Clearance Sale,
-Golden Hour, Lucky Breeze, Cash Splash, Sugar Rush, Quick Hands, Fortress, Snack Patrol, the rare Snack Party,
-weather (a Thunderstorm with rain, lightning and Electric Snacklings; a Meteor Shower with shooting stars and Galaxy
-Snacklings; Toxic Fog with Toxic Snacklings) or drops (a Supply Drop of crates to race for, or a Coin Rain). Change an effect, a name or the schedule there (CI
-keeps every effect inside `limits`); `schedule.enabled = false` turns them off and `weight = 0` keeps one for `/mod`
-only. BALANCE.md "Server modifiers" has the numbers.
+Golden Hour, Lucky Breeze, Cash Splash, Sugar Rush, Quick Hands, Fortress, Snack Patrol, the rare Snack Party and
+Jackpot (double cash), weather (a Thunderstorm with rain, lightning and Electric Snacklings; a Meteor Shower with
+shooting stars and Galaxy Snacklings; Toxic Fog with Toxic Snacklings; Northern Lights with an aurora and Aurora
+Snacklings; a Heatwave with Toasted Snacklings) or drops (a Supply Drop of crates to race for, a Coin Rain, or a Great
+Escape: Snacklings break out of the factory and run along the walkways, and whoever catches one keeps it). Change an
+effect, a name or the schedule there (CI keeps every effect inside `limits`); `schedule.enabled = false` turns them
+off and `weight = 0` keeps one for `/mod` only. BALANCE.md "Server modifiers" has the numbers.
 
 * **A new weather:** a modifier with `weather` (particles), `lighting` (an overlay like a seasonal one) and/or
-  `skyEffect` (`lightning`, `meteors`), and a mutation with `modifierId = "<its id>"` (its description should name
-  the mutation; CI checks).
+  `skyEffect` (`lightning`, `meteors`, `aurora`), and a mutation with `modifierId = "<its id>"` (its description
+  should name the mutation; CI checks).
 * **Thunder:** `world.thunder` in `src/shared/Config/Sounds.luau` is a slowed-down whoosh for now; paste a real
   thunder clap from the sound library there when you find one you like.
-* **Drops:** what crates and coins pay, how long crates take to fall and to open, and where they land are in
-  `src/shared/Config/Drops.luau`; how often they come is the modifier's `drops` (CI checks both).
+* **Drops:** what crates and coins pay, how long crates take to fall and to open, where they land, and how fast and
+  how cleverly a runaway runs are in `src/shared/Config/Drops.luau`; how often they come is the modifier's `drops` (CI
+  checks both). In Studio, `/runaway` lets one out now and `/runaway here` right beside you.
 
 ### First-time tutorial
 

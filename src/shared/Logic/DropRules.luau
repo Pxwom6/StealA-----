@@ -1,8 +1,14 @@
 --!strict
 --[[
 	Drop rules (Config/Drops, and Config/Modifiers `drops` for when): where a crate or a coin lands, the times a
-	modifier drops something, what a pickup pays, whether a crate was held open long enough, and validation.
-	Pure: no Roblox APIs; random numbers come in as a function returning [0, 1).
+	modifier drops something, what a pickup pays, whether a crate was held open long enough, where a runaway Snackling
+	appears and runs, and validation. Pure: no Roblox APIs; random numbers come in as a function returning [0, 1).
+
+	A runaway moves in legs: it waits at `from` until `startsAt`, then runs in a straight line to `to`, arriving at
+	`endsAt`. The server plans the next leg when one ends (away from the players near it, sprinting when someone is
+	close; now and then hopping over the belt to the other walkway) and publishes it as a string attribute; the client
+	draws the runaway on the same leg, and the server checks catches against the same position (legPosition), so
+	nothing is sent while it runs.
 ]]
 
 local EconomyMath = require("./EconomyMath")
@@ -13,7 +19,13 @@ type ModifierDrops = Types.ModifierDrops
 
 local DropRules = {}
 
-DropRules.KINDS = table.freeze({ crate = true, coins = true } :: { [string]: boolean })
+DropRules.KINDS = table.freeze({ crate = true, coins = true, runaway = true } :: { [string]: boolean })
+
+-- A horizontal position (world X, Z).
+export type Point = { x: number, z: number }
+
+-- One straight run of a runaway Snackling (server time): it waits at from until startsAt, then reaches to at endsAt.
+export type Leg = { fromX: number, fromZ: number, toX: number, toZ: number, startsAt: number, endsAt: number }
 
 -- A landing spot (world X, Z) on one of the two walkways, picked at random. Draws exactly three numbers.
 function DropRules.position(
@@ -59,6 +71,171 @@ end
 -- Whether a player standing at horizontal distance `distance` (studs) from a coin picks it up.
 function DropRules.inPickupRange(config: DropsConfig, horizontal: number, vertical: number): boolean
 	return horizontal <= config.coins.pickupRange and math.abs(vertical) <= config.coins.height + 6
+end
+
+-- Runaways ------------------------------------------------------------------------------------------------------------
+
+-- Horizontal distance from (x, z) to the nearest of `players` (math.huge with none).
+local function nearest(players: { Point }, x: number, z: number): number
+	local best = math.huge
+	for _, point in players do
+		local dx, dz = point.x - x, point.z - z
+		best = math.min(best, math.sqrt(dx * dx + dz * dz))
+	end
+	return best
+end
+
+-- (x, z) moved onto the nearest walkway inside the drop area: a runaway may hop over the belt, never stop on it.
+local function snapToWalkway(
+	area: { minX: number, maxX: number, minZ: number, maxZ: number },
+	x: number,
+	z: number
+): (number, number)
+	local side = if z < 0 then -1 else 1
+	return math.clamp(x, area.minX, area.maxX), math.clamp(math.abs(z), area.minZ, area.maxZ) * side
+end
+
+-- Where a runaway appears: of `candidates` random spots on the walkways (at least edgeMargin from their ends, so it has
+-- room to run either way), the one farthest from every player, so nobody can wait for it (with no players, the
+-- first). Draws exactly 3 numbers per candidate.
+function DropRules.runawayStart(config: DropsConfig, players: { Point }, random: () -> number): (number, number)
+	local area, margin = config.area, config.runaway.edgeMargin
+	local inner = { minX = area.minX + margin, maxX = area.maxX - margin, minZ = area.minZ, maxZ = area.maxZ }
+	local bestX, bestZ, bestScore = 0, 0, -math.huge
+	for _ = 1, config.runaway.candidates do
+		local x, z = DropRules.position(inner, random)
+		local score = nearest(players, x, z)
+		if score > bestScore then
+			bestX, bestZ, bestScore = x, z, score
+		end
+	end
+	return bestX, bestZ
+end
+
+-- Whether someone is near enough to scare a runaway at (x, z): it sprints, and barely stops at turns.
+function DropRules.isFleeing(config: DropsConfig, x: number, z: number, players: { Point }): boolean
+	return nearest(players, x, z) <= config.runaway.fleeRadius
+end
+
+-- Where a runaway at (x, z) runs next: of `candidates` random spots legMin..legMax away on a walkway, the one farthest
+-- from the nearest player within fleeRadius (farther players don't scare it), with a little randomness so it never
+-- runs the same way twice; with nobody near, it wanders. A spot on the other walkway (a hop over the belt) counts
+-- beltHopPenalty studs less, so it only hops over when that really gets it away. Draws exactly 3 numbers per
+-- candidate.
+function DropRules.runawayTarget(
+	config: DropsConfig,
+	x: number,
+	z: number,
+	players: { Point },
+	random: () -> number
+): (number, number)
+	local cfg = config.runaway
+	local bestX, bestZ, bestScore = x, z, -math.huge
+	for _ = 1, cfg.candidates do
+		local angle = random() * math.pi * 2
+		local distance = cfg.legMin + (cfg.legMax - cfg.legMin) * random()
+		local jitter = random()
+		local cx, cz = snapToWalkway(config.area, x + math.cos(angle) * distance, z + math.sin(angle) * distance)
+		local score = math.min(nearest(players, cx, cz), cfg.fleeRadius) + jitter * cfg.legMin * 0.5
+		if (cz < 0) ~= (z < 0) then
+			score -= cfg.beltHopPenalty
+		end
+		if score > bestScore then
+			bestX, bestZ, bestScore = cx, cz, score
+		end
+	end
+	return bestX, bestZ
+end
+
+-- The leg from (x, z) to (toX, toZ) starting at `now`: a pause, then a run; both quicker while `fleeing`.
+function DropRules.runawayLeg(
+	config: DropsConfig,
+	x: number,
+	z: number,
+	toX: number,
+	toZ: number,
+	now: number,
+	fleeing: boolean
+): Leg
+	local cfg = config.runaway
+	local startsAt = now + (if fleeing then cfg.sprintPauseSeconds else cfg.pauseSeconds)
+	local speed = if fleeing then cfg.sprintSpeed else cfg.speed
+	local dx, dz = toX - x, toZ - z
+	return {
+		fromX = x,
+		fromZ = z,
+		toX = toX,
+		toZ = toZ,
+		startsAt = startsAt,
+		endsAt = startsAt + math.sqrt(dx * dx + dz * dz) / speed,
+	}
+end
+
+-- How far along `leg` a runaway is at `t` (0 before it sets off, 1 once it arrived).
+function DropRules.legProgress(leg: Leg, t: number): number
+	if leg.endsAt <= leg.startsAt then
+		return if t >= leg.endsAt then 1 else 0
+	end
+	return math.clamp((t - leg.startsAt) / (leg.endsAt - leg.startsAt), 0, 1)
+end
+
+-- Whether `leg` hops over the belt to the other walkway (the client draws a big jump).
+function DropRules.crossesBelt(leg: Leg): boolean
+	return (leg.fromZ < 0) ~= (leg.toZ < 0)
+end
+
+-- Where a runaway is at time `t` on `leg`, and whether it is running (false while it waits, and once it arrived).
+function DropRules.legPosition(leg: Leg, t: number): (number, number, boolean)
+	if t <= leg.startsAt then
+		return leg.fromX, leg.fromZ, false
+	elseif t >= leg.endsAt then
+		return leg.toX, leg.toZ, false
+	end
+	local share = (t - leg.startsAt) / (leg.endsAt - leg.startsAt)
+	return leg.fromX + (leg.toX - leg.fromX) * share, leg.fromZ + (leg.toZ - leg.fromZ) * share, true
+end
+
+-- A leg as text for an attribute (one value, so a client never sees half of a new leg), and back. decodeLeg is nil
+-- for anything that isn't six finite numbers.
+function DropRules.encodeLeg(leg: Leg): string
+	return string.format(
+		"%.2f,%.2f,%.2f,%.2f,%.3f,%.3f",
+		leg.fromX,
+		leg.fromZ,
+		leg.toX,
+		leg.toZ,
+		leg.startsAt,
+		leg.endsAt
+	)
+end
+
+function DropRules.decodeLeg(text: string): Leg?
+	local parts = string.split(text, ",")
+	if #parts ~= 6 then
+		return nil
+	end
+	local numbers: { number } = {}
+	for index, part in parts do
+		local value = tonumber(part)
+		if value == nil or value ~= value or value == math.huge or value == -math.huge then
+			return nil
+		end
+		numbers[index] = value
+	end
+	return {
+		fromX = numbers[1],
+		fromZ = numbers[2],
+		toX = numbers[3],
+		toZ = numbers[4],
+		startsAt = numbers[5],
+		endsAt = numbers[6],
+	}
+end
+
+-- Whether a player whose root is `horizontal` studs from a runaway (and `vertical` above it) catches it. `slack` is
+-- the extra reach the server allows (the player's position is a little behind on the server).
+function DropRules.catches(config: DropsConfig, horizontal: number, vertical: number, slack: number): boolean
+	return horizontal <= config.runaway.catchRange + slack and math.abs(vertical) <= 8
 end
 
 -- Problems with Config/Drops (an empty list means valid). `walkway` is the band the walkways cover: |z| up to
@@ -121,6 +298,41 @@ function DropRules.validate(
 	positive(coins.lifetimeSeconds, "coins.lifetimeSeconds")
 	positive(coins.pickupRange, "coins.pickupRange")
 	reward(coins.value, "coins.value")
+
+	local runaway = config.runaway
+	positive(runaway.speed, "runaway.speed")
+	if not (runaway.sprintSpeed >= runaway.speed) then
+		problem("runaway.sprintSpeed must be at least its speed")
+	end
+	if not (runaway.pauseSeconds >= 0 and runaway.pauseSeconds <= 3) then
+		problem("runaway.pauseSeconds must be between 0 and 3")
+	end
+	if not (runaway.sprintPauseSeconds >= 0 and runaway.sprintPauseSeconds <= runaway.pauseSeconds) then
+		problem("runaway.sprintPauseSeconds must be between 0 and pauseSeconds")
+	end
+	if not (runaway.edgeMargin >= 0 and runaway.edgeMargin * 2 < area.maxX - area.minX) then
+		problem("runaway.edgeMargin must leave some walkway in the middle")
+	end
+	if not (runaway.beltHopPenalty >= 0) then
+		problem("runaway.beltHopPenalty must be 0 or more")
+	end
+	if
+		not (runaway.legMin > 0 and runaway.legMax >= runaway.legMin and runaway.legMax <= area.maxZ - area.minZ + 40)
+	then
+		problem("runaway legs need 0 < legMin <= legMax, and not much longer than the walkway is wide")
+	end
+	if not (runaway.candidates >= 1 and runaway.candidates <= 32 and runaway.candidates % 1 == 0) then
+		problem("runaway.candidates must be a whole number from 1 to 32")
+	end
+	positive(runaway.fleeRadius, "runaway.fleeRadius")
+	positive(runaway.catchRange, "runaway.catchRange")
+	positive(runaway.lifetimeSeconds, "runaway.lifetimeSeconds")
+	if not (runaway.luck >= 1 and runaway.luck <= 6) then
+		problem("runaway.luck must be between 1 and 6")
+	end
+	if not (runaway.mutationChance >= 1 and runaway.mutationChance <= 4) then
+		problem("runaway.mutationChance must be between 1 and 4")
+	end
 	return problems
 end
 
@@ -128,7 +340,7 @@ end
 function DropRules.dropsProblems(drops: ModifierDrops, duration: number, name: string): { string }
 	local problems: { string } = {}
 	if not DropRules.KINDS[drops.kind] then
-		table.insert(problems, `{name} drops.kind {drops.kind} is not crate or coins`)
+		table.insert(problems, `{name} drops.kind {drops.kind} is not crate, coins or runaway`)
 	end
 	if not (drops.firstSeconds >= 0 and drops.firstSeconds < duration) then
 		table.insert(problems, `{name} drops.firstSeconds must be at least 0 and before the modifier ends`)

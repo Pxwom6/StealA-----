@@ -524,6 +524,7 @@ export type WeatherKind =
 	| "shavings"
 	| "confetti"
 	| "fizz"
+	| "heat"
 
 export type MapThemeDef = {
 	displayName: string,
@@ -567,13 +568,13 @@ export type ModifierEffects = {
 	tagRange: number?, -- × how far a tag reaches
 }
 
--- A one-off effect in the sky while a weather modifier runs (client only; off with Reduce effects).
-export type SkyEffect = "lightning" | "meteors"
+-- An effect in the sky while a weather modifier runs (client only; off with Reduce effects).
+export type SkyEffect = "lightning" | "meteors" | "aurora"
 
 -- Things a modifier drops on the walkways while it runs (DropService, Config/Drops): supply crates (hold to open,
--- first player wins) or a shower of coins (walk over them).
+-- first player wins), a shower of coins (walk over them) or a runaway Snackling (catch it).
 export type ModifierDrops = {
-	kind: "crate" | "coins",
+	kind: "crate" | "coins" | "runaway",
 	firstSeconds: number, -- the first drop this long after the modifier starts
 	everySeconds: number, -- then one every this long until it ends
 }
@@ -590,7 +591,7 @@ export type ModifierDef = {
 	weather: WeatherKind?,
 	lighting: SeasonLighting?,
 	skyEffect: SkyEffect?,
-	drops: ModifierDrops?, -- crates or coins on the walkways (Config/Drops)
+	drops: ModifierDrops?, -- crates, coins or runaways on the walkways (Config/Drops)
 }
 
 export type ModifierSchedule = {
@@ -722,6 +723,24 @@ export type DropsConfig = {
 		lifetimeSeconds: number,
 		pickupRange: number, -- horizontal studs from a coin's centre to the player's root
 		value: IncomeReward, -- each coin
+	},
+	-- A Snackling that escaped the factory and runs along a walkway, away from whoever comes near: walk into it to
+	-- catch it (Logic/DropRules.runawayTarget plans each leg; the client follows the same legs).
+	runaway: {
+		speed: number, -- studs per second while it wanders
+		sprintSpeed: number, -- while someone is within fleeRadius (slower than players: Gameplay.walkSpeed)
+		pauseSeconds: number, -- it stops this long at every turn while it wanders
+		sprintPauseSeconds: number, -- and this long while it flees
+		legMin: number, -- studs per leg
+		legMax: number,
+		candidates: number, -- spots it considers for each leg (and for where it appears)
+		fleeRadius: number, -- players nearer than this scare it; farther ones don't
+		edgeMargin: number, -- it appears at least this far from the ends of the walkways
+		beltHopPenalty: number, -- studs a spot over the belt counts less (higher: it hops over less often)
+		catchRange: number, -- horizontal studs from its centre to a player's root (the server allows a little more)
+		lifetimeSeconds: number, -- uncaught, it gets away after this long
+		luck: number, -- × server luck for which Snackling escapes
+		mutationChance: number, -- × mutation chances for it
 	},
 }
 

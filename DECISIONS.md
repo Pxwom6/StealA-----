@@ -824,3 +824,29 @@ it needs no new save data and starts and ends by itself.
 
 **Why:** more variety for the rotation and three more mutations to collect; caves and swamps are moods no map had.
 **Reversal cost:** none — `weight = 0` keeps a map out of rotation; keep its mutation id.
+
+### 40. Four more modifiers: Jackpot, Northern Lights, Heatwave, Great Escape
+
+* **What:** **Jackpot** doubles everyone's income for 5 minutes (weight 0.35: rarer than Cash Splash). **Northern
+  Lights** is a weather: a clear polar night with an aurora (ribbons of light swaying and shimmering all around the
+  sky, client-only Beams, off with Reduce effects) and **Aurora** Snacklings (teal crystal, glowing, ribbons of light).
+  **Heatwave** is a blazing hazy noon with heat shimmer rising off the ground and **Toasted** Snacklings (golden-brown,
+  steaming). Both mutations are 2% and x4, announced, like the other weather ones. **Great Escape** is a drop: six
+  times in 5 minutes a Snackling (rolled at 2x luck and 2x mutation chance) breaks out, announced with its rarity, and
+  runs along the walkways; the first player to walk into it keeps it (its sell value with a full base).
+* **How a runaway runs:** it appears on a walkway as far from every player as it can (never at the walkway ends, so
+  it has room to run), wanders at 9 studs/s and sprints at 14.5 (players walk at 16) while anyone is within 40 studs,
+  each leg picked from a dozen random spots as the one farthest from the nearest player, now and then hopping over
+  the belt to the other walkway when that really gets it away. The server plans each leg and publishes it as one
+  attribute; the client draws it on the same leg (easing into a new one, hopping as it runs, jumping the belt), and
+  the server checks catches against the same position and trusted player positions, so nothing streams while it
+  runs. Offline chases with the real numbers: one player catches it in about 15 s (mostly the run to it, then a 2-3 s
+  chase), four players in about 4 s; it always gets caught before its 45 seconds are up when someone chases it.
+* **Checks:** the rules are pure and tested (where it appears, fleeing, belt hops, legs, encoding, catching, a
+  simulated chase); the server test lets one escape, watches it run, catches one, and checks both new weathers' skies
+  and mutations. `/runaway` and `/runaway here` in Studio.
+
+**Why:** more variety in the modifier mix (nineteen now), two more weather mutations to collect, and a drop that is a
+chase rather than a hold: runaways get players moving and bumping into each other on the walkways, where stealing
+happens.
+**Reversal cost:** none — `weight = 0` keeps any of them for `/mod` only; keep the mutation ids.
