@@ -562,6 +562,22 @@ export type ModifiersConfig = {
 	limits: { [string]: { min: number, max: number } }, -- allowed range of each effect
 }
 
+-- Config: redeem codes (server/Codes.luau, server-only so codes never reach a client) --------------------------------
+
+-- What a code gives: cash sized from the player's steady income (like a cash pack), or a Snackling (with a mutation
+-- or plain) on a free podium.
+export type CodeReward =
+	{ kind: "cash", incomeSeconds: number, minimum: number }
+	| { kind: "creature", creatureId: string, variant: string? }
+
+export type CodeDef = {
+	reward: CodeReward,
+	expiresAt: number?, -- unix seconds (UTC); nil = never
+}
+
+-- Codes by their text: letters and digits only, any case when typed (CodeRules.normalize upper-cases it).
+export type CodesConfig = { [string]: CodeDef }
+
 -- Config: drops (Config/Drops): what Supply Drop and Coin Rain put on the walkways -------------------------------
 
 -- Rewards are IncomeReward (below): sized from the player's steady income, like a cash pack.

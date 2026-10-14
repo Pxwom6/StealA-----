@@ -263,6 +263,21 @@ Reduce effects switches. They apply at once and are saved per player in the save
 particles, the belt / factory animations, Bloom and SunRays on that device; client code can read it with
 `ClientSettings.reduceEffects()` (or the LocalPlayer attribute `ReduceEffects`).
 
+### Redeem codes
+
+Players redeem codes from the Settings dialog (🎟️ Codes row). The codes live in `src/server/Codes.luau`, which never
+reaches a client, so nobody can read one you have not posted. Each works once per account (the save's `flags` map,
+`code_<CODE>`; no save-format change); typing is forgiving (any case, spaces around it), and guessing is slowed to one
+try every 5 seconds.
+
+* **Add a code:** a new entry keyed by its text in UPPER CASE letters and digits, with a reward: cash sized from the
+  player's income (`{ kind = "cash", incomeSeconds = 180, minimum = 1000 }` = 3 minutes of their income, at least
+  $1,000) or a Snackling (`{ kind = "creature", creatureId = "pizza_pup", variant = "golden" }`). Optional
+  `expiresAt` (unix seconds, UTC). CI checks every code; changing them needs a publish.
+* **Codes ready to post:** `WELCOME` (2 minutes of income), `SNACKTIME` (a Golden Pizza Pup), `FOURTEENMAPS` (3
+  minutes of income), `STORMCHASER` (an Electric Pretzel Pal) and `SPOOKY26` (a Haunted Candy Corn Cat, until
+  Halloween ends on 2 Nov).
+
 ### Studio test commands
 
 These work in Studio only (`src/server/Services/DevCommands.luau`):

@@ -702,3 +702,17 @@ keep its id in the config).
 **Why:** the other modifiers change numbers; these give the whole server something to run for, on the walkways
 where everyone already is, and they make the belt area busier (more steals, more chances to tag).
 **Reversal cost:** none — `weight = 0` keeps either for `/mod` only; nothing is saved.
+
+### 34. Redeem codes: server-only, once per account, slow to guess
+
+* **What:** a 🎟️ Codes row in Settings opens a dialog to type a code; `CodeService` pays cash sized from steady income
+  (like a cash pack) or a Snackling (optionally mutated). Codes are in `src/server/Codes.luau`.
+* **Server-only list:** the codes module sits under ServerScriptService, so clients never receive it; the client
+  sends what was typed and gets a toast back. Only `CodeRules` (normalising and checking, no codes) is shared.
+* **Once per account, in flags:** redeeming sets `code_<CODE>` before paying, so a code cannot pay twice even on
+  a retry; no save-format change. A Snackling code with a full base is refused without using the code up.
+* **Guessing:** RedeemCode allows 3 tries then one every 5 s per player; codes are letters and digits only.
+
+**Why:** codes are how Roblox games reward followers of their group and updates; it costs nothing to run and gives
+Leo something to post.
+**Reversal cost:** none — remove a code (or give it an `expiresAt` in the past) and publish.

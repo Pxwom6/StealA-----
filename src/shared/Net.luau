@@ -32,6 +32,7 @@ export type ClientToServer =
 	| "VoteMap"
 	| "CrateBegin"
 	| "CrateOpen"
+	| "RedeemCode"
 
 export type ServerToClient =
 	"StateUpdate"
@@ -69,6 +70,7 @@ local CLIENT_TO_SERVER: { ClientToServer } = {
 	"VoteMap",
 	"CrateBegin",
 	"CrateOpen",
+	"RedeemCode",
 }
 
 local SERVER_TO_CLIENT: { ServerToClient } = {
