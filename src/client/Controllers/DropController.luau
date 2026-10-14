@@ -198,7 +198,7 @@ local function onRunaway(instance: Instance)
 	UiKit.label({
 		Name = "Call",
 		Text = Theme.text.runawayMarker,
-		Size = UDim2.new(1, 0, 0.55, 0),
+		Size = UDim2.fromScale(1, 0.55),
 		TextScaled = true,
 		Parent = board,
 	})
@@ -208,7 +208,7 @@ local function onRunaway(instance: Instance)
 			Name = "Name",
 			Text = `{rarity.displayName} {GameData.displayName(def, if type(variant) == "string" then variant else nil)}`,
 			TextColor3 = color,
-			Size = UDim2.new(1, 0, 0.45, 0),
+			Size = UDim2.fromScale(1, 0.45),
 			Position = UDim2.fromScale(0, 0.55),
 			TextScaled = true,
 			Parent = board,
