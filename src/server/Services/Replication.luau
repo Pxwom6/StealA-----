@@ -22,6 +22,10 @@ local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local Types = require(ReplicatedStorage.Shared.Types)
 local Quests = require(ReplicatedStorage.Shared.Config.Quests)
 local QuestRules = require(ReplicatedStorage.Shared.Logic.QuestRules)
+local Gifts = require(ReplicatedStorage.Shared.Config.Gifts)
+local Spin = require(ReplicatedStorage.Shared.Config.Spin)
+local GiftRules = require(ReplicatedStorage.Shared.Logic.GiftRules)
+local SpinRules = require(ReplicatedStorage.Shared.Logic.SpinRules)
 local Remotes = require(script.Parent.Remotes)
 local Sessions = require(script.Parent.Sessions)
 
@@ -33,6 +37,30 @@ local questDefs = QuestRules.index(Quests.pool)
 
 function Replication.markDirty(session: Session)
 	session.dirty = true
+end
+
+-- What a cash prize pays this player now (0 for other kinds), for the Gifts and Spin tabs.
+local function cashOf(reward: Types.PrizeReward, income: number): number
+	if reward.kind == "cash" then
+		return EconomyMath.cashPackAmount(income, { incomeSeconds = reward.incomeSeconds, minimum = reward.minimum })
+	end
+	return 0
+end
+
+local function giftRewards(income: number): { number }
+	local list: { number } = {}
+	for _, def in Gifts.ladder do
+		table.insert(list, cashOf(def.reward, income))
+	end
+	return list
+end
+
+local function spinRewards(income: number): { number }
+	local list: { number } = {}
+	for _, segment in Spin.segments do
+		table.insert(list, cashOf(segment.reward, income))
+	end
+	return list
 end
 
 function Replication.snapshot(session: Session): Types.ClientState
@@ -92,6 +120,20 @@ function Replication.snapshot(session: Session): Types.ClientState
 		settings = SettingsRules.fromFlags(data.flags),
 		-- Rewards as QuestService pays them (steady income, see EconomyMath.packIncome).
 		quests = QuestRules.view(data.quests, questDefs, Quests, session.packIncome, DailyStreak.dayIndex(now)),
+		gifts = {
+			seconds = data.gifts.seconds,
+			syncedAt = now,
+			claimed = table.clone(data.gifts.claimed),
+			claimable = GiftRules.claimable(data.gifts, Gifts),
+			resetsAt = (DailyStreak.dayIndex(now) + 1) * 86400,
+			rewards = giftRewards(session.packIncome),
+		},
+		spin = {
+			nextFreeAt = data.spin.nextFreeAt,
+			spins = data.spin.spins,
+			ready = SpinRules.source(data.spin, now) ~= nil,
+			rewards = spinRewards(session.packIncome),
+		},
 	}
 end
 

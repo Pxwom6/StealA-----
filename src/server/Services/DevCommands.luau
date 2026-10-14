@@ -19,6 +19,8 @@
 	  /dex fill <rarity>    mark every Snackling of a tier discovered except one, and clear that tier's reward, so
 	                        buying the missing one (the toast names it; /spawn it) tests completion; e.g. /dex fill
 	                        common. "event" fills the Event section the same way (it has no reward)
+	  /playtime <minutes>   add minutes to today's playtime (unlocks playtime gifts), e.g. /playtime 60
+	  /spins <n>            bank n Lucky Spins, e.g. /spins 5; /spins free makes the free spin ready now
 
 	Map themes (MapThemeService; admins can use these in live servers too, that server only):
 	  /map <id>             switch to that map now, e.g. /map candy, /map volcano
@@ -42,7 +44,9 @@ local SnackdexRules = require(ReplicatedStorage.Shared.Logic.SnackdexRules)
 local BeltService = require(script.Parent.BeltService)
 local DevGallery = require(script.Parent.DevGallery)
 local EconomyService = require(script.Parent.EconomyService)
+local GiftService = require(script.Parent.GiftService)
 local LockService = require(script.Parent.LockService)
+local Replication = require(script.Parent.Replication)
 local QuestService = require(script.Parent.QuestService)
 local Remotes = require(script.Parent.Remotes)
 local Sessions = require(script.Parent.Sessions)
@@ -211,10 +215,37 @@ function DevCommands.start()
 			Remotes.notify(player, `[Studio] {sectionId} has no Snacklings`, "error")
 		end
 	end)
+	add("playtime", function(player: Player, args: { string })
+		local session = Sessions.get(player)
+		local minutes = tonumber(args[1])
+		if session and minutes and minutes > 0 and minutes <= 24 * 60 then
+			GiftService.addPlaytime(session, minutes * 60)
+			Replication.markDirty(session)
+			Remotes.notify(player, `[Studio] +{minutes} min of playtime today`, "info")
+		end
+	end)
+	add("spins", function(player: Player, args: { string })
+		local session = Sessions.get(player)
+		if session == nil then
+			return
+		end
+		if args[1] == "free" then
+			session.data.spin.nextFreeAt = 0
+		else
+			local count = tonumber(args[1])
+			if count == nil or count < 1 or count > 100 then
+				Remotes.notify(player, "[Studio] usage: /spins <n> | /spins free", "error")
+				return
+			end
+			session.data.spin.spins += math.floor(count)
+		end
+		Replication.markDirty(session)
+		Remotes.notify(player, "[Studio] spins updated", "info")
+	end)
 	print(
 		"[DevCommands] Studio commands enabled: /cash <n>, /spawn <creatureId> [mutationId], /noshield, /friends <n|off>,"
 			.. " /tutorial, /gallery [mutationId|off], /sky <clockTime>,"
-			.. " /quests reset, /dex fill <rarity|event>, /map <id|vote|list>"
+			.. " /quests reset, /dex fill <rarity|event>, /map <id|vote|list>, /playtime <min>, /spins <n|free>"
 			.. " (LiveOps: /event <id> [minutes], /event off, /luck <x> <min>)"
 	)
 end

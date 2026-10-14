@@ -2,13 +2,15 @@
 --[[
 	Retention UI:
 	  * "Welcome back — you earned X" popup after offline earnings
-	  * Rewards panel (side button with a badge) with two tabs:
+	  * Rewards panel (side button with a badge) with four tabs:
 	      Daily   the login streak: a 7-day track and one-tap claim; the panel opens itself on this tab once per
 	              session when a reward is waiting (after the welcome popup, never during the first-time tutorial)
 	      Quests  today's three quests (QuestService → StateUpdate `quests`): progress bars, rewards, Claim buttons, the
 	              all-done bonus and when new quests arrive
-	    Each tab has its own red dot when something is claimable; the side button shows one when either does. The open
-	    panel updates live (progress, countdowns) without being rebuilt.
+	      Gifts   playtime gifts that unlock with time in game today (GiftsTab)
+	      Spin    the Lucky Spin reel (SpinTab)
+	    Each tab has its own red dot when something is claimable (a gift unlocked, a spin ready...); the side button
+	    shows one when any does. The open panel updates live (progress, countdowns) without being rebuilt.
 	  * HUD pills for live events (banner + "Halloween ends in 3d 4h", in the event's theme colour) and server luck
 	    (multiplier + time until it next changes), from LiveOpsService's workspace attributes
 ]]
@@ -27,12 +29,14 @@ local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local QuestRules = require(ReplicatedStorage.Shared.Logic.QuestRules)
 local Modal = require(script.Parent.Parent.UI.Modal)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
+local GiftsTab = require(script.Parent.GiftsTab)
 local HudController = require(script.Parent.HudController)
 local NotificationController = require(script.Parent.NotificationController)
 local SoundPlayer = require(script.Parent.SoundPlayer)
+local SpinTab = require(script.Parent.SpinTab)
 local StateStore = require(script.Parent.StateStore)
 
-export type Tab = "daily" | "quests"
+export type Tab = "daily" | "quests" | "gifts" | "spin"
 
 type TabButton = { button: TextButton, badge: Frame }
 type TabDef = { id: string, text: string }
@@ -50,7 +54,7 @@ local RewardsController = {}
 -- Reference px. Height stays within Modal's 340 so the panel fits a landscape phone.
 local PANEL_SIZE = Vector2.new(620, 336)
 local TAB_BAR_HEIGHT = 40
-local TAB_WIDTH = 170
+local TAB_WIDTH = 134
 local CONTENT_TOP = 48
 local QUEST_ROW_HEIGHT = 56
 local QUEST_ROW_GAP = 6
@@ -60,6 +64,8 @@ local SECONDS_PER_DAY = 86400
 local TABS: { TabDef } = {
 	{ id = "daily", text = Theme.text.rewardsTabDaily },
 	{ id = "quests", text = Theme.text.rewardsTabQuests },
+	{ id = "gifts", text = Theme.text.rewardsTabGifts },
+	{ id = "spin", text = Theme.text.rewardsTabSpin },
 }
 
 local questDefs = QuestRules.index(Quests.pool)
@@ -384,13 +390,24 @@ end
 local function updateBadges(state: Types.ClientState)
 	local dailyReady = state.daily.canClaim
 	local questsReady = state.quests.claimable > 0
-	rewardsButton.badge.Visible = dailyReady or questsReady
+	local giftsReady = GiftsTab.claimable(state.gifts) > 0
+	local spinReady = state.spin.spins > 0 or workspace:GetServerTimeNow() >= state.spin.nextFreeAt
+	rewardsButton.badge.Visible = dailyReady or questsReady or giftsReady or spinReady
 	local current = panel
 	if current then
 		current.tabs.daily.badge.Visible = dailyReady
 		current.tabs.quests.badge.Visible = questsReady
+		current.tabs.gifts.badge.Visible = giftsReady
+		current.tabs.spin.badge.Visible = spinReady
 	end
 end
+
+local BUILDERS: { [string]: (content: Frame) -> (state: Types.ClientState) -> () } = {
+	daily = buildDaily,
+	quests = buildQuests,
+	gifts = GiftsTab.build,
+	spin = SpinTab.build,
+}
 
 local function selectTab(tab: string)
 	local current = panel
@@ -402,7 +419,8 @@ local function selectTab(tab: string)
 		entry.button.BackgroundColor3 = if id == tab then UiTheme.palette("gold") else UiTheme.palette("panelLight")
 	end
 	current.content:ClearAllChildren()
-	current.refresh = if tab == "daily" then buildDaily(current.content) else buildQuests(current.content)
+	SpinTab.clear()
+	current.refresh = BUILDERS[tab](current.content)
 	local state = StateStore.get()
 	if state and current.refresh then
 		current.refresh(state)
@@ -417,6 +435,7 @@ function RewardsController.open(tab: Tab?)
 	end
 	local modal = Modal.open(Theme.text.rewardsTitle, PANEL_SIZE, function()
 		panel = nil
+		SpinTab.clear()
 	end)
 	local tabBar = UiKit.new("Frame", {
 		Name = "Tabs",
@@ -458,7 +477,13 @@ function RewardsController.open(tab: Tab?)
 		button.Parent = tabBar
 	end
 	panel = { modal = modal, tab = "daily", tabs = tabs, content = content, refresh = nil }
-	local defaultTab: Tab = if state.daily.canClaim or #state.quests.list == 0 then "daily" else "quests"
+	local defaultTab: Tab = if state.daily.canClaim
+		then "daily"
+		elseif state.quests.claimable > 0 then "quests"
+		elseif GiftsTab.claimable(state.gifts) > 0 then "gifts"
+		elseif state.spin.ready then "spin"
+		elseif #state.quests.list == 0 then "daily"
+		else "quests"
 	selectTab(tab or defaultTab)
 	updateBadges(state)
 	-- Countdowns tick while the panel is open.
@@ -649,6 +674,17 @@ function RewardsController.start()
 			task.wait(0.5)
 		end
 	end)
+	-- Gifts unlock and the free spin comes back with time alone: re-check the badges every couple of seconds.
+	task.spawn(function()
+		while true do
+			task.wait(2)
+			local state = StateStore.get()
+			if state then
+				updateBadges(state)
+			end
+		end
+	end)
+	SpinTab.start()
 end
 
 return RewardsController

@@ -39,5 +39,7 @@ require("./MapThemeRules.spec")
 require("./ModifierRules.spec")
 require("./DropRules.spec")
 require("./CodeRules.spec")
+require("./GiftRules.spec")
+require("./SpinRules.spec")
 
 T.finish()

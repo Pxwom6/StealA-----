@@ -1,0 +1,127 @@
+--!strict
+--[[
+	Lucky Spin rules (Config/Spin) on the saved `data.spin` (Types.SpinState): whether a spin is available (the free
+	one first, then a banked one), using one, banking spins from gifts, picking the prize by weight, and validation.
+	Pure: no Roblox APIs; random numbers come in as a function returning [0, 1).
+]]
+
+local GiftRules = require("./GiftRules")
+local Types = require("../Types")
+
+type SpinState = Types.SpinState
+type SpinConfig = Types.SpinConfig
+type SpinSegment = Types.SpinSegment
+
+local SpinRules = {}
+
+export type Source = "free" | "banked"
+
+-- Which spin a player would use now: the free one when it is ready, else a banked one; nil when there is none.
+function SpinRules.source(state: SpinState, now: number): Source?
+	if now >= state.nextFreeAt then
+		return "free"
+	elseif state.spins > 0 then
+		return "banked"
+	end
+	return nil
+end
+
+-- Uses one spin from `source` (SpinRules.source): the free one starts its timer again, a banked one is spent.
+function SpinRules.consume(state: SpinState, source: Source, now: number, config: SpinConfig)
+	if source == "free" then
+		state.nextFreeAt = now + config.freeEverySeconds
+	else
+		state.spins = math.max(0, state.spins - 1)
+	end
+	state.total += 1
+end
+
+-- Banks `count` spins up to config.maxBanked; returns how many did not fit (the caller pays those as cash).
+function SpinRules.bank(state: SpinState, count: number, config: SpinConfig): number
+	local room = math.max(0, config.maxBanked - state.spins)
+	local banked = math.min(room, count)
+	state.spins += banked
+	return count - banked
+end
+
+-- Each segment's chance (weight / total), in order.
+function SpinRules.chances(segments: { SpinSegment }): { number }
+	local total = 0
+	for _, segment in segments do
+		total += math.max(0, segment.weight)
+	end
+	local chances: { number } = {}
+	for _, segment in segments do
+		table.insert(chances, if total > 0 then math.max(0, segment.weight) / total else 0)
+	end
+	return chances
+end
+
+-- Picks a segment index by weight. Draws exactly one number.
+function SpinRules.pick(segments: { SpinSegment }, random: () -> number): number
+	local roll = random()
+	local running = 0
+	local chances = SpinRules.chances(segments)
+	for index, chance in chances do
+		running += chance
+		if roll < running then
+			return index
+		end
+	end
+	return #segments
+end
+
+-- Problems with Config/Spin (an empty list means valid). `mutations` are the known mutation ids.
+function SpinRules.validate(config: SpinConfig, mutations: { [string]: any }): { string }
+	local problems: { string } = {}
+	if not (config.freeEverySeconds >= 3600 and config.freeEverySeconds <= 7 * 86400) then
+		table.insert(problems, "freeEverySeconds must be between an hour and a week")
+	end
+	if not (config.maxBanked >= 1 and config.maxBanked <= 1000 and config.maxBanked % 1 == 0) then
+		table.insert(problems, "maxBanked must be a whole number from 1 to 1000")
+	end
+	for _, message in
+		GiftRules.rewardProblems({
+			kind = "cash",
+			incomeSeconds = config.bankedOverflow.incomeSeconds,
+			minimum = config.bankedOverflow.minimum,
+		}, "bankedOverflow", mutations, false)
+	do
+		table.insert(problems, message)
+	end
+	if #config.segments < 2 or #config.segments > 12 then
+		table.insert(problems, "the reel needs 2 to 12 segments")
+	end
+	local ids: { [string]: boolean } = {}
+	local total = 0
+	for index, segment in config.segments do
+		local name = `segment {segment.id}`
+		if segment.id == "" or ids[segment.id] then
+			table.insert(problems, `segment {index} needs a unique id`)
+		end
+		ids[segment.id] = true
+		if segment.label == "" or #segment.label > 14 then
+			table.insert(problems, `{name} needs a label of at most 14 characters`)
+		end
+		if segment.icon == "" then
+			table.insert(problems, `{name} needs an icon`)
+		end
+		if string.match(segment.color, "^#%x%x%x%x%x%x$") == nil then
+			table.insert(problems, `{name} color must be #RRGGBB`)
+		end
+		if not (segment.weight > 0) then
+			table.insert(problems, `{name} weight must be above 0`)
+		else
+			total += segment.weight
+		end
+		for _, message in GiftRules.rewardProblems(segment.reward, name, mutations, false) do
+			table.insert(problems, message)
+		end
+	end
+	if not (total > 0) then
+		table.insert(problems, "the weights add up to nothing")
+	end
+	return problems
+end
+
+return SpinRules

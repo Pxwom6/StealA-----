@@ -188,6 +188,8 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `VoteMap` | `themeId: string` | a map vote is running and `themeId` is on its ballot (one vote per player, changeable) |
 | `CrateBegin` | `crateId: int` | the supply crate exists, has landed and is closed; the player's trusted position is within reach → the hold starts |
 | `CrateOpen` | `crateId: int` | same, and the hold lasted long enough (`DropRules.holdLongEnough`); the first one wins |
+| `ClaimGift` | `index: int` | the gift exists, today's playtime unlocked it and it isn't claimed yet (`GiftRules.claim`) |
+| `Spin` | – | a free spin is ready or one is banked (`SpinRules.source`), and the last reel has finished |
 | `RedeemCode` | `code: string` | letters and digits, at most 24 (`CodeRules.normalize`); the code exists, has not expired and its `code_<CODE>` flag is unset; a Snackling code needs a free podium; rate limit 3 then 1 per 5 s |
 | `DevGrantProduct` | `key: string` | **Studio only** – runs the real receipt path with a fake receipt |
 
@@ -204,6 +206,7 @@ Server → client:
 | `StealAlert` | to victim: `{thiefName, creatureId, variant?}` |
 | `Effect` | one-shot VFX cue `{kind, position, rarity}` (e.g. `tutorialComplete`, `quest`, `questsAllDone`) |
 | `SnackdexSync` | the whole Snackdex `{dex, discovered?, completed?}` on ready and on every change (a new entry, a tier paid) |
+| `SpinResult` | `{index, text}`: the Lucky Spin segment the server picked (the reel stops there), and the prize toast |
 
 World state the client reads from **attributes** (replicated automatically): plot `OwnerUserId`, `LockedUntil`,
 `GraceUntil`, `PodiumCount`; podium `CreatureId`, `Variant` (mutation id, "" for none), `Stored`, `Income`
@@ -214,7 +217,7 @@ luck next changes), `PurchasedLuckEndsAt`, `CashMultiplier`, `ActiveEventIds`, `
 `MapTheme` (id), `MapThemeEndsAt` (the next change), `MapVoteEndsAt` (0 = no vote), `MapVoteCandidates`,
 `MapVoteCounts`; and the server modifier: `Modifier` (id, "" = none), `ModifierEndsAt`, `ModifierNextAt`.
 
-## 5. Data schema (version 3)
+## 5. Data schema (version 4)
 
 ```lua
 type CreatureRecord = { uid: string, id: string, podium: number, acquiredAt: number, stored: number,
@@ -241,6 +244,8 @@ type PlayerData = {   -- exactly Types.PlayerData
                                    -- tutorial progress (`tutorial_<step>`, `tutorial_done`), settings (`settings_<key>`),
                                    -- redeemed codes (`code_<CODE>`)
     firstJoin: number, lastSeen: number,
+    gifts: { day: number, seconds: number, claimed: { number } },  -- playtime gifts today (v4)
+    spin: { nextFreeAt: number, spins: number, total: number },     -- the Lucky Spin (v4)
     snackdex: { creatures: { [string]: boolean },              -- ever owned (v3, backfilled on migration)
                 variants: { [string]: { [string]: boolean } }, -- creature id -> mutation ids owned with it
                 tiers: { [string]: boolean } },                -- rarity tiers whose reward was paid

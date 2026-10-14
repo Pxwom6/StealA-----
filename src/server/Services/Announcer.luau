@@ -11,7 +11,7 @@ export type Announcement = {
 	text: string,
 	rarity: string?, -- colours the banner
 	color: string?, -- "#RRGGBB": colours the banner instead of the rarity (a mutation's own announcement)
-	kind: string?, -- "spawn" | "buy" | "steal" | "rebirth" | "luck" | "admin" | "map" | "modifier" | "drop"
+	kind: string?, -- "spawn" | "buy" | "steal" | "rebirth" | "luck" | "admin" | "map" | "modifier" | "drop" | "spin"
 }
 
 local Announcer = {}

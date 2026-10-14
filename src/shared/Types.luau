@@ -562,6 +562,42 @@ export type ModifiersConfig = {
 	limits: { [string]: { min: number, max: number } }, -- allowed range of each effect
 }
 
+-- Config: playtime gifts (Config/Gifts) and the Lucky Spin (Config/Spin) ------------------------------------------
+
+-- What a gift or a spin gives: cash sized from steady income (like a cash pack), spins for the Lucky Spin, or a
+-- Snackling rolled at `luck` x the server's luck (sold for its refund when the base is full), optionally always with
+-- `mutation`.
+export type PrizeReward =
+	{ kind: "cash", incomeSeconds: number, minimum: number }
+	| { kind: "spin", count: number }
+	| { kind: "creature", luck: number, mutation: string? }
+
+export type GiftDef = {
+	minutes: number, -- minutes played today before it unlocks
+	icon: string,
+	reward: PrizeReward,
+}
+
+export type GiftsConfig = {
+	ladder: { GiftDef }, -- in unlock order
+}
+
+export type SpinSegment = {
+	id: string,
+	label: string, -- on its reel tile, e.g. "Jackpot!"
+	icon: string,
+	color: string, -- the tile's colour
+	weight: number, -- chance = weight / total
+	reward: PrizeReward, -- never "spin"
+}
+
+export type SpinConfig = {
+	freeEverySeconds: number, -- a free spin this long after the last free one
+	maxBanked: number, -- spins from gifts beyond this are paid as cash instead (Logic/SpinRules)
+	bankedOverflow: { incomeSeconds: number, minimum: number }, -- that cash, per spin
+	segments: { SpinSegment },
+}
+
 -- Config: redeem codes (server/Codes.luau, server-only so codes never reach a client) --------------------------------
 
 -- What a code gives: cash sized from the player's steady income (like a cash pack), or a Snackling (with a mutation
@@ -770,6 +806,20 @@ export type QuestState = {
 	bonusClaimed: boolean, -- the all-done bonus for `day` was paid
 }
 
+-- Playtime gifts (v4): a ladder of gifts that unlock with time played each UTC day (Config/Gifts, Logic/GiftRules).
+export type GiftState = {
+	day: number, -- UTC day index (DailyStreak.dayIndex) the playtime belongs to; -1 before the first
+	seconds: number, -- seconds played that day (counted while in game)
+	claimed: { number }, -- ladder indices claimed that day
+}
+
+-- The Lucky Spin (v4): a free spin every so often, plus spins banked from gifts (Config/Spin, Logic/SpinRules).
+export type SpinState = {
+	nextFreeAt: number, -- Unix time the next free spin is ready (0 = ready now)
+	spins: number, -- extra spins banked
+	total: number, -- spins ever spun
+}
+
 export type PlayerData = {
 	version: number,
 	cash: number,
@@ -795,6 +845,8 @@ export type PlayerData = {
 	lastSeen: number,
 	snackdex: Snackdex, -- v3
 	quests: QuestState, -- v3
+	gifts: GiftState, -- v4
+	spin: SpinState, -- v4
 }
 
 -- Runtime / network ---------------------------------------------------------------------------------------------
@@ -841,6 +893,23 @@ export type SettingsView = {
 
 -- One of today's quests as the Rewards panel shows it. `reward` is what claiming pays right now.
 export type QuestSlotView = { id: string, progress: number, target: number, claimed: boolean, reward: number }
+
+-- Playtime gifts as the Rewards panel shows them. The client counts on from `seconds` while it stays in game.
+export type GiftsView = {
+	seconds: number, -- seconds played today when this state was sent
+	syncedAt: number, -- Unix time it was sent (server clock)
+	claimed: { number }, -- ladder indices claimed today
+	claimable: number, -- unlocked and not claimed, when sent
+	resetsAt: number, -- Unix time of the next UTC midnight (the ladder starts again)
+	rewards: { number }, -- what each cash gift pays right now (0 for other kinds)
+}
+
+export type SpinView = {
+	nextFreeAt: number, -- Unix time the next free spin is ready
+	spins: number, -- banked spins
+	ready: boolean, -- a spin can be used now (free or banked)
+	rewards: { number }, -- what each cash segment pays right now (0 for other kinds)
+}
 
 export type QuestsView = {
 	list: { QuestSlotView },
@@ -901,6 +970,8 @@ export type ClientState = {
 	tutorial: TutorialView,
 	settings: SettingsView,
 	quests: QuestsView,
+	gifts: GiftsView,
+	spin: SpinView,
 }
 
 export type BeltItem = { id: number, creatureId: string, spawnAt: number, variant: string? }

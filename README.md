@@ -263,6 +263,14 @@ Reduce effects switches. They apply at once and are saved per player in the save
 particles, the belt / factory animations, Bloom and SunRays on that device; client code can read it with
 `ClientSettings.reduceEffects()` (or the LocalPlayer attribute `ReduceEffects`).
 
+### Playtime gifts and the Lucky Spin
+
+The Rewards panel (🎁) has four tabs: Daily, Quests, **Gifts** (six gifts a day that unlock with time in game: cash,
+Lucky Spins, lucky Snacklings) and **Spin** (the Lucky Spin reel: a free spin every 12 hours, plus spins from gifts;
+"Odds" lists every chance). Tune them in `src/shared/Config/Gifts.luau` and `src/shared/Config/Spin.luau` (CI checks
+both); BALANCE.md has the numbers. Studio: `/playtime <minutes>` unlocks gifts, `/spins <n>` banks spins and
+`/spins free` makes the free spin ready.
+
 ### Redeem codes
 
 Players redeem codes from the Settings dialog (🎟️ Codes row). The codes live in `src/server/Codes.luau`, which never
@@ -291,6 +299,7 @@ These work in Studio only (`src/server/Services/DevCommands.luau`):
 * `/gallery [mutationId|off]` (every Snackling in labelled rows past the north boundary wall, e.g. `/gallery golden`),
   `/sky <clockTime>` (preview another time of day, e.g. `/sky 18`; the next map or season change resets it)
 * `/map <id>`, `/map vote`, `/map list` (map themes; admins can use these in live servers too, that server only)
+* `/playtime <minutes>` (unlock playtime gifts), `/spins <n>` / `/spins free` (Lucky Spins)
 * `/mod <id> [minutes]`, `/mod off`, `/mod list` (server modifiers, e.g. `/mod rushHour 2`, `/mod thunderstorm`,
   `/mod supplyDrop` (first crate after 10 s); admins too, that server only)
 
