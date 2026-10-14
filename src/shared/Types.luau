@@ -287,6 +287,10 @@ export type SeasonDecorations = {
 	snowmen: number?, -- at the belt ends (the ghosts' spots)
 	snowflakes: number?, -- big flakes hanging above the walkway (the bats' spots, a little higher)
 	snowPilesPerPlot: number?, -- snowdrifts along each plot's front wall, from the corners in (1 or 2)
+	rosesPerPlot: number?, -- potted rose bushes beside each plot entrance (after any pumpkins and presents)
+	beltRosesPerSide: number?, -- smaller ones along both belt rails (after any pumpkins and presents)
+	heartBalloons: number?, -- heart-shaped balloons floating above the walkway
+	giantHearts: number?, -- big hearts pierced by Cupid's arrow at the belt ends (after any snowmen)
 }
 
 -- Colours of the props a theme uses ("#RRGGBB"). Only the keys of the props a theme places are needed
@@ -312,6 +316,14 @@ export type SeasonPalette = {
 	scarf: string?,
 	hat: string?,
 	snowflake: string?,
+	pot: string?, -- rose pots
+	leaves: string?, -- rose bushes
+	roses: { string }?, -- rose blooms
+	balloons: { string }?, -- heart balloons
+	balloonString: string?,
+	heart: string?, -- the giant hearts
+	pedestal: string?,
+	arrow: string?, -- Cupid's arrow through each giant heart
 }
 
 export type SeasonTheme = {

@@ -299,6 +299,101 @@ T.describe("SeasonRules.layout (Winter on the real map)", function()
 	end)
 end)
 
+T.describe("SeasonRules.layout (Valentine's on the real map)", function()
+	local map, rects = realMap()
+	local valentine = theme("Valentine2027")
+	local d = valentine.decorations
+	local props = SeasonRules.layout(d, valentine.palette, map)
+	local counts = countKinds(props)
+
+	T.it("is switched on by Valentine2027 and drops petals", function()
+		T.expect((SeasonRules.activeTheme(Seasons, { Valentine2027 = true, ValentineLuck2027 = true })))
+			.toBe("valentine")
+		T.expect(valentine.weather).toBe("petals")
+	end)
+	T.it("stays within the part budget", function()
+		T.expect(SeasonRules.partCount(props)).toBeAtMost(Seasons.maxParts)
+		T.expect(SeasonRules.partCount(props)).toBe(280)
+	end)
+	T.it("places the configured number of each prop, and nothing from the other seasons", function()
+		T.expect(counts.rosePot).toBe((d.rosesPerPlot :: number) * MAP.plotCount + 2 * (d.beltRosesPerSide :: number))
+		T.expect(counts.bulb).toBe((d.bulbsPerPlot :: number) * MAP.plotCount)
+		T.expect(counts.lamp).toBe(2 * (MAP.plotsPerSide - 1))
+		T.expect(counts.heartBalloon).toBe(d.heartBalloons)
+		T.expect(counts.giantHeart).toBe(d.giantHearts)
+		for _, kind in { "pumpkin", "present", "tree", "snowman", "snowflake", "snowPile", "bat", "ghost" } do
+			T.expect(counts[kind]).toBeNil()
+		end
+	end)
+	T.it("never puts anything inside a plot, on the belt or on the lobby spawn", function()
+		expectClearOfGameplay(props, rects)
+	end)
+	T.it("colours the roses and balloons from their lists, facing the walkway", function()
+		for _, prop in props do
+			if prop.kind == "rosePot" then
+				T.expect(table.find(valentine.palette.roses :: { string }, prop.color :: string) ~= nil).toBe(true)
+				T.expect(table.find(valentine.palette.roses :: { string }, prop.color2 :: string) ~= nil).toBe(true)
+				local atBelt = math.abs(prop.z) < MAP.walkwayWidth / 2
+				if atBelt then
+					T.expect(prop.faceZ * prop.z).toBeGreaterThan(0)
+				else
+					T.expect(prop.faceZ * prop.z).toBeLessThan(0)
+				end
+			elseif prop.kind == "heartBalloon" then
+				T.expect(table.find(valentine.palette.balloons :: { string }, prop.color :: string) ~= nil).toBe(true)
+				-- above head height, over the walkway, facing across the belt
+				T.expect(prop.y).toBeGreaterThan(10)
+				T.expect(math.abs(prop.z)).toBeLessThan(MAP.walkwayWidth)
+				T.expect(prop.faceZ * prop.z).toBeLessThan(0)
+			end
+		end
+	end)
+	T.it("stands the giant hearts past the belt ends, clear of the factory and the chute", function()
+		for _, prop in props do
+			if prop.kind == "giantHeart" then
+				T.expect(math.abs(prop.x)).toBeGreaterThan(Gameplay.belt.length / 2)
+				T.expect(prop.y).toBe(map.groundY)
+				T.expect(prop.faceX * prop.x).toBeLessThan(0) -- looking back at the belt
+				-- the heart is 6.5 studs wide, across the walkway: its near edge stays clear of the factory intake
+				-- and the chute (|z| up to 7)
+				T.expect(math.abs(prop.z) - 3.25).toBeGreaterThan(7)
+			end
+		end
+	end)
+	T.it("never stacks two props on the same spot", function()
+		for i, a in props do
+			for j = i + 1, #props do
+				local b = props[j]
+				local apart = math.sqrt((a.x - b.x) ^ 2 + (a.y - b.y) ^ 2 + (a.z - b.z) ^ 2)
+				if apart < 1.5 then
+					error(`{a.kind} and {b.kind} share the spot ({a.x}, {a.y}, {a.z})`)
+				end
+			end
+		end
+	end)
+	T.it("shares the spots with every other prop without overlapping", function()
+		local everything = table.clone(d)
+		everything.pumpkinsPerPlot = 1
+		everything.presentsPerPlot = 1
+		everything.beltPumpkinsPerSide = 1
+		everything.beltPresentsPerSide = 1
+		everything.snowmen = 4
+		everything.bats = 6
+		everything.snowflakes = 8
+		local mixed = SeasonRules.layout(everything, valentine.palette, map)
+		local mixedCounts = countKinds(mixed)
+		T.expect(mixedCounts.rosePot).toBe(counts.rosePot)
+		T.expect(mixedCounts.giantHeart).toBe(counts.giantHeart)
+		T.expect(mixedCounts.snowman).toBe(4)
+		for i, a in mixed do
+			for j = i + 1, #mixed do
+				local b = mixed[j]
+				T.expect(math.sqrt((a.x - b.x) ^ 2 + (a.y - b.y) ^ 2 + (a.z - b.z) ^ 2)).toBeGreaterThan(1.5)
+			end
+		end
+	end)
+end)
+
 T.describe("SeasonRules.validate", function()
 	local map = realMap()
 	T.it("accepts the shipped config", function()

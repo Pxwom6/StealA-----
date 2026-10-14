@@ -850,3 +850,31 @@ it needs no new save data and starts and ends by itself.
 chase rather than a hold: runaways get players moving and bumping into each other on the walkways, where stealing
 happens.
 **Reversal cost:** none — `weight = 0` keeps any of them for `/mod` only; keep the mutation ids.
+
+### 41. Valentine's 2027: the third seasonal event, and three new kinds of decoration
+
+* **What:** `Valentine2027` (Fri 5 Feb 17:00 UTC → Tue 16 Feb 08:00 UTC, taking in Valentine's Day and the US
+  Presidents' Day holiday) with `ValentineLuck2027` (2× luck, Valentine's weekend). Four event Snacklings, one per tier
+  from Rare to Mythic like the other events, a little pricier than Winter's: Candy Heart Hamster, Cherry Cordial
+  Kitten, Red Velvet Raccoon and Rose Petal Pegasus, with hand-built polished models (`batch-5.json`, checked from
+  five sides in the offline preview; `prompt-batch-5.md` asks Claude Design for its own take) and recipe fallbacks.
+  The Sweetheart mutation (2%, x3, like Haunted and Festive): candy red with a pink glow and little hearts floating
+  up. The `valentine` theme: potted rose bushes beside every entrance and along the belt, heart balloons over the
+  walkway, giant hearts pierced by Cupid's arrows at the belt ends (lit from inside), string lights, rose-pink lamps,
+  a rosy late afternoon and falling petals. Code `LOVE27` (a Sweetheart Candy Heart Hamster, until the event ends).
+* **New prop kinds, same rules:** roses take the entrance and belt spots after pumpkins and presents, balloons the
+  air over the walkway below the bats, giant hearts the belt-end corners after the snowmen, so every kind can share a
+  theme without two props on one spot (tested with all of them at once). Each is counted in SeasonRules and built
+  exactly; the theme builds 280 of the 400 parts allowed.
+* **No music yet:** no Valentine's track was verified to load, so the theme keeps the lobby track until one is pasted
+  into `music.valentine` (a slot that fails to load is skipped anyway).
+* **Mutation bounds:** with a third event mutation, every event at once (only possible by admin command) adds up to
+  13.15% of spawns, so that check's bound moved from 12% to 15%; any one event with the strongest map and modifier
+  stays at 9.15%, under 10%.
+* **Renders before shipping:** the kitten's chest first read as a bite with a cherry in it and became a cream heart;
+  the raccoon's forehead blaze read as a horn and went; the pegasus lost brows that made it look worried and gained
+  shoulders and haunches so its legs join its body.
+
+**Why:** an event between Winter and the spring, with Snacklings and a mutation players can only get then.
+**Reversal cost:** none — move the dates, or drop the `Valentine2027` line from Config/Seasons to keep the
+Snacklings without the decorations. Never remove the creature or mutation ids (they are in players' saves).

@@ -732,6 +732,54 @@ local Creatures: { CreatureDef } = {
 		flavor = "Glitters in the first snowfall.",
 		eventId = "Winter2026",
 	},
+
+	-- Event: Valentine's 2027 -----------------------------------------------------------------------------------
+	-- Only spawn while LiveOps event "Valentine2027" runs, sharing their tier's odds like the other event ones
+	-- (BALANCE.md "Valentine's"). Appended after everything else, so no earlier roll changes.
+	{
+		id = "candy_heart_hamster",
+		displayName = "Candy Heart Hamster",
+		rarity = "Rare",
+		price = 12000,
+		income = 158,
+		beltWeight = 30,
+		modelName = "CandyHeartHamster",
+		flavor = "Says BE MINE. Means ALL MINE.",
+		eventId = "Valentine2027",
+	},
+	{
+		id = "cherry_cordial_kitten",
+		displayName = "Cherry Cordial Kitten",
+		rarity = "Epic",
+		price = 140000,
+		income = 905,
+		beltWeight = 30,
+		modelName = "CherryCordialKitten",
+		flavor = "Hard shell, soft centre, sweet on everyone.",
+		eventId = "Valentine2027",
+	},
+	{
+		id = "red_velvet_raccoon",
+		displayName = "Red Velvet Raccoon",
+		rarity = "Legendary",
+		price = 3200000,
+		income = 6250,
+		beltWeight = 30,
+		modelName = "RedVelvetRaccoon",
+		flavor = "Steals hearts. And the frosting.",
+		eventId = "Valentine2027",
+	},
+	{
+		id = "rose_petal_pegasus",
+		displayName = "Rose Petal Pegasus",
+		rarity = "Mythic",
+		price = 80000000,
+		income = 54000,
+		beltWeight = 40,
+		modelName = "RosePetalPegasus",
+		flavor = "Flies on rose petals. Lands in your heart.",
+		eventId = "Valentine2027",
+	},
 }
 
 return Creatures

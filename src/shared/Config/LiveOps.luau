@@ -105,6 +105,30 @@ local LiveOps = {
 			title = "Christmas luck",
 			durationSeconds = 1800,
 		},
+
+		-- Valentine's 2027: four event Snacklings (Config/Creatures), the Sweetheart mutation (Config/Mutations) and the
+		-- "valentine" seasonal theme (Config/Seasons: potted roses, heart balloons, giant hearts with Cupid's arrows,
+		-- string lights, rose-pink lamps, falling petals and a rosy late afternoon).
+		-- Fri 5 Feb 17:00 UTC (12 PM EST / 9 AM PST) -> Tue 16 Feb 08:00 UTC (3 AM EST / Mon midnight PST), so it
+		-- takes in Valentine's Day (Sun 14) and the US Presidents' Day holiday after it (Mon 15).
+		{
+			id = "Valentine2027",
+			startsAt = 1801846800, -- 2027-02-05 17:00 UTC
+			endsAt = 1802764800, -- 2027-02-16 08:00 UTC
+			bannerText = "Valentine's: sweet Snacklings & Sweetheart mutations!",
+			title = "Valentine's",
+			durationSeconds = 3600, -- `/event Valentine2027` runs it for an hour
+		},
+		-- Valentine's weekend inside the event: 2x luck (stacks with Server Luck, clamped by limits below).
+		-- Fri 12 Feb 17:00 UTC (12 PM EST / 9 AM PST) -> Sun 14 Feb 23:59 UTC (6:59 PM EST / 3:59 PM PST).
+		{
+			id = "ValentineLuck2027",
+			startsAt = 1802451600, -- 2027-02-12 17:00 UTC
+			endsAt = 1802649540, -- 2027-02-14 23:59 UTC
+			luckMultiplier = 2,
+			title = "Sweetheart luck",
+			durationSeconds = 1800,
+		},
 	} :: { EventDef },
 
 	limits = {
