@@ -9,6 +9,7 @@ local Services = script.Services
 
 local Analytics = require(Services.Analytics)
 local BeltService = require(Services.BeltService)
+local CodeService = require(Services.CodeService)
 local DataService = require(Services.DataService)
 local DevCommands = require(Services.DevCommands)
 local DropService = require(Services.DropService)
@@ -63,6 +64,7 @@ SnackdexService.start() -- after the tutorial: discoveries (and the quest event 
 QuestService.start()
 LeaderboardService.start(world)
 SettingsService.start() -- music / sound effects / reduce effects, saved in flags
+CodeService.start() -- redeem codes (server/Codes.luau), once per account, saved in flags
 DevCommands.start() -- Studio only
 
 local hooks = PlayerLifecycle.hooks()

@@ -3,7 +3,7 @@
 	Settings: a small gear button in the HUD's top-right corner (just under Roblox's top bar; left of Roblox's player
 	list on computers, see Logic/ScreenLayout) opens a dialog with three switches: Music, Sound effects and Reduce
 	effects. A change applies at once and is saved per player (ClientSettings → SetSetting intent → `settings_<key>`
-	flags in the save).
+	flags in the save). A last row opens the Redeem Code dialog (CodesController).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,6 +17,7 @@ local SettingsRules = require(ReplicatedStorage.Shared.Logic.SettingsRules)
 local Modal = require(script.Parent.Parent.UI.Modal)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local ClientSettings = require(script.Parent.ClientSettings)
+local CodesController = require(script.Parent.CodesController)
 local HudController = require(script.Parent.HudController)
 local SoundPlayer = require(script.Parent.SoundPlayer)
 
@@ -58,7 +59,7 @@ end
 
 -- One settings line: its label (and hint) on the left, an ON / OFF switch on the right; the whole row is the target.
 local function buildRow(row: Row, order: number, parent: Instance): (Types.SettingsView) -> ()
-	local height = if row.hint then 84 else 60
+	local height = if row.hint then 78 else 54
 	local button = UiKit.new("TextButton", {
 		Name = row.key,
 		LayoutOrder = order,
@@ -75,8 +76,8 @@ local function buildRow(row: Row, order: number, parent: Instance): (Types.Setti
 		Name = "Label",
 		Text = UiTheme.text(row.label),
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Position = UDim2.fromOffset(16, 8),
-		Size = UDim2.new(1, -TRACK_SIZE.X - 40, 0, 44),
+		Position = UDim2.fromOffset(16, 7),
+		Size = UDim2.new(1, -TRACK_SIZE.X - 40, 0, 40),
 		Parent = button,
 	})
 	if row.hint then
@@ -87,7 +88,7 @@ local function buildRow(row: Row, order: number, parent: Instance): (Types.Setti
 			TextColor3 = UiTheme.palette("textDim"),
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextWrapped = true,
-			Position = UDim2.fromOffset(16, 52),
+			Position = UDim2.fromOffset(16, 48),
 			Size = UDim2.new(1, -TRACK_SIZE.X - 40, 0, 24),
 			Parent = button,
 		})
@@ -151,9 +152,48 @@ local function buildRow(row: Row, order: number, parent: Instance): (Types.Setti
 	return show
 end
 
+-- The last row: opens the Redeem Code dialog in place of this one.
+local function buildCodesRow(order: number, parent: Instance)
+	local button = UiKit.new("TextButton", {
+		Name = "Codes",
+		LayoutOrder = order,
+		AutoButtonColor = false,
+		Text = "",
+		Size = UDim2.new(1, 0, 0, 54),
+		BackgroundColor3 = UiTheme.palette("panelLight"),
+		Parent = parent,
+	}) :: TextButton
+	UiKit.corner(UiKit.RADIUS.medium).Parent = button
+	UiKit.stroke(UiKit.STROKE.normal).Parent = button
+	UiKit.addPressFeedback(button)
+	UiKit.label({
+		Name = "Label",
+		Text = Theme.text.settingsCodes,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.fromOffset(16, 7),
+		Size = UDim2.new(0.45, 0, 0, 40),
+		Parent = button,
+	})
+	UiKit.label({
+		Name = "Hint",
+		Text = Theme.text.settingsCodesHint,
+		FontFace = UiTheme.bodyFont,
+		TextColor3 = UiTheme.palette("textDim"),
+		TextXAlignment = Enum.TextXAlignment.Right,
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -16, 0.5, 0),
+		Size = UDim2.new(0.5, 0, 0, 24),
+		Parent = button,
+	})
+	button.Activated:Connect(function()
+		SoundPlayer.ui("click")
+		CodesController.open()
+	end)
+end
+
 function SettingsController.open()
 	local stopListening: (() -> ())? = nil
-	local modal = Modal.open(Theme.text.settingsTitle, Vector2.new(460, 300), function()
+	local modal = Modal.open(Theme.text.settingsTitle, Vector2.new(460, 336), function()
 		if stopListening then
 			stopListening()
 		end
@@ -167,6 +207,7 @@ function SettingsController.open()
 	for order, row in ROWS do
 		table.insert(updaters, buildRow(row, order, modal.body))
 	end
+	buildCodesRow(#ROWS + 1, modal.body)
 	stopListening = ClientSettings.onChanged(function(settings)
 		for _, update in updaters do
 			update(settings)

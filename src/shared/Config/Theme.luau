@@ -448,6 +448,21 @@ local Theme = {
 		modifierStarted = "{icon} {name}! {description}",
 		modifierChip = "{icon} {name} {time}",
 
+		-- Redeem codes (server/Codes.luau): the Codes dialog (from Settings) and its answers
+		settingsCodes = "🎟️ Codes",
+		settingsCodesHint = "Got a code? Redeem it here",
+		codesTitle = "Redeem a Code",
+		codesBody = "Codes give free cash and Snacklings. Each one works once.",
+		codesPlaceholder = "Type a code",
+		codesRedeem = "Redeem",
+		codeRedeemedCash = "🎟️ Code redeemed: +{amount}!",
+		codeRedeemedCreature = "🎟️ Code redeemed: {creature} joined your base!",
+		codeInvalid = "Codes are letters and numbers only.",
+		codeUnknown = "That code doesn't exist. Check the spelling!",
+		codeExpired = "That code has expired.",
+		codeUsed = "You've already redeemed that code.",
+		codeBaseFull = "Your base is full! Sell a Snackling, then redeem the code again.",
+
 		-- Drops (Config/Drops): supply crates and coins on the walkways
 		crateAction = "Open",
 		crateObject = "Supply Crate",

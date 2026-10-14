@@ -281,6 +281,34 @@ local function scenario()
 	Sim.chat(alice, "/mod off")
 	task.wait(0.1)
 
+	-- Redeem codes ------------------------------------------------------------------------------------------------------
+	local function lastToast(userId: number): string
+		local list = Sim.received(userId, "Notify")
+		local last = list[#list]
+		return if last then last[1].text else ""
+	end
+	local cash = bobSession.data.cash
+	Sim.fireServer(bob, "RedeemCode", " welcome ")
+	task.wait(0.1)
+	check(bobSession.data.cash > cash, "a code pays (typed in lower case, with spaces)")
+	cash = bobSession.data.cash
+	Sim.fireServer(bob, "RedeemCode", "WELCOME")
+	task.wait(0.1)
+	check(bobSession.data.cash == cash, "but only once per account")
+	check(string.find(lastToast(1002), "already", 1, true) ~= nil, `and says so ({lastToast(1002)})`)
+	Sim.fireServer(bob, "RedeemCode", "NOTACODE")
+	task.wait(0.1)
+	check(string.find(lastToast(1002), "exist", 1, true) ~= nil, "an unknown code is refused")
+	-- (Alice: Bob has used up his burst of tries; the rate limit allows one more every 5 s.)
+	local aliceOwned = #aliceSession.data.creatures
+	Sim.fireServer(alice, "RedeemCode", "snacktime")
+	task.wait(0.1)
+	local newest = aliceSession.data.creatures[#aliceSession.data.creatures]
+	check(
+		#aliceSession.data.creatures == aliceOwned + 1 and newest.variant == "golden",
+		"a Snackling code puts a Golden Snackling in the base"
+	)
+
 	-- Locking -------------------------------------------------------------------------------------------------------------
 	local lockButton = PlotService.refs(aliceSession.plot).lockButton
 	Sim.moveCharacter(alice, lockButton.Position + roblox.Vector3.new(0, 3, 0))

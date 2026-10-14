@@ -188,6 +188,7 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `VoteMap` | `themeId: string` | a map vote is running and `themeId` is on its ballot (one vote per player, changeable) |
 | `CrateBegin` | `crateId: int` | the supply crate exists, has landed and is closed; the player's trusted position is within reach → the hold starts |
 | `CrateOpen` | `crateId: int` | same, and the hold lasted long enough (`DropRules.holdLongEnough`); the first one wins |
+| `RedeemCode` | `code: string` | letters and digits, at most 24 (`CodeRules.normalize`); the code exists, has not expired and its `code_<CODE>` flag is unset; a Snackling code needs a free podium; rate limit 3 then 1 per 5 s |
 | `DevGrantProduct` | `key: string` | **Studio only** – runs the real receipt path with a fake receipt |
 
 Server → client:
@@ -237,7 +238,8 @@ type PlayerData = {   -- exactly Types.PlayerData
     stats: { steals: number, timesStolenFrom: number, beltPurchases: number, playTime: number,
              bestCashPerSecond: number, robuxSpent: number, totalEarned: number },
     flags: { [string]: boolean },  -- onboarding funnel milestones, one-time rewards (`social_groupWelcome`),
-                                   -- tutorial progress (`tutorial_<step>`, `tutorial_done`), settings (`settings_<key>`)
+                                   -- tutorial progress (`tutorial_<step>`, `tutorial_done`), settings (`settings_<key>`),
+                                   -- redeemed codes (`code_<CODE>`)
     firstJoin: number, lastSeen: number,
     snackdex: { creatures: { [string]: boolean },              -- ever owned (v3, backfilled on migration)
                 variants: { [string]: { [string]: boolean } }, -- creature id -> mutation ids owned with it

@@ -143,6 +143,8 @@ local Gameplay = {
 		-- Supply crates (DropService): a hold starting and completing; letting go and holding again is fine.
 		CrateBegin = { burst = 4, perSecond = 2 },
 		CrateOpen = { burst = 4, perSecond = 2 },
+		-- Redeem codes (CodeService): a few tries, then one every 5 s, so codes can't be guessed by brute force.
+		RedeemCode = { burst = 3, perSecond = 0.2 },
 	} :: { [string]: RateLimit },
 }
 

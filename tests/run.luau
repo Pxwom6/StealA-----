@@ -38,5 +38,6 @@ require("./CashOfferRules.spec")
 require("./MapThemeRules.spec")
 require("./ModifierRules.spec")
 require("./DropRules.spec")
+require("./CodeRules.spec")
 
 T.finish()
