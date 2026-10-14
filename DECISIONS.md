@@ -785,3 +785,22 @@ place for Roblox badges.
 **Why:** the Christmas holidays are the busiest weeks of the Roblox year; the event reuses every Halloween system so
 it needs no new save data and starts and ends by itself.
 **Reversal cost:** none for dates, decorations and codes (data); event creature and mutation ids are permanent.
+
+### 38. More maps: Cocoa Canyon, Cotton Candy Carnival, Pizza Piazza
+
+* **What:** three more worlds on the same pieces as #32. **Cocoa Canyon**: cocoa-powder ground, a chocolate river,
+  giant chocolate-dipped strawberries and cacao trees with ripe pods, tiered chocolate fountains and layer-cake mesas
+  (the mesa landmark recoloured), chocolate shavings drifting down in a golden afternoon. **Cotton Candy Carnival**:
+  fairy-floss trees, bunches of party balloons, Ferris wheels with glowing rims and striped big tops at a pink dusk,
+  with confetti. **Pizza Piazza**: olive trees and tall cypresses, leaning bell towers and brick pizza ovens with a fire
+  in their mouths, cobbled walkways, a warm Mediterranean afternoon with golden pollen. Signature mutations: Fudge
+  (glossy chocolate, dripping), Balloon (shiny pink foil, confetti) and Cheesy (melted mozzarella, cheese drips).
+* **Same guarantees:** 6 flora kinds, 5 landmark kinds, 2 weather kinds and 3 particle presets, each counted in
+  MapThemeRules and built exactly (the smoke test builds and restyles all seventeen maps), flora inside the trees'
+  footprints, every map under the scenery part budget. Rendered offline from several angles before shipping (a tent
+  roof and the oven's size were fixed from the renders).
+* **Globetrotter** ("play on every map") now takes its target from the number of maps, so it stays true as maps are
+  added; anyone who already has it keeps it (achievements pay once).
+
+**Why:** more variety for the 20-minute rotation, and three more signature mutations to collect.
+**Reversal cost:** none — `weight = 0` keeps a map out of rotation; keep its mutation id.

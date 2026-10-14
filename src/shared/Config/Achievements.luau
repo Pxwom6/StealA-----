@@ -11,6 +11,7 @@
 ]]
 
 local Types = require("../Types")
+local MapThemes = require("./MapThemes")
 
 local function cash(seconds: number, minimum: number): Types.PrizeReward
 	return { kind = "cash", incomeSeconds = seconds, minimum = minimum }
@@ -244,7 +245,7 @@ local Achievements: Types.AchievementsConfig = {
 			description = "Play on every map",
 			icon = "🌍",
 			goal = "maps",
-			target = 14,
+			target = #MapThemes.order, -- grows with the maps (players who already have it keep it)
 			reward = { kind = "spin", count = 3 },
 		},
 		{

@@ -324,9 +324,10 @@ Two "come back tomorrow" loops (DECISIONS.md #24), both server-authoritative and
 
 ## 11. Map themes
 
-Fourteen dressings of the same map (DECISIONS.md #29, #32): Sunny Meadow, Candy Kingdom, Frosty Peaks, Nacho Dunes,
-Hot Sauce Volcano, Midnight Market, Coconut Cove, Apple Pie Orchard, Cherry Blossom Garden, Cookie Moon, Mango
-Rainforest, Neon Noodle City, Cloud Nine and Sushi Reef (`Config/MapThemes`). Each changes the scenery's colours,
+Seventeen dressings of the same map (DECISIONS.md #29, #32, #38): Sunny Meadow, Candy Kingdom, Frosty Peaks, Nacho
+Dunes, Hot Sauce Volcano, Midnight Market, Coconut Cove, Apple Pie Orchard, Cherry Blossom Garden, Cookie Moon, Mango
+Rainforest, Neon Noodle City, Cloud Nine, Sushi Reef, Cocoa Canyon, Cotton Candy Carnival and Pizza Piazza
+(`Config/MapThemes`). Each changes the scenery's colours,
 the ground / walkway / wall materials, the lighting, what grows on the tree spots, ten big landmarks outside the wall
 and the weather around each player; plots, the belt and every gameplay position never move. A server starts on a
 random map and changes it every 20 minutes after a 40-second vote between three others (HUD top stack, `VoteMap`).

@@ -125,6 +125,10 @@ local RELEASED_MUTATION_IDS = {
 	"galaxy",
 	"toxic",
 	"festive", -- Winter 2026 (event-only)
+	-- map signatures of the maps added later
+	"fudge",
+	"balloon",
+	"cheesy",
 }
 
 T.describe("Config integrity", function()
