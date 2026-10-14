@@ -1,6 +1,7 @@
 --!strict
 --[[
-	How every Snackling looks: one model recipe per creature id (Config/Creatures). Plain data only.
+	How every Snackling looks: one model recipe per creature id (Config/Creatures). Plain data only. The polished models in
+	Config/CreatureParts replace these where they exist (all 64 today); the recipes stay as the fallback.
 	Logic/CreatureRecipe turns a recipe into parts (its header lists every plan, skin, face, feature and topping) and
 	CreatureVisuals builds them in 3D; ReplicatedStorage.CreatureModels/<modelName> replaces a recipe with custom art.
 

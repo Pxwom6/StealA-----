@@ -44,6 +44,7 @@ Studio test purchases, etc.).
 | --- | --- |
 | `lune run tests/run.luau` | Unit tests for all pure game logic (no Studio needed) |
 | `lune run tools/simulate.luau` | Economy simulation used to write `BALANCE.md` |
+| `lune run tools/importParts.luau` | Import the polished Snackling models from `art/snackling-parts/` |
 | `stylua src tests tools` | Format |
 | `selene src tests tools` | Lint |
 | `rojo sourcemap default.project.json -o sourcemap.json` | Sourcemap for luau-lsp |
@@ -137,15 +138,20 @@ already had progress when it shipped never see it. Steps finish only when the se
 
 ### Snackling models
 
-Every Snackling is a 3D "living snack" built in code from plain Roblox parts (no meshes or asset ids): its recipe in
-`src/shared/Config/CreatureLooks.luau` picks a body plan (blob, biped, quadruped, swimmer, tentacled), the food its
+Every Snackling is a 3D "living snack" built in code from plain Roblox parts (no meshes or asset ids).
+
+* **Polished models:** all 64 were designed in Claude Design from the prompts in `art/snackling-parts/` and imported
+  with `lune run tools/importParts.luau`, which checks them, sizes them and writes `src/shared/Config/CreatureParts.luau`
+  (generated: edit a `batch-*.json` and re-run the tool). See DECISIONS.md #28.
+* **Recipes (the fallback):** a Snackling without a polished model builds from its recipe in
+  `src/shared/Config/CreatureLooks.luau`, which picks a body plan (blob, biped, quadruped, swimmer, tentacled), the food its
 body and head are made of (pizza slice, sushi roll, donut, cupcake, burger, pancake stack, bowl...), a face, animal
 features (ears, tails, wings, snouts, horns, shells, manes...) and toppings (sprinkles, drips, a cherry...). Every
 kind is listed at the top of `src/shared/Logic/CreatureRecipe.luau`.
 
 * **Restyle one:** change its colours, swap a feature or topping, or change `size`, then check it in Studio with
-  `/gallery`. CI keeps every recipe valid, inside its rarity's part budget (30 Common / Uncommon, 40 Rare / Epic,
-  50 Legendary and up), standing on its feet and narrow enough for the podiums.
+  `/gallery`. CI keeps every model and recipe valid, inside its rarity's part budget (40 Common / Uncommon, 50 Rare /
+  Epic, 60 Legendary and up), standing on its feet and narrow enough for the podiums.
 * **Faces stay readable:** eyes, mouths and cheeks are never restyled by mutations (Golden, Diamond, Rainbow,
   Haunted).
 * **They feel alive:** Snacklings near your camera bob, squash and sway on their podiums, and hop along the belt

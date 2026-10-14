@@ -77,8 +77,13 @@ export type Compiled = {
 
 local CreatureRecipe = {}
 
--- Part budget per rarity order (Root and the Mythic+ aura ring included): CI keeps every recipe under it.
-CreatureRecipe.BUDGETS = { 30, 30, 40, 40, 50, 50, 50 }
+-- Part budget per rarity order (Root and the Mythic+ aura ring included): CI keeps every model under it. Raised by
+-- 10 for the polished imported models (DECISIONS.md #28): Commons / Uncommons 40, Rares / Epics 50, the rest 60.
+CreatureRecipe.BUDGETS = { 40, 40, 50, 50, 60, 60, 60 }
+
+-- What a podium has room for at the rarity's scale (studs): side to side between neighbouring podiums, and up to
+-- the podium billboard (it floats 8.5 above the podium; a model starts 0.7 above that point).
+CreatureRecipe.PODIUM_FIT = table.freeze({ width = 6.6, height = 7.4 })
 
 function CreatureRecipe.budgetFor(rarityOrder: number): number
 	return CreatureRecipe.BUDGETS[math.clamp(rarityOrder, 1, #CreatureRecipe.BUDGETS)]
@@ -3367,6 +3372,322 @@ function CreatureRecipe.validate(look: CreatureLook, materials: { string }): { s
 		end
 	end
 	return problems
+end
+
+-- Imported models (Config/CreatureParts) ---------------------------------------------------------------------------
+--[[
+	Polished models designed in Claude Design (prompts and source JSON in art/snackling-parts, imported by
+	`lune run tools/importParts.luau`, DECISIONS.md #28). A creature's imported model replaces its recipe; the recipe
+	stays as the fallback. Each part is { name, shape, size, position, rotation, color, material, role, transparency? }
+	in design units: the model fits x and z in [-1, 1] and y in [0, 2], stands on y = 0 and faces -Z.
+	  sphere    an ellipsoid, size = its three diameters                                  -> Ellipsoid
+	  box       size = x, y, z                                                            -> Block
+	  cylinder  circular, its axis along local Y, size = diameter, height, diameter       -> Cylinder (along X)
+	  wedge     flat bottom, full-height face at +Z, slope rising from the bottom-front edge to the top-back edge
+	            (Roblox's WedgePart has exactly this shape)                               -> Wedge
+	Rotation is in degrees, three.js Euler order XYZ: rx * ry * rz, the same as CFrame.Angles. The model's `scale`
+	turns design units into studs at rarity scale 1.
+]]
+
+CreatureRecipe.IMPORT = table.freeze({
+	shapes = table.freeze({ sphere = "Ellipsoid", box = "Block", cylinder = "Cylinder", wedge = "Wedge" }),
+	materials = table.freeze({
+		"SmoothPlastic",
+		"Sand",
+		"Fabric",
+		"Glass",
+		"Ice",
+		"Foil",
+		"Metal",
+		"Wood",
+		"Cardboard",
+		"Neon",
+	}),
+	roles = table.freeze({ body = true, face = true, detail = true }),
+	faceNames = table.freeze({
+		Eye = true,
+		Pupil = true,
+		Highlight = true,
+		Mouth = true,
+		Tongue = true,
+		Teeth = true,
+		Cheek = true,
+		Brow = true,
+		Nose = true,
+		Patch = true,
+	}),
+	halfWidth = 1, -- |x| and |z| stay within this
+	height = 2, -- y stays within [0, height]
+	tolerance = 0.03, -- design rounding allowed on those bounds
+	minSize = 0.03, -- smallest part dimension
+	maxTransparency = 0.6,
+	shadowCasters = 3, -- the biggest body shapes cast shadows
+})
+
+local IMPORT = CreatureRecipe.IMPORT
+local SHAPE_VOLUME: { [string]: number } = { sphere = math.pi / 6, box = 1, cylinder = math.pi / 4, wedge = 0.5 }
+
+-- Extra rotation from a design shape's frame to its Roblox part's frame: a Roblox cylinder runs along its local X.
+local TO_ROBLOX: { [string]: M } = { cylinder = rz(math.pi / 2) }
+
+local function eulerXYZ(rot: { number }): M
+	return mmul(mmul(rx(math.rad(rot[1])), ry(math.rad(rot[2]))), rz(math.rad(rot[3])))
+end
+
+-- How far a design part reaches from its centre along world x, y and z: { lowX, highX, lowY, highY, lowZ, highZ },
+-- exact for each shape (half sizes a, b, c on its local x, y, z).
+local function reach(shape: string, r: M, a: number, b: number, c: number): { number }
+	local out: { number } = {}
+	if shape == "wedge" then
+		local corners = {
+			v3(-a, -b, -c),
+			v3(a, -b, -c),
+			v3(-a, -b, c),
+			v3(a, -b, c),
+			v3(-a, b, c),
+			v3(a, b, c),
+		}
+		for axis = 1, 3 do
+			local low, high = math.huge, -math.huge
+			for _, corner in corners do
+				local w = mv(r, corner)
+				local value = if axis == 1 then w.x elseif axis == 2 then w.y else w.z
+				low, high = math.min(low, value), math.max(high, value)
+			end
+			out[axis * 2 - 1], out[axis * 2] = low, high
+		end
+		return out
+	end
+	for axis = 1, 3 do
+		local rx_, ry_, rz_ = r[axis * 3 - 2], r[axis * 3 - 1], r[axis * 3]
+		local e: number
+		if shape == "sphere" then
+			e = math.sqrt((rx_ * a) ^ 2 + (ry_ * b) ^ 2 + (rz_ * c) ^ 2)
+		elseif shape == "cylinder" then
+			e = math.abs(ry_) * b + a * math.sqrt(math.max(0, 1 - ry_ * ry_))
+		else
+			e = math.abs(rx_) * a + math.abs(ry_) * b + math.abs(rz_) * c
+		end
+		out[axis * 2 - 1], out[axis * 2] = -e, e
+	end
+	return out
+end
+
+type Bounds = { minX: number, maxX: number, minY: number, maxY: number, minZ: number, maxZ: number }
+
+-- The design-unit bounding box of a model (every part's exact reach).
+local function importedBounds(model: Types.ImportedModel): Bounds
+	local bounds = {
+		minX = math.huge,
+		maxX = -math.huge,
+		minY = math.huge,
+		maxY = -math.huge,
+		minZ = math.huge,
+		maxZ = -math.huge,
+	}
+	for _, raw in model.parts do
+		local size: { number } = raw[3]
+		local pos: { number } = raw[4]
+		local r = eulerXYZ(raw[5])
+		local e = reach(raw[2], r, size[1] / 2, size[2] / 2, size[3] / 2)
+		bounds.minX = math.min(bounds.minX, pos[1] + e[1])
+		bounds.maxX = math.max(bounds.maxX, pos[1] + e[2])
+		bounds.minY = math.min(bounds.minY, pos[2] + e[3])
+		bounds.maxY = math.max(bounds.maxY, pos[2] + e[4])
+		bounds.minZ = math.min(bounds.minZ, pos[3] + e[5])
+		bounds.maxZ = math.max(bounds.maxZ, pos[3] + e[6])
+	end
+	return bounds
+end
+
+-- Problems with an imported model (an empty list means valid). `maxParts`: its parts allowance (the rarity's budget
+-- minus the Root and the aura ring).
+function CreatureRecipe.validateImported(model: Types.ImportedModel, maxParts: number): { string }
+	local problems: { string } = {}
+	local function problem(message: string)
+		table.insert(problems, message)
+	end
+	local function numbers(value: any, count: number): boolean
+		if type(value) ~= "table" or #value ~= count then
+			return false
+		end
+		for _, n in value do
+			if type(n) ~= "number" or n ~= n or n == math.huge or n == -math.huge then
+				return false
+			end
+		end
+		return true
+	end
+	if not (type(model.scale) == "number" and model.scale > 0 and model.scale < 10) then
+		problem("scale must be in (0, 10)")
+	end
+	if #model.parts == 0 or #model.parts > maxParts then
+		problem(`{#model.parts} parts (allowed 1..{maxParts})`)
+	end
+	local bodies, eyes = 0, 0
+	local wellFormed = true
+	for i, raw in model.parts do
+		local label = `part {i}`
+		if type(raw) ~= "table" or #raw < 8 or #raw > 9 then
+			problem(`{label} must have 8 or 9 values`)
+			wellFormed = false
+			continue
+		end
+		local name, shape, role = raw[1], raw[2], raw[8]
+		if type(name) ~= "string" or string.match(name, "^%a[%w_]*$") == nil then
+			problem(`{label} needs a name`)
+		else
+			label = `part {i} ({name})`
+		end
+		if type(shape) ~= "string" or IMPORT.shapes[shape] == nil then
+			problem(`{label}: unknown shape {shape}`)
+			wellFormed = false
+		end
+		if not (numbers(raw[3], 3) and numbers(raw[4], 3) and numbers(raw[5], 3)) then
+			problem(`{label}: size, position and rotation need three numbers each`)
+			wellFormed = false
+			continue
+		end
+		local size: { number } = raw[3]
+		if math.min(size[1], size[2], size[3]) < IMPORT.minSize - 1e-6 then
+			problem(`{label}: smaller than {IMPORT.minSize}`)
+		end
+		if shape == "cylinder" and math.abs(size[1] - size[3]) > 1e-3 then
+			problem(`{label}: a cylinder must be circular (size x = size z)`)
+		end
+		if type(raw[6]) ~= "string" or string.match(raw[6], HEX_PATTERN) == nil then
+			problem(`{label}: colour must be #RRGGBB`)
+		end
+		if table.find(IMPORT.materials, raw[7]) == nil then
+			problem(`{label}: unknown material {raw[7]}`)
+		end
+		if type(role) ~= "string" or IMPORT.roles[role] == nil then
+			problem(`{label}: unknown role {role}`)
+		end
+		if IMPORT.faceNames[name] and role ~= "face" then
+			problem(`{label}: face parts need the face role (mutations skip them)`)
+		end
+		if role == "face" and not IMPORT.faceNames[name] then
+			problem(
+				`{label}: a face part must be named Eye, Pupil, Highlight, Mouth, Tongue, Teeth, Cheek, Brow, Nose or Patch`
+			)
+		end
+		local transparency = raw[9]
+		if
+			transparency ~= nil
+			and not (type(transparency) == "number" and transparency >= 0 and transparency <= IMPORT.maxTransparency)
+		then
+			problem(`{label}: transparency must be in [0, {IMPORT.maxTransparency}]`)
+		end
+		if name == "Body" then
+			bodies += 1
+		end
+		if name == "Eye" or name == "Pupil" then
+			eyes += 1
+		end
+	end
+	if bodies ~= 1 then
+		problem(`needs exactly one part called Body for the rarity flair (has {bodies})`)
+	end
+	if eyes < 2 then
+		problem("needs two eyes")
+	end
+	if wellFormed and #model.parts > 0 then
+		local b = importedBounds(model)
+		local w, h, tol = IMPORT.halfWidth, IMPORT.height, IMPORT.tolerance
+		if b.minX < -w - tol or b.maxX > w + tol or b.minZ < -w - tol or b.maxZ > w + tol or b.maxY > h + tol then
+			problem("reaches outside the design box (x, z in [-1, 1], y in [0, 2])")
+		end
+		if math.abs(b.minY) > tol then
+			problem(`must stand on y = 0 (lowest point {b.minY})`)
+		end
+	end
+	return problems
+end
+
+-- Every part of an imported model at the given scale (the rarity's modelScale), in model space: the same output as
+-- a compiled recipe. The model is moved so its lowest point is exactly y = 0.
+function CreatureRecipe.compileImported(model: Types.ImportedModel, scale: number?): Compiled
+	local k = model.scale * (scale or 1)
+	local parts: { PartSpec } = {}
+	local volumes: { { index: number, volume: number } } = {}
+	local minY, maxY, wide, wideX = math.huge, -math.huge, 0, 0
+	for _, raw in model.parts do
+		local shape: string = raw[2]
+		local size: { number } = raw[3]
+		local pos: { number } = raw[4]
+		local r = eulerXYZ(raw[5])
+		local a, b, c = size[1] * k / 2, size[2] * k / 2, size[3] * k / 2
+		local x, y, z = pos[1] * k, pos[2] * k, pos[3] * k
+		local e = reach(shape, r, a, b, c)
+		minY = math.min(minY, y + e[3])
+		maxY = math.max(maxY, y + e[4])
+		wide = math.max(wide, math.abs(x + e[1]), math.abs(x + e[2]), math.abs(z + e[5]), math.abs(z + e[6]))
+		wideX = math.max(wideX, math.abs(x + e[1]), math.abs(x + e[2]))
+
+		local fix = TO_ROBLOX[shape]
+		local m = if fix then mmul(r, fix) else r
+		local spec: PartSpec = {
+			name = raw[1],
+			shape = IMPORT.shapes[shape] :: PartShape,
+			-- a Roblox cylinder's length is its X size
+			size = if shape == "cylinder" then { b * 2, a * 2, c * 2 } else { a * 2, b * 2, c * 2 },
+			cf = { x, y, z, m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8], m[9] },
+			color = raw[6],
+			role = raw[8],
+		}
+		if raw[7] ~= "SmoothPlastic" then
+			spec.material = raw[7]
+		end
+		if raw[9] ~= nil and raw[9] > 0 then
+			spec.transparency = raw[9]
+		end
+		table.insert(parts, spec)
+		if spec.role == "body" then
+			table.insert(volumes, { index = #parts, volume = 8 * a * b * c * SHAPE_VOLUME[shape] })
+		end
+	end
+	-- The biggest body shapes cast shadows; the biggest upright ellipsoid or box breathes with the idle squash.
+	table.sort(volumes, function(p, q)
+		return p.volume > q.volume
+	end)
+	local squashed = false
+	for rank, entry in volumes do
+		local part = parts[entry.index]
+		if rank <= IMPORT.shadowCasters then
+			part.shadow = true
+		end
+		if not squashed and (part.shape == "Ellipsoid" or part.shape == "Block") then
+			-- the local axis most aligned with world up: row 2 of the rotation (cf[7..9], after the position)
+			local best, axis = 0, 0
+			for i = 1, 3 do
+				if math.abs(part.cf[6 + i]) > best then
+					best, axis = math.abs(part.cf[6 + i]), i
+				end
+			end
+			if best > 0.95 then
+				part.squashAxis = axis
+				squashed = true
+			end
+		end
+	end
+	-- Stand exactly on y = 0 (the design allows a little rounding).
+	for _, part in parts do
+		part.cf[2] -= minY
+	end
+	return {
+		parts = parts,
+		minY = 0,
+		maxY = maxY - minY,
+		width = wideX * 2,
+		footprint = wide * 2,
+		base = wide * 2 * 0.75,
+	}
+end
+
+-- Parts in a built imported model: its parts, the Root, and the aura ring Mythic and up get (CreatureVisuals).
+function CreatureRecipe.importedPartCount(model: Types.ImportedModel, rarityOrder: number): number
+	return #model.parts + 1 + (if rarityOrder >= 6 then 1 else 0)
 end
 
 -- Kinds a recipe may use (for docs and tests).

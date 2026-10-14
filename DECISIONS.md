@@ -539,3 +539,31 @@ player is learning the game.
 that makes each one feel like its own place, at the cost of slightly longer walks.
 **Reversal cost:** low — data in `Config/Gameplay` and `Config/Scenery` plus the three pad constants; saves don't
 store positions.
+
+### 28. Polished Snackling models designed in Claude Design, imported as data
+
+* **What:** all 64 Snacklings were redesigned in Claude Design from three batch prompts (`art/snackling-parts/
+  prompt-batch-*.md`): same food, animal and colours as their recipes, much more shape and detail. Each design is
+  a list of primitive parts (sphere / box / cylinder / wedge, size, position, rotation, colour, material, role) in a
+  2 × 2 × 2 design box, facing -Z, the exact format the prompts asked for (`art/snackling-parts/batch-*.json`).
+* **Import:** `lune run tools/importParts.luau` checks every model (`CreatureRecipe.validateImported`: known shapes,
+  materials and roles, circular cylinders, face parts named and roled as faces, one part called Body for the rarity
+  flair, two eyes, inside the box, standing on y = 0, the part budget), sizes it, and writes the generated
+  `Config/CreatureParts.luau`. `CreatureRecipe.compileImported` turns a model into the same part specs a recipe
+  produces (a design cylinder's axis Y becomes Roblox's X; rotations are three.js XYZ = `CFrame.Angles` order;
+  exact per-shape extents), so `CreatureVisuals`, mutations, rarity flair and the idle squash work unchanged. The
+  biggest body part squashes; the three biggest cast shadows.
+* **Size:** every Snackling of a rarity reads about as big as that rarity's recipe models did (the upper quartile of
+  their heights: about 3 studs for Commons, 4.2 for Secrets before `modelScale`). A long, low model counts 75% of
+  its length instead (a dachshund doesn't shrink to nothing). Then it shrinks if needed to fit a podium (6.6 wide,
+  7.4 tall at the rarity's scale; three Secrets were shrunk slightly).
+* **Budgets:** +10 parts per tier (40 Common / Uncommon, 50 Rare / Epic, 60 Legendary and up, Root and aura
+  included) to leave room for polish. A full base of 20 Secrets is about 1,200 parts.
+* **Fallback:** `Config/CreatureLooks` recipes stay and are still checked by CI; a creature without an imported
+  model (a future Snackling) builds from its recipe, and a Model in `ReplicatedStorage.CreatureModels` still wins
+  over both.
+
+**Why:** a big visual upgrade without meshes or asset uploads: the designs are reviewable as data, CI checks all 64,
+and they keep every system built on the recipe models (mutations, faces, idle animation, belt, gallery).
+**Reversal cost:** low — delete an entry from `Config/CreatureParts` (re-run the tool without its batch) and the
+recipe comes back.
