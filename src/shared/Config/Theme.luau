@@ -385,6 +385,10 @@ local Theme = {
 		snackdexNew = "NEW! {creature} joined your Snackdex",
 		snackdexTierComplete = "{rarity} Snackdex complete! +{amount} and +{percent}% income forever!",
 
+		-- Server modifiers (Config/Modifiers): the start banner and the HUD chip
+		modifierStarted = "{icon} {name}! {description}",
+		modifierChip = "{icon} {name} {time}",
+
 		-- Map themes (Config/MapThemes): the vote for the next map and the change itself
 		mapVoteTitle = "Vote for the next map! {time}",
 		mapVoteCount = "{votes}", -- votes under each choice on the vote card

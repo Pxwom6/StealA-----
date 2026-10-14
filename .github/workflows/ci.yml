@@ -58,3 +58,6 @@ jobs:
 
       - name: World smoke test (builds every map theme offline)
         run: lune run tools/worldsim/smoke.luau
+
+      - name: Server test (boots the server offline and plays a short session)
+        run: lune run tools/worldsim/server.luau

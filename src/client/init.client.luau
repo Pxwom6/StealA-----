@@ -36,12 +36,14 @@ local WorldFxController = require(Controllers.WorldFxController)
 local SnackdexController = require(Controllers.SnackdexController)
 local CashOfferController = require(Controllers.CashOfferController)
 local MapThemeController = require(Controllers.MapThemeController)
+local ModifierController = require(Controllers.ModifierController)
 local WeatherController = require(Controllers.WeatherController)
 
 StateStore.start()
 ClientSettings.start() -- saved settings (music, sound effects, reduce effects) arrive with the first state
 HudController.start()
 NotificationController.start()
+ModifierController.start() -- the running server modifier: HUD chip, and the effects belt prices / steals read
 BeltController.start()
 PlotController.start()
 InteractionController.start()

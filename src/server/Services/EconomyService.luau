@@ -31,7 +31,9 @@ local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local Analytics = require(script.Parent.Analytics)
 local CashOfferService = require(script.Parent.CashOfferService)
 local GameEvents = require(script.Parent.GameEvents)
+local LiveOps = require(ReplicatedStorage.Shared.Config.LiveOps)
 local LiveOpsService = require(script.Parent.LiveOpsService)
+local ModifierService = require(script.Parent.ModifierService)
 local PlotService = require(script.Parent.PlotService)
 local Remotes = require(script.Parent.Remotes)
 local Replication = require(script.Parent.Replication)
@@ -53,7 +55,11 @@ local function multiplierInputs(session: Session): EconomyMath.MultiplierInputs
 		doubleCashMultiplier = perks.doubleCashMultiplier,
 		isVip = session.passes.VIP,
 		vipIncomeBonus = perks.vipIncomeBonus,
-		eventCashMultiplier = LiveOpsService.cashMultiplier(),
+		-- LiveOps cash events and a server modifier (Cash Splash) together, under the same cap.
+		eventCashMultiplier = math.min(
+			LiveOps.limits.maxCashMultiplier,
+			LiveOpsService.cashMultiplier() * ModifierService.effects().income
+		),
 		socialBonus = SocialRules.totalBonus(session.social.friends, session.social.groupMember, Social),
 		-- Earned for good (completed Snackdex tiers): part of the steady income packs and rewards are sized from.
 		collectionBonus = SnackdexRules.incomeBonus(session.data.snackdex, Snackdex),
@@ -300,11 +306,13 @@ function EconomyService.start()
 	Remotes.onIntent("BuyPodium", onBuyPodium)
 	Remotes.onIntent("SellCreature", onSellCreature)
 
-	LiveOpsService.onCashMultiplierChanged(function()
+	local function refreshAll()
 		for _, session in Sessions.all() do
 			EconomyService.refresh(session)
 		end
-	end)
+	end
+	LiveOpsService.onCashMultiplierChanged(refreshAll)
+	ModifierService.onChanged(refreshAll)
 
 	task.spawn(function()
 		local last = os.clock()

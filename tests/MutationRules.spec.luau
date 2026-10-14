@@ -48,6 +48,20 @@ T.describe("MutationRules.odds", function()
 		T.expect(odds[1].chance).toBeNear(0.7)
 		T.expect(odds[2].chance).toBeNear(0.3)
 	end)
+	T.it("multiplies every chance by a server modifier's mutation chance", function()
+		local odds = MutationRules.odds(mutations, { Halloween = true }, 3)
+		T.expect(odds[1].chance).toBeNear(0.3)
+		T.expect(odds[2].chance).toBeNear(0.06)
+		T.expect(odds[3].chance).toBeNear(0.015)
+		T.expect(odds[4].chance).toBeNear(0.15)
+		-- Still clamped at 1 in total.
+		local huge = MutationRules.odds(mutations, {}, 20)
+		local total = 0
+		for _, entry in huge do
+			total += entry.chance
+		end
+		T.expect(total).toBeNear(1)
+	end)
 end)
 
 T.describe("MutationRules.roll", function()
@@ -96,6 +110,12 @@ T.describe("MutationRules.roll", function()
 		T.expect((counts.rainbow or 0) / n).toBeNear(0.005, 0.0007)
 		T.expect((counts.none or 0) / n).toBeNear(0.875, 0.003)
 		T.expect(counts.haunted).toBeNil()
+	end)
+	T.it("rolls with the multiplied chances", function()
+		local rng = scripted({ 0.29 })
+		T.expect(MutationRules.roll(mutations, {}, rng, 3)).toBe("golden")
+		local plain = scripted({ 0.29 })
+		T.expect(MutationRules.roll(mutations, {}, plain)).toBeNil()
 	end)
 	T.it("rolls an event-only mutation at its chance while the event runs", function()
 		local rng = T.seededRandom(77)

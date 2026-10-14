@@ -31,6 +31,7 @@ local DataService = require(script.Parent.DataService)
 local EconomyService = require(script.Parent.EconomyService)
 local GameEvents = require(script.Parent.GameEvents)
 local LockService = require(script.Parent.LockService)
+local ModifierService = require(script.Parent.ModifierService)
 local PlotService = require(script.Parent.PlotService)
 local PositionTracker = require(script.Parent.PositionTracker)
 local Remotes = require(script.Parent.Remotes)
@@ -46,12 +47,25 @@ local StealService = {}
 
 local CFG = Gameplay.steal
 
-local CARRY_LIMITS: StealRules.CarryLimits = {
-	maxSpeed = Gameplay.walkSpeed * CFG.carrySpeedMultiplier,
-	tolerance = CFG.speedCheckTolerance,
-	budgetSeconds = CFG.speedBudgetSeconds,
-	leeway = CFG.speedCheckLeeway,
-}
+-- The carry movement budget: carrying speed, scaled by what a speed modifier allows right now (see
+-- ModifierService.walkSpeedAllowance).
+local function carryLimits(): StealRules.CarryLimits
+	return {
+		maxSpeed = Gameplay.walkSpeed * ModifierService.walkSpeedAllowance() * CFG.carrySpeedMultiplier,
+		tolerance = CFG.speedCheckTolerance,
+		budgetSeconds = CFG.speedBudgetSeconds,
+		leeway = CFG.speedCheckLeeway,
+	}
+end
+
+-- Walking and carrying speeds, with a running modifier (Sugar Rush).
+local function walkSpeed(): number
+	return Gameplay.walkSpeed * ModifierService.effects().walkSpeed
+end
+
+local function carrySpeed(): number
+	return walkSpeed() * CFG.carrySpeedMultiplier
+end
 
 local function now(): number
 	return workspace:GetServerTimeNow()
@@ -129,7 +143,7 @@ local function clearCarry(session: Session)
 		carry.marker:Destroy()
 	end
 	session.player:SetAttribute("Carrying", nil)
-	setWalkSpeed(session, Gameplay.walkSpeed)
+	setWalkSpeed(session, walkSpeed())
 	Replication.markDirty(session)
 end
 
@@ -311,7 +325,7 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 		thiefTrusted = PositionTracker.isTrustedForSteal(thief, root.Position),
 		holdStartedAt = if sameHold then sameHold.startedAt else nil,
 		holdRefusal = if sameHold then sameHold.refusal else nil,
-		holdSeconds = CFG.holdSeconds,
+		holdSeconds = CFG.holdSeconds * ModifierService.effects().stealHold, -- Quick Hands: shorter
 		holdTolerance = CFG.holdTolerance,
 	})
 	if not ok or record == nil then
@@ -336,7 +350,7 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 		creatureId = record.id,
 		variant = record.variant,
 		startedAt = t,
-		track = StealRules.newCarryTrack(root.Position.X, root.Position.Y, root.Position.Z, os.clock(), CARRY_LIMITS),
+		track = StealRules.newCarryTrack(root.Position.X, root.Position.Y, root.Position.Z, os.clock(), carryLimits()),
 		model = nil,
 		marker = nil,
 	}
@@ -347,7 +361,7 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 		LockService.endGrace(thief) -- stealing forfeits your own new-player protection
 		attachCarryVisuals(thief, carry)
 		player:SetAttribute("Carrying", record.id)
-		setWalkSpeed(thief, Gameplay.walkSpeed * CFG.carrySpeedMultiplier)
+		setWalkSpeed(thief, carrySpeed())
 		Replication.markDirty(thief)
 
 		local def = GameData.catalog.creatures[record.id]
@@ -397,7 +411,7 @@ local function onTag(player: Player, targetArg: unknown)
 			thiefRoot.Position.Z - taggerRoot.Position.Z
 		).Magnitude,
 		verticalDistance = thiefRoot.Position.Y - taggerRoot.Position.Y,
-		tagRange = CFG.tagRange,
+		tagRange = CFG.tagRange * ModifierService.effects().tagRange, -- Snack Patrol: longer
 		tagVerticalAllowance = CFG.tagVerticalAllowance,
 		taggerCooldownUntil = tagger.tagCooldownUntil,
 		taggerTrusted = PositionTracker.isTrusted(
@@ -457,7 +471,7 @@ local function checkCarry(thief: Session, allowDeliver: boolean)
 		-- after the client catches up (so is the push, unless it was made as the lock started; see LockService).
 		return
 	end
-	if not StealRules.stepCarryTrack(carry.track, position.X, position.Y, position.Z, os.clock(), CARRY_LIMITS) then
+	if not StealRules.stepCarryTrack(carry.track, position.X, position.Y, position.Z, os.clock(), carryLimits()) then
 		StealService.cancel(thief, "speed")
 		return
 	end
@@ -509,6 +523,12 @@ function StealService.onBaseLocked(owner: Session)
 end
 
 function StealService.start()
+	-- A speed modifier starting or ending: everyone's speed follows at once (thieves keep their carrying slowdown).
+	ModifierService.onChanged(function()
+		for _, session in Sessions.all() do
+			setWalkSpeed(session, if session.carry then carrySpeed() else walkSpeed())
+		end
+	end)
 	Remotes.onIntent("StealBegin", onStealBegin)
 	Remotes.onIntent("StealConfirm", onStealConfirm)
 	Remotes.onIntent("TagThief", onTag)

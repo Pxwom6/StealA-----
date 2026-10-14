@@ -29,11 +29,13 @@ local Types = require(ReplicatedStorage.Shared.Types)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local BeltMath = require(ReplicatedStorage.Shared.Logic.BeltMath)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
+local ModifierRules = require(ReplicatedStorage.Shared.Logic.ModifierRules)
 local ScreenLayout = require(ReplicatedStorage.Shared.Logic.ScreenLayout)
 local TutorialRules = require(ReplicatedStorage.Shared.Logic.TutorialRules)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local BeltController = require(script.Parent.BeltController)
 local HudController = require(script.Parent.HudController)
+local ModifierController = require(script.Parent.ModifierController)
 local NotificationController = require(script.Parent.NotificationController)
 local PlotController = require(script.Parent.PlotController)
 local SoundPlayer = require(script.Parent.SoundPlayer)
@@ -202,7 +204,7 @@ local function beltTarget(root: BasePart, state: Types.ClientState): Target?
 			models[view.item.id] = view
 			table.insert(candidates, {
 				id = view.item.id,
-				price = GameData.price(def, view.variant),
+				price = ModifierRules.beltPrice(GameData.price(def, view.variant), ModifierController.effects()),
 				x = position.X,
 				z = position.Z,
 				secondsLeft = belt.travelSeconds - (now - view.item.spawnAt),

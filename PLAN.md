@@ -67,7 +67,8 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | Snackling models | podium models built by `PlotService` through `CreatureVisuals` | belt models (`BeltController`), idle bob / squash / sway (`IdleController`) | `CreatureRecipe` (recipe → parts), `IdleMotion` |
 | World & scenery | `MapBuilder` (plot decor, belt chevrons, boards, lobby spawn; `restyle` for a new map theme), `SceneryBuilder` (spawn plaza, Snack Factory, chute, flora, landmarks, boundary wall, terrain), `ThemeProps` (each theme's flora and landmarks), `WorldLighting` (map lighting + seasonal overlay) | `WorldFxController` (belt chevrons, factory cog, blinking lights; Reduce effects) | `SceneryLayout` |
 | Map themes | `MapThemeService` (first map, 20-minute rotation, the vote, `/map`) | `MapThemeController` (vote card in the top stack, new-map title card), `WeatherController` (snow / embers / leaves... around the camera) | `MapThemeRules` |
-| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends <n\|off>`, `/tutorial`, `/gallery [mutationId\|off]` via `DevGallery`, `/sky <clockTime>`, `/quests reset`, `/dex fill <rarity\|event>`); `/map <id\|vote\|list>` (MapThemeService); LiveOps `/event <id> [minutes]`, `/event off`, `/luck`, `/announce` (anyone in Studio, local only) | – | – |
+| Server modifiers | `ModifierService` (schedule, `/mod`; belt, economy, lock, steal, movement read its effects) | `ModifierController` (HUD chip beside the luck chip; effects for belt prices, steal hold, tag reach) | `ModifierRules` |
+| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends <n\|off>`, `/tutorial`, `/gallery [mutationId\|off]` via `DevGallery`, `/sky <clockTime>`, `/quests reset`, `/dex fill <rarity\|event>`); `/map <id\|vote\|list>` (MapThemeService); `/mod <id> [minutes]`, `/mod off`, `/mod list` (ModifierService); LiveOps `/event <id> [minutes]`, `/event off`, `/luck`, `/announce` (anyone in Studio, local only) | – | – |
 | Settings & audio | `SettingsService` (SetSetting → `settings_<key>` flags) | `ClientSettings`, `SettingsController` (top-right gear), `SoundPlayer`, `MusicController` (looping, crossfade) | `SettingsRules`, `ScreenLayout` |
 
 ## 3. Module list
@@ -89,6 +90,7 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | `Sounds` | sound effects `{ id, volume, pitch }` (built-in `rbxasset://sounds/` files), music tracks (**empty, TODO**) and the crossfade time |
 | `Scenery` | the world's layout: default lighting, boundary wall, terrain (hills, rocks, lake), spawn plaza layout, tree spots, landmark spots, belt chevron spacing, part budget |
 | `MapThemes` | the eight map themes (palette over `Theme.world`, lighting, materials, flora, landmarks, weather), the first map, the rotation and vote timings |
+| `Modifiers` | the ten server modifiers (name, icon, description, colour, weight, effect multipliers), their schedule and each effect's limits |
 | `Social` | friend bonus (+10% per friend in the server, max 3), group id (**placeholder 0 = off**), group bonus, one-time welcome gift |
 | `Tutorial` | first-time tutorial: on/off, steps in order (buy, collect, lock, steal) with their automatic endings, one-time reward, belt-target tuning |
 | `Snackdex` | collection book rewards: one-time cash per completed rarity tier (steady income, minimum), permanent income bonus per tier and its cap |
@@ -126,6 +128,7 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `IdleMotion` | idle animation curves: podium breathing bob with squash & stretch and sway, belt hop with landing squash and waddle |
 | `SceneryLayout` | where the scenery goes (plaza props, trees, tree line, landmark spots), factory / chute footprints, terrain heights, validation against plots, belt, walkway, lobby spawn and Halloween props, part estimate |
 | `MapThemeRules` | first map, vote candidates, vote counting and the winner, flora / landmark part counts and footprints, which colours maps may change, `Config/MapThemes` validation |
+| `ModifierRules` | a modifier's effects (all 1 when none), belt price and capacity under them, the next pick and gap, the fastest walking speed allowed, `Config/Modifiers` validation |
 | `SettingsRules` | player settings as `settings_<key>` flags: keys, read, apply |
 | `ScreenLayout` | HUD placement around Roblox's player list (top-right gear, tutorial banner limit) |
 | `SnackdexRules` | discovery of Snacklings and (Snackling, mutation) pairs, tier progress over regular Snacklings (Event section apart), claim-once tier rewards, capped collection bonus, client view, config validation |
@@ -140,7 +143,8 @@ aura, then the mutation look, which skips the face; tags anchored models for the
 ### `src/server`
 `init.server.luau` bootstraps in order:
 `Remotes → DataService → MapThemeService.firstMap → MapBuilder (+ SceneryBuilder, WorldLighting) → PlotService → Analytics →
-LiveOpsService → SeasonService → MapThemeService → Replication → PositionTracker → EconomyService → BeltService →
+LiveOpsService → SeasonService → MapThemeService → ModifierService → Replication → PositionTracker → EconomyService →
+BeltService →
 LockService → StealService → RebirthService → MonetizationService → RetentionService → SocialService →
 TutorialService → SnackdexService → QuestService → LeaderboardService → SettingsService → DevCommands →
 PlayerLifecycle`, and wires cross-service join/leave steps through `PlayerLifecycle.hooks()` (keeps services free of
@@ -156,6 +160,7 @@ release plot → release profile.
 InteractionController, StealController, LockController, RebirthController, StoreController, ChatTagController,
 RewardsController, MutationFxController, SocialController, TutorialController, IdleController, SettingsController,
 MusicController, WorldFxController, SnackdexController, CashOfferController, MapThemeController, WeatherController`
+(`ModifierController` starts right after `NotificationController`)
 (UI helpers: `UI/UiKit`, `UI/Modal`; audio: `SoundPlayer`).
 
 ## 4. Remotes (all in `ReplicatedStorage.Remotes`, created by the server)
@@ -204,7 +209,7 @@ CollectionService tag `MutationRainbow`. LiveOps state is on `workspace`: `LuckM
 luck next changes), `PurchasedLuckEndsAt`, `CashMultiplier`, `ActiveEventIds`, `EventBanner`, `EventBannerId`,
 `EventTitle`, `EventEndsAt`, and `SeasonTheme` (the seasonal theme on, "" for none). The map theme is there too:
 `MapTheme` (id), `MapThemeEndsAt` (the next change), `MapVoteEndsAt` (0 = no vote), `MapVoteCandidates`,
-`MapVoteCounts`.
+`MapVoteCounts`; and the server modifier: `Modifier` (id, "" = none), `ModifierEndsAt`, `ModifierNextAt`.
 
 ## 5. Data schema (version 3)
 
@@ -306,3 +311,12 @@ random map and changes it every 20 minutes after a 40-second vote between three 
 `MapBuilder.restyle` swaps the scenery in about 30 ms; `WorldLighting` keeps a seasonal mood (Halloween) on top of
 whatever map is on. Studio: `/map <id>`, `/map vote`, `/map list`. Offline: `lune run tools/worldsim/smoke.luau`
 (CI) builds and restyles every map; `lune run tools/worldsim/export.luau <id>` writes one as JSON for a 3D preview.
+
+## 12. Server modifiers
+
+Every 4-8 minutes a server runs one of ten modifiers for 5 minutes (DECISIONS.md #30, `Config/Modifiers`): Rush Hour,
+Clearance Sale, Golden Hour, Lucky Breeze, Cash Splash, Sugar Rush, Quick Hands, Fortress, Snack Patrol and the rare
+Snack Party. A banner announces it, a chip beside the luck chip counts it down (tap it for the description), and
+each system applies the effect where it decides (belt, economy, locks, steals, movement), the client showing the same
+prices, hold time and tag reach. Studio: `/mod <id> [minutes]`, `/mod off`, `/mod list`. Offline:
+`lune run tools/worldsim/server.luau` (CI) boots the server and plays a session that checks them.

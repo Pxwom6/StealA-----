@@ -92,6 +92,18 @@ function LiveOpsService.setBoosts(list: { LiveOpsRules.Boost })
 	boosts = list
 end
 
+-- Ends every running boost from `source` now (e.g. "modifier" when a server modifier is switched off early).
+function LiveOpsService.endBoosts(source: string)
+	local kept: { LiveOpsRules.Boost } = {}
+	for _, boost in boosts do
+		if boost.source ~= source then
+			table.insert(kept, boost)
+		end
+	end
+	boosts = kept
+	LiveOpsService.publishAttributes()
+end
+
 -- Starts a configured (or ad-hoc) event right now for `seconds`. If that event id is already running (scheduled,
 -- remote config, or started earlier), this only extends it: it ends at the later of its current end and now +
 -- `seconds`, never sooner, and never runs twice (the rules count each event id once, LiveOpsRules.distinctActiveEvents).

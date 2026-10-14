@@ -17,6 +17,7 @@ local Analytics = require(script.Parent.Analytics)
 local BeltService = require(script.Parent.BeltService)
 local DataService = require(script.Parent.DataService)
 local EconomyService = require(script.Parent.EconomyService)
+local ModifierService = require(script.Parent.ModifierService)
 local PlotService = require(script.Parent.PlotService)
 local PositionTracker = require(script.Parent.PositionTracker)
 local Remotes = require(script.Parent.Remotes)
@@ -71,7 +72,7 @@ local function onCharacterAdded(session: Session, character: Model)
 	PositionTracker.reset(session, nil)
 	local humanoid = character:WaitForChild("Humanoid", 10)
 	if humanoid and humanoid:IsA("Humanoid") then
-		humanoid.WalkSpeed = Gameplay.walkSpeed
+		humanoid.WalkSpeed = Gameplay.walkSpeed * ModifierService.effects().walkSpeed -- Sugar Rush: faster
 	end
 	task.defer(placeAtBase, session, character)
 end

@@ -20,6 +20,7 @@ local StealRules = require(ReplicatedStorage.Shared.Logic.StealRules)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local HudController = require(script.Parent.HudController)
 local InteractionController = require(script.Parent.InteractionController)
+local ModifierController = require(script.Parent.ModifierController)
 local NotificationController = require(script.Parent.NotificationController)
 local PlotController = require(script.Parent.PlotController)
 local SoundPlayer = require(script.Parent.SoundPlayer)
@@ -44,6 +45,15 @@ local function myRoot(): BasePart?
 	local character = localPlayer.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	return if root and root:IsA("BasePart") then root else nil
+end
+
+-- The hold-to-steal time and tag reach the server checks right now (a modifier can change both).
+local function holdSeconds(): number
+	return CFG.holdSeconds * ModifierController.effects().stealHold
+end
+
+local function tagRange(): number
+	return CFG.tagRange * ModifierController.effects().tagRange
 end
 
 local function isProtected(plot: Model): boolean
@@ -100,7 +110,7 @@ local function stealHook(podium: Model, plot: Model, prompt: ProximityPrompt): b
 	prompt:SetAttribute("Role", "Steal")
 	prompt.ActionText = Theme.text.stealAction
 	prompt.ObjectText = GameData.displayName(def, InteractionController.variantOf(podium))
-	prompt.HoldDuration = CFG.holdSeconds
+	prompt.HoldDuration = holdSeconds()
 	prompt.MaxActivationDistance = CFG.grabRange - 2
 	prompt.Enabled = not isProtected(plot)
 	if not wiredPrompts[prompt] then
@@ -131,7 +141,8 @@ local function nearestThief(): Player?
 		return nil
 	end
 	local best: Player? = nil
-	local bestDistance = CFG.tagRange - 1
+	local reach = tagRange() - 1
+	local bestDistance = reach
 	for _, other in Players:GetPlayers() do
 		if other == localPlayer then
 			continue
@@ -148,7 +159,7 @@ local function nearestThief(): Player?
 			local horizontal = Vector3.new(offset.X, 0, offset.Z).Magnitude
 			if
 				horizontal <= bestDistance
-				and StealRules.withinTagReach(horizontal, offset.Y, CFG.tagRange - 1, CFG.tagVerticalAllowance)
+				and StealRules.withinTagReach(horizontal, offset.Y, reach, CFG.tagVerticalAllowance)
 			then
 				best = other
 				bestDistance = horizontal
@@ -283,6 +294,14 @@ end
 function StealController.start()
 	build()
 	InteractionController.addForeignPodiumHook(stealHook)
+	-- A modifier changing the hold time updates the steal prompts already out there.
+	ModifierController.onChanged(function()
+		for prompt in wiredPrompts do
+			if prompt.Parent and prompt:GetAttribute("Role") == "Steal" then
+				prompt.HoldDuration = holdSeconds()
+			end
+		end
+	end)
 
 	StateStore.onChange(function(state)
 		setCarrying(state.carrying)

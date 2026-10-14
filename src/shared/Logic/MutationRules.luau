@@ -7,8 +7,9 @@
 	packs, offline earnings, balance simulation). A variant that is nil or not in the config pays x1, so a save
 	holding an id that was removed by mistake keeps it and earns normally again once the id is restored.
 
-	Mutation chances are absolute (per spawn) and never scaled by luck. Pure: no Roblox APIs; the RNG and the
-	active-event set are passed in.
+	Mutation chances are absolute (per spawn) and never scaled by luck; only a server modifier (Config/Modifiers
+	`mutationChance`, e.g. Golden Hour) multiplies them while it runs. Pure: no Roblox APIs; the RNG, the active-event
+	set and that multiplier are passed in.
 ]]
 
 local Format = require("./Format")
@@ -25,9 +26,15 @@ function MutationRules.isEligible(mutation: MutationDef, activeEvents: { [string
 	return mutation.eventId == nil or activeEvents[mutation.eventId] == true
 end
 
--- The eligible mutations in roll order (by `order`), each with its exact chance per spawn. The chances are used as
--- given; Catalog.validateMutations keeps their total below 1 (it is clamped here as a last resort).
-function MutationRules.odds(mutations: { MutationDef }, activeEvents: { [string]: boolean }): { Odds }
+-- The eligible mutations in roll order (by `order`), each with its exact chance per spawn: the configured chance times
+-- `chanceMultiplier` (default 1). Catalog.validateMutations and ModifierRules.validate keep the total well below 1 (it
+-- is clamped here as a last resort).
+function MutationRules.odds(
+	mutations: { MutationDef },
+	activeEvents: { [string]: boolean },
+	chanceMultiplier: number?
+): { Odds }
+	local multiplier = math.max(0, chanceMultiplier or 1)
 	local eligible: { MutationDef } = {}
 	for _, mutation in mutations do
 		if MutationRules.isEligible(mutation, activeEvents) and mutation.chance > 0 then
@@ -40,7 +47,7 @@ function MutationRules.odds(mutations: { MutationDef }, activeEvents: { [string]
 	local result: { Odds } = {}
 	local total = 0
 	for _, mutation in eligible do
-		local chance = math.min(mutation.chance, math.max(0, 1 - total))
+		local chance = math.min(mutation.chance * multiplier, math.max(0, 1 - total))
 		total += chance
 		table.insert(result, { id = mutation.id, chance = chance })
 	end
@@ -49,10 +56,15 @@ end
 
 -- Rolls the mutation for one belt spawn: a mutation id, or nil for a plain creature. Always draws exactly one
 -- number from `rng` (which returns numbers in [0, 1)), so a seeded roll sequence stays reproducible.
-function MutationRules.roll(mutations: { MutationDef }, activeEvents: { [string]: boolean }, rng: () -> number): string?
+function MutationRules.roll(
+	mutations: { MutationDef },
+	activeEvents: { [string]: boolean },
+	rng: () -> number,
+	chanceMultiplier: number?
+): string?
 	local r = rng()
 	local running = 0
-	for _, entry in MutationRules.odds(mutations, activeEvents) do
+	for _, entry in MutationRules.odds(mutations, activeEvents, chanceMultiplier) do
 		running += entry.chance
 		if r < running then
 			return entry.id

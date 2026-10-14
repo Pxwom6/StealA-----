@@ -36,5 +36,6 @@ require("./QuestRules.spec")
 require("./RetentionConfig.spec")
 require("./CashOfferRules.spec")
 require("./MapThemeRules.spec")
+require("./ModifierRules.spec")
 
 T.finish()

@@ -547,7 +547,7 @@ local function updateLiveOpsPills()
 			time = Format.duration(remaining),
 		})
 	end
-	pillStack.Visible = hasLuck or hasBanner
+	pillStack.Visible = hasBanner
 end
 
 function RewardsController.start()
@@ -556,7 +556,7 @@ function RewardsController.start()
 		RewardsController.open()
 	end)
 
-	-- LiveOps pills share one slot in the HUD's top stack: the event banner with its countdown, then server luck.
+	-- The event banner with its countdown has its own slot in the HUD's top stack.
 	pillStack = UiKit.new("Frame", {
 		Name = "LiveOpsPills",
 		LayoutOrder = HudController.TOP_ORDER.liveOps,
@@ -595,13 +595,14 @@ function RewardsController.start()
 		Position = UDim2.fromOffset(8, 25),
 		Parent = eventPill,
 	})
+	-- Server luck is a chip in the HUD's chip row, beside the running server modifier.
 	luckPill = UiKit.panel({
 		Name = "LuckPill",
-		LayoutOrder = 2,
-		Size = UDim2.fromOffset(230, 32),
+		LayoutOrder = 1,
+		Size = UDim2.fromOffset(142, 32),
 		BackgroundColor3 = UiTheme.palette("luck"),
 		Visible = false,
-		Parent = pillStack,
+		Parent = HudController.chipRow(),
 	})
 	luckLabel = UiKit.label({ Size = UDim2.new(1, -12, 1, -6), Position = UDim2.fromOffset(6, 3), Parent = luckPill })
 

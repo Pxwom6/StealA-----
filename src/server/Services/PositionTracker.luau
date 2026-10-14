@@ -25,6 +25,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
 local StealRules = require(ReplicatedStorage.Shared.Logic.StealRules)
+local ModifierService = require(script.Parent.ModifierService)
 local Sessions = require(script.Parent.Sessions)
 
 type Session = Sessions.Session
@@ -33,12 +34,16 @@ local CFG = Gameplay.tracking
 
 local PositionTracker = {}
 
-local WALK_LIMITS: StealRules.WalkLimits = {
-	maxSpeed = Gameplay.walkSpeed,
-	tolerance = CFG.walkTolerance,
-	budgetSeconds = CFG.walkBudgetSeconds,
-	leeway = CFG.walkLeeway,
-}
+-- The walking budget: normal speed, or what a speed modifier allows (ModifierService.walkSpeedAllowance keeps the
+-- faster of the old and new speeds for a few seconds after a change).
+local function walkLimits(): StealRules.WalkLimits
+	return {
+		maxSpeed = Gameplay.walkSpeed * ModifierService.walkSpeedAllowance(),
+		tolerance = CFG.walkTolerance,
+		budgetSeconds = CFG.walkBudgetSeconds,
+		leeway = CFG.walkLeeway,
+	}
+end
 
 local STEAL_TRUST: StealRules.StealTrustWindows = {
 	overrunSeconds = CFG.stealOverrunSeconds,
@@ -64,8 +69,8 @@ function PositionTracker.record(session: Session, position: Vector3)
 	end
 	local track = session.walk
 	if track == nil then
-		session.walk = StealRules.newWalkTrack(position.X, position.Y, position.Z, t, WALK_LIMITS)
-	elseif not StealRules.stepWalkTrack(track, position.X, position.Y, position.Z, t, WALK_LIMITS) then
+		session.walk = StealRules.newWalkTrack(position.X, position.Y, position.Z, t, walkLimits())
+	elseif not StealRules.stepWalkTrack(track, position.X, position.Y, position.Z, t, walkLimits()) then
 		session.flaggedAt = t
 		if StealRules.walkStepVerdict(track, CFG.teleportDeficit) == "teleport" then
 			session.teleportedAt = t
@@ -79,7 +84,7 @@ end
 function PositionTracker.reset(session: Session, position: Vector3?)
 	local t = now()
 	if position then
-		session.walk = StealRules.newWalkTrack(position.X, position.Y, position.Z, t, WALK_LIMITS)
+		session.walk = StealRules.newWalkTrack(position.X, position.Y, position.Z, t, walkLimits())
 		session.settle = { x = position.X, y = position.Y, z = position.Z, untilT = t + CFG.settleSeconds }
 	else
 		session.walk = nil
@@ -102,7 +107,7 @@ function PositionTracker.isTrusted(session: Session, position: Vector3, carrySta
 		z = position.Z,
 		t = t,
 		stepSlack = CFG.stepSlack,
-	}, WALK_LIMITS)
+	}, walkLimits())
 end
 
 -- True when a thief's `position` can be trusted for starting or finishing a steal: walkable from the latest sample,
@@ -120,7 +125,7 @@ function PositionTracker.isTrustedForSteal(session: Session, position: Vector3):
 		z = position.Z,
 		t = t,
 		stepSlack = CFG.stepSlack,
-	}, WALK_LIMITS)
+	}, walkLimits())
 end
 
 function PositionTracker.start()

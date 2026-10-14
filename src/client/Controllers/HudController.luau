@@ -34,6 +34,7 @@ local actionArea: Frame
 local cashLabel: TextLabel
 local incomeLabel: TextLabel
 local cashPill: Frame
+local chipRow: Frame
 
 -- Left column (reference px): four 76x58 buttons with 6 px gaps are 250 tall, the same footprint as the three 74 px
 -- buttons before (246). Centred at 42% of the height: at 667x375 (about 785x373 under the top bar, UI scale 0.85) the
@@ -56,15 +57,22 @@ HudController.TOP_ORDER = table.freeze({
 	cash = 1,
 	income = 2,
 	tutorial = 3, -- right under the cash: where a new player looks first
-	liveOps = 4, -- event banner + countdown, server luck
-	mapVote = 5, -- the vote for the next map (MapThemeController), only while it runs
-	lock = 6,
-	social = 7,
+	liveOps = 4, -- event banner + countdown
+	chips = 5, -- small status chips side by side: server luck, the running modifier (HudController.chipRow)
+	mapVote = 6, -- the vote for the next map (MapThemeController), only while it runs
+	lock = 7,
+	social = 8,
 })
 
 -- Container below the cash readout for status pills (luck, lock...). Children sort by LayoutOrder (TOP_ORDER).
 function HudController.topStack(): Frame
 	return topStack
+end
+
+-- A row in the top stack for small status chips (server luck, the running modifier), side by side so they don't
+-- stack up. It takes no room while every chip in it is hidden.
+function HudController.chipRow(): Frame
+	return chipRow
 end
 
 -- Bottom-right container above the jump button for big contextual buttons.
@@ -181,6 +189,21 @@ local function build()
 		TextColor3 = UiTheme.palette("cash"),
 		Text = UiTheme.perSecond(0),
 		Parent = topStack,
+	})
+	chipRow = UiKit.new("Frame", {
+		Name = "Chips",
+		LayoutOrder = HudController.TOP_ORDER.chips,
+		Size = UDim2.fromOffset(300, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundTransparency = 1,
+		Parent = topStack,
+	}) :: Frame
+	UiKit.new("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 6),
+		Parent = chipRow,
 	})
 
 	sideColumn = UiKit.new("Frame", {
