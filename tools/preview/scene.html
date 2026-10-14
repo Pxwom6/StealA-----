@@ -1,0 +1,424 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Snackling world preview</title>
+<style>
+	html, body { margin: 0; background: #000; }
+	canvas { display: block; }
+</style>
+<script src="node_modules/three/build/three.min.js"></script>
+</head>
+<body>
+<script>
+// Renders a worldsim export (tools/worldsim/export.luau, exportCreatures.luau) with three.js.
+// render.mjs calls window.renderShots(scene, shots, options) and saves the PNGs it returns.
+"use strict";
+
+const ROUGH = {
+	SmoothPlastic: [0.45, 0.0], Plastic: [0.55, 0.0], Neon: [1, 0], Glass: [0.05, 0.1], ForceField: [0.2, 0],
+	Metal: [0.35, 0.65], DiamondPlate: [0.4, 0.6], CorrodedMetal: [0.7, 0.5], Foil: [0.25, 0.8],
+	Ice: [0.15, 0.05], Glacier: [0.2, 0.05], Marble: [0.25, 0], Granite: [0.6, 0], Slate: [0.8, 0],
+	Pebble: [0.9, 0], Cobblestone: [0.9, 0], Brick: [0.9, 0], Concrete: [0.9, 0], Pavement: [0.9, 0],
+	Wood: [0.75, 0], WoodPlanks: [0.75, 0], Fabric: [0.95, 0], Sand: [0.95, 0], Grass: [0.95, 0],
+	LeafyGrass: [0.95, 0], Snow: [0.9, 0], Salt: [0.9, 0], Ground: [0.95, 0], Mud: [0.9, 0], Rock: [0.85, 0],
+	Basalt: [0.85, 0], CrackedLava: [0.8, 0], Sandstone: [0.9, 0], Limestone: [0.9, 0], Asphalt: [0.95, 0],
+	CeramicTiles: [0.35, 0], Cardboard: [0.95, 0], Carpet: [1, 0], Leather: [0.7, 0], Rubber: [0.9, 0],
+	Plaster: [0.9, 0], ClayRoofTiles: [0.85, 0], RoofShingles: [0.9, 0], Water: [0.05, 0],
+};
+
+// Default Roblox terrain colours (used when the export has none for a material).
+const TERRAIN_DEFAULT = {
+	Grass: [0.42, 0.5, 0.25], Sand: [0.56, 0.49, 0.37], Rock: [0.4, 0.4, 0.38], Snow: [0.76, 0.78, 0.85],
+	Water: [0.05, 0.33, 0.36], Mud: [0.23, 0.18, 0.14], Ground: [0.4, 0.36, 0.23], Slate: [0.25, 0.5, 0.42],
+	Basalt: [0.12, 0.12, 0.15], CrackedLava: [0.91, 0.61, 0.29], Ice: [0.5, 0.76, 0.88], Glacier: [0.4, 0.69, 0.92],
+	LeafyGrass: [0.45, 0.52, 0.29], Asphalt: [0.45, 0.48, 0.42], Concrete: [0.5, 0.4, 0.25], Pavement: [0.58, 0.58, 0.55],
+	Salt: [0.78, 0.74, 0.71], Sandstone: [0.54, 0.35, 0.28], Limestone: [0.81, 0.68, 0.58], Brick: [0.54, 0.34, 0.24],
+	Cobblestone: [0.52, 0.48, 0.35], WoodPlanks: [0.55, 0.43, 0.31],
+};
+
+// Roblox colours are sRGB; three.js lights in linear space and writes sRGB.
+function col(c) { return new THREE.Color(c[0], c[1], c[2]).convertSRGBToLinear(); }
+
+// A soft sky-and-ground environment so metals and glass have something to reflect.
+function environmentFor(renderer, sky, ground) {
+	const envScene = new THREE.Scene();
+	const geo = new THREE.SphereGeometry(50, 32, 16);
+	const colours = [];
+	const pos = geo.attributes.position;
+	for (let i = 0; i < pos.count; i++) {
+		const t = (pos.getY(i) / 50 + 1) / 2;
+		const c = ground.clone().lerp(sky, Math.min(1, Math.max(0, (t - 0.35) * 2.2)));
+		if (t > 0.92) c.lerp(new THREE.Color(1, 1, 1), (t - 0.92) * 6);
+		colours.push(c.r, c.g, c.b);
+	}
+	geo.setAttribute("color", new THREE.Float32BufferAttribute(colours, 3));
+	envScene.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
+	const pmrem = new THREE.PMREMGenerator(renderer);
+	return pmrem.fromScene(envScene, 0.04).texture;
+}
+
+function matrixOf(cf) {
+	const m = new THREE.Matrix4();
+	m.set(cf[3], cf[4], cf[5], cf[0], cf[6], cf[7], cf[8], cf[1], cf[9], cf[10], cf[11], cf[2], 0, 0, 0, 1);
+	return m;
+}
+
+// A Roblox WedgePart: full bottom, full-height back face (+Z), slope down to the front (-Z).
+function wedgeGeometry(sx, sy, sz) {
+	const x = sx / 2, y = sy / 2, z = sz / 2;
+	const v = {
+		a: [-x, -y, -z], b: [x, -y, -z], c: [x, -y, z], d: [-x, -y, z], e: [-x, y, z], f: [x, y, z],
+	};
+	const tris = [
+		// bottom (normal -Y)
+		[v.a, v.c, v.b], [v.a, v.d, v.c],
+		// back (+Z)
+		[v.d, v.f, v.e], [v.d, v.c, v.f],
+		// slope (front-up)
+		[v.a, v.b, v.f], [v.a, v.f, v.e],
+		// sides
+		[v.a, v.e, v.d], [v.b, v.c, v.f],
+	];
+	const pos = [];
+	for (const t of tris) for (const p of t) pos.push(p[0], p[1], p[2]);
+	const g = new THREE.BufferGeometry();
+	g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+	g.computeVertexNormals();
+	return g;
+}
+
+// A Roblox CornerWedgePart (approximate): a pyramid with its apex over the back-right top corner.
+function cornerWedgeGeometry(sx, sy, sz) {
+	const x = sx / 2, y = sy / 2, z = sz / 2;
+	const a = [-x, -y, -z], b = [x, -y, -z], c = [x, -y, z], d = [-x, -y, z], t = [x, y, z];
+	const tris = [[a, c, b], [a, d, c], [a, b, t], [b, c, t], [c, d, t], [d, a, t]];
+	const pos = [];
+	for (const tr of tris) for (const p of tr) pos.push(p[0], p[1], p[2]);
+	const g = new THREE.BufferGeometry();
+	g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+	g.computeVertexNormals();
+	return g;
+}
+
+function partGeometry(p) {
+	const [sx, sy, sz] = p.size;
+	switch (p.shape) {
+		case "Ball": {
+			const g = new THREE.SphereGeometry(0.5, 28, 18);
+			g.scale(sx, sy, sz);
+			return g;
+		}
+		case "Cylinder": {
+			// Roblox cylinders run along local X; the diameter is the smaller of Y and Z.
+			const r = Math.min(sy, sz) / 2;
+			const g = new THREE.CylinderGeometry(r, r, sx, 28, 1);
+			g.rotateZ(Math.PI / 2);
+			return g;
+		}
+		case "Wedge": return wedgeGeometry(sx, sy, sz);
+		case "CornerWedge": return cornerWedgeGeometry(sx, sy, sz);
+		default: return new THREE.BoxGeometry(sx, sy, sz);
+	}
+}
+
+const materialCache = new Map();
+function partMaterial(p) {
+	const t = p.transparency || 0;
+	const key = `${p.material}|${p.color.join(",")}|${t}`;
+	let m = materialCache.get(key);
+	if (m) return m;
+	const color = col(p.color);
+	const [rough, metal] = ROUGH[p.material] || [0.7, 0];
+	if (p.material === "Neon") {
+		m = new THREE.MeshBasicMaterial({ color: color.clone().multiplyScalar(1.6) });
+	} else {
+		m = new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal });
+		if (p.material === "ForceField") {
+			m.transparent = true; m.opacity = 0.25; m.emissive = color.clone().multiplyScalar(0.4);
+		}
+	}
+	let opacity = 1 - t;
+	if (p.material === "Glass") opacity = Math.min(opacity, 0.45);
+	if (p.material === "Ice" || p.material === "Glacier") opacity = Math.min(opacity, 0.85);
+	if (opacity < 0.999) { m.transparent = true; m.opacity = opacity; m.depthWrite = opacity > 0.6; }
+	materialCache.set(key, m);
+	return m;
+}
+
+// --- Terrain: voxelise the recorded fills in order (Air carves), then draw the top surface as columns. -----------
+
+function terrainColour(terrain, name) {
+	const c = (terrain.materialColors && terrain.materialColors[name]) || TERRAIN_DEFAULT[name] || [0.5, 0.5, 0.5];
+	return c;
+}
+
+function buildTerrain(scene, terrain, opts) {
+	const ops = terrain.ops || [];
+	if (ops.length === 0) return;
+	const cell = opts.cell || 4;
+	const half = opts.terrainHalf || 760;
+	const minY = -140, maxY = 160;
+	const nx = Math.ceil((2 * half) / cell), nz = nx, ny = Math.ceil((maxY - minY) / cell);
+	const grid = new Uint8Array(nx * ny * nz);
+	const names = ["Air"];
+	const ids = { Air: 0 };
+	const matId = (n) => { if (!(n in ids)) { ids[n] = names.length; names.push(n); } return ids[n]; };
+	const idx = (i, j, k) => (j * nz + k) * nx + i;
+	const toI = (x) => Math.floor((x + half) / cell);
+	const toJ = (y) => Math.floor((y - minY) / cell);
+	const center = (i) => -half + (i + 0.5) * cell;
+	const centerY = (j) => minY + (j + 0.5) * cell;
+	const clampI = (i) => Math.max(0, Math.min(nx - 1, i));
+	const clampJ = (j) => Math.max(0, Math.min(ny - 1, j));
+
+	function fillBox(cf, size, id, inside) {
+		// AABB of the rotated box
+		const R = [cf[3], cf[4], cf[5], cf[6], cf[7], cf[8], cf[9], cf[10], cf[11]];
+		const hx = size[0] / 2, hy = size[1] / 2, hz = size[2] / 2;
+		const ex = Math.abs(R[0]) * hx + Math.abs(R[1]) * hy + Math.abs(R[2]) * hz;
+		const ey = Math.abs(R[3]) * hx + Math.abs(R[4]) * hy + Math.abs(R[5]) * hz;
+		const ez = Math.abs(R[6]) * hx + Math.abs(R[7]) * hy + Math.abs(R[8]) * hz;
+		const i0 = clampI(toI(cf[0] - ex)), i1 = clampI(toI(cf[0] + ex));
+		const j0 = clampJ(toJ(cf[1] - ey)), j1 = clampJ(toJ(cf[1] + ey));
+		const k0 = clampI(toI(cf[2] - ez)), k1 = clampI(toI(cf[2] + ez));
+		for (let j = j0; j <= j1; j++) for (let k = k0; k <= k1; k++) for (let i = i0; i <= i1; i++) {
+			const dx = center(i) - cf[0], dy = centerY(j) - cf[1], dz = center(k) - cf[2];
+			// local = R^T * d
+			const lx = R[0] * dx + R[3] * dy + R[6] * dz;
+			const ly = R[1] * dx + R[4] * dy + R[7] * dz;
+			const lz = R[2] * dx + R[5] * dy + R[8] * dz;
+			if (inside(lx, ly, lz, hx, hy, hz)) grid[idx(i, j, k)] = id;
+		}
+	}
+	const inBox = (lx, ly, lz, hx, hy, hz) => Math.abs(lx) <= hx && Math.abs(ly) <= hy && Math.abs(lz) <= hz;
+	for (const op of ops) {
+		const a = op.args;
+		if (op.op === "FillBlock") {
+			fillBox(a[0].cframe, a[1].vector, matId(a[2].enum), inBox);
+		} else if (op.op === "FillBall") {
+			const c = a[0].vector, r = a[1], id = matId(a[2].enum);
+			fillBox([c[0], c[1], c[2], 1, 0, 0, 0, 1, 0, 0, 0, 1], [2 * r, 2 * r, 2 * r], id,
+				(x, y, z) => x * x + y * y + z * z <= r * r);
+		} else if (op.op === "FillCylinder") {
+			const cf = a[0].cframe, h = a[1], r = a[2], id = matId(a[3].enum);
+			fillBox(cf, [2 * r, h, 2 * r], id, (x, y, z, hx, hy) => Math.abs(y) <= hy && x * x + z * z <= r * r);
+		} else if (op.op === "FillWedge") {
+			const cf = a[0].cframe, s = a[1].vector, id = matId(a[2].enum);
+			// wedge: y <= slope from front-bottom (z=-hz, y=-hy) to back-top (z=+hz, y=+hy)
+			fillBox(cf, s, id, (x, y, z, hx, hy, hz) =>
+				inBox(x, y, z, hx, hy, hz) && (y + hy) <= ((z + hz) / (2 * hz)) * (2 * hy) + 1e-6);
+		} else if (op.op === "Clear") {
+			grid.fill(0);
+		}
+	}
+
+	// Columns: the top solid voxel, drawn down to the lowest neighbouring top (so cliffs show).
+	const waterId = ids.Water;
+	const tops = new Int16Array(nx * nz).fill(-1); // top non-water solid
+	const waterTop = new Int16Array(nx * nz).fill(-1);
+	for (let k = 0; k < nz; k++) for (let i = 0; i < nx; i++) {
+		for (let j = ny - 1; j >= 0; j--) {
+			const v = grid[idx(i, j, k)];
+			if (v === 0) continue;
+			if (v === waterId) { if (waterTop[k * nx + i] < 0) waterTop[k * nx + i] = j; continue; }
+			tops[k * nx + i] = j;
+			break;
+		}
+	}
+	const byMat = new Map();
+	const push = (mat, x, y0, y1, z) => {
+		if (!byMat.has(mat)) byMat.set(mat, []);
+		byMat.get(mat).push([x, y0, y1, z]);
+	};
+	for (let k = 0; k < nz; k++) for (let i = 0; i < nx; i++) {
+		const t = tops[k * nx + i];
+		if (t >= 0) {
+			let low = t;
+			for (const [di, dk] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+				const ii = i + di, kk = k + dk;
+				if (ii < 0 || kk < 0 || ii >= nx || kk >= nz) continue;
+				const nt = tops[kk * nx + ii];
+				low = Math.min(low, nt < 0 ? 0 : nt + 1);
+			}
+			push(names[grid[idx(i, t, k)]], center(i), minY + low * cell, minY + (t + 1) * cell, center(k));
+		}
+		const w = waterTop[k * nx + i];
+		if (w >= 0) push("Water", center(i), minY + (Math.max(t, 0) + 1) * cell, minY + (w + 1) * cell - cell * 0.15, center(k));
+	}
+	const box = new THREE.BoxGeometry(1, 1, 1);
+	const dummy = new THREE.Object3D();
+	for (const [mat, cols] of byMat) {
+		const c = mat === "Water" ? (terrain.waterColor || TERRAIN_DEFAULT.Water) : terrainColour(terrain, mat);
+		let material;
+		if (mat === "Water") {
+			material = new THREE.MeshStandardMaterial({ color: col(c), roughness: 0.08, metalness: 0.1,
+				transparent: true, opacity: 0.8 - 0.5 * (terrain.waterTransparency || 0.3) });
+		} else {
+			const [rough, metal] = ROUGH[mat] || [0.9, 0];
+			material = new THREE.MeshStandardMaterial({ color: col(c), roughness: rough, metalness: metal });
+			if (mat === "CrackedLava") material.emissive = col(c).multiplyScalar(0.35);
+		}
+		const mesh = new THREE.InstancedMesh(box, material, cols.length);
+		cols.forEach(([x, y0, y1, z], n) => {
+			dummy.position.set(x, (y0 + y1) / 2, z);
+			dummy.scale.set(cell, Math.max(0.05, y1 - y0), cell);
+			dummy.updateMatrix();
+			mesh.setMatrixAt(n, dummy.matrix);
+		});
+		mesh.receiveShadow = true;
+		mesh.castShadow = mat !== "Water";
+		scene.add(mesh);
+	}
+}
+
+// --- Lighting -------------------------------------------------------------------------------------------------
+
+function sunDirection(clockTime, latitude) {
+	// Roblox's sun: rises in the east (+X), sets in the west, tilted south by the latitude.
+	const h = ((clockTime - 12) / 12) * Math.PI; // 0 at noon
+	const lat = THREE.MathUtils.degToRad(latitude || 0);
+	const v = new THREE.Vector3(-Math.sin(h), Math.cos(h), 0);
+	v.applyAxisAngle(new THREE.Vector3(1, 0, 0), -lat * 0.6);
+	return v.normalize();
+}
+
+function skyColour(lighting) {
+	const t = lighting.clockTime;
+	const atm = lighting.atmosphere;
+	const day = col([0.48, 0.7, 0.95]), dusk = col([0.95, 0.55, 0.35]), night = col([0.02, 0.03, 0.08]);
+	const sunUp = Math.cos(((t - 12) / 12) * Math.PI); // 1 noon, 0 at 6/18, -1 midnight
+	let c;
+	if (sunUp > 0.25) c = day.clone();
+	else if (sunUp > -0.05) c = dusk.clone().lerp(day, (sunUp + 0.05) / 0.3);
+	else c = night.clone().lerp(dusk, Math.max(0, (sunUp + 0.25) / 0.2));
+	if (atm) c.lerp(col(atm.color), Math.min(0.6, atm.haze * 0.18 + atm.density * 0.5));
+	return c;
+}
+
+function addLighting(scene, lighting, bounds, opts) {
+	const sunUp = Math.cos(((lighting.clockTime - 12) / 12) * Math.PI);
+	const isDay = sunUp > -0.02;
+	const dir = sunDirection(isDay ? lighting.clockTime : lighting.clockTime + 12, lighting.latitude);
+	const brightness = lighting.brightness ?? 2;
+	const sunColour = isDay ? col([1, 0.96, 0.88]).lerp(col([1, 0.6, 0.35]), Math.max(0, 0.4 - sunUp) * 1.6)
+		: col([0.55, 0.65, 1]);
+	const sun = new THREE.DirectionalLight(sunColour, (isDay ? 1.1 : 0.3) * brightness);
+	const span = bounds.radius;
+	sun.position.copy(bounds.center).addScaledVector(dir, span * 2);
+	sun.target.position.copy(bounds.center);
+	if (opts.shadows !== false) {
+		sun.castShadow = true;
+		sun.shadow.mapSize.set(opts.shadowMap || 4096, opts.shadowMap || 4096);
+		const s = sun.shadow.camera;
+		s.left = -span; s.right = span; s.top = span; s.bottom = -span; s.near = 0.5; s.far = span * 5;
+		sun.shadow.bias = -0.0004;
+		sun.shadow.normalBias = 0.02;
+	}
+	scene.add(sun, sun.target);
+	const amb = col(lighting.ambient || [0.5, 0.5, 0.5]);
+	const out = col(lighting.outdoorAmbient || [0.5, 0.5, 0.5]);
+	scene.add(new THREE.HemisphereLight(out, amb, 0.75));
+	scene.add(new THREE.AmbientLight(amb, 0.25));
+	const sky = skyColour(lighting);
+	scene.background = sky;
+	scene.environment = environmentFor(opts.renderer, sky.clone(), out.clone().multiplyScalar(0.6));
+	const atm = lighting.atmosphere;
+	if (atm && opts.fog !== false) {
+		scene.fog = new THREE.FogExp2(col(atm.color).lerp(sky, 0.5), atm.density * 0.0035 + 0.0002);
+	}
+}
+
+function boundsOf(parts) {
+	const box = new THREE.Box3();
+	for (const p of parts) box.expandByPoint(new THREE.Vector3(p.cf[0], p.cf[1], p.cf[2]));
+	const center = box.getCenter(new THREE.Vector3());
+	const radius = Math.max(8, box.getSize(new THREE.Vector3()).length() / 2);
+	return { box, center, radius };
+}
+
+window.renderShots = function (data, shots, opts) {
+	opts = opts || {};
+	const [w, h] = opts.size || [1280, 720];
+	const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+	renderer.setSize(w, h);
+	renderer.setPixelRatio(1);
+	renderer.shadowMap.enabled = opts.shadows !== false;
+	renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+	renderer.toneMapping = THREE.ACESFilmicToneMapping;
+	renderer.toneMappingExposure = Math.pow(2, (data.lighting && data.lighting.exposure) || 0) * (opts.exposure || 1.15);
+	opts.renderer = renderer;
+	renderer.outputEncoding = THREE.sRGBEncoding;
+	document.body.appendChild(renderer.domElement);
+
+	const scene = new THREE.Scene();
+	const parts = data.parts || [];
+	for (const p of parts) {
+		const mesh = new THREE.Mesh(partGeometry(p), partMaterial(p));
+		mesh.matrixAutoUpdate = false;
+		mesh.matrix.copy(matrixOf(p.cf));
+		const opaque = !(p.transparency > 0.05) && p.material !== "Glass";
+		mesh.castShadow = opaque && p.material !== "Neon";
+		mesh.receiveShadow = true;
+		scene.add(mesh);
+	}
+	const lights = (data.lights || []).slice().sort((a, b) => b.brightness * b.range - a.brightness * a.range);
+	for (const l of lights.slice(0, opts.maxLights || 12)) {
+		const pl = new THREE.PointLight(col(l.color), l.brightness * 1.2, l.range * 1.4, 1.5);
+		pl.position.set(l.position[0], l.position[1], l.position[2]);
+		scene.add(pl);
+	}
+	if (data.terrain) buildTerrain(scene, data.terrain, opts);
+	if (data.labels) {
+		// A lineup: a soft grey floor to stand on.
+		const floor = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000),
+			new THREE.MeshStandardMaterial({ color: col([0.78, 0.8, 0.82]), roughness: 0.9 }));
+		floor.rotation.x = -Math.PI / 2;
+		floor.position.y = -0.02;
+		floor.receiveShadow = true;
+		scene.add(floor);
+	}
+	const bounds = opts.focus ? { center: new THREE.Vector3(...opts.focus.center), radius: opts.focus.radius } : boundsOf(parts);
+	addLighting(scene, data.lighting || { clockTime: 14, brightness: 2 }, bounds, opts);
+	if (data.labels) scene.background = col([0.62, 0.72, 0.84]);
+
+	// Colour correction (brightness / contrast / saturation) applied when copying to a 2D canvas.
+	let filter = "none";
+	const cc = data.lighting && data.lighting.colorCorrection;
+	if (cc && cc.length) {
+		let b = 1, c = 1, s = 1;
+		for (const e of cc) { b += e.brightness || 0; c += e.contrast || 0; s += e.saturation || 0; }
+		filter = `brightness(${b}) contrast(${c}) saturate(${s})`;
+	}
+	const flat = document.createElement("canvas");
+	flat.width = w; flat.height = h;
+	const ctx = flat.getContext("2d");
+
+	const out = [];
+	for (const shot of shots) {
+		const cam = new THREE.PerspectiveCamera(shot.fov || 55, w / h, 0.3, 6000);
+		cam.position.set(...shot.pos);
+		cam.lookAt(new THREE.Vector3(...shot.target));
+		renderer.render(scene, cam);
+		ctx.filter = filter;
+		ctx.drawImage(renderer.domElement, 0, 0);
+		ctx.filter = "none";
+		if (shot.labels) {
+			ctx.font = "bold 15px sans-serif";
+			ctx.textAlign = "center";
+			for (const l of shot.labels) {
+				const v = new THREE.Vector3(...l.at).project(cam);
+				if (v.z > 1) continue;
+				const x = (v.x + 1) / 2 * w, y = (1 - v.y) / 2 * h;
+				ctx.lineWidth = 4; ctx.strokeStyle = "rgba(0,0,0,0.8)"; ctx.strokeText(l.text, x, y);
+				ctx.fillStyle = "#fff"; ctx.fillText(l.text, x, y);
+			}
+		}
+		out.push({ name: shot.name, url: flat.toDataURL("image/png") });
+	}
+	return out;
+};
+window.previewReady = true;
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "name": "snackling-preview",
+  "private": true,
+  "description": "Offline 3D preview of worldsim exports (dev tool, not part of the game)",
+  "type": "module",
+  "dependencies": {
+    "playwright-core": "1.47.2",
+    "three": "0.128.0"
+  }
+}
