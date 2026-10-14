@@ -39,6 +39,7 @@ local MapThemeController = require(Controllers.MapThemeController)
 local ModifierController = require(Controllers.ModifierController)
 local WeatherController = require(Controllers.WeatherController)
 local DropController = require(Controllers.DropController)
+local BossController = require(Controllers.BossController)
 
 StateStore.start()
 ClientSettings.start() -- saved settings (music, sound effects, reduce effects) arrive with the first state
@@ -65,6 +66,7 @@ SnackdexController.start() -- side button LayoutOrder 4, under Rewards
 CashOfferController.start() -- "Need $X more?" card when a purchase fails for lack of cash
 MapThemeController.start() -- the vote for the next map (top stack) and the new map's title card
 WeatherController.start() -- the map theme's snow / embers / leaves... around the camera
-DropController.start() -- supply crates (marker, hold prompt) and spinning coins on the walkways
+DropController.start() -- supply crates (marker, hold prompt), spinning coins and runaways on the walkways
+BossController.start() -- Snack Attack: the giant's health bar, bob and hit reactions
 
 Net.get("ClientReady"):FireServer()

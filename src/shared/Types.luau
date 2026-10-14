@@ -584,9 +584,10 @@ export type ModifierEffects = {
 export type SkyEffect = "lightning" | "meteors" | "aurora"
 
 -- Things a modifier drops on the walkways while it runs (DropService, Config/Drops): supply crates (hold to open,
--- first player wins), a shower of coins (walk over them) or a runaway Snackling (catch it).
+-- first player wins), a shower of coins (walk over them) or a runaway Snackling (catch it); or a giant Snackling over
+-- the belt that everyone taps together (BossService, Config/Boss).
 export type ModifierDrops = {
-	kind: "crate" | "coins" | "runaway",
+	kind: "crate" | "coins" | "runaway" | "boss",
 	firstSeconds: number, -- the first drop this long after the modifier starts
 	everySeconds: number, -- then one every this long until it ends
 }
@@ -715,6 +716,24 @@ export type CodesConfig = { [string]: CodeDef }
 -- Config: drops (Config/Drops): what Supply Drop and Coin Rain put on the walkways -------------------------------
 
 -- Rewards are IncomeReward (below): sized from the player's steady income, like a cash pack.
+-- Config: Snack Attack (Config/Boss): a giant Snackling over the middle of the belt that everyone taps together -----
+export type BossConfig = {
+	hpPerPlayer: number, -- hits it takes for each player in the server when it appears
+	minHp: number,
+	hitsPerSecond: number, -- the most hits the server counts from one player (taps beyond it are ignored)
+	burst: number, -- hits a player can land at once before the limit kicks in
+	reach: number, -- studs from its middle a player can tap it from (the server allows a little more)
+	lifetimeSeconds: number, -- not taken down within this long, it flies off and nothing is paid
+	scale: number, -- times its podium size
+	hoverHeight: number, -- studs between the walkway and its feet (clear of the belt and the players)
+	rarities: { string }, -- the giant is a regular Snackling of one of these tiers (looks only)
+	minHits: number, -- hits a player needs to share the reward
+	cash: { baseSeconds: number, shareSeconds: number, minimum: number }, -- each helper: steady income x (base +
+	-- share x their share of all hits), at least the minimum
+	luck: number, -- × server luck for the top hitter's Snackling
+	mutationChance: number, -- × mutation chances for it
+}
+
 export type DropsConfig = {
 	-- Where drops land: a band on each side of the belt, between it and the bases (world X / Z; mirrored in Z).
 	area: { minX: number, maxX: number, minZ: number, maxZ: number },

@@ -207,6 +207,7 @@ for _, entry in
 		{ "Player", "CharacterAdded" },
 		{ "Player", "CharacterRemoving" },
 		{ "Humanoid", "Died" },
+		{ "ClickDetector", "MouseClick" },
 	}
 do
 	roblox.implementProperty(entry[1], entry[2], function(self: any): any
@@ -1108,6 +1109,11 @@ function Sim.fireServer(player: any, remoteName: string, ...: any)
 	local remote = remotes and remotes:FindFirstChild(remoteName)
 	assert(remote, `no remote {remoteName}`)
 	instanceSignal(remote, "OnServerEvent"):Fire(player, ...)
+end
+
+-- `player` clicks (or taps) a ClickDetector the server made.
+function Sim.click(player: any, clickDetector: any)
+	instanceSignal(unwrap(clickDetector), "MouseClick"):Fire(player)
 end
 
 -- A chat command typed by `player` (e.g. "/mod rushHour").

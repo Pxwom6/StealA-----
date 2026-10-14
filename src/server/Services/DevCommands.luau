@@ -23,6 +23,7 @@
 	  /spins <n>            bank n Lucky Spins, e.g. /spins 5; /spins free makes the free spin ready now
 	  /runaway [here]       a Snackling escapes now, as in Great Escape (far from everyone); /runaway here lets it out
 	                        right beside you, to test catching it
+	  /boss [hp]            a Snack Attack giant appears over the belt now (tap it to test), e.g. /boss 20 for a quick one
 
 	Map themes (MapThemeService; admins can use these in live servers too, that server only):
 	  /map <id>             switch to that map now, e.g. /map candy, /map volcano
@@ -44,6 +45,7 @@ local GameData = require(ReplicatedStorage.Shared.GameData)
 local SnackdexRules = require(ReplicatedStorage.Shared.Logic.SnackdexRules)
 
 local BeltService = require(script.Parent.BeltService)
+local BossService = require(script.Parent.BossService)
 local DevGallery = require(script.Parent.DevGallery)
 local DropService = require(script.Parent.DropService)
 local EconomyService = require(script.Parent.EconomyService)
@@ -254,11 +256,20 @@ function DevCommands.start()
 			Remotes.notify(player, "[Studio] no Snackling could escape", "error")
 		end
 	end)
+	add("boss", function(player: Player, args: { string })
+		local hp = tonumber(args[1])
+		if hp then
+			hp = math.clamp(math.floor(hp), 1, 10000)
+		end
+		if BossService.release(nil, hp) == nil then
+			Remotes.notify(player, "[Studio] no Snackling could play the giant", "error")
+		end
+	end)
 	print(
 		"[DevCommands] Studio commands enabled: /cash <n>, /spawn <creatureId> [mutationId], /noshield, /friends <n|off>,"
 			.. " /tutorial, /gallery [mutationId|off], /sky <clockTime>,"
 			.. " /quests reset, /dex fill <rarity|event>, /map <id|vote|list>, /playtime <min>, /spins <n|free>,"
-			.. " /runaway [here]"
+			.. " /runaway [here], /boss [hp]"
 			.. " (LiveOps: /event <id> [minutes], /event off, /luck <x> <min>)"
 	)
 end
