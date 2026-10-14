@@ -46,21 +46,56 @@ local function realMap(): (SeasonRules.MapShape, { Rect })
 		rects
 end
 
-local function theme(): Types.SeasonTheme
-	return Seasons.themes[Seasons.eventThemes.Halloween2026]
+local function theme(eventId: string?): Types.SeasonTheme
+	return Seasons.themes[Seasons.eventThemes[eventId or "Halloween2026"]]
 end
 
+-- A copy of the shipped config whose themes (decorations and palettes) can be edited freely.
 local function cloneConfig(): Types.SeasonsConfig
-	local halloween = theme()
-	local copy = table.clone(halloween)
-	copy.decorations = table.clone(halloween.decorations)
-	copy.palette = table.clone(halloween.palette)
+	local themes: { [string]: Types.SeasonTheme } = {}
+	for id, original in Seasons.themes do
+		local copy = table.clone(original)
+		copy.decorations = table.clone(original.decorations)
+		copy.palette = table.clone(original.palette)
+		themes[id] = copy
+	end
 	return {
 		eventThemes = table.clone(Seasons.eventThemes),
-		themes = { halloween = copy },
+		themes = themes,
 		maxParts = Seasons.maxParts,
 		transitionSeconds = Seasons.transitionSeconds,
 	}
+end
+
+-- Every prop of `props` of each kind.
+local function countKinds(props: { SeasonRules.Prop }): { [string]: number }
+	local counts: { [string]: number } = {}
+	for _, prop in props do
+		counts[prop.kind] = (counts[prop.kind] or 0) + 1
+	end
+	return counts
+end
+
+-- The checks every theme's layout must pass on the real map: nothing inside a plot, on the belt or on the lobby
+-- spawn, and every prop facing a horizontal unit direction.
+local function expectClearOfGameplay(props: { SeasonRules.Prop }, rects: { Rect })
+	local lobby = MAP.lobby -- the spawn plaza (Config/Scenery); MapBuilder puts LobbySpawn there
+	for _, prop in props do
+		for _, rect in rects do
+			local inside = prop.x > rect.minX - 0.5
+				and prop.x < rect.maxX + 0.5
+				and prop.z > rect.minZ - 0.5
+				and prop.z < rect.maxZ + 0.5
+			if inside then
+				error(`{prop.kind} at ({prop.x}, {prop.z}) is inside a plot`)
+			end
+		end
+		if prop.y < 12 then
+			T.expect(math.abs(prop.z)).toBeGreaterThan(Gameplay.belt.width / 2 + 0.8)
+		end
+		T.expect(math.sqrt((prop.x - lobby.x) ^ 2 + (prop.z - lobby.z) ^ 2)).toBeGreaterThan(6)
+		T.expect(prop.faceX ^ 2 + prop.faceZ ^ 2).toBeNear(1, 1e-9)
+	end
 end
 
 T.describe("SeasonRules.activeTheme", function()
@@ -103,10 +138,7 @@ T.describe("SeasonRules.layout (Halloween on the real map)", function()
 		T.expect(SeasonRules.partCount(props)).toBeLessThan(250)
 	end)
 	T.it("places the configured number of each prop", function()
-		local counts: { [string]: number } = {}
-		for _, prop in props do
-			counts[prop.kind] = (counts[prop.kind] or 0) + 1
-		end
+		local counts = countKinds(props)
 		local d = halloween.decorations
 		T.expect(counts.pumpkin)
 			.toBe((d.pumpkinsPerPlot :: number) * MAP.plotCount + 2 * (d.beltPumpkinsPerSide :: number))
@@ -116,23 +148,7 @@ T.describe("SeasonRules.layout (Halloween on the real map)", function()
 		T.expect(counts.ghost).toBe(d.ghosts)
 	end)
 	T.it("never puts anything inside a plot, on the belt or on the lobby spawn", function()
-		local lobby = MAP.lobby -- the spawn plaza (Config/Scenery); MapBuilder puts LobbySpawn there
-		for _, prop in props do
-			for _, rect in rects do
-				local inside = prop.x > rect.minX - 0.5
-					and prop.x < rect.maxX + 0.5
-					and prop.z > rect.minZ - 0.5
-					and prop.z < rect.maxZ + 0.5
-				if inside then
-					error(`{prop.kind} at ({prop.x}, {prop.z}) is inside a plot`)
-				end
-			end
-			if prop.y < 12 then
-				T.expect(math.abs(prop.z)).toBeGreaterThan(Gameplay.belt.width / 2 + 0.8)
-			end
-			T.expect(math.sqrt((prop.x - lobby.x) ^ 2 + (prop.z - lobby.z) ^ 2)).toBeGreaterThan(6)
-			T.expect(prop.faceX ^ 2 + prop.faceZ ^ 2).toBeNear(1, 1e-9)
-		end
+		expectClearOfGameplay(props, rects)
 	end)
 	T.it("faces every pumpkin and bulb towards the walkway and alternates bulb colours", function()
 		local previous: string? = nil
@@ -162,6 +178,124 @@ T.describe("SeasonRules.layout (Halloween on the real map)", function()
 	end)
 	T.it("builds nothing for an empty theme", function()
 		T.expect(#SeasonRules.layout({}, { bulbs = {} }, map)).toBe(0)
+	end)
+	T.it("keeps the Halloween layout of earlier releases (220 parts)", function()
+		T.expect(SeasonRules.partCount(props)).toBe(220)
+	end)
+end)
+
+T.describe("SeasonRules.layout (Winter on the real map)", function()
+	local map, rects = realMap()
+	local winter = theme("Winter2026")
+	local d = winter.decorations
+	local props = SeasonRules.layout(d, winter.palette, map)
+	local counts = countKinds(props)
+
+	T.it("is switched on by Winter2026 and snows", function()
+		T.expect((SeasonRules.activeTheme(Seasons, { Winter2026 = true, WinterLuck2026 = true }))).toBe("winter")
+		T.expect(winter.weather).toBe("snow")
+	end)
+	T.it("stays within the part budget", function()
+		T.expect(SeasonRules.partCount(props)).toBeAtMost(Seasons.maxParts)
+		T.expect(SeasonRules.partCount(props)).toBe(380)
+	end)
+	T.it("places the configured number of each prop, and nothing from Halloween", function()
+		T.expect(counts.present)
+			.toBe((d.presentsPerPlot :: number) * MAP.plotCount + 2 * (d.beltPresentsPerSide :: number))
+		T.expect(counts.bulb).toBe((d.bulbsPerPlot :: number) * MAP.plotCount)
+		T.expect(counts.tree).toBe(2 * (MAP.plotsPerSide - 1))
+		T.expect(counts.snowman).toBe(d.snowmen)
+		T.expect(counts.snowflake).toBe(d.snowflakes)
+		T.expect(counts.snowPile).toBe((d.snowPilesPerPlot :: number) * MAP.plotCount)
+		for _, kind in { "pumpkin", "lamp", "bat", "ghost" } do
+			T.expect(counts[kind]).toBeNil()
+		end
+	end)
+	T.it("never puts anything inside a plot, on the belt or on the lobby spawn", function()
+		expectClearOfGameplay(props, rects)
+	end)
+	T.it("wraps presents in cycling colours and ribbons, turned a little each", function()
+		local wraps: { [string]: boolean } = {}
+		local turned = 0
+		for _, prop in props do
+			if prop.kind == "present" then
+				T.expect(table.find(winter.palette.presents :: { string }, prop.color :: string) ~= nil).toBe(true)
+				T.expect(table.find(winter.palette.ribbons :: { string }, prop.color2 :: string) ~= nil).toBe(true)
+				wraps[prop.color :: string] = true
+				if math.abs(prop.faceX) > 1e-6 then
+					turned += 1
+				end
+			end
+		end
+		local distinct = 0
+		for _ in wraps do
+			distinct += 1
+		end
+		T.expect(distinct).toBe(#(winter.palette.presents :: { string }))
+		T.expect(turned).toBeGreaterThan(0)
+	end)
+	T.it("stands the trees in the grass between bases, behind the plot fronts", function()
+		for _, prop in props do
+			if prop.kind == "tree" then
+				-- further from the belt than the plot fronts, and clear of both neighbouring plots' walls
+				T.expect(math.abs(prop.z)).toBeGreaterThan(MAP.walkwayWidth + 3)
+				for _, rect in rects do
+					if prop.z > rect.minZ and prop.z < rect.maxZ then
+						local gap = math.min(math.abs(prop.x - rect.minX), math.abs(prop.x - rect.maxX))
+						T.expect(gap).toBeGreaterThan(MAP.plotGap / 2 - 0.5)
+					end
+				end
+			end
+		end
+	end)
+	T.it("hangs the snowflakes above head height and stands the snowmen past the belt ends", function()
+		for _, prop in props do
+			if prop.kind == "snowflake" then
+				T.expect(prop.y).toBeGreaterThan(15)
+				T.expect(math.abs(prop.z)).toBeLessThan(MAP.walkwayWidth)
+			elseif prop.kind == "snowman" then
+				T.expect(math.abs(prop.x)).toBeGreaterThan(Gameplay.belt.length / 2)
+				T.expect(prop.y).toBe(map.groundY)
+				T.expect(prop.faceX * prop.x).toBeLessThan(0) -- looking back at the belt
+			end
+		end
+	end)
+	T.it("puts the snowdrifts against the front walls, near their ends", function()
+		for _, prop in props do
+			if prop.kind == "snowPile" then
+				T.expect(math.abs(prop.z)).toBeLessThan(MAP.walkwayWidth)
+				T.expect(math.abs(prop.z)).toBeGreaterThan(MAP.walkwayWidth - 2)
+			end
+		end
+	end)
+	T.it("never stacks two props on the same spot", function()
+		for i, a in props do
+			for j = i + 1, #props do
+				local b = props[j]
+				local apart = math.sqrt((a.x - b.x) ^ 2 + (a.y - b.y) ^ 2 + (a.z - b.z) ^ 2)
+				if apart < 1.5 then
+					error(`{a.kind} and {b.kind} share the spot ({a.x}, {a.y}, {a.z})`)
+				end
+			end
+		end
+	end)
+	T.it("lets pumpkins and presents share a theme without overlapping", function()
+		local both = table.clone(d)
+		both.pumpkinsPerPlot = 2
+		both.beltPumpkinsPerSide = 2
+		both.ghosts = 2
+		local mixed = SeasonRules.layout(both, winter.palette, map)
+		local mixedCounts = countKinds(mixed)
+		T.expect(mixedCounts.pumpkin).toBe(2 * MAP.plotCount + 4)
+		T.expect(mixedCounts.present).toBe(counts.present)
+		T.expect(mixedCounts.ghost).toBe(2)
+		T.expect(mixedCounts.snowman).toBe(counts.snowman)
+		for i, a in mixed do
+			for j = i + 1, #mixed do
+				local b = mixed[j]
+				T.expect(math.sqrt((a.x - b.x) ^ 2 + (a.y - b.y) ^ 2 + (a.z - b.z) ^ 2)).toBeGreaterThan(1.5)
+			end
+		end
 	end)
 end)
 
@@ -219,6 +353,50 @@ T.describe("SeasonRules.validate", function()
 		T.expect(problemsWith(function(_, t)
 			t.lighting = nil -- decorations only: fine
 		end)).toBe(0)
+	end)
+	T.it("asks only for the colours of the props a theme places", function()
+		local function problemsWith(edit: (Types.SeasonTheme) -> ()): { string }
+			local config = cloneConfig()
+			edit(config.themes.winter)
+			return SeasonRules.validate(config, map)
+		end
+		-- the winter theme places no pumpkins, so it needs no pumpkin colours
+		T.expect(Seasons.themes.winter.palette.pumpkin).toBeNil()
+		T.expect(#problemsWith(function(t)
+			t.palette.ribbons = nil -- its presents need ribbons
+		end)).toBe(1)
+		T.expect(#problemsWith(function(t)
+			t.palette.ornaments = {} -- an empty list counts as missing
+		end)).toBe(1)
+		T.expect(#problemsWith(function(t)
+			t.decorations.beltPumpkinsPerSide = 1 -- pumpkins now, without pumpkin, pumpkinFace and stem colours
+		end)).toBe(3)
+		T.expect(#problemsWith(function(t)
+			(t.palette :: any).presnts = { "#FF0000" } -- a typo is not a palette colour
+		end)).toBe(1)
+		T.expect(#problemsWith(function(t)
+			t.palette.snow = "white"
+		end)).toBe(1)
+		T.expect(#problemsWith(function(t)
+			t.weather = "blizzard" :: any
+		end)).toBe(1)
+		T.expect(#problemsWith(function(t)
+			t.decorations.snowmen = -1
+		end)).toBe(1)
+		T.expect(#problemsWith(function(t)
+			t.weather = nil -- no weather of its own: the map's
+		end)).toBe(0)
+	end)
+	T.it("names every palette key a prop kind needs, and builds every kind", function()
+		local partsPer = SeasonRules.PARTS_PER :: { [any]: number }
+		local paletteKeys = SeasonRules.PALETTE_KEYS :: { [any]: { string } }
+		for kind, parts in partsPer do
+			T.expect(parts).toBeGreaterThan(0)
+			T.expect(#paletteKeys[kind]).toBeGreaterThan(0)
+		end
+		for kind in paletteKeys do
+			T.expect(partsPer[kind] ~= nil).toBe(true)
+		end
 	end)
 end)
 

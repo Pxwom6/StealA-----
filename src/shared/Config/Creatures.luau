@@ -684,6 +684,54 @@ local Creatures: { CreatureDef } = {
 		flavor = "Extra foam, extra boo.",
 		eventId = "Halloween2026",
 	},
+
+	-- Event: Winter 2026 ---------------------------------------------------------------------------------------
+	-- Only spawn while LiveOps event "Winter2026" runs, sharing their tier's odds like the Halloween ones (BALANCE.md
+	-- "Winter"). Appended after everything else, so no earlier roll changes.
+	{
+		id = "peppermint_puffin",
+		displayName = "Peppermint Puffin",
+		rarity = "Rare",
+		price = 11500,
+		income = 152,
+		beltWeight = 30,
+		modelName = "PeppermintPuffin",
+		flavor = "Minty fresh. Slightly flappy.",
+		eventId = "Winter2026",
+	},
+	{
+		id = "candy_cane_chameleon",
+		displayName = "Candy Cane Chameleon",
+		rarity = "Epic",
+		price = 130000,
+		income = 840,
+		beltWeight = 30,
+		modelName = "CandyCaneChameleon",
+		flavor = "Blends in anywhere festive.",
+		eventId = "Winter2026",
+	},
+	{
+		id = "yule_log_yak",
+		displayName = "Yule Log Yak",
+		rarity = "Legendary",
+		price = 3000000,
+		income = 5850,
+		beltWeight = 30,
+		modelName = "YuleLogYak",
+		flavor = "Rolled, frosted and ready to roam.",
+		eventId = "Winter2026",
+	},
+	{
+		id = "spun_sugar_stag",
+		displayName = "Spun Sugar Stag",
+		rarity = "Mythic",
+		price = 75000000,
+		income = 50500,
+		beltWeight = 40,
+		modelName = "SpunSugarStag",
+		flavor = "Glitters in the first snowfall.",
+		eventId = "Winter2026",
+	},
 }
 
 return Creatures

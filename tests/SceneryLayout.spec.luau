@@ -12,8 +12,8 @@ local BELT = Gameplay.belt
 local FLOOR_TOP = 0.4
 local WALKWAY_TOP = 0.2
 
--- Every Halloween decoration on the real map (the same shape SeasonService builds it on).
-local function halloweenProps(): { SceneryLayout.Point }
+-- Every seasonal decoration (every theme: Halloween, Winter...) on the real map, the shape SeasonService builds on.
+local function seasonalProps(): { SceneryLayout.Point }
 	local entrances: { SeasonRules.Entrance } = {}
 	for index, rect in SceneryLayout.plotRects(MAP) do
 		local north = index <= MAP.plotsPerSide
@@ -79,17 +79,17 @@ T.describe("SceneryLayout map shape", function()
 end)
 
 T.describe("Config/Scenery", function()
-	T.it("passes validation on the real map, clear of every Halloween decoration", function()
-		local problems = SceneryLayout.validate(Scenery, MAP, BELT, halloweenProps())
+	T.it("passes validation on the real map, clear of every seasonal decoration", function()
+		local problems = SceneryLayout.validate(Scenery, MAP, BELT, seasonalProps())
 		if #problems > 0 then
 			error(table.concat(problems, "\n"))
 		end
 	end)
-	T.it("keeps the lobby spawn on the plaza and every Halloween prop off it", function()
+	T.it("keeps the lobby spawn on the plaza and every seasonal prop off it", function()
 		local lobby = MAP.lobby
 		local fromPlaza = math.sqrt((lobby.x - Scenery.plaza.x) ^ 2 + (lobby.z - Scenery.plaza.z) ^ 2)
 		T.expect(fromPlaza).toBeLessThan(Scenery.plaza.radius)
-		for _, point in halloweenProps() do
+		for _, point in seasonalProps() do
 			T.expect(math.sqrt((point.x - lobby.x) ^ 2 + (point.z - lobby.z) ^ 2)).toBeGreaterThan(6)
 		end
 	end)
@@ -139,7 +139,7 @@ T.describe("SceneryLayout terrain maths", function()
 end)
 
 T.describe("SceneryLayout.validate catches", function()
-	local avoid = halloweenProps()
+	local avoid = seasonalProps()
 	local function problemsWith(edit: (Types.SceneryConfig) -> ()): { string }
 		local config = clone()
 		edit(config)

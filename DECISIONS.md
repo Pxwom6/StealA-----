@@ -752,3 +752,36 @@ schema never goes back).
 **Why:** long-term goals that point players at every system (stealing, collecting, mutations, maps, rebirths), and a
 place for Roblox badges.
 **Reversal cost:** none — remove an achievement and it simply stops showing (its flag stays harmless).
+
+### 37. Winter 2026: the second seasonal event, and themes that mix any props
+
+* **Same shape as Halloween (#20):** `Winter2026` (Fri 18 Dec 17:00 UTC → Mon 4 Jan 08:00 UTC) gates four event
+  Snacklings that share their tiers' odds and stay inside their tiers' price and payback bands, and the Festive
+  mutation (2%, x3, rolled last so no earlier roll changes). `WinterLuck2026` is 2× luck for Christmas (24-26 Dec)
+  and `NewYearCash2026` is 2× income for New Year's Eve; the HUD shows the first active event with a banner, so the
+  cash event is listed before Winter and its banner takes over while it runs. Codes `JINGLE26` (a Festive Peppermint
+  Puffin until the event ends) and `HAPPY2027` (cash, until 8 Jan).
+* **Themes are mixes of props:** `Config/Seasons` decorations now cover presents, decorated trees, snowmen,
+  snowflakes and snowdrifts as well as Halloween's pumpkins, string lights, lamps, bats and ghosts. Every kind has
+  fixed spots (entrances, front walls, the gaps between bases, the belt rails, the air over the walkway, the belt
+  ends) and kinds sharing spots are offset, so any mix lays out cleanly (tested). A palette only needs the colours of
+  the props it places (`SeasonRules.PALETTE_KEYS`; CI flags missing, misspelt or malformed colours). Winter builds
+  380 parts, so the budget went from 240 to 400: anchored, non-colliding, no shadows, under 4% of a full server.
+* **A theme can bring weather:** `weather` (e.g. "snow") replaces the map's particles while the theme is on, below a
+  weather modifier's (a storm still rains). Music follows the theme as before (`music.winter`); a track that fails
+  to load is now skipped for the session, so a bad seasonal id falls back to the lobby music instead of silence.
+* **Worst-case mutation odds:** two seasonal events never overlap on the calendar, so CI keeps any one event with the
+  strongest map and modifier under 10% (9.15%), and every event at once (only an admin `/event` could do that) under
+  12% (11.15%).
+* **Models:** the four winter Snacklings were built by hand in the Claude Design batch format (`batch-4.json`, with
+  helper code for mirrored parts, eye sets, stripes and pinwheels) and checked from five angles in an offline three.js
+  preview and in the world renderer with every mutation; `prompt-batch-4.md` can replace them with a Claude Design
+  pass. Adding them nudged the Mythic tier's reference height, so eight existing Mythic+ models grew by about 0.2%
+  (invisible). Each also has a recipe fallback.
+* **Tested offline end to end:** the server simulation starts `/event Winter2026`, counts the 380 decoration parts
+  and checks none can be touched, collided with or raycast, checks the lighting, spawns a Festive Snackling and
+  ends the event again.
+
+**Why:** the Christmas holidays are the busiest weeks of the Roblox year; the event reuses every Halloween system so
+it needs no new save data and starts and ends by itself.
+**Reversal cost:** none for dates, decorations and codes (data); event creature and mutation ids are permanent.

@@ -81,6 +81,10 @@ local Sounds = {
 	music = {
 		lobby = { id = "rbxassetid://1842203609", volume = 0.25 }, -- Laugh To Learn (59 s loop)
 		halloween = { id = "rbxassetid://1848232312", volume = 0.3 }, -- Hear, The Wind Blows (49 s)
+		-- Festive Medley, APM Christmas Classics Ensemble (3:39). Other carols from the same album: Jingle Bells
+		-- 1836605892, We Wish You a Merry Christmas 1844376070, O Tannenbaum 1844376185. If an id ever fails to
+		-- load, MusicController falls back to the lobby track.
+		winter = { id = "rbxassetid://1836394584", volume = 0.28 },
 	} :: { [string]: Types.MusicTrack },
 	musicFadeSeconds = 2.5, -- crossfade between tracks, and fade in / out when Music is switched on / off
 }

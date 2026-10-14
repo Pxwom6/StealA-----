@@ -281,17 +281,37 @@ export type SeasonDecorations = {
 	lampsBetweenPlots: boolean?, -- lamp posts in the gaps between plots
 	bats: number?, -- floating above the walkway
 	ghosts: number?, -- near the leaderboards at the belt ends
+	presentsPerPlot: number?, -- wrapped presents beside each plot entrance (after any pumpkins)
+	beltPresentsPerSide: number?, -- smaller ones along both belt rails (after any pumpkins)
+	treesBetweenPlots: boolean?, -- decorated trees in the gaps between plots, a little back from the walkway
+	snowmen: number?, -- at the belt ends (the ghosts' spots)
+	snowflakes: number?, -- big flakes hanging above the walkway (the bats' spots, a little higher)
+	snowPilesPerPlot: number?, -- snowdrifts along each plot's front wall, from the corners in (1 or 2)
 }
 
+-- Colours of the props a theme uses ("#RRGGBB"). Only the keys of the props a theme places are needed
+-- (Logic/SeasonRules.PALETTE_KEYS lists them per prop); lists are cycled through.
 export type SeasonPalette = {
-	pumpkin: string,
-	pumpkinFace: string, -- glowing eyes / mouth (and their light)
-	stem: string,
-	bulbs: { string }, -- string lights cycle through these
-	lampPost: string,
-	lampLight: string,
-	bat: string,
-	ghost: string,
+	bulbs: { string }, -- string lights (may be empty when the theme has none)
+	pumpkin: string?,
+	pumpkinFace: string?, -- glowing eyes / mouth (and their light)
+	stem: string?,
+	lampPost: string?,
+	lampLight: string?,
+	bat: string?,
+	ghost: string?,
+	presents: { string }?, -- wrapping paper
+	ribbons: { string }?, -- ribbon and bow
+	tree: string?, -- the tree's tiers
+	wood: string?, -- the tree's trunk and a snowman's stick arms
+	treeStar: string?, -- the glowing star on top
+	ornaments: { string }?, -- baubles
+	snow: string?, -- snowmen and snowdrifts
+	carrot: string?, -- a snowman's nose
+	coal: string?, -- a snowman's eyes and buttons
+	scarf: string?,
+	hat: string?,
+	snowflake: string?,
 }
 
 export type SeasonTheme = {
@@ -299,6 +319,9 @@ export type SeasonTheme = {
 	accentColor: string, -- HUD event pill and the "EVENT" tag on this event's Snacklings
 	priority: number, -- when several themed events overlap, the highest priority wins
 	lighting: SeasonLighting?,
+	-- Particles around every player while the theme is on, instead of the map's own (a weather modifier's still win).
+	-- nil: the map's weather.
+	weather: WeatherKind?,
 	decorations: SeasonDecorations,
 	palette: SeasonPalette,
 }

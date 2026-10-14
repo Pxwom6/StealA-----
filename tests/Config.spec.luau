@@ -90,6 +90,11 @@ local RELEASED_CREATURE_IDS = {
 	"fortune_cookie_kitsune",
 	"bonbon_behemoth",
 	"wedding_cake_wyvern",
+	-- Winter 2026 event Snacklings (eventId "Winter2026")
+	"peppermint_puffin",
+	"candy_cane_chameleon",
+	"yule_log_yak",
+	"spun_sugar_stag",
 }
 
 -- Every mutation id that has shipped (saved in players' CreatureRecord.variant). APPEND-ONLY, like creature ids: a
@@ -119,6 +124,7 @@ local RELEASED_MUTATION_IDS = {
 	"electric",
 	"galaxy",
 	"toxic",
+	"festive", -- Winter 2026 (event-only)
 }
 
 T.describe("Config integrity", function()
@@ -467,145 +473,160 @@ T.describe("Config integrity", function()
 	end)
 end)
 
-T.describe("Halloween 2026 event Snacklings", function()
-	local catalog = Catalog.build(Creatures, Rarities, Mutations)
-	local eventCreatures: { Types.CreatureDef } = {}
-	for _, creature in Creatures do
-		if creature.eventId == "Halloween2026" then
-			table.insert(eventCreatures, creature)
-		end
-	end
+-- Each seasonal event: its four Snacklings and its event-only mutation.
+local SEASONAL_EVENTS = {
+	{ eventId = "Halloween2026", name = "Halloween 2026", mutation = "haunted" },
+	{ eventId = "Winter2026", name = "Winter 2026", mutation = "festive" },
+}
 
-	T.it("has one Snackling per tier from Rare to Mythic, tied to a configured event", function()
-		local tiers: { string } = {}
-		for _, creature in eventCreatures do
-			table.insert(tiers, creature.rarity)
-		end
-		T.expect(tiers).toEqual({ "Rare", "Epic", "Legendary", "Mythic" })
-		local configured = false
-		for _, event in LiveOps.events do
-			configured = configured or event.id == "Halloween2026"
-		end
-		T.expect(configured).toBe(true)
-	end)
+for _, season in SEASONAL_EVENTS do
+	local eventId = season.eventId
 
-	T.it("prices and pays back like the regular Snacklings of its tier", function()
-		for _, creature in eventCreatures do
-			local minPrice, maxPrice, minPayback, maxPayback = math.huge, 0, math.huge, 0
-			for _, regular in catalog.byRarity[creature.rarity] do
-				if regular.eventId == nil then
-					minPrice = math.min(minPrice, regular.price)
-					maxPrice = math.max(maxPrice, regular.price)
-					minPayback = math.min(minPayback, regular.price / regular.income)
-					maxPayback = math.max(maxPayback, regular.price / regular.income)
+	T.describe(`{season.name} event Snacklings`, function()
+		local catalog = Catalog.build(Creatures, Rarities, Mutations)
+		local eventCreatures: { Types.CreatureDef } = {}
+		for _, creature in Creatures do
+			if creature.eventId == eventId then
+				table.insert(eventCreatures, creature)
+			end
+		end
+
+		T.it("has one Snackling per tier from Rare to Mythic, tied to a configured event", function()
+			local tiers: { string } = {}
+			for _, creature in eventCreatures do
+				table.insert(tiers, creature.rarity)
+			end
+			T.expect(tiers).toEqual({ "Rare", "Epic", "Legendary", "Mythic" })
+			local configured = false
+			for _, event in LiveOps.events do
+				configured = configured or event.id == eventId
+			end
+			T.expect(configured).toBe(true)
+		end)
+
+		T.it("prices and pays back like the regular Snacklings of its tier", function()
+			for _, creature in eventCreatures do
+				local minPrice, maxPrice, minPayback, maxPayback = math.huge, 0, math.huge, 0
+				for _, regular in catalog.byRarity[creature.rarity] do
+					if regular.eventId == nil then
+						minPrice = math.min(minPrice, regular.price)
+						maxPrice = math.max(maxPrice, regular.price)
+						minPayback = math.min(minPayback, regular.price / regular.income)
+						maxPayback = math.max(maxPayback, regular.price / regular.income)
+					end
+				end
+				T.expect(creature.price).toBeAtLeast(minPrice)
+				T.expect(creature.price).toBeAtMost(maxPrice)
+				T.expect(creature.price / creature.income).toBeAtLeast(minPayback)
+				T.expect(creature.price / creature.income).toBeAtMost(maxPayback)
+			end
+		end)
+
+		T.it("leaves every regular belt roll unchanged outside the event", function()
+			local regular: { Types.CreatureDef } = {}
+			for _, creature in Creatures do
+				if creature.eventId == nil then
+					table.insert(regular, creature)
 				end
 			end
-			T.expect(creature.price).toBeAtLeast(minPrice)
-			T.expect(creature.price).toBeAtMost(maxPrice)
-			T.expect(creature.price / creature.income).toBeAtLeast(minPayback)
-			T.expect(creature.price / creature.income).toBeAtMost(maxPayback)
-		end
+			local withEvent, without = T.seededRandom(31337), T.seededRandom(31337)
+			for _, luck in { 1, 2, 6 } do
+				for _ = 1, 20000 do
+					local a = RarityRoll.roll(Rarities, Creatures, luck, {}, withEvent)
+					local b = RarityRoll.roll(Rarities, regular, luck, {}, without)
+					T.expect(a).toBe(b)
+				end
+			end
+		end)
+
+		T.it("shares its tier's odds during the event instead of adding to them", function()
+			local events = { [eventId] = true }
+			for _, luck in { 1, 2 } do
+				T.expect(RarityRoll.odds(Rarities, Creatures, luck, events))
+					.toEqual(RarityRoll.odds(Rarities, Creatures, luck, {}))
+			end
+			local rng = T.seededRandom(2026)
+			local seen: { [string]: boolean } = {}
+			for _ = 1, 200000 do
+				local id = RarityRoll.roll(Rarities, Creatures, 1, events, rng) :: string
+				seen[id] = true
+			end
+			for _, creature in eventCreatures do
+				T.expect(seen[creature.id]).toBe(true)
+			end
+			-- and only this event's Snacklings appear while it runs
+			for id in seen do
+				local def = catalog.creatures[id]
+				T.expect(def.eventId == nil or def.eventId == eventId).toBe(true)
+			end
+		end)
 	end)
 
-	T.it("leaves every regular belt roll unchanged outside the event", function()
-		local regular: { Types.CreatureDef } = {}
-		for _, creature in Creatures do
-			if creature.eventId == nil then
-				table.insert(regular, creature)
+	T.describe(`{season.name} {season.mutation} mutation`, function()
+		local found: Types.MutationDef? = nil
+		for _, mutation in Mutations do
+			if mutation.id == season.mutation then
+				found = mutation
 			end
 		end
-		local withEvent, without = T.seededRandom(31337), T.seededRandom(31337)
-		for _, luck in { 1, 2, 6 } do
+		local function total(events: { [string]: boolean }): number
+			local sum = 0
+			for _, entry in MutationRules.odds(Mutations, events) do
+				sum += entry.chance
+			end
+			return sum
+		end
+
+		T.it("only rolls during its event and is always a lucky find", function()
+			local def = found :: Types.MutationDef
+			T.expect(def.eventId).toBe(eventId)
+			T.expect(def.incomeMultiplier).toBeAtLeast(def.priceMultiplier)
+			for _, entry in MutationRules.odds(Mutations, {}) do
+				T.expect(entry.id ~= def.id).toBe(true)
+			end
+			T.expect(total({ [eventId] = true }) - total({})).toBeNear(def.chance, 1e-12)
+		end)
+
+		T.it("is a chase: rarer than Golden and stronger, so Golden still matters during the event", function()
+			local def = found :: Types.MutationDef
+			local golden: Types.MutationDef? = nil
+			for _, mutation in Mutations do
+				if mutation.id == "golden" then
+					golden = mutation
+				end
+			end
+			T.expect(def.chance).toBeLessThan((golden :: Types.MutationDef).chance)
+			T.expect(def.incomeMultiplier).toBeGreaterThan((golden :: Types.MutationDef).incomeMultiplier)
+		end)
+
+		T.it("keeps every mutation chance together, event ones included, below 10%", function()
+			local allEvents: { [string]: boolean } = {}
+			for _, mutation in Mutations do
+				if mutation.eventId then
+					allEvents[mutation.eventId] = true
+				end
+			end
+			T.expect(total(allEvents)).toBeLessThan(0.1)
+		end)
+
+		T.it("rolls after the permanent mutations, so their rolls are unchanged", function()
+			local def = found :: Types.MutationDef
+			for _, mutation in Mutations do
+				if MutationRules.gate(mutation) == nil then
+					T.expect(mutation.order).toBeLessThan(def.order)
+				end
+			end
+			local a, b = T.seededRandom(5), T.seededRandom(5)
 			for _ = 1, 20000 do
-				local a = RarityRoll.roll(Rarities, Creatures, luck, {}, withEvent)
-				local b = RarityRoll.roll(Rarities, regular, luck, {}, without)
-				T.expect(a).toBe(b)
+				local during = MutationRules.roll(Mutations, { [eventId] = true }, a)
+				local outside = MutationRules.roll(Mutations, {}, b)
+				if during ~= def.id then
+					T.expect(during).toBe(outside)
+				end
 			end
-		end
+		end)
 	end)
-
-	T.it("shares its tier's odds during the event instead of adding to them", function()
-		local events = { Halloween2026 = true }
-		for _, luck in { 1, 2 } do
-			T.expect(RarityRoll.odds(Rarities, Creatures, luck, events))
-				.toEqual(RarityRoll.odds(Rarities, Creatures, luck, {}))
-		end
-		local rng = T.seededRandom(2026)
-		local seen: { [string]: boolean } = {}
-		for _ = 1, 200000 do
-			local id = RarityRoll.roll(Rarities, Creatures, 1, events, rng) :: string
-			seen[id] = true
-		end
-		for _, creature in eventCreatures do
-			T.expect(seen[creature.id]).toBe(true)
-		end
-	end)
-end)
-
-T.describe("Halloween 2026 Haunted mutation", function()
-	local haunted: Types.MutationDef? = nil
-	for _, mutation in Mutations do
-		if mutation.id == "haunted" then
-			haunted = mutation
-		end
-	end
-	local function total(events: { [string]: boolean }): number
-		local sum = 0
-		for _, entry in MutationRules.odds(Mutations, events) do
-			sum += entry.chance
-		end
-		return sum
-	end
-
-	T.it("only rolls during Halloween2026 and is always a lucky find", function()
-		local def = haunted :: Types.MutationDef
-		T.expect(def.eventId).toBe("Halloween2026")
-		T.expect(def.incomeMultiplier).toBeAtLeast(def.priceMultiplier)
-		for _, entry in MutationRules.odds(Mutations, {}) do
-			T.expect(entry.id ~= "haunted").toBe(true)
-		end
-		T.expect(total({ Halloween2026 = true }) - total({})).toBeNear(def.chance, 1e-12)
-	end)
-
-	T.it("is a chase: rarer than Golden and stronger, so Golden still matters during the event", function()
-		local def = haunted :: Types.MutationDef
-		local golden: Types.MutationDef? = nil
-		for _, mutation in Mutations do
-			if mutation.id == "golden" then
-				golden = mutation
-			end
-		end
-		T.expect(def.chance).toBeLessThan((golden :: Types.MutationDef).chance)
-		T.expect(def.incomeMultiplier).toBeGreaterThan((golden :: Types.MutationDef).incomeMultiplier)
-	end)
-
-	T.it("keeps every mutation chance together, event ones included, below 10%", function()
-		local allEvents: { [string]: boolean } = {}
-		for _, mutation in Mutations do
-			if mutation.eventId then
-				allEvents[mutation.eventId] = true
-			end
-		end
-		T.expect(total(allEvents)).toBeLessThan(0.1)
-	end)
-
-	T.it("rolls after the permanent mutations, so their rolls are unchanged", function()
-		local def = haunted :: Types.MutationDef
-		for _, mutation in Mutations do
-			if MutationRules.gate(mutation) == nil then
-				T.expect(mutation.order).toBeLessThan(def.order)
-			end
-		end
-		local a, b = T.seededRandom(5), T.seededRandom(5)
-		for _ = 1, 20000 do
-			local during = MutationRules.roll(Mutations, { Halloween2026 = true }, a)
-			local outside = MutationRules.roll(Mutations, {}, b)
-			if during ~= "haunted" then
-				T.expect(during).toBe(outside)
-			end
-		end
-	end)
-end)
+end
 
 T.describe("Map and weather mutations", function()
 	local function byIdOf(id: string): Types.MutationDef
@@ -670,25 +691,48 @@ T.describe("Map and weather mutations", function()
 		end
 	end)
 
-	T.it("keeps the worst case (every event, the strongest map and modifier) below 10%", function()
-		local worst = MutationRules.worstCaseTotal(Mutations)
-		T.expect(worst).toBeLessThan(0.1)
-		local events: { [string]: boolean } = {}
-		for _, mutation in Mutations do
-			if mutation.eventId then
-				events[mutation.eventId] = true
+	T.it(
+		"keeps any one event with the strongest map and modifier below 10%, and every event at once below 12%",
+		function()
+			-- Seasonal events are months apart, so one event's mutations at a time is what players meet; an admin could
+			-- still start them all together (`/event`), which must stay sane too.
+			local permanent, strongestMap, strongestModifier = 0, 0, 0
+			local byEvent: { [string]: number } = {}
+			for _, mutation in Mutations do
+				local gate = MutationRules.gate(mutation)
+				if gate == nil then
+					permanent += mutation.chance
+				elseif gate == "map" then
+					strongestMap = math.max(strongestMap, mutation.chance)
+				elseif gate == "modifier" then
+					strongestModifier = math.max(strongestModifier, mutation.chance)
+				else
+					local eventId = mutation.eventId :: string
+					byEvent[eventId] = (byEvent[eventId] or 0) + mutation.chance
+				end
 			end
-		end
-		local seen = 0
-		for _, themeId in MapThemes.order do
-			for _, modifierId in Modifiers.order do
-				local live = total(MutationRules.conditions(events, themeId, modifierId))
-				T.expect(live).toBeAtMost(worst + 1e-12)
-				seen = math.max(seen, live)
+			for _, chance in byEvent do
+				T.expect(permanent + chance + strongestMap + strongestModifier).toBeLessThan(0.1)
 			end
+			local worst = MutationRules.worstCaseTotal(Mutations)
+			T.expect(worst).toBeLessThan(0.12)
+			local events: { [string]: boolean } = {}
+			for _, mutation in Mutations do
+				if mutation.eventId then
+					events[mutation.eventId] = true
+				end
+			end
+			local seen = 0
+			for _, themeId in MapThemes.order do
+				for _, modifierId in Modifiers.order do
+					local live = total(MutationRules.conditions(events, themeId, modifierId))
+					T.expect(live).toBeAtMost(worst + 1e-12)
+					seen = math.max(seen, live)
+				end
+			end
+			T.expect(seen).toBeNear(worst, 1e-12)
 		end
-		T.expect(seen).toBeNear(worst, 1e-12)
-	end)
+	)
 
 	T.it("stays sane with Golden Hour on any map (one modifier at a time)", function()
 		local strongest = 1

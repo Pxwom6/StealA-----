@@ -5,26 +5,48 @@
 
 	Layout coordinates are world studs (Y up). The map shape is passed in (plot entrances etc.), so the rules don't
 	depend on MapBuilder and tests can check that nothing lands inside a plot, on the belt or on the lobby spawn.
+
+	Where each prop goes (every theme uses the same spots, so a new theme is only data):
+	  beside each plot entrance   pumpkins, then presents (alternating sides, stepping outwards)
+	  the plot's front wall       string-light bulbs hanging under its top; snowdrifts at its ends, on the walkway
+	  between neighbouring plots  lamp posts at the walkway; trees a little back, in the grass gap
+	  along both belt rails       small pumpkins, then small presents
+	  above the walkway           bats; snowflakes a little higher and closer to the belt
+	  past both belt ends         ghosts; snowmen at the corners, a little closer in
 ]]
 
+local MapThemeRules = require("./MapThemeRules")
 local Types = require("../Types")
 
 type SeasonsConfig = Types.SeasonsConfig
 type SeasonTheme = Types.SeasonTheme
 type SeasonDecorations = Types.SeasonDecorations
+type SeasonPalette = Types.SeasonPalette
 
-export type PropKind = "pumpkin" | "bulb" | "lamp" | "bat" | "ghost"
+export type PropKind =
+	"pumpkin"
+	| "bulb"
+	| "lamp"
+	| "bat"
+	| "ghost"
+	| "present"
+	| "tree"
+	| "snowman"
+	| "snowflake"
+	| "snowPile"
 
 -- One decoration to build. (faceX, faceZ) is the horizontal direction its front looks at.
 export type Prop = {
 	kind: PropKind,
 	x: number,
-	y: number, -- bottom of the prop (pumpkins, lamps, ghosts) or its centre (bulbs, bats)
+	y: number, -- bottom of the prop (pumpkins, lamps, ghosts, presents, trees, snowmen, drifts) or its centre (bulbs,
+	-- bats, snowflakes)
 	z: number,
 	faceX: number,
 	faceZ: number,
 	scale: number,
-	color: string?, -- bulbs: their colour from palette.bulbs
+	color: string?, -- bulbs: their colour (palette.bulbs); presents: the wrapping (palette.presents)
+	color2: string?, -- presents: the ribbon (palette.ribbons)
 }
 
 -- A plot entrance: the centre of its front wall's outer face, and the unit direction pointing out of the plot.
@@ -50,9 +72,72 @@ SeasonRules.PARTS_PER = {
 	lamp = 3, -- post, lantern, cap
 	bat = 3, -- body, two wings
 	ghost = 4, -- head, skirt, two eyes
+	present = 5, -- box, lid, two ribbons, bow
+	tree = 13, -- trunk, four tiers, six baubles, two star points
+	snowman = 12, -- three snowballs, two eyes, nose, hat brim and crown, scarf and its tail, two stick arms
+	snowflake = 3, -- three crossed bars
+	snowPile = 1,
 } :: { [PropKind]: number }
 
+-- The palette colours each prop kind is built with: a theme that places a kind must define these (lists need at
+-- least one colour).
+SeasonRules.PALETTE_KEYS = {
+	pumpkin = { "pumpkin", "pumpkinFace", "stem" },
+	bulb = { "bulbs" },
+	lamp = { "lampPost", "lampLight" },
+	bat = { "bat" },
+	ghost = { "ghost" },
+	present = { "presents", "ribbons" },
+	tree = { "tree", "wood", "treeStar", "ornaments" },
+	snowman = { "snow", "carrot", "coal", "scarf", "hat", "wood" },
+	snowflake = { "snowflake" },
+	snowPile = { "snow" },
+} :: { [PropKind]: { string } }
+
+-- Every palette key and whether it holds a list of colours.
+local PALETTE_LISTS: { [string]: boolean } = {
+	bulbs = true,
+	presents = true,
+	ribbons = true,
+	ornaments = true,
+	pumpkin = false,
+	pumpkinFace = false,
+	stem = false,
+	lampPost = false,
+	lampLight = false,
+	bat = false,
+	ghost = false,
+	tree = false,
+	wood = false,
+	treeStar = false,
+	snow = false,
+	carrot = false,
+	coal = false,
+	scarf = false,
+	hat = false,
+	snowflake = false,
+}
+
+local COUNT_KEYS = {
+	"pumpkinsPerPlot",
+	"beltPumpkinsPerSide",
+	"bulbsPerPlot",
+	"bats",
+	"ghosts",
+	"presentsPerPlot",
+	"beltPresentsPerSide",
+	"snowmen",
+	"snowflakes",
+	"snowPilesPerPlot",
+}
+
 local HEX_PATTERN = "^#%x%x%x%x%x%x$"
+
+-- Presents beside an entrance vary a little in size and angle, so a row reads as a pile of gifts.
+local PRESENT_SCALES = { 1, 0.8, 1.15, 0.9 }
+local PRESENT_TURNS = { 0, 0.32, -0.24, 0.45 } -- radians off the walkway direction
+-- Trees stand this far back from the plot fronts, in the grass between two bases.
+local TREE_BACK = 6
 
 -- The theme to show for the active events: among active events that map to a theme, the highest-priority theme
 -- (ties: the alphabetically first event id, so every server agrees). Returns the theme id and the event that
@@ -90,13 +175,51 @@ local function count(value: number?): number
 	return math.max(0, math.floor(value or 0))
 end
 
+-- The `index`th colour of a list (1-based, cycling), or nil for an empty or missing list.
+local function cycle(list: { string }?, index: number): string?
+	if list == nil or #list == 0 then
+		return nil
+	end
+	return list[(index - 1) % #list + 1]
+end
+
+-- The midpoints between neighbouring plots on the same side of the belt, with the direction out of those plots.
+local function gaps(map: MapShape): { Entrance }
+	local sides: { [string]: { Entrance } } = {}
+	for _, entrance in map.entrances do
+		local key = `{math.floor(entrance.outX * 10 + 0.5)},{math.floor(entrance.outZ * 10 + 0.5)}`
+		sides[key] = sides[key] or {}
+		table.insert(sides[key], entrance)
+	end
+	local keys: { string } = {}
+	for key in sides do
+		table.insert(keys, key)
+	end
+	table.sort(keys)
+	local list: { Entrance } = {}
+	for _, key in keys do
+		local row = sides[key]
+		table.sort(row, function(a: Entrance, b: Entrance): boolean
+			return a.x < b.x or (a.x == b.x and a.z < b.z)
+		end)
+		for i = 1, #row - 1 do
+			local a, b = row[i], row[i + 1]
+			table.insert(list, { x = (a.x + b.x) / 2, z = (a.z + b.z) / 2, outX = a.outX, outZ = a.outZ })
+		end
+	end
+	return list
+end
+
 -- Every decoration of a theme, placed on the given map. Deterministic: the same inputs give the same layout.
-function SeasonRules.layout(decorations: SeasonDecorations, palette: { bulbs: { string } }, map: MapShape): { Prop }
+function SeasonRules.layout(decorations: SeasonDecorations, palette: SeasonPalette, map: MapShape): { Prop }
 	local props: { Prop } = {}
 	local function add(prop: Prop)
 		table.insert(props, prop)
 	end
 
+	local pumpkinsPerPlot = count(decorations.pumpkinsPerPlot)
+	local presentsPerPlot = count(decorations.presentsPerPlot)
+	local presentIndex = 0
 	for _, entrance in map.entrances do
 		-- "Right" along the front wall (any perpendicular works: props are placed on both sides).
 		local rightX, rightZ = entrance.outZ, -entrance.outX
@@ -104,12 +227,15 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: { bulbs: { 
 			return entrance.x + rightX * lateral + entrance.outX * out,
 				entrance.z + rightZ * lateral + entrance.outZ * out
 		end
+		-- Spot k (0-based) beside the entrance: alternating sides, stepping outwards every two.
+		local function slot(k: number): number
+			local side = if k % 2 == 0 then -1 else 1
+			return side * (map.entranceWidth / 2 + 2.5 + (k // 2) * 5)
+		end
 
 		-- Jack-o'-lanterns beside the entrance, alternating sides, facing the walkway.
-		for k = 0, count(decorations.pumpkinsPerPlot) - 1 do
-			local side = if k % 2 == 0 then -1 else 1
-			local lateral = side * (map.entranceWidth / 2 + 2.5 + (k // 2) * 5)
-			local x, z = at(lateral, 1.8)
+		for k = 0, pumpkinsPerPlot - 1 do
+			local x, z = at(slot(k), 1.8)
 			add({
 				kind = "pumpkin",
 				x = x,
@@ -118,6 +244,24 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: { bulbs: { 
 				faceX = entrance.outX,
 				faceZ = entrance.outZ,
 				scale = 1,
+			})
+		end
+
+		-- Presents in the next spots, each a little bigger or smaller and turned, in cycling wrapping and ribbons.
+		for k = pumpkinsPerPlot, pumpkinsPerPlot + presentsPerPlot - 1 do
+			presentIndex += 1
+			local x, z = at(slot(k), 1.8)
+			local turn = PRESENT_TURNS[(presentIndex - 1) % #PRESENT_TURNS + 1]
+			add({
+				kind = "present",
+				x = x,
+				y = map.groundY,
+				z = z,
+				faceX = entrance.outX * math.cos(turn) - entrance.outZ * math.sin(turn),
+				faceZ = entrance.outX * math.sin(turn) + entrance.outZ * math.cos(turn),
+				scale = PRESENT_SCALES[(presentIndex - 1) % #PRESENT_SCALES + 1],
+				color = cycle(palette.presents, presentIndex),
+				color2 = cycle(palette.ribbons, presentIndex),
 			})
 		end
 
@@ -142,57 +286,71 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: { bulbs: { 
 					faceX = entrance.outX,
 					faceZ = entrance.outZ,
 					scale = 1,
-					color = if #palette.bulbs > 0 then palette.bulbs[(index - 1) % #palette.bulbs + 1] else nil,
+					color = cycle(palette.bulbs, index),
 				})
 			end
 		end
-	end
 
-	-- Lamp posts in the gaps between neighbouring plots on the same side of the belt.
-	if decorations.lampsBetweenPlots then
-		local sides: { [string]: { Entrance } } = {}
-		for _, entrance in map.entrances do
-			local key = `{math.floor(entrance.outX * 10 + 0.5)},{math.floor(entrance.outZ * 10 + 0.5)}`
-			sides[key] = sides[key] or {}
-			table.insert(sides[key], entrance)
-		end
-		local keys: { string } = {}
-		for key in sides do
-			table.insert(keys, key)
-		end
-		table.sort(keys)
-		for _, key in keys do
-			local row = sides[key]
-			table.sort(row, function(a: Entrance, b: Entrance): boolean
-				return a.x < b.x or (a.x == b.x and a.z < b.z)
-			end)
-			for i = 1, #row - 1 do
-				local a, b = row[i], row[i + 1]
-				add({
-					kind = "lamp",
-					x = (a.x + b.x) / 2 + a.outX * 1.5,
-					y = map.groundY,
-					z = (a.z + b.z) / 2 + a.outZ * 1.5,
-					faceX = a.outX,
-					faceZ = a.outZ,
-					scale = 1,
-				})
-			end
-		end
-	end
-
-	-- Small pumpkins along both belt rails, facing away from the belt.
-	local beltPumpkins = count(decorations.beltPumpkinsPerSide)
-	for _, side in { -1, 1 } do
-		for i = 1, beltPumpkins do
+		-- Snowdrifts against the front wall: one at each end, then further in.
+		for k = 0, count(decorations.snowPilesPerPlot) - 1 do
+			local side = if k % 2 == 0 then -1 else 1
+			local x, z = at(side * (map.plotWidth / 2 - 3.5 - (k // 2) * 6), 1.4)
 			add({
-				kind = "pumpkin",
-				x = (i - (beltPumpkins + 1) / 2) * (map.beltLength / beltPumpkins),
+				kind = "snowPile",
+				x = x,
+				y = map.groundY,
+				z = z,
+				faceX = entrance.outX,
+				faceZ = entrance.outZ,
+				scale = 1,
+			})
+		end
+	end
+
+	-- Lamp posts at the walkway between neighbouring plots on the same side of the belt, trees further back.
+	for _, gap in gaps(map) do
+		if decorations.lampsBetweenPlots then
+			add({
+				kind = "lamp",
+				x = gap.x + gap.outX * 1.5,
+				y = map.groundY,
+				z = gap.z + gap.outZ * 1.5,
+				faceX = gap.outX,
+				faceZ = gap.outZ,
+				scale = 1,
+			})
+		end
+		if decorations.treesBetweenPlots then
+			add({
+				kind = "tree",
+				x = gap.x - gap.outX * TREE_BACK,
+				y = map.groundY,
+				z = gap.z - gap.outZ * TREE_BACK,
+				faceX = gap.outX,
+				faceZ = gap.outZ,
+				scale = 1,
+			})
+		end
+	end
+
+	-- Small pumpkins, then small presents, along both belt rails, facing away from the belt.
+	local beltPumpkins = count(decorations.beltPumpkinsPerSide)
+	local beltPresents = count(decorations.beltPresentsPerSide)
+	local beltTotal = beltPumpkins + beltPresents
+	for sideIndex, side in { -1, 1 } do
+		for i = 1, beltTotal do
+			local isPumpkin = i <= beltPumpkins
+			local n = (sideIndex - 1) * beltPresents + (i - beltPumpkins)
+			add({
+				kind = if isPumpkin then "pumpkin" else "present",
+				x = (i - (beltTotal + 1) / 2) * (map.beltLength / beltTotal),
 				y = map.groundY,
 				z = side * (map.beltWidth / 2 + 2.2),
 				faceX = 0,
 				faceZ = side,
 				scale = 0.7,
+				color = if isPumpkin then nil else cycle(palette.presents, n + 2),
+				color2 = if isPumpkin then nil else cycle(palette.ribbons, n + 1),
 			})
 		end
 	end
@@ -212,6 +370,22 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: { bulbs: { 
 		})
 	end
 
+	-- Snowflakes hanging higher and closer to the belt, turned a little towards it.
+	local flakes = count(decorations.snowflakes)
+	for i = 1, flakes do
+		local zSide = if i % 2 == 0 then 1 else -1
+		local turn = ((i % 4) - 1.5) * 0.3
+		add({
+			kind = "snowflake",
+			x = (i - (flakes + 1) / 2) * (map.beltLength * 0.85 / flakes),
+			y = 20 + (i % 3) * 2.5,
+			z = zSide * map.walkwayWidth * 0.4,
+			faceX = math.sin(turn),
+			faceZ = -zSide * math.cos(turn),
+			scale = 1,
+		})
+	end
+
 	-- Ghosts floating past the belt's end arches, looking back at the belt.
 	for i = 1, count(decorations.ghosts) do
 		local endSide = if i % 2 == 1 then -1 else 1
@@ -222,6 +396,22 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: { bulbs: { 
 			x = endSide * (map.beltLength / 2 + 12 + row * 6),
 			y = map.groundY + 2.5,
 			z = zSide * (10 + row * 3),
+			faceX = -endSide,
+			faceZ = 0,
+			scale = 1,
+		})
+	end
+
+	-- Snowmen at the corners of both belt ends (clear of the factory and the chute), looking along the walkway.
+	for i = 1, count(decorations.snowmen) do
+		local endSide = if i % 2 == 1 then -1 else 1
+		local zSide = if ((i - 1) // 2) % 2 == 0 then -1 else 1
+		local row = (i - 1) // 4
+		add({
+			kind = "snowman",
+			x = endSide * (map.beltLength / 2 + 8 + row * 7),
+			y = map.groundY,
+			z = zSide * (12 + row * 2),
 			faceX = -endSide,
 			faceZ = 0,
 			scale = 1,
@@ -279,16 +469,56 @@ function SeasonRules.lightingProblems(lighting: Types.SeasonLighting, name: stri
 	return problems
 end
 
+-- Problems with a theme's palette: unknown keys, colours that aren't #RRGGBB, and colours missing for a prop kind
+-- the theme places (`kinds`).
+local function paletteProblems(palette: SeasonPalette, kinds: { [string]: boolean }, name: string): { string }
+	local problems: { string } = {}
+	local raw = (palette :: any) :: { [string]: any }
+	local keys: { string } = {}
+	for key in raw do
+		table.insert(keys, key)
+	end
+	table.sort(keys)
+	for _, key in keys do
+		local value = raw[key]
+		local isList = PALETTE_LISTS[key]
+		if isList == nil then
+			table.insert(problems, `{name} palette.{key} is not a palette colour`)
+		elseif isList then
+			if type(value) ~= "table" then
+				table.insert(problems, `{name} palette.{key} must be a list of #RRGGBB colours`)
+			else
+				for index, color in value do
+					if type(color) ~= "string" or string.match(color, HEX_PATTERN) == nil then
+						table.insert(problems, `{name} palette.{key}[{index}] must be #RRGGBB`)
+					end
+				end
+			end
+		elseif type(value) ~= "string" or string.match(value, HEX_PATTERN) == nil then
+			table.insert(problems, `{name} palette.{key} must be #RRGGBB`)
+		end
+	end
+	local kindList: { string } = {}
+	for kind in kinds do
+		table.insert(kindList, kind)
+	end
+	table.sort(kindList)
+	for _, kind in kindList do
+		for _, key in SeasonRules.PALETTE_KEYS[kind :: PropKind] do
+			local value = raw[key]
+			if value == nil or (type(value) == "table" and #value == 0) then
+				table.insert(problems, `{name} places {kind} props but has no palette.{key}`)
+			end
+		end
+	end
+	return problems
+end
+
 -- Problems with Config/Seasons (an empty list means valid). `map` is used for the part budget.
 function SeasonRules.validate(config: SeasonsConfig, map: MapShape): { string }
 	local problems: { string } = {}
 	local function problem(message: string)
 		table.insert(problems, message)
-	end
-	local function hex(value: string?, what: string)
-		if value == nil or string.match(value, HEX_PATTERN) == nil then
-			problem(`{what} must be #RRGGBB`)
-		end
 	end
 
 	for eventId, themeId in config.eventThemes do
@@ -311,25 +541,28 @@ function SeasonRules.validate(config: SeasonsConfig, map: MapShape): { string }
 		if theme.priority ~= theme.priority then
 			problem(`{name} priority must be a number`)
 		end
-		hex(theme.accentColor, `{name} accentColor`)
-		local palette = theme.palette
-		for _, key in { "pumpkin", "pumpkinFace", "stem", "lampPost", "lampLight", "bat", "ghost" } do
-			hex((palette :: any)[key], `{name} palette.{key}`)
+		if string.match(theme.accentColor, HEX_PATTERN) == nil then
+			problem(`{name} accentColor must be #RRGGBB`)
 		end
-		for index, color in palette.bulbs do
-			hex(color, `{name} palette.bulbs[{index}]`)
+		if theme.weather ~= nil and not MapThemeRules.WEATHER[theme.weather] then
+			problem(`{name} weather {theme.weather} is not a weather kind`)
 		end
 		local decorations = theme.decorations
-		for _, key in { "pumpkinsPerPlot", "beltPumpkinsPerSide", "bulbsPerPlot", "bats", "ghosts" } do
+		for _, key in COUNT_KEYS do
 			local value = (decorations :: any)[key]
 			if value ~= nil and not (type(value) == "number" and value >= 0 and value == math.floor(value)) then
 				problem(`{name} decorations.{key} must be a whole number >= 0`)
 			end
 		end
-		if count(decorations.bulbsPerPlot) > 0 and #palette.bulbs == 0 then
-			problem(`{name} has bulbs but no palette.bulbs colours`)
+		local props = SeasonRules.layout(decorations, theme.palette, map)
+		local kinds: { [string]: boolean } = {}
+		for _, prop in props do
+			kinds[prop.kind] = true
 		end
-		local parts = SeasonRules.partCount(SeasonRules.layout(decorations, palette, map))
+		for _, message in paletteProblems(theme.palette, kinds, name) do
+			problem(message)
+		end
+		local parts = SeasonRules.partCount(props)
 		if parts > config.maxParts then
 			problem(`{name} builds {parts} parts, over the budget of {config.maxParts}`)
 		end

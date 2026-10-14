@@ -11,8 +11,11 @@
 	client's screen and a rumble of thunder every 6-14 seconds) or shooting stars streaking across the sky. The server
 	changes the lighting itself (ModifierService).
 
+	A seasonal theme with weather of its own (Config/Seasons, e.g. Winter's snow) replaces the map's particles while
+	it is on; a weather modifier still wins over it.
+
 	Off with Settings > Reduce effects (only the thunder stays), and while there is no weather. The kinds come from the
-	server through the workspace attributes MapTheme and Modifier.
+	server through the workspace attributes MapTheme, SeasonTheme and Modifier.
 ]]
 
 local Lighting = game:GetService("Lighting")
@@ -22,6 +25,7 @@ local TweenService = game:GetService("TweenService")
 
 local MapThemes = require(ReplicatedStorage.Shared.Config.MapThemes)
 local Modifiers = require(ReplicatedStorage.Shared.Config.Modifiers)
+local Seasons = require(ReplicatedStorage.Shared.Config.Seasons)
 local Types = require(ReplicatedStorage.Shared.Types)
 local ClientSettings = require(script.Parent.ClientSettings)
 local SoundPlayer = require(script.Parent.SoundPlayer)
@@ -322,11 +326,16 @@ local function runningModifier(): Types.ModifierDef?
 	return if type(id) == "string" then Modifiers.modifiers[id] else nil
 end
 
--- The modifier's weather while one with weather runs, else the map's.
+-- The modifier's weather while one with weather runs, else the seasonal theme's (if it has one), else the map's.
 local function currentKind(): Types.WeatherKind
 	local modifier = runningModifier()
 	if modifier and modifier.weather then
 		return modifier.weather
+	end
+	local seasonId = workspace:GetAttribute("SeasonTheme")
+	local season = if type(seasonId) == "string" then Seasons.themes[seasonId] else nil
+	if season and season.weather then
+		return season.weather
 	end
 	local themeId = workspace:GetAttribute("MapTheme")
 	local theme = if type(themeId) == "string" then MapThemes.themes[themeId] else nil
@@ -534,6 +543,7 @@ end
 
 function WeatherController.start()
 	workspace:GetAttributeChangedSignal("MapTheme"):Connect(refresh)
+	workspace:GetAttributeChangedSignal("SeasonTheme"):Connect(refresh)
 	workspace:GetAttributeChangedSignal("Modifier"):Connect(refresh)
 	local reduced = ClientSettings.reduceEffects()
 	ClientSettings.onChanged(function(settings)

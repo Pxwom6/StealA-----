@@ -111,27 +111,29 @@ T.describe("LiveOpsRules events", function()
 	end)
 end)
 
-T.describe("LiveOpsRules shipped Halloween 2026 events", function()
-	local function find(id: string): LiveOpsRules.EventDef
-		for _, event in LiveOps.events do
-			if event.id == id then
-				return event
-			end
+local function findShipped(id: string): LiveOpsRules.EventDef
+	for _, event in LiveOps.events do
+		if event.id == id then
+			return event
 		end
-		error(`LiveOps.events has no {id}`)
 	end
-	local halloween = find("Halloween2026")
-	local luckWeekend = find("HalloweenLuck2026")
-	-- Unix seconds of a UTC date (days-from-civil), independent of the machine's time zone.
-	local function utc(year: number, month: number, day: number, hour: number, min: number): number
-		local y = if month <= 2 then year - 1 else year
-		local era = y // 400
-		local yearOfEra = y - era * 400
-		local dayOfYear = (153 * ((month + 9) % 12) + 2) // 5 + day - 1
-		local dayOfEra = yearOfEra * 365 + yearOfEra // 4 - yearOfEra // 100 + dayOfYear
-		local days = era * 146097 + dayOfEra - 719468
-		return days * 86400 + hour * 3600 + min * 60
-	end
+	error(`LiveOps.events has no {id}`)
+end
+
+-- Unix seconds of a UTC date (days-from-civil), independent of the machine's time zone.
+local function utc(year: number, month: number, day: number, hour: number, min: number): number
+	local y = if month <= 2 then year - 1 else year
+	local era = y // 400
+	local yearOfEra = y - era * 400
+	local dayOfYear = (153 * ((month + 9) % 12) + 2) // 5 + day - 1
+	local dayOfEra = yearOfEra * 365 + yearOfEra // 4 - yearOfEra // 100 + dayOfYear
+	local days = era * 146097 + dayOfEra - 719468
+	return days * 86400 + hour * 3600 + min * 60
+end
+
+T.describe("LiveOpsRules shipped Halloween 2026 events", function()
+	local halloween = findShipped("Halloween2026")
+	local luckWeekend = findShipped("HalloweenLuck2026")
 
 	T.it("runs Fri 23 Oct 17:00 UTC to Mon 2 Nov 08:00 UTC, with a 2x luck weekend inside it", function()
 		T.expect(halloween.startsAt).toBe(utc(2026, 10, 23, 17, 0))
@@ -161,6 +163,63 @@ T.describe("LiveOpsRules shipped Halloween 2026 events", function()
 		T.expect(banner.id).toBe("Halloween2026")
 		T.expect(banner.title).toBe("Halloween")
 		T.expect(LiveOpsRules.luckChangesAt(all, {}, midWeekend, LiveOps.limits)).toBe(luckWeekend.endsAt)
+	end)
+end)
+
+T.describe("LiveOpsRules shipped Winter 2026 events", function()
+	local winter = findShipped("Winter2026")
+	local christmasLuck = findShipped("WinterLuck2026")
+	local newYear = findShipped("NewYearCash2026")
+	local all = LiveOps.events
+
+	T.it(
+		"runs Fri 18 Dec 17:00 UTC to Mon 4 Jan 08:00 UTC, with Christmas luck and New Year's cash inside it",
+		function()
+			T.expect(winter.startsAt).toBe(utc(2026, 12, 18, 17, 0))
+			T.expect(winter.endsAt).toBe(utc(2027, 1, 4, 8, 0))
+			T.expect(christmasLuck.startsAt).toBe(utc(2026, 12, 24, 17, 0))
+			T.expect(christmasLuck.endsAt).toBe(utc(2026, 12, 26, 23, 59))
+			T.expect(newYear.startsAt).toBe(utc(2026, 12, 31, 17, 0))
+			T.expect(newYear.endsAt).toBe(utc(2027, 1, 1, 23, 59))
+			T.expect(christmasLuck.luckMultiplier).toBe(2)
+			T.expect(newYear.cashMultiplier).toBe(2)
+			for _, inner in { christmasLuck, newYear } do
+				T.expect(inner.startsAt).toBeGreaterThan(winter.startsAt)
+				T.expect(inner.endsAt).toBeLessThan(winter.endsAt)
+			end
+			T.expect(winter.luckMultiplier or 1).toBe(1)
+			T.expect(winter.cashMultiplier or 1).toBe(1)
+			-- never overlaps Halloween: one seasonal theme at a time
+			T.expect(winter.startsAt).toBeGreaterThan(findShipped("Halloween2026").endsAt)
+		end
+	)
+
+	T.it("switches on and off by date alone, with the right luck and cash on each day", function()
+		T.expect(LiveOpsRules.activeEventIds(all, winter.startsAt - 1).Winter2026).toBeNil()
+		T.expect(LiveOpsRules.activeEventIds(all, winter.startsAt).Winter2026).toBe(true)
+		T.expect(LiveOpsRules.activeEventIds(all, winter.endsAt - 1).Winter2026).toBe(true)
+		T.expect(LiveOpsRules.activeEventIds(all, winter.endsAt).Winter2026).toBeNil()
+		local christmasDay = utc(2026, 12, 25, 12, 0)
+		T.expect(LiveOpsRules.activeEventIds(all, christmasDay)).toEqual({ Winter2026 = true, WinterLuck2026 = true })
+		T.expect(LiveOpsRules.luckMultiplier(all, {}, christmasDay, LiveOps.limits)).toBe(2)
+		T.expect(LiveOpsRules.cashMultiplier(all, christmasDay, LiveOps.limits)).toBe(1)
+		local newYearsEve = utc(2026, 12, 31, 22, 0)
+		T.expect(LiveOpsRules.activeEventIds(all, newYearsEve)).toEqual({ Winter2026 = true, NewYearCash2026 = true })
+		T.expect(LiveOpsRules.luckMultiplier(all, {}, newYearsEve, LiveOps.limits)).toBe(1)
+		T.expect(LiveOpsRules.cashMultiplier(all, newYearsEve, LiveOps.limits)).toBe(2)
+		T.expect(LiveOpsRules.cashMultiplier(all, newYear.endsAt, LiveOps.limits)).toBe(1)
+	end)
+
+	T.it("shows the Winter banner, and New Year's 2x Cash banner while that runs", function()
+		local christmasDay = utc(2026, 12, 25, 12, 0)
+		local banner = LiveOpsRules.bannerEvent(all, christmasDay) :: LiveOpsRules.EventDef
+		T.expect(banner.id).toBe("Winter2026")
+		T.expect(banner.title).toBe("Winter")
+		local nye = LiveOpsRules.bannerEvent(all, utc(2026, 12, 31, 22, 0)) :: LiveOpsRules.EventDef
+		T.expect(nye.id).toBe("NewYearCash2026")
+		T.expect(nye.title).toBe("2x Cash")
+		local after = LiveOpsRules.bannerEvent(all, newYear.endsAt) :: LiveOpsRules.EventDef
+		T.expect(after.id).toBe("Winter2026")
 	end)
 end)
 
