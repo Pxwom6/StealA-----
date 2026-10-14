@@ -71,6 +71,19 @@ T.describe("IdleMotion", function()
 		T.expect(top.roll * nextTop.roll).toBeLessThan(0)
 	end)
 
+	T.it("run: the same hop, quicker and higher than the belt's", function()
+		local run, belt = IdleMotion.RUN, IdleMotion.BELT
+		T.expect(run.hopsPerSecond).toBeGreaterThan(belt.hopsPerSecond)
+		T.expect(run.height).toBeGreaterThan(belt.height)
+		local top = IdleMotion.run(1.5 / run.hopsPerSecond, 0)
+		T.expect(top.lift).toBeNear(run.height, 1e-6)
+		for i = 0, 200 do
+			local pose = IdleMotion.run(i * 0.011, 0.6)
+			T.expect(pose.lift).toBeAtLeast(0)
+			T.expect(pose.lift).toBeAtMost(run.height + 1e-9)
+		end
+	end)
+
 	T.it("turns any number into a phase between 0 and 1", function()
 		for _, n in { 0, 1, 2, 17, 12345, -3 } do
 			local phase = IdleMotion.phaseOf(n)

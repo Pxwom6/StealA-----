@@ -9,13 +9,14 @@
 	moment after), and prices, hold times and tag reach are worked out the same way on the client
 	(Logic/ModifierRules.effects).
 
-	Weather modifiers (Thunderstorm, Meteor Shower, Toxic Fog) change nothing but the sky, and unlock a mutation that
-	only rolls while they run (Config/Mutations `modifierId`): Electric, Galaxy and Toxic Snacklings. Their `weather`
-	replaces the map's particles, `lighting` goes over the map's (and a seasonal theme's) like a seasonal overlay, and
-	`skyEffect` adds lightning flashes (off with Reduce effects) or shooting stars.
+	Weather modifiers (Thunderstorm, Meteor Shower, Toxic Fog, Northern Lights, Heatwave) change nothing but the sky,
+	and unlock a mutation that only rolls while they run (Config/Mutations `modifierId`): Electric, Galaxy, Toxic,
+	Aurora and Toasted Snacklings. Their `weather` replaces the map's particles, `lighting` goes over the map's (and a
+	seasonal theme's) like a seasonal overlay, and `skyEffect` adds lightning flashes (off with Reduce effects),
+	shooting stars or the shimmering curtains of an aurora.
 
-	Drop modifiers (Supply Drop, Coin Rain) put crates or coins on the walkways while they run (`drops`; what they
-	hold is in Config/Drops).
+	Drop modifiers (Supply Drop, Coin Rain, Great Escape) put crates, coins or runaway Snacklings on the walkways while
+	they run (`drops`; what they hold is in Config/Drops).
 
 	Commands: /mod <id> [minutes], /mod off, /mod list (anyone in Studio; admins in live servers, that server only).
 	Balance notes: BALANCE.md "Server modifiers".
@@ -59,6 +60,30 @@ local TOXIC: Types.SeasonLighting = {
 	atmosphere = { density = 0.48, offset = 0.05, color = "#9AD878", decay = "#3E6A2E", glare = 0.2, haze = 2.6 },
 	colorCorrection = { tint = "#E4FFD8", brightness = 0, contrast = 0.08, saturation = -0.05 },
 	clouds = { cover = 0.7, density = 0.7, color = "#8AA86A" },
+}
+
+-- A clear polar night lit by an aurora (bright enough to play on every map).
+local POLAR: Types.SeasonLighting = {
+	clockTime = 23.4,
+	brightness = 1.9,
+	ambient = "#4E6A7E",
+	outdoorAmbient = "#7EA4B8",
+	colorShiftTop = "#9AFFD8",
+	atmosphere = { density = 0.18, offset = 0.1, color = "#2A4A5E", decay = "#10202E", glare = 0, haze = 0.6 },
+	colorCorrection = { tint = "#E8FFF6", brightness = 0.07, contrast = 0.1, saturation = 0.15 },
+	clouds = { cover = 0.08, density = 0.3, color = "#4A6A7A" },
+}
+
+-- A blazing, hazy noon.
+local HEAT: Types.SeasonLighting = {
+	clockTime = 13.2,
+	brightness = 3.4,
+	ambient = "#9A7A5A",
+	outdoorAmbient = "#D8B48A",
+	colorShiftTop = "#FFC890",
+	atmosphere = { density = 0.38, offset = 0.15, color = "#FFD8A0", decay = "#E89A5A", glare = 0.6, haze = 2.4 },
+	colorCorrection = { tint = "#FFF0DC", brightness = 0.04, contrast = 0.06, saturation = 0.08 },
+	clouds = { cover = 0.05, density = 0.2, color = "#FFFFFF" },
 }
 
 local Modifiers: ModifiersConfig = {
@@ -143,6 +168,14 @@ local Modifiers: ModifiersConfig = {
 			weight = 0.5, -- the rare double
 			effects = { spawnInterval = 0.67, luck = 2 },
 		},
+		jackpot = {
+			displayName = "Jackpot",
+			icon = "🎰",
+			description = "Everyone earns DOUBLE cash!",
+			color = "#FFD700",
+			weight = 0.35, -- rarer than Cash Splash, twice the boost
+			effects = { income = 2 },
+		},
 
 		-- Weather: each unlocks a mutation (Config/Mutations modifierId) and changes the sky.
 		thunderstorm = {
@@ -176,6 +209,26 @@ local Modifiers: ModifiersConfig = {
 			weather = "spores",
 			lighting = TOXIC,
 		},
+		northernLights = {
+			displayName = "Northern Lights",
+			icon = "🌌",
+			description = "Aurora Snacklings can appear on the belt!",
+			color = "#3CF0B4",
+			weight = 1,
+			effects = {},
+			lighting = POLAR,
+			skyEffect = "aurora",
+		},
+		heatwave = {
+			displayName = "Heatwave",
+			icon = "🥵",
+			description = "Toasted Snacklings can appear on the belt!",
+			color = "#FF8A3D",
+			weight = 1,
+			effects = {},
+			weather = "heat",
+			lighting = HEAT,
+		},
 
 		-- Drops on the walkways (Config/Drops).
 		supplyDrop = {
@@ -196,6 +249,15 @@ local Modifiers: ModifiersConfig = {
 			effects = {},
 			drops = { kind = "coins", firstSeconds = 3, everySeconds = 40 }, -- 8 showers
 		},
+		greatEscape = {
+			displayName = "Great Escape",
+			icon = "🏃",
+			description = "Snacklings escaped! Catch them on the walkways!",
+			color = "#FF8C1A",
+			weight = 1,
+			effects = {},
+			drops = { kind = "runaway", firstSeconds = 6, everySeconds = 50 }, -- 6 runaways
+		},
 	},
 
 	order = {
@@ -209,11 +271,15 @@ local Modifiers: ModifiersConfig = {
 		"fortress",
 		"snackPatrol",
 		"snackParty",
+		"jackpot",
 		"thunderstorm",
 		"meteorShower",
 		"toxicFog",
+		"northernLights",
+		"heatwave",
 		"supplyDrop",
 		"coinRain",
+		"greatEscape",
 	},
 
 	schedule = {

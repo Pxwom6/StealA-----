@@ -6,6 +6,7 @@
 	  podium  a slow breathing bob: up and down by a few % of the model's height, squashed at the bottom and stretched
 	          at the top, with a slow sway (roll) and a gentle turn (yaw)
 	  belt    a bouncy hop: stretched in the air, squashed when it lands, leaning to alternate sides (a waddle)
+	  run     the same hop, quicker and higher: a runaway Snackling (Great Escape) dashing along a walkway
 
 	Each model passes its own `phase` (0..1) so a row of Snacklings never moves in lockstep.
 ]]
@@ -36,6 +37,13 @@ IdleMotion.BELT = {
 	roll = 0.07,
 }
 
+IdleMotion.RUN = {
+	hopsPerSecond = 3.4,
+	height = 0.9,
+	squash = 0.05,
+	roll = 0.12,
+}
+
 local TAU = math.pi * 2
 
 -- Resting pose on a podium at clock time `t` for a model `height` studs tall.
@@ -53,12 +61,13 @@ function IdleMotion.podium(t: number, phase: number, height: number): Pose
 	}
 end
 
--- Hopping pose on the belt, `t` seconds after the item spawned.
-function IdleMotion.belt(t: number, phase: number): Pose
-	local cfg = IdleMotion.BELT
+type HopConfig = { hopsPerSecond: number, height: number, squash: number, roll: number }
+
+-- A hop at time `t`: stretched in the air, squashed on landing, leaning to alternate sides.
+local function hopPose(cfg: HopConfig, t: number, phase: number): Pose
 	local u = t * cfg.hopsPerSecond + phase
-	local hop = u - math.floor(u)
-	local arc = math.sin(math.pi * hop) -- 0 when touching the belt, 1 at the top of the hop
+	local progress = u - math.floor(u)
+	local arc = math.sin(math.pi * progress) -- 0 when touching the ground, 1 at the top of the hop
 	local side = if math.floor(u) % 2 == 0 then 1 else -1
 	return {
 		lift = cfg.height * arc,
@@ -66,6 +75,16 @@ function IdleMotion.belt(t: number, phase: number): Pose
 		roll = cfg.roll * arc * side,
 		yaw = 0,
 	}
+end
+
+-- Hopping pose on the belt, `t` seconds after the item spawned.
+function IdleMotion.belt(t: number, phase: number): Pose
+	return hopPose(IdleMotion.BELT, t, phase)
+end
+
+-- Running pose of a runaway Snackling at clock time `t`.
+function IdleMotion.run(t: number, phase: number): Pose
+	return hopPose(IdleMotion.RUN, t, phase)
 end
 
 -- A stable 0..1 phase from any number (e.g. a belt item id).

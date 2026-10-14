@@ -188,6 +188,8 @@ the store stay exact. Golden Hour (a server modifier) is the only thing that mul
 | Amethyst | on Rock Candy Caverns | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
 | Zesty | on Lemonade Lagoon | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
 | Bubblegum | on Bubblegum Bayou | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Aurora | during Northern Lights | 2% | 28.8 | x4 | x2.5 | x0.63 | spawn |
+| Toasted | during Heatwave | 2% | 28.8 | x4 | x2.5 | x0.63 | spawn |
 
 "Per server-hour" is while the mutation can roll. Any mutation on an ordinary spawn (the map's signature included,
 no modifier): 5.15% of spawns (74.2 per server-hour). Expected value of one spawn: income x1.0885, price x1.0435.
@@ -343,28 +345,32 @@ after about 7½ minutes (a Peppermint Puffin). Re-run with `lune run tools/simul
 ## Server modifiers
 
 A modifier runs for 5 minutes, then the server waits 4-8 minutes (6 on average) before the next one
-(`Config/Modifiers.luau` `schedule`), so one is running about **45% of the time**. Fifteen modifiers share the picks
-by weight (fourteen at 1, Snack Party at 0.5), never the same twice in a row: each regular one runs about **1.9
-minutes per server-hour**, Snack Party about 0.9. A player in a 30-minute session sees about three: a weather one
-about half the time, a drop one (crates or coins) about a third of the time.
+(`Config/Modifiers.luau` `schedule`), so one is running about **45% of the time**. Nineteen modifiers share the picks
+by weight (seventeen at 1, Snack Party at 0.5, Jackpot at 0.35), never the same twice in a row: each regular one runs
+about **1.5 minutes per server-hour**, Snack Party about 0.8 and Jackpot about 0.5. A player in a 30-minute session
+sees about three: a weather one more often than not, a drop one (crates, coins or runaways) about two times in five.
 
 | Modifier | Effect while it runs | Effect over a server-hour |
 | --- | --- | --- |
-| Rush Hour | belt spawns every 1.25 s instead of 2.5 (the belt holds 32 instead of 16) | about +4% Snacklings on the belt (with Snack Party) |
+| Rush Hour | belt spawns every 1.25 s instead of 2.5 (the belt holds 32 instead of 16) | about +3% Snacklings on the belt (with Snack Party) |
 | Clearance Sale | belt prices x0.7 (rounded to whole cash, at least 1) | about 1% off what an always-buying player spends |
-| Golden Hour | every mutation chance x3 (5.15% → 15.5% of spawns; 7.15% → 21.5% while Halloween runs) | about +6% mutations |
-| Lucky Breeze | 2x luck (a LiveOps boost: shows in the luck pill, capped with everything else at 6x) | rare odds doubled ~4.7% of the time (with Snack Party) |
-| Cash Splash | income x1.5 (with LiveOps cash events, capped at 3x) | about +1.6% income; cash packs and quest rewards are not inflated (they use the steady income) |
+| Golden Hour | every mutation chance x3 (5.15% → 15.5% of spawns; 7.15% → 21.5% while Halloween runs) | about +5% mutations |
+| Lucky Breeze | 2x luck (a LiveOps boost: shows in the luck pill, capped with everything else at 6x) | rare odds doubled ~3.8% of the time (with Snack Party) |
+| Cash Splash | income x1.5 (with LiveOps cash events, capped at 3x) | about +1.3% income; cash packs and quest rewards are not inflated (they use the steady income) |
 | Sugar Rush | everyone walks (and carries) 25% faster | – |
 | Quick Hands | the steal hold is 0.75 s instead of 1.5 | – |
 | Fortress | locks started while it runs last 1.5x (the open window grows with them: at least half the lock) | – |
 | Snack Patrol | tag reach 13 → 19.5 studs | – |
 | Snack Party (rare) | spawns every 1.7 s and 2x luck | – |
+| Jackpot (rare) | income x2 (with LiveOps cash events, capped at 3x) | about +0.9% income |
 | Thunderstorm | rain, lightning and a dark sky; Electric Snacklings can roll (2% of spawns) | about 2–3 Electric per storm |
 | Meteor Shower | a starry midnight with shooting stars; Galaxy Snacklings can roll (2%) | about 2–3 Galaxy per shower |
 | Toxic Fog | green haze and glowing spores; Toxic Snacklings can roll (2%) | about 2–3 Toxic per fog |
+| Northern Lights | a polar night with an aurora swaying across the sky; Aurora Snacklings can roll (2%) | about 2–3 Aurora per night |
+| Heatwave | a blazing, hazy noon with heat shimmer; Toasted Snacklings can roll (2%) | about 2–3 Toasted per heatwave |
 | Supply Drop | 4 crates parachute onto the walkways; hold one open (2.5 s) to win it | see below |
 | Coin Rain | 8 showers of 12 coins over the walkways; walk through them | see below |
+| Great Escape | 6 Snacklings break out (one every 50 s) and run along the walkways; walk into one to catch it | see below |
 
 They are spice, not an economy change: the biggest, Golden Hour, adds under a tenth to a server's mutations per hour.
 
@@ -374,13 +380,18 @@ the player's steady income:
 * **A supply crate** holds a Snackling rolled at 3x luck (and 2x mutation chance) plus 45 seconds of the opener's
   income (at least $300); with a full base the Snackling is sold for its usual refund instead. At 3x luck a crate is
   Common 42%, Uncommon 20%, Rare 26%, Epic 9.4%, Legendary 2.5%, Mythic 0.4%, Secret 0.04% (the belt: 56 / 27 / 11.5
-  / 4.2 / 1.1 / 0.18 / 0.02). A server sees about 1.5 crates an hour and only one player wins each, so a new player's
+  / 4.2 / 1.1 / 0.18 / 0.02). A server sees about 1.2 crates an hour and only one player wins each, so a new player's
   lucky Legendary is a story, not a shortcut everyone takes.
 * **Coins** pay 3 seconds of the collector's income each (at least $30); a whole Coin Rain is 96 coins, about 5
   minutes of income shared by everyone in the server. A newcomer grabbing a dozen gets a few hundred dollars early on
   (a Rare costs $4.5K); a big base gets a few seconds per coin.
-* Pickups are checked against the player's trusted position (no teleporting to coins) and a crate's hold is
-  re-checked like a steal's.
+* **A runaway** is a Snackling rolled at 2x luck (and 2x mutation chance), no cash: Common 48%, Uncommon 23%, Rare
+  20%, Epic 7.2%, Legendary 1.9%, Mythic 0.31%, Secret 0.03% (the "With 2× luck" column above). A server sees about
+  two an hour, and only the first player to reach each one gets it. It runs slower than players (9 studs/s wandering,
+  14.5 while someone is within 40 studs; players walk at 16), so it is always catchable: in offline chases with these
+  numbers one player catches it in about 15 s (mostly running to it), four in about 4 s, well inside its 45 seconds.
+* Pickups and catches are checked against the player's trusted position (no teleporting to coins or runaways) and a
+  crate's hold is re-checked like a steal's.
 The weather ones change only the sky (a lighting overlay above the map's and a seasonal theme's, the client's
 particles and sky effects) and unlock their mutation; lightning flashes are soft, at most two in a quarter second,
 and off with Reduce effects.

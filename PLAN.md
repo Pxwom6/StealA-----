@@ -337,20 +337,21 @@ whatever map is on. Studio: `/map <id>`, `/map vote`, `/map list`. Offline: `lun
 
 ## 12. Server modifiers
 
-Every 4-8 minutes a server runs one of fifteen modifiers for 5 minutes (DECISIONS.md #30, `Config/Modifiers`): Rush
+Every 4-8 minutes a server runs one of nineteen modifiers for 5 minutes (DECISIONS.md #30, `Config/Modifiers`): Rush
 Hour, Clearance Sale, Golden Hour, Lucky Breeze, Cash Splash, Sugar Rush, Quick Hands, Fortress, Snack Patrol, the rare
-Snack Party, three weathers (Thunderstorm, Meteor Shower, Toxic Fog) that change the sky and unlock a mutation
-(DECISIONS.md #31), and two drops (Supply Drop, Coin Rain; DropService, `Config/Drops`, DECISIONS.md #33). A banner announces it, a chip beside the luck chip counts it down (tap it for the description), and
+Snack Party and Jackpot, five weathers (Thunderstorm, Meteor Shower, Toxic Fog, Northern Lights, Heatwave) that change
+the sky and unlock a mutation (DECISIONS.md #31, #40), and three drops (Supply Drop, Coin Rain, Great Escape;
+DropService, `Config/Drops`, DECISIONS.md #33, #40). A banner announces it, a chip beside the luck chip counts it down (tap it for the description), and
 each system applies the effect where it decides (belt, economy, locks, steals, movement), the client showing the same
 prices, hold time and tag reach. Studio: `/mod <id> [minutes]`, `/mod off`, `/mod list`. Offline:
 `lune run tools/worldsim/server.luau` (CI) boots the server and plays a session that checks them.
 
 ## 13. Map and weather mutations
 
-Twenty-three gated mutations (DECISIONS.md #31, `Config/Mutations`): one signature per map that only rolls on that map
+Twenty-five gated mutations (DECISIONS.md #31, `Config/Mutations`): one signature per map that only rolls on that map
 (Honey, Sprinkled, Frozen, Fossil, Molten, Moonlit, Pearl, Candy Apple, Blossom, Lunar, Mossy, Cyber, Angelic,
 Abyssal, Fudge, Balloon, Cheesy, Amethyst, Zesty, Bubblegum; 1.2%, x3) and one per weather modifier that
-only rolls while it runs (Electric, Galaxy, Toxic; 2%, x4, announced). `BeltService.mutationConditions()` passes the
+only rolls while it runs (Electric, Galaxy, Toxic, Aurora, Toasted; 2%, x4, announced). `BeltService.mutationConditions()` passes the
 running events, the map and the modifier into `MutationRules.roll`; permanent rolls never change. The vote buttons
 and the map title card name each map's mutation; the Snackdex shows a pip for each one owned. Mutation looks gained
 particle presets (`MutationLook.particles`, built by `CreatureVisuals`).

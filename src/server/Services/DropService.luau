@@ -11,6 +11,12 @@
 	  * Coins: a scatter over both walkways every so often. The server itself picks a coin up for whoever walks
 	    through it (a quick distance check against trusted positions, not client touch events), paying a few seconds
 	    of that player's income.
+	  * Runaways (Great Escape): a Snackling rolled with extra luck appears on a walkway, as far from everyone as it
+	    can (announced, rarity and all), and runs along it in short legs, each planned away from the players near it
+	    (DropRules.runawayTarget). The leg is published as one attribute and the client draws the Snackling on it, so
+	    nothing is sent while it runs; the server checks catches against the same position (DropRules.legPosition) and
+	    trusted player positions, like coins. The first player to reach it gets it (its sell value with a full base);
+	    uncaught, it gets away after its lifetime.
 
 	The schedule follows server time from the moment the modifier starts (DropRules.times). Crates and coins live in
 	workspace.Drops, tagged for the client (DropController adds the prompt, the marker, the spin and the effects).
@@ -23,11 +29,13 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
+local CreatureVisuals = require(ReplicatedStorage.Shared.CreatureVisuals)
 local Drops = require(ReplicatedStorage.Shared.Config.Drops)
 local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
 local Modifiers = require(ReplicatedStorage.Shared.Config.Modifiers)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local GameData = require(ReplicatedStorage.Shared.GameData)
+local Types = require(ReplicatedStorage.Shared.Types)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local DropRules = require(ReplicatedStorage.Shared.Logic.DropRules)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
@@ -46,6 +54,7 @@ local DropService = {}
 
 DropService.CRATE_TAG = "SupplyCrate"
 DropService.COIN_TAG = "DropCoin"
+DropService.RUNAWAY_TAG = "Runaway"
 
 local CRATE_SIZE = 4
 local CRATE_COLOR = "#B07443"
@@ -56,6 +65,8 @@ local STEP_SECONDS = 0.25
 local PICKUP_SECONDS = 0.1
 -- The server allows this much more than the client prompt's reach (a player stepping back as the hold completes).
 local REACH_SLACK = 2
+-- A new runaway stands still this long before it runs, so everyone sees where it popped out.
+local RUNAWAY_APPEAR_SECONDS = 1.2
 
 type Crate = {
 	id: number,
@@ -71,10 +82,21 @@ type Crate = {
 
 type Coin = { part: BasePart, expiresAt: number }
 
+type Runaway = {
+	id: number,
+	model: Model,
+	def: Types.CreatureDef,
+	variant: string?,
+	leg: DropRules.Leg,
+	expiresAt: number,
+}
+
 local folder: Folder
 local walkwayY = 0.2
 local crates: { [number]: Crate } = {}
 local coins: { Coin } = {}
+local runaways: { [number]: Runaway } = {}
+local nextRunawayId = 1
 local nextCrateId = 1
 local random = Random.new()
 local runningId: string? = nil
@@ -325,6 +347,156 @@ local function pickUp()
 	end
 end
 
+-- Runaways -----------------------------------------------------------------------------------------------------------
+
+-- Where every player stands (horizontally), for a runaway to keep away from.
+local function playerPoints(): { DropRules.Point }
+	local list: { DropRules.Point } = {}
+	for _, player in Players:GetPlayers() do
+		local session = Sessions.get(player)
+		local root = if session then Sessions.rootPart(session) else nil
+		if root then
+			table.insert(list, { x = root.Position.X, z = root.Position.Z })
+		end
+	end
+	return list
+end
+
+local function setLeg(runaway: Runaway, leg: DropRules.Leg)
+	runaway.leg = leg
+	runaway.model:SetAttribute("Leg", DropRules.encodeLeg(leg))
+end
+
+local function removeRunaway(runaway: Runaway)
+	runaways[runaway.id] = nil
+	runaway.model:Destroy()
+end
+
+-- A Snackling escapes: far from everyone, or right at `at` (the Studio command and the server test). nil when no
+-- Snackling can roll.
+local function spawnRunaway(t: number, at: Vector3?): Runaway?
+	local cfg = Drops.runaway
+	local def, variant = PrizeService.rollCreature(cfg.luck, cfg.mutationChance, nil)
+	if def == nil then
+		return nil
+	end
+	local x, z
+	if at then
+		x, z = at.X, at.Z
+	else
+		x, z = DropRules.runawayStart(Drops, playerPoints(), nextRandom)
+	end
+	local rarity = GameData.catalog.rarities[def.rarity]
+	local model =
+		CreatureVisuals.build(def, rarity, { anchored = true, mutation = GameData.mutation(variant), idle = false })
+	local id = nextRunawayId
+	nextRunawayId += 1
+	model.Name = `Runaway{id}`
+	model:PivotTo(CFrame.new(x, walkwayY, z) * CFrame.Angles(0, nextRandom() * math.pi * 2, 0))
+	model:SetAttribute("RunawayId", id)
+	model:SetAttribute("Rarity", def.rarity)
+	local runaway: Runaway = {
+		id = id,
+		model = model,
+		def = def,
+		variant = variant,
+		leg = { fromX = x, fromZ = z, toX = x, toZ = z, startsAt = t, endsAt = t + RUNAWAY_APPEAR_SECONDS },
+		expiresAt = t + cfg.lifetimeSeconds,
+	}
+	setLeg(runaway, runaway.leg)
+	CollectionService:AddTag(model, DropService.RUNAWAY_TAG)
+	model.Parent = folder
+	runaways[id] = runaway
+	Announcer.broadcast({
+		text = Format.template(
+			Theme.text.runawayEscaped,
+			{ rarity = rarity.displayName, creature = GameData.displayName(def, variant) }
+		),
+		rarity = def.rarity,
+		kind = "drop",
+	})
+	return runaway
+end
+
+-- Where a runaway is now (on the walkway, at its feet).
+local function runawayPosition(runaway: Runaway, t: number): Vector3
+	local x, z = DropRules.legPosition(runaway.leg, t)
+	return Vector3.new(x, walkwayY, z)
+end
+
+local function catch(session: Session, runaway: Runaway, position: Vector3)
+	removeRunaway(runaway)
+	local player = session.player
+	local def, variant = runaway.def, runaway.variant
+	local name = GameData.displayName(def, variant)
+	local rarity = GameData.catalog.rarities[def.rarity]
+	local given, refund = PrizeService.giveOrSell(session, def, variant, "Runaway")
+	if given then
+		Remotes.notify(player, Format.template(Theme.text.runawayReward, { creature = name }), "success")
+	else
+		Remotes.notify(
+			player,
+			Format.template(Theme.text.runawayRewardFull, { creature = name, cash = UiTheme.cash(refund) }),
+			"success"
+		)
+	end
+	Announcer.broadcast({
+		text = Format.template(
+			Theme.text.runawayCaught,
+			{ player = player.DisplayName, rarity = rarity.displayName, creature = name }
+		),
+		rarity = def.rarity,
+		kind = "drop",
+	})
+	Remotes.fireAll("Effect", { kind = "runaway", position = position, rarity = def.rarity })
+end
+
+-- Plans each runaway's next leg as the last one ends (sprinting while someone is near), and lets uncaught ones get
+-- away.
+local function runRunaways(t: number)
+	local points: { DropRules.Point }? = nil
+	for _, runaway in runaways do
+		if t >= runaway.expiresAt then
+			removeRunaway(runaway)
+		elseif t >= runaway.leg.endsAt then
+			local players = points or playerPoints()
+			points = players
+			local leg = runaway.leg
+			local toX, toZ = DropRules.runawayTarget(Drops, leg.toX, leg.toZ, players, nextRandom)
+			local fleeing = DropRules.isFleeing(Drops, leg.toX, leg.toZ, players)
+			setLeg(runaway, DropRules.runawayLeg(Drops, leg.toX, leg.toZ, toX, toZ, t, fleeing))
+		end
+	end
+end
+
+-- Moves the runaways on, then whoever reaches one first catches it (trusted positions only, like coins).
+local function stepRunaways()
+	if next(runaways) == nil then
+		return
+	end
+	local t = now()
+	runRunaways(t)
+	for _, runaway in runaways do
+		local position = runawayPosition(runaway, t)
+		for _, player in Players:GetPlayers() do
+			local session = Sessions.get(player)
+			local root = if session then Sessions.rootPart(session) else nil
+			if session == nil or root == nil then
+				continue
+			end
+			local offset = root.Position - position
+			local horizontal = Vector3.new(offset.X, 0, offset.Z).Magnitude
+			if
+				DropRules.catches(Drops, horizontal, offset.Y, REACH_SLACK)
+				and PositionTracker.isTrusted(session, root.Position)
+			then
+				catch(session, runaway, position)
+				break
+			end
+		end
+	end
+end
+
 -- The schedule -------------------------------------------------------------------------------------------------------
 
 local function step()
@@ -345,6 +517,8 @@ local function step()
 		table.remove(pending, 1)
 		if drops.kind == "crate" then
 			spawnCrate(t)
+		elseif drops.kind == "runaway" then
+			spawnRunaway(t)
 		else
 			spawnCoins(t)
 		end
@@ -366,13 +540,29 @@ local function step()
 	end
 end
 
--- How many crates and coins are out right now (tests).
-function DropService.counts(): (number, number)
-	local crateCount = 0
+-- How many crates, coins and runaways are out right now (tests).
+function DropService.counts(): (number, number, number)
+	local crateCount, runawayCount = 0, 0
 	for _ in crates do
 		crateCount += 1
 	end
-	return crateCount, #coins
+	for _ in runaways do
+		runawayCount += 1
+	end
+	return crateCount, #coins, runawayCount
+end
+
+-- A Snackling escapes now (Studio /runaway; the server test): far from everyone, or at `at`. Returns its model.
+function DropService.releaseRunaway(at: Vector3?): Model?
+	local runaway = spawnRunaway(now(), at)
+	return if runaway then runaway.model else nil
+end
+
+-- Where runaway `model` is now, as the server sees it (tests).
+function DropService.runawayPosition(model: Model): Vector3?
+	local id = model:GetAttribute("RunawayId")
+	local runaway = if type(id) == "number" then runaways[id] else nil
+	return if runaway then runawayPosition(runaway, now()) else nil
 end
 
 -- The crate models out right now, by id (tests).
@@ -413,6 +603,10 @@ function DropService.start(walkwayTop: number)
 		while true do
 			task.wait(PICKUP_SECONDS)
 			local ok, err = pcall(pickUp :: () -> ...any)
+			if not ok then
+				warn(`[Drops] {err}`)
+			end
+			ok, err = pcall(stepRunaways :: () -> ...any)
 			if not ok then
 				warn(`[Drops] {err}`)
 			end

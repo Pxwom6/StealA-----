@@ -78,6 +78,8 @@ Catalog.MUTATION_PARTICLES = {
 	"cheese",
 	"fizz",
 	"gumBubbles",
+	"aurora",
+	"steam",
 }
 
 local HEX_PATTERN = "^#%x%x%x%x%x%x$"

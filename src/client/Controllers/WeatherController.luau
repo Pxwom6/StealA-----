@@ -2,14 +2,15 @@
 --[[
 	Weather for the current map theme (Config/MapThemes `weather`): particles drifting around this player's camera —
 	snow, embers, falling leaves, fireflies, candy sprinkles, desert dust, petals, stardust, pollen, feathers, bubbles,
-	chocolate shavings, confetti, lemonade fizz or rain. One invisible box follows the camera
+	chocolate shavings, confetti, lemonade fizz, heat shimmer or rain. One invisible box follows the camera
 	(it lives under the Camera, so only this client has it) and its emitter fills the air around you, which is far
 	cheaper than covering the whole map.
 
-	A weather modifier (Config/Modifiers: Thunderstorm, Meteor Shower, Toxic Fog) replaces the map's particles with its
-	own (rain, glowing spores) while it runs, and adds its sky effect: lightning (a far-off bolt, a soft flash of this
-	client's screen and a rumble of thunder every 6-14 seconds) or shooting stars streaking across the sky. The server
-	changes the lighting itself (ModifierService).
+	A weather modifier (Config/Modifiers: Thunderstorm, Meteor Shower, Toxic Fog, Northern Lights, Heatwave) replaces
+	the map's particles with its own (rain, glowing spores, heat shimmer) while it runs, and adds its sky effect:
+	lightning (a far-off bolt, a soft flash of this client's screen and a rumble of thunder every 6-14 seconds),
+	shooting stars streaking across the sky, or an aurora (ribbons of light all around the sky, swaying and
+	shimmering). The server changes the lighting itself (ModifierService).
 
 	A seasonal theme with weather of its own (Config/Seasons, e.g. Winter's snow) replaces the map's particles while
 	it is on; a weather modifier still wins over it.
@@ -44,6 +45,19 @@ local BOLT_DISTANCE = NumberRange.new(170, 280)
 local METEOR_GAP = NumberRange.new(0.5, 1.4)
 local METEOR_SPREAD = 170
 local METEOR_HEIGHT = NumberRange.new(110, 170)
+-- Aurora: ribbons around the camera (yaw of each ribbon's middle in degrees, its distance and height, its colours
+-- end to end), how long and tall they are, and how fast they sway and shimmer.
+local AURORA_RIBBONS = {
+	{ yaw = 0, distance = 270, height = 110, colors = { "#3CF0B4", "#2EE8E0", "#9A6BFF" } },
+	{ yaw = 72, distance = 290, height = 125, colors = { "#7CFF9A", "#3CF0B4", "#2EC8E8" } },
+	{ yaw = 144, distance = 280, height = 115, colors = { "#3CF0B4", "#B07CFF", "#FF7CC8" } },
+	{ yaw = 216, distance = 285, height = 100, colors = { "#2EE8A8", "#2EC8E8", "#7C9AFF" } },
+	{ yaw = 288, distance = 265, height = 130, colors = { "#9AFF7C", "#3CF0B4", "#9A6BFF" } },
+}
+local AURORA_LENGTH = 380
+local AURORA_WIDTH = 60
+local AURORA_SWAY = 70 -- studs the ribbons bend
+local AURORA_STEP = 1 / 20
 
 local random = Random.new()
 
@@ -273,7 +287,6 @@ local RECIPES: { [Types.WeatherKind]: Recipe } = {
 			EmissionDirection = Enum.NormalId.Bottom,
 		},
 	},
-	-- Bubbles rising from the sea floor (Sushi Reef).
 	-- Chocolate shavings curling down, dark and white.
 	shavings = {
 		boxSize = Vector3.new(110, 1, 110),
@@ -336,6 +349,7 @@ local RECIPES: { [Types.WeatherKind]: Recipe } = {
 			EmissionDirection = Enum.NormalId.Top,
 		},
 	},
+	-- Bubbles rising from the sea floor (Sushi Reef).
 	bubbles = {
 		boxSize = Vector3.new(100, 1, 100),
 		offset = Vector3.new(0, -6, 0),
@@ -349,6 +363,25 @@ local RECIPES: { [Types.WeatherKind]: Recipe } = {
 			Acceleration = Vector3.new(0.3, 0.5, 0.2),
 			Lifetime = NumberRange.new(6, 8),
 			Rate = 30,
+			EmissionDirection = Enum.NormalId.Top,
+		},
+	},
+	-- Heat shimmer: faint wavy wisps rising off the ground on a blazing day (Heatwave).
+	heat = {
+		boxSize = Vector3.new(100, 2, 100),
+		offset = Vector3.new(0, -5, 0),
+		props = {
+			Texture = SMOKE,
+			Color = colours({ Color3.fromRGB(255, 244, 224) }),
+			Size = sequence({ { 0, 1.5 }, { 1, 4 } }),
+			Transparency = sequence({ { 0, 1 }, { 0.3, 0.88 }, { 0.7, 0.9 }, { 1, 1 } }),
+			Speed = NumberRange.new(2, 4),
+			SpreadAngle = Vector2.new(10, 10),
+			Acceleration = Vector3.new(0, 0.8, 0),
+			Lifetime = NumberRange.new(2.5, 4),
+			Rate = 20,
+			Rotation = NumberRange.new(0, 360),
+			RotSpeed = NumberRange.new(-30, 30),
 			EmissionDirection = Enum.NormalId.Top,
 		},
 	},
@@ -542,6 +575,97 @@ local function meteor()
 	tween:Play()
 end
 
+-- The aurora: one invisible anchor following the camera, with a ribbon (a Beam between two attachments) on each side
+-- of the sky. Returns the anchor and a function that sways and shimmers the ribbons at time `t`.
+local function buildAurora(): (Part, (t: number) -> ())
+	local anchor = Instance.new("Part")
+	anchor.Name = "Aurora"
+	anchor.Anchored = true
+	anchor.CanCollide = false
+	anchor.CanQuery = false
+	anchor.CanTouch = false
+	anchor.CastShadow = false
+	anchor.Transparency = 1
+	anchor.Size = Vector3.one
+	local beams: { Beam } = {}
+	for index, ribbon in AURORA_RIBBONS do
+		local yaw = math.rad(ribbon.yaw)
+		local middle = Vector3.new(math.sin(yaw) * ribbon.distance, ribbon.height, math.cos(yaw) * ribbon.distance)
+		local along = Vector3.new(math.cos(yaw), 0, -math.sin(yaw)) * AURORA_LENGTH / 2
+		local a0 = Instance.new("Attachment")
+		a0.Name = `Start{index}`
+		a0.Position = middle - along
+		a0.Parent = anchor
+		local a1 = Instance.new("Attachment")
+		a1.Name = `End{index}`
+		a1.Position = middle + along + Vector3.new(0, 25, 0)
+		a1.Parent = anchor
+		local list: { Color3 } = {}
+		for _, hex in ribbon.colors do
+			table.insert(list, Color3.fromHex(hex))
+		end
+		local beam = Instance.new("Beam")
+		beam.Attachment0 = a0
+		beam.Attachment1 = a1
+		beam.Color = colours(list)
+		beam.Width0 = AURORA_WIDTH
+		beam.Width1 = AURORA_WIDTH * 1.3
+		beam.FaceCamera = true
+		beam.LightEmission = 1
+		beam.LightInfluence = 0
+		beam.Segments = 24
+		beam.Parent = anchor
+		table.insert(beams, beam)
+	end
+	local function animate(t: number)
+		for index, beam in beams do
+			local phase = index * 1.7
+			beam.CurveSize0 = math.sin(t * 0.25 + phase) * AURORA_SWAY
+			beam.CurveSize1 = math.cos(t * 0.21 + phase * 1.3) * AURORA_SWAY
+			-- brighter bands drifting along the ribbon
+			local shift = (t * 0.05 + index * 0.23) % 1
+			beam.Transparency = sequence({
+				{ 0, 1 },
+				{ 0.12, 0.75 + 0.15 * math.sin(t * 0.9 + phase) },
+				{ 0.35, 0.55 + 0.2 * math.sin(t * 0.7 + phase + shift * 6) },
+				{ 0.6, 0.6 + 0.2 * math.cos(t * 0.8 + phase - shift * 6) },
+				{ 0.85, 0.7 + 0.15 * math.sin(t * 1.1 + phase) },
+				{ 1, 1 },
+			})
+		end
+	end
+	animate(0)
+	return anchor, animate
+end
+
+-- Runs the aurora until the sky effect changes (token): built while effects are on, gone while they are reduced.
+local function auroraLoop(token: number)
+	local built: { anchor: Part, animate: (t: number) -> () }? = nil
+	while token == skyToken do
+		if ClientSettings.reduceEffects() then
+			if built then
+				built.anchor:Destroy()
+				built = nil
+			end
+		else
+			if built == nil or built.anchor.Parent == nil then
+				local anchor, animate = buildAurora()
+				anchor.Parent = folder()
+				built = { anchor = anchor, animate = animate }
+			end
+			local current = built
+			if current then
+				current.anchor.CFrame = CFrame.new(workspace.CurrentCamera.Focus.Position)
+				current.animate(os.clock())
+			end
+		end
+		task.wait(AURORA_STEP)
+	end
+	if built then
+		built.anchor:Destroy()
+	end
+end
+
 -- Starts (or stops, with nil) the running sky effect's loop.
 local function setSkyEffect(effect: Types.SkyEffect?)
 	if effect == skyEffect then
@@ -551,6 +675,10 @@ local function setSkyEffect(effect: Types.SkyEffect?)
 	skyToken += 1
 	local token = skyToken
 	if effect == nil then
+		return
+	end
+	if effect == "aurora" then
+		task.spawn(auroraLoop, token)
 		return
 	end
 	task.spawn(function()

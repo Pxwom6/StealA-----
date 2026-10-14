@@ -219,9 +219,9 @@ T.describe("ModifierRules.validate", function()
 		)).toBeTruthy()
 		T.expect(mentions(
 			broken(function(config)
-				config.modifiers.meteorShower.skyEffect = "aurora"
+				config.modifiers.meteorShower.skyEffect = "rainbowArc"
 			end),
-			"skyEffect aurora"
+			"skyEffect rainbowArc"
 		)).toBeTruthy()
 		T.expect(mentions(
 			broken(function(config)
