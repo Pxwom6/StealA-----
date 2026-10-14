@@ -35,6 +35,20 @@ rojo plugin install
 
 Alternatively `rojo build -o StealASnackling.rbxl` builds a place file you can open directly.
 
+### Updating a place in Studio straight from GitHub (no Rojo)
+
+[`studio/SyncFromGitHub.luau`](studio/SyncFromGitHub.luau) brings an existing place's code up to date with the
+latest `main`, from inside Studio:
+
+1. Game Settings → **Security** → turn on *Allow HTTP Requests* (you can turn it off again afterwards).
+2. View → **Command Bar**, paste the whole file, press Enter. The Output window lists what was added and updated,
+   and any script that is no longer in the repo (kept unless you set `REMOVE_STALE = true` at the top).
+3. Play-test, then **File → Publish to Roblox**. One Undo takes the whole sync back.
+
+It only touches `ReplicatedStorage.Shared`, `ServerScriptService.Server` and `StarterPlayerScripts.Client` (the
+same mapping as `default.project.json`); custom models, ProfileStore and the place's settings stay as they are. CI
+checks it against Rojo builds of every commit (`tools/syncTest.luau`).
+
 The PR description for each round contains a step-by-step test script (2-player local server for stealing,
 Studio test purchases, etc.).
 
@@ -48,10 +62,11 @@ Studio test purchases, etc.).
 | `lune run tools/worldsim/smoke.luau` | Build the map offline in every map theme and check it (CI runs this too) |
 | `lune run tools/worldsim/export.luau <mapId> [out.json]` | Dump one map theme's built world as JSON for a 3D preview |
 | `lune run tools/worldsim/server.luau` | Boot the whole server offline and play a short two-player session (CI runs this too) |
-| `stylua src tests tools` | Format |
-| `selene src tests tools` | Lint |
+| `rojo build -o build/sync.rbxl` then `lune run tools/syncTest.luau build/sync.rbxl` | Check the Studio sync script (`studio/SyncFromGitHub.luau`) offline |
+| `stylua src tests tools studio` | Format |
+| `selene src tests tools studio` | Lint |
 | `rojo sourcemap default.project.json -o sourcemap.json` | Sourcemap for luau-lsp |
-| `luau-lsp analyze --platform=roblox --definitions=@roblox=globalTypes.d.luau --sourcemap=sourcemap.json --settings=.vscode/settings.json src` | Strict type check (download `globalTypes.d.luau` as in CI) |
+| `luau-lsp analyze --platform=roblox --definitions=@roblox=globalTypes.d.luau --sourcemap=sourcemap.json --settings=.vscode/settings.json src studio` | Strict type check (download `globalTypes.d.luau` as in CI) |
 
 CI (`.github/workflows/ci.yml`) runs all of the above on every pull request.
 

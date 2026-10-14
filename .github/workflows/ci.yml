@@ -26,10 +26,10 @@ jobs:
         run: wally install
 
       - name: StyLua (format check)
-        run: stylua --check src tests tools
+        run: stylua --check src tests tools studio
 
       - name: selene (lint)
-        run: selene src tests tools
+        run: selene src tests tools studio
 
       - name: Generate Rojo sourcemap
         run: rojo sourcemap default.project.json --output sourcemap.json
@@ -48,7 +48,7 @@ jobs:
             --sourcemap=sourcemap.json \
             --settings=.vscode/settings.json \
             --ignore="**/_Index/**" \
-            src
+            src studio
 
       - name: luau-lsp (strict type analysis, tests and tools)
         run: luau-lsp analyze --platform=standard --settings=.vscode/settings.json tests tools
@@ -61,3 +61,9 @@ jobs:
 
       - name: Server test (boots the server offline and plays a short session)
         run: lune run tools/worldsim/server.luau
+
+      - name: Studio sync script test (pulls this checkout into Rojo-built places offline)
+        run: |
+          mkdir -p build
+          rojo build default.project.json --output build/sync.rbxl
+          lune run tools/syncTest.luau build/sync.rbxl
