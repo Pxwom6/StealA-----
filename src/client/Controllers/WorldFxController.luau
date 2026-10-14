@@ -3,7 +3,8 @@
 	Ambient world animation, all on the client and cheap:
 	  * the belt's chevrons slide along at the items' speed (one BulkMoveTo of ~70 parts per frame; the belt's ends are
 	    inside the factory intake and the chute, so they wrap around out of sight)
-	  * the Snack Factory's cog turns, the chute's warning lights blink (2 Hz)
+	  * the Snack Factory's cog turns, the chute's warning lights blink (2 Hz); found again whenever a new map theme
+	    rebuilds the scenery
 
 	Settings > Reduce effects (ClientSettings) stops all of that and, on this device only, switches off every particle
 	emitter / sparkles / smoke / fire in the world (factory smoke, fountain spray, rarity sparkles, mutations...,
@@ -106,22 +107,38 @@ local function findChevrons()
 	end
 end
 
-local function findFactoryBits()
-	local scenery = workspace:WaitForChild("Map"):WaitForChild("Scenery")
-	local factory = scenery:WaitForChild("SnackFactory")
-	local found = factory:WaitForChild("Cog", 10)
-	if found and found:IsA("Model") then
+-- The factory cog and the chute's lights in this Scenery folder (a new map theme rebuilds the folder).
+local function findFactoryBits(scenery: Instance)
+	cog = nil
+	cogSpinSpeed = 0
+	cogAngle = 0
+	blinkers = {}
+	local factory = scenery:WaitForChild("SnackFactory", 10)
+	local found = factory and factory:WaitForChild("Cog", 10)
+	if found and found:IsA("Model") and scenery.Parent then
 		cog = found
 		cogPivot = found:GetPivot()
 		local speed = found:GetAttribute("SpinSpeed")
 		cogSpinSpeed = if type(speed) == "number" then speed else 0
 	end
-	local chute = scenery:WaitForChild("Chute")
-	for _, child in chute:GetChildren() do
-		if child:IsA("BasePart") and child:GetAttribute("Blink") == true then
-			table.insert(blinkers, child)
+	local chute = scenery:WaitForChild("Chute", 10)
+	if chute then
+		for _, child in chute:GetChildren() do
+			if child:IsA("BasePart") and child:GetAttribute("Blink") == true then
+				table.insert(blinkers, child)
+			end
 		end
 	end
+end
+
+local function watchScenery()
+	local map = workspace:WaitForChild("Map")
+	map.ChildAdded:Connect(function(child)
+		if child.Name == "Scenery" then
+			findFactoryBits(child)
+		end
+	end)
+	findFactoryBits(map:WaitForChild("Scenery"))
 end
 
 local function step(dt: number)
@@ -144,7 +161,7 @@ end
 
 function WorldFxController.start()
 	task.spawn(findChevrons)
-	task.spawn(findFactoryBits)
+	task.spawn(watchScenery)
 	workspace.DescendantAdded:Connect(function(descendant)
 		if reduced and isEmitter(descendant) then
 			-- Let whoever created it finish setting it up first.

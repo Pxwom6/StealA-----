@@ -222,7 +222,11 @@ function NotificationController.start()
 			SoundPlayer.ui("purchase")
 		end
 	end)
-	Net.get("Announce").OnClientEvent:Connect(function(payload: Banner)
+	Net.get("Announce").OnClientEvent:Connect(function(payload: Banner & { kind: string? })
+		if payload.kind == "map" then
+			systemChat(payload.text) -- a new map: MapThemeController shows its own title card
+			return
+		end
 		local color = if type(payload.color) == "string" and string.match(payload.color, "^#%x%x%x%x%x%x$")
 			then payload.color
 			else nil

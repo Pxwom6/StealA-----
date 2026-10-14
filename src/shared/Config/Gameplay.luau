@@ -139,6 +139,7 @@ local Gameplay = {
 		SetSetting = { burst = 8, perSecond = 2 }, -- settings toggles (the client also coalesces quick changes)
 		DevGrantProduct = { burst = 3, perSecond = 1 },
 		ClaimQuest = { burst = 4, perSecond = 1 }, -- three quests a day; each claim pays once (QuestRules.claim)
+		VoteMap = { burst = 4, perSecond = 1 }, -- the map vote (MapThemeService): changing your mind is fine
 	} :: { [string]: RateLimit },
 }
 

@@ -59,6 +59,7 @@ local Sounds = {
 		announce = { id = WHOOSH_SHORT, volume = 0.4, pitch = 1.2 }, -- a server-wide banner slides in
 		luck = { id = FUNFAIR_STING, volume = 0.45 },
 		mutation = { id = PIANO_HELLO, volume = 0.45, pitch = 1.2 }, -- a mutated Snackling (Golden, Diamond...) appears on the belt
+		mapChange = { id = SWEEP, volume = 0.5, pitch = 0.85 }, -- a new map theme (the title card drops in)
 	} :: { [string]: SoundSlot },
 	-- Played when a creature of this rarity appears on the belt near you / lands in your base.
 	rarity = {

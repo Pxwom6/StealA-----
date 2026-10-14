@@ -185,6 +185,21 @@ T.describe("SceneryLayout.validate catches", function()
 			c.lighting.clockTime = 30
 		end)).toBe(1)
 	end)
+	T.it("a landmark spot near the wall, in the lake or off the terrain", function()
+		T.expect(#problemsWith(function(c)
+			c.landmarkSpots = { { x = 0, z = 190 } } -- 30 studs past the north wall
+		end)).toBe(1)
+		T.expect(#problemsWith(function(c)
+			local lake = assert(c.terrain.lake, "the map has a lake")
+			c.landmarkSpots = { { x = lake.x, z = lake.z } }
+		end)).toBe(1)
+		T.expect(#problemsWith(function(c)
+			c.landmarkSpots = { { x = 620, z = 0 } }
+		end)).toBe(1)
+		T.expect(#problemsWith(function(c)
+			c.landmarkSpots = { { x = -345, z = -80, scale = 3 } }
+		end)).toBe(1)
+	end)
 end)
 
 return nil

@@ -13,12 +13,17 @@
 	                        again when completed, Studio only)
 	  /gallery [mutationId] every Snackling in labelled rows past the north boundary wall (and you, in front of them), to
 	                        check and screenshot the models, e.g. /gallery, /gallery golden; /gallery off removes it
-	  /sky <clockTime>      preview the lighting at another time of day, e.g. /sky 18 (dusk), /sky 14.6 (back to
-	                        Config/Scenery's afternoon); everyone in the session sees it
+	  /sky <clockTime>      preview the lighting at another time of day, e.g. /sky 18 (dusk); everyone in the session
+	                        sees it, until the next map or season change sets the lighting again
 	  /quests reset         re-roll today's daily quests (new picks, progress and claims start over)
 	  /dex fill <rarity>    mark every Snackling of a tier discovered except one, and clear that tier's reward, so
 	                        buying the missing one (the toast names it; /spawn it) tests completion; e.g. /dex fill
 	                        common. "event" fills the Event section the same way (it has no reward)
+
+	Map themes (MapThemeService; admins can use these in live servers too, that server only):
+	  /map <id>             switch to that map now, e.g. /map candy, /map volcano
+	  /map vote             start a 20-second vote for the next map
+	  /map list             every map id (the current one in brackets)
 
 	The LiveOps admin commands (LiveOpsService) also work for anyone in Studio, only in that session:
 	  /event <eventId> [minutes], /event off [eventId], /luck <multiplier> <minutes>, /announce <text>
@@ -209,7 +214,7 @@ function DevCommands.start()
 	print(
 		"[DevCommands] Studio commands enabled: /cash <n>, /spawn <creatureId> [mutationId], /noshield, /friends <n|off>,"
 			.. " /tutorial, /gallery [mutationId|off], /sky <clockTime>,"
-			.. " /quests reset, /dex fill <rarity|event>"
+			.. " /quests reset, /dex fill <rarity|event>, /map <id|vote|list>"
 			.. " (LiveOps: /event <id> [minutes], /event off, /luck <x> <min>)"
 	)
 end

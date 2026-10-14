@@ -29,6 +29,7 @@ export type ClientToServer =
 	| "SetSetting"
 	| "DevGrantProduct"
 	| "ClaimQuest"
+	| "VoteMap"
 
 export type ServerToClient =
 	"StateUpdate"
@@ -63,6 +64,7 @@ local CLIENT_TO_SERVER: { ClientToServer } = {
 	"SetSetting",
 	"DevGrantProduct",
 	"ClaimQuest",
+	"VoteMap",
 }
 
 local SERVER_TO_CLIENT: { ServerToClient } = {

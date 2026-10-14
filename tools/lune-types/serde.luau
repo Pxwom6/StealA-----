@@ -6,4 +6,8 @@ function serde.decode(_format: "json" | "toml" | "yaml", _encoded: string): any
 	error("stub")
 end
 
+function serde.encode(_format: "json" | "toml" | "yaml", _value: any, _pretty: boolean?): string
+	error("stub")
+end
+
 return serde

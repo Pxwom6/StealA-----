@@ -113,6 +113,49 @@ local Theme = {
 		terrainSand = "#E8D9A8",
 		terrainRock = "#8E8C96",
 		terrainWater = "#3FA9D6",
+
+		-- Map themes (Config/MapThemes): what the other maps' trees and landmarks are made of. Each map overrides the
+		-- ones it uses in its palette; these are the defaults.
+		snow = "#F4F8FF",
+		ice = "#A8E4FF",
+		candyStick = "#FFF6F0",
+		candy1 = "#FF5C8A",
+		candy2 = "#FFD23F",
+		candy3 = "#7CD9FF",
+		candy4 = "#A78BFA",
+		palmTrunk = "#A0784E",
+		palmLeaf = "#3E9A4E",
+		coconut = "#6B4A2E",
+		cactus = "#4E9A5A",
+		cactusFlower = "#FF6FB5",
+		crystal = "#8FD8FF",
+		crystalGlow = "#D7F4FF",
+		mushroomStem = "#F3E9D2",
+		mushroomCap = "#FF5C5C",
+		mushroomSpot = "#FFFFFF",
+		deadWood = "#4A3B33",
+		balloon1 = "#FF5C8A",
+		balloon2 = "#FFD23F",
+		balloon3 = "#4DA8FF",
+		basket = "#B07443",
+		windmillTower = "#F2E8CF",
+		windmillRoof = "#B5483A",
+		windmillBlade = "#FFFFFF",
+		mesa = "#C97B4A",
+		mesaBand = "#E3A36B",
+		lava = "#FF5A1F",
+		lavaRock = "#2B2124",
+		lantern = "#FFB347",
+		lighthouse = "#FFFFFF",
+		lighthouseStripe = "#E8263B",
+		lighthouseLight = "#FFF4B0",
+		umbrella1 = "#FF5C5C",
+		umbrella2 = "#FFFFFF",
+		barn = "#B5483A",
+		barnTrim = "#FFFFFF",
+		hay = "#E8C35A",
+		carrot = "#FF8A1A",
+		hat = "#2B2D42",
 	},
 
 	-- One colour per plot (index = plot number).
@@ -341,6 +384,13 @@ local Theme = {
 		snackdexNewTag = "NEW",
 		snackdexNew = "NEW! {creature} joined your Snackdex",
 		snackdexTierComplete = "{rarity} Snackdex complete! +{amount} and +{percent}% income forever!",
+
+		-- Map themes (Config/MapThemes): the vote for the next map and the change itself
+		mapVoteTitle = "Vote for the next map! {time}",
+		mapVoteCount = "{votes}", -- votes under each choice on the vote card
+		mapChanged = "{icon} Welcome to {map}!",
+		mapNext = "Next map in {time}",
+		mapCardSubtitle = "NEW MAP",
 	},
 
 	-- Store copy per item key (see Config/Monetization). Available placeholders: {vipBonus} {extraPodiums}

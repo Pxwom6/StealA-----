@@ -19,12 +19,15 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
+local MapThemes = require(ReplicatedStorage.Shared.Config.MapThemes)
 local Scenery = require(ReplicatedStorage.Shared.Config.Scenery)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
+local Types = require(ReplicatedStorage.Shared.Types)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local BeltMath = require(ReplicatedStorage.Shared.Logic.BeltMath)
 local StealRules = require(ReplicatedStorage.Shared.Logic.StealRules)
 local SceneryBuilder = require(script.Parent.SceneryBuilder)
+local WorldLighting = require(script.Parent.WorldLighting)
 
 export type PodiumRefs = {
 	index: number,
@@ -87,6 +90,39 @@ local BLACK = Color3.new(0, 0, 0)
 local MapBuilder = {}
 
 local decorCount = 0
+
+-- Parts outside the scenery whose colour (and for the ground and walkway, material) follows the map theme.
+type Painted = { part: BasePart, key: string, material: ("ground" | "walkway")? }
+local painted: { Painted } = {}
+local mapFolder: Folder? = nil
+
+local function paint(part: BasePart, key: string, material: ("ground" | "walkway")?)
+	part:SetAttribute("Paint", key)
+	table.insert(painted, { part = part, key = key, material = material })
+end
+
+local function materialNamed(name: string, fallback: Enum.Material): Enum.Material
+	return (Enum.Material :: any)[name] or fallback
+end
+
+-- Applies the theme's colours and materials to the painted parts.
+local function repaint(theme: Types.MapThemeDef)
+	for _, entry in painted do
+		entry.part.Color = UiTheme.world(entry.key)
+		if entry.material == "ground" then
+			entry.part.Material = materialNamed(theme.groundMaterial, Enum.Material.Grass)
+		elseif entry.material == "walkway" then
+			entry.part.Material = materialNamed(theme.walkwayMaterial, Enum.Material.SmoothPlastic)
+		end
+	end
+end
+
+-- The theme to build with: its palette goes on top of Config/Theme.world first.
+local function useTheme(themeId: string): Types.MapThemeDef
+	local theme = MapThemes.themes[themeId] or MapThemes.themes[MapThemes.order[1]]
+	UiTheme.setWorldOverrides(theme.palette)
+	return theme
+end
 
 local function part(props: { [string]: any }): Part
 	local p = Instance.new("Part")
@@ -665,13 +701,16 @@ local function buildLeaderboard(name: string, title: string, cframe: CFrame, par
 		Parent = parent,
 	})
 	board:SetAttribute("Title", title)
-	decor({
-		Name = name .. "Frame",
-		Size = Vector3.new(boardSize.X + 1.2, boardSize.Y + 1.2, 0.6),
-		CFrame = cframe * CFrame.new(0, 0, boardSize.Z / 2 + 0.2),
-		Color = UiTheme.world("boardFrame"),
-		Parent = parent,
-	})
+	paint(
+		decor({
+			Name = name .. "Frame",
+			Size = Vector3.new(boardSize.X + 1.2, boardSize.Y + 1.2, 0.6),
+			CFrame = cframe * CFrame.new(0, 0, boardSize.Z / 2 + 0.2),
+			Color = UiTheme.world("boardFrame"),
+			Parent = parent,
+		}),
+		"boardFrame"
+	)
 	decor({
 		Name = name .. "Header",
 		Size = Vector3.new(boardSize.X + 2, 1.6, 2.4),
@@ -681,28 +720,37 @@ local function buildLeaderboard(name: string, title: string, cframe: CFrame, par
 	})
 	local bottom = cframe.Position.Y - boardSize.Y / 2
 	for _, side in { -1, 1 } do
-		decor({
-			Name = name .. "Leg",
-			Size = Vector3.new(1.4, bottom + 6, 1.4),
-			CFrame = cframe * CFrame.new(side * 6.5, -boardSize.Y / 2 - (bottom - 6) / 2, 1.1),
-			Color = UiTheme.world("boardPost"),
-			Material = Enum.Material.Metal,
-			Parent = parent,
-		})
+		paint(
+			decor({
+				Name = name .. "Leg",
+				Size = Vector3.new(1.4, bottom + 6, 1.4),
+				CFrame = cframe * CFrame.new(side * 6.5, -boardSize.Y / 2 - (bottom - 6) / 2, 1.1),
+				Color = UiTheme.world("boardPost"),
+				Material = Enum.Material.Metal,
+				Parent = parent,
+			}),
+			"boardPost"
+		)
 	end
-	decor({
-		Name = name .. "Plinth",
-		Size = Vector3.new(boardSize.X + 2, 1, 3.4),
-		CFrame = cframe * CFrame.new(0, -cframe.Position.Y + 0.5, 1.1),
-		Color = UiTheme.world("stoneWall"),
-		Material = Enum.Material.Slate,
-		Parent = parent,
-	})
+	paint(
+		decor({
+			Name = name .. "Plinth",
+			Size = Vector3.new(boardSize.X + 2, 1, 3.4),
+			CFrame = cframe * CFrame.new(0, -cframe.Position.Y + 0.5, 1.1),
+			Color = UiTheme.world("stoneWall"),
+			Material = Enum.Material.Slate,
+			Parent = parent,
+		}),
+		"stoneWall"
+	)
 	return board
 end
 
-function MapBuilder.build(): World
+-- Builds the map dressed as map theme `themeId` (Config/MapThemes; an unknown id builds the first theme).
+function MapBuilder.build(themeId: string): World
 	local started = os.clock()
+	local theme = useTheme(themeId)
+	painted = {}
 	-- Remove the template's baseplate / spawn so the generated map is the only geometry.
 	for _, name in { "Baseplate", "SpawnLocation" } do
 		local existing = workspace:FindFirstChild(name)
@@ -715,30 +763,39 @@ function MapBuilder.build(): World
 		old:Destroy()
 	end
 
-	SceneryBuilder.applyLighting()
+	WorldLighting.setBase(theme.lighting, 0)
 	decorCount = 0
 
 	local map = Instance.new("Folder")
 	map.Name = "Map"
+	mapFolder = map
 
 	-- The ground under the play area (the boundary wall stands on its edge; terrain carries on outside it).
 	local boundary = Scenery.boundary
-	part({
-		Name = "Ground",
-		Size = Vector3.new(boundary.maxX - boundary.minX, 4, boundary.maxZ - boundary.minZ),
-		CFrame = CFrame.new((boundary.minX + boundary.maxX) / 2, -2, (boundary.minZ + boundary.maxZ) / 2),
-		Color = UiTheme.world("ground"),
-		Material = Enum.Material.Grass,
-		Parent = map,
-	})
+	paint(
+		part({
+			Name = "Ground",
+			Size = Vector3.new(boundary.maxX - boundary.minX, 4, boundary.maxZ - boundary.minZ),
+			CFrame = CFrame.new((boundary.minX + boundary.maxX) / 2, -2, (boundary.minZ + boundary.maxZ) / 2),
+			Color = UiTheme.world("ground"),
+			Material = Enum.Material.Grass,
+			Parent = map,
+		}),
+		"ground",
+		"ground"
+	)
 	local walkwaySpan = MAP.plotsPerSide * MAP.plotWidth + (MAP.plotsPerSide - 1) * MAP.plotGap + 60
-	part({
-		Name = "Walkway",
-		Size = Vector3.new(walkwaySpan, WALKWAY_TOP, MAP.walkwayWidth * 2),
-		CFrame = CFrame.new(0, WALKWAY_TOP / 2, 0),
-		Color = UiTheme.world("walkway"),
-		Parent = map,
-	})
+	paint(
+		part({
+			Name = "Walkway",
+			Size = Vector3.new(walkwaySpan, WALKWAY_TOP, MAP.walkwayWidth * 2),
+			CFrame = CFrame.new(0, WALKWAY_TOP / 2, 0),
+			Color = UiTheme.world("walkway"),
+			Parent = map,
+		}),
+		"walkway",
+		"walkway"
+	)
 
 	local belt, beltSurfaceY = buildBelt(map)
 
@@ -773,8 +830,10 @@ function MapBuilder.build(): World
 	spawn.Transparency = 0.2
 	spawn.Duration = 0
 	spawn.Parent = map
+	paint(spawn, "lobby")
+	repaint(theme)
 
-	local sceneryParts = SceneryBuilder.build(map)
+	local sceneryParts = SceneryBuilder.build(map, theme)
 	for _, problem in SceneryBuilder.validate() do
 		warn(`[Scenery] config problem: {problem}`)
 	end
@@ -786,9 +845,10 @@ function MapBuilder.build(): World
 	map.Parent = workspace
 	print(
 		string.format(
-			"[MapBuilder] map built in %.0f ms (%d decoration parts)",
+			"[MapBuilder] map built in %.0f ms (%d decoration parts, %s)",
 			(os.clock() - started) * 1000,
-			extraParts
+			extraParts,
+			theme.displayName
 		)
 	)
 	return {
@@ -800,6 +860,33 @@ function MapBuilder.build(): World
 		groundY = 0,
 		walkwayY = WALKWAY_TOP,
 	}
+end
+
+-- Dresses the built map as another map theme: its colours and materials, the scenery rebuilt (trees, landmarks,
+-- boundary, plaza, factory) and the lighting fading over `seconds`. Gameplay parts are never touched. Returns how many
+-- scenery parts it built.
+function MapBuilder.restyle(themeId: string, seconds: number): number
+	local map = mapFolder
+	assert(map, "MapBuilder.restyle before MapBuilder.build")
+	local started = os.clock()
+	local theme = useTheme(themeId)
+	repaint(theme)
+	local sceneryParts = SceneryBuilder.restyle(map, theme)
+	WorldLighting.setBase(theme.lighting, seconds)
+	if decorCount + sceneryParts > Scenery.partBudget then
+		warn(
+			`[Scenery] {theme.displayName}: {decorCount + sceneryParts} parts, over the budget of {Scenery.partBudget}`
+		)
+	end
+	print(
+		string.format(
+			"[MapBuilder] restyled as %s in %.0f ms (%d scenery parts)",
+			theme.displayName,
+			(os.clock() - started) * 1000,
+			sceneryParts
+		)
+	)
+	return sceneryParts
 end
 
 return MapBuilder

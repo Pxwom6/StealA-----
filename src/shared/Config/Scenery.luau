@@ -17,8 +17,8 @@
 local Types = require("../Types")
 
 local Scenery: Types.SceneryConfig = {
-	-- A bright, warm afternoon. SeasonService snapshots these values when a seasonal theme starts and restores them
-	-- when it ends.
+	-- A bright, warm afternoon: the Sunny Meadow map's lighting (Config/MapThemes; each map has its own, and a seasonal
+	-- theme's mood goes on top of it while it runs).
 	lighting = {
 		clockTime = 14.6,
 		geographicLatitude = 35,
@@ -157,6 +157,21 @@ local Scenery: Types.SceneryConfig = {
 	},
 
 	treeLine = { count = 30, minDistance = 14, maxDistance = 40, seed = 17 },
+
+	-- Where each map's landmarks stand (Config/MapThemes): 70-140 studs outside the wall, all round the map, clear of
+	-- the lake. Visible from every base, out of reach of everyone.
+	landmarkSpots = {
+		{ x = -345, z = -80, scale = 1.1 },
+		{ x = -330, z = 110 },
+		{ x = -160, z = 255, scale = 1.15 },
+		{ x = 40, z = 265 },
+		{ x = 200, z = 290, scale = 0.9 },
+		{ x = 395, z = 60, scale = 1.2 },
+		{ x = 370, z = -130 },
+		{ x = 180, z = -265, scale = 1.1 },
+		{ x = -40, z = -260, scale = 0.95 },
+		{ x = -250, z = -250 },
+	},
 
 	chevronSpacing = 8,
 

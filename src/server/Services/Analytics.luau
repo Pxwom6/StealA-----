@@ -30,6 +30,8 @@
 	  snackdex_tier_completed              01 rarity id  (value = the rarity's order; once per tier per account)
 	  quest_claimed                        01 quest id  02 difficulty  03 how ("claim" | "auto": paid at the day change)
 	  quests_all_done                      01 how ("claim" | "auto")  (once per player per UTC day)
+	  map_vote                             01 map voted for  02 the map it would replace  (value = its place on the
+	                                       ballot; a player's first vote in each vote only)
 
 	Every call is pcall'd: analytics must never break gameplay (and is a no-op in some Studio configurations).
 ]]

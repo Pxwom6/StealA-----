@@ -15,4 +15,12 @@ function fs.readDir(_path: string): { string }
 	error("stub")
 end
 
+function fs.isFile(_path: string): boolean
+	error("stub")
+end
+
+function fs.isDir(_path: string): boolean
+	error("stub")
+end
+
 return fs
