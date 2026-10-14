@@ -41,5 +41,6 @@ require("./DropRules.spec")
 require("./CodeRules.spec")
 require("./GiftRules.spec")
 require("./SpinRules.spec")
+require("./AchievementRules.spec")
 
 T.finish()

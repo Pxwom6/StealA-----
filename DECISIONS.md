@@ -735,3 +735,20 @@ Leo something to post.
 on systems the game already has.
 **Reversal cost:** low — empty the ladder's later gifts or lengthen `freeEverySeconds`; the v4 keys must stay (a save
 schema never goes back).
+
+### 36. Achievements: counted from the save, paid automatically, no new save keys
+
+* **What:** 25 achievements in a Trophies tab (`Config/Achievements`), from "First Bite" to "Globetrotter" (every
+  map) and "Mutation Master" (16 mutations). Each pays once per account the moment it is reached, with a toast;
+  optional Roblox badges by id.
+* **Counted, not tracked:** every goal reads what the save already keeps (stats, the Snackdex, rebirths, Lucky Spins)
+  plus `map_<id>` flags for maps played on, so achievements need no new counters and no schema bump, and existing
+  players get credit for what they have already done the first time they join.
+* **Paid once:** the flag `ach_<id>` is set before the prize is paid (PrizeService), so a retry or a crash can't pay
+  twice; CI keeps a list of shipped ids because a renamed id would pay again.
+* **Checked when it matters:** within a second of any game event for that player, and every 10 s for everyone; the
+  tab asks for progress only while it is open.
+
+**Why:** long-term goals that point players at every system (stealing, collecting, mutations, maps, rebirths), and a
+place for Roblox badges.
+**Reversal cost:** none — remove an achievement and it simply stops showing (its flag stays harmless).

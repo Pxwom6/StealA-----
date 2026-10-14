@@ -2,13 +2,14 @@
 --[[
 	Retention UI:
 	  * "Welcome back — you earned X" popup after offline earnings
-	  * Rewards panel (side button with a badge) with four tabs:
+	  * Rewards panel (side button with a badge) with five tabs:
 	      Daily   the login streak: a 7-day track and one-tap claim; the panel opens itself on this tab once per
 	              session when a reward is waiting (after the welcome popup, never during the first-time tutorial)
 	      Quests  today's three quests (QuestService → StateUpdate `quests`): progress bars, rewards, Claim buttons, the
 	              all-done bonus and when new quests arrive
 	      Gifts   playtime gifts that unlock with time in game today (GiftsTab)
 	      Spin    the Lucky Spin reel (SpinTab)
+	      Trophies  achievements and how far you are with each (AchievementsTab)
 	    Each tab has its own red dot when something is claimable (a gift unlocked, a spin ready...); the side button
 	    shows one when any does. The open panel updates live (progress, countdowns) without being rebuilt.
 	  * HUD pills for live events (banner + "Halloween ends in 3d 4h", in the event's theme colour) and server luck
@@ -29,6 +30,7 @@ local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local QuestRules = require(ReplicatedStorage.Shared.Logic.QuestRules)
 local Modal = require(script.Parent.Parent.UI.Modal)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
+local AchievementsTab = require(script.Parent.AchievementsTab)
 local GiftsTab = require(script.Parent.GiftsTab)
 local HudController = require(script.Parent.HudController)
 local NotificationController = require(script.Parent.NotificationController)
@@ -36,7 +38,7 @@ local SoundPlayer = require(script.Parent.SoundPlayer)
 local SpinTab = require(script.Parent.SpinTab)
 local StateStore = require(script.Parent.StateStore)
 
-export type Tab = "daily" | "quests" | "gifts" | "spin"
+export type Tab = "daily" | "quests" | "gifts" | "spin" | "trophies"
 
 type TabButton = { button: TextButton, badge: Frame }
 type TabDef = { id: string, text: string }
@@ -54,7 +56,7 @@ local RewardsController = {}
 -- Reference px. Height stays within Modal's 340 so the panel fits a landscape phone.
 local PANEL_SIZE = Vector2.new(620, 336)
 local TAB_BAR_HEIGHT = 40
-local TAB_WIDTH = 134
+local TAB_WIDTH = 110
 local CONTENT_TOP = 48
 local QUEST_ROW_HEIGHT = 56
 local QUEST_ROW_GAP = 6
@@ -66,6 +68,7 @@ local TABS: { TabDef } = {
 	{ id = "quests", text = Theme.text.rewardsTabQuests },
 	{ id = "gifts", text = Theme.text.rewardsTabGifts },
 	{ id = "spin", text = Theme.text.rewardsTabSpin },
+	{ id = "trophies", text = Theme.text.rewardsTabTrophies },
 }
 
 local questDefs = QuestRules.index(Quests.pool)
@@ -407,6 +410,7 @@ local BUILDERS: { [string]: (content: Frame) -> (state: Types.ClientState) -> ()
 	quests = buildQuests,
 	gifts = GiftsTab.build,
 	spin = SpinTab.build,
+	trophies = AchievementsTab.build,
 }
 
 local function selectTab(tab: string)
@@ -420,6 +424,7 @@ local function selectTab(tab: string)
 	end
 	current.content:ClearAllChildren()
 	SpinTab.clear()
+	AchievementsTab.clear()
 	current.refresh = BUILDERS[tab](current.content)
 	local state = StateStore.get()
 	if state and current.refresh then
@@ -436,6 +441,7 @@ function RewardsController.open(tab: Tab?)
 	local modal = Modal.open(Theme.text.rewardsTitle, PANEL_SIZE, function()
 		panel = nil
 		SpinTab.clear()
+		AchievementsTab.clear()
 	end)
 	local tabBar = UiKit.new("Frame", {
 		Name = "Tabs",
@@ -447,7 +453,7 @@ function RewardsController.open(tab: Tab?)
 		FillDirection = Enum.FillDirection.Horizontal,
 		HorizontalAlignment = Enum.HorizontalAlignment.Center,
 		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(0, 10),
+		Padding = UDim.new(0, 8),
 		Parent = tabBar,
 	})
 	local content = UiKit.new("Frame", {
@@ -685,6 +691,7 @@ function RewardsController.start()
 		end
 	end)
 	SpinTab.start()
+	AchievementsTab.start()
 end
 
 return RewardsController

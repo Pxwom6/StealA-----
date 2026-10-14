@@ -7,6 +7,7 @@
 
 local Services = script.Services
 
+local AchievementService = require(Services.AchievementService)
 local Analytics = require(Services.Analytics)
 local BeltService = require(Services.BeltService)
 local CodeService = require(Services.CodeService)
@@ -69,6 +70,7 @@ SettingsService.start() -- music / sound effects / reduce effects, saved in flag
 CodeService.start() -- redeem codes (server/Codes.luau), once per account, saved in flags
 GiftService.start() -- playtime gifts: a daily ladder that unlocks with time in game
 SpinService.start() -- the Lucky Spin: a free spin every 12 hours, plus spins from gifts
+AchievementService.start() -- achievements paid once each, checked after every game event
 DevCommands.start() -- Studio only
 
 local hooks = PlayerLifecycle.hooks()

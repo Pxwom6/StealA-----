@@ -598,6 +598,45 @@ export type SpinConfig = {
 	segments: { SpinSegment },
 }
 
+-- Config: achievements (Config/Achievements) -------------------------------------------------------------------------
+
+-- What an achievement counts (Logic/AchievementRules.progress reads each from the save):
+--   beltPurchases / steals / rebirths / spins   counters
+--   earned        total cash ever earned
+--   discovered    Snacklings in the Snackdex (any)
+--   allRegular    every regular Snackling discovered (target ignored: the current roster size)
+--   rarity        owning a Snackling of `rarity` or rarer (target 1)
+--   mutations     different mutations owned (on any Snackling)
+--   maps          different maps played on
+export type AchievementGoal =
+	"beltPurchases"
+	| "steals"
+	| "rebirths"
+	| "spins"
+	| "earned"
+	| "discovered"
+	| "allRegular"
+	| "rarity"
+	| "mutations"
+	| "maps"
+
+export type AchievementDef = {
+	id: string, -- saved as the flag ach_<id>: never rename one that has shipped
+	title: string,
+	description: string,
+	icon: string,
+	goal: AchievementGoal,
+	target: number,
+	rarity: string?, -- for goal "rarity"
+	reward: PrizeReward,
+	badgeId: number?, -- a Roblox badge to award too (create it in the Creator Hub, paste its id); nil = none
+}
+
+export type AchievementsConfig = { list: { AchievementDef } }
+
+-- One achievement as the Trophies tab shows it.
+export type AchievementView = { id: string, progress: number, target: number, done: boolean }
+
 -- Config: redeem codes (server/Codes.luau, server-only so codes never reach a client) --------------------------------
 
 -- What a code gives: cash sized from the player's steady income (like a cash pack), or a Snackling (with a mutation

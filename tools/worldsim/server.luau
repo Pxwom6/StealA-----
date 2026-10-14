@@ -342,6 +342,24 @@ local function scenario()
 	task.wait(0.1)
 	check(#Sim.received(1001, "SpinResult") == 1, "one spin at a time while the reel runs")
 
+	-- Achievements: reached ones pay once, and the map you're on counts -------------------------------------------------
+	task.wait(1.3) -- the achievement check runs every second for players something just happened to
+	local flags = aliceSession.data.flags
+	check(flags.ach_firstBite == true, "First Bite is paid after the first purchase")
+	check(flags.ach_stickyFingers == nil, "Sticky Fingers waits for a steal (Alice never stole)")
+	check(bobSession.data.flags.ach_stickyFingers == nil, "nor Bob: his steal was tagged, so it never landed")
+	check(flags["map_" .. workspace:GetAttribute("MapTheme")] == true, "the current map is recorded")
+	cash = aliceSession.data.cash
+	Sim.server("Services/AchievementService").check(aliceSession)
+	check(aliceSession.data.cash == cash, "nothing pays twice")
+	Sim.fireServer(alice, "GetAchievements")
+	task.wait(0.1)
+	local sync = Sim.received(1001, "AchievementSync")
+	check(
+		#sync == 1 and #sync[1][1] == #Sim.shared("Config/Achievements").list,
+		"the Trophies tab gets every achievement"
+	)
+
 	-- Locking -------------------------------------------------------------------------------------------------------------
 	local lockButton = PlotService.refs(aliceSession.plot).lockButton
 	Sim.moveCharacter(alice, lockButton.Position + roblox.Vector3.new(0, 3, 0))

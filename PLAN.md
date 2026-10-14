@@ -190,6 +190,7 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `CrateOpen` | `crateId: int` | same, and the hold lasted long enough (`DropRules.holdLongEnough`); the first one wins |
 | `ClaimGift` | `index: int` | the gift exists, today's playtime unlocked it and it isn't claimed yet (`GiftRules.claim`) |
 | `Spin` | – | a free spin is ready or one is banked (`SpinRules.source`), and the last reel has finished |
+| `GetAchievements` | – | rate limit only → `AchievementSync` with the player's progress |
 | `RedeemCode` | `code: string` | letters and digits, at most 24 (`CodeRules.normalize`); the code exists, has not expired and its `code_<CODE>` flag is unset; a Snackling code needs a free podium; rate limit 3 then 1 per 5 s |
 | `DevGrantProduct` | `key: string` | **Studio only** – runs the real receipt path with a fake receipt |
 
@@ -207,6 +208,7 @@ Server → client:
 | `Effect` | one-shot VFX cue `{kind, position, rarity}` (e.g. `tutorialComplete`, `quest`, `questsAllDone`) |
 | `SnackdexSync` | the whole Snackdex `{dex, discovered?, completed?}` on ready and on every change (a new entry, a tier paid) |
 | `SpinResult` | `{index, text}`: the Lucky Spin segment the server picked (the reel stops there), and the prize toast |
+| `AchievementSync` | `{ {id, progress, target, done} }` for the Trophies tab |
 
 World state the client reads from **attributes** (replicated automatically): plot `OwnerUserId`, `LockedUntil`,
 `GraceUntil`, `PodiumCount`; podium `CreatureId`, `Variant` (mutation id, "" for none), `Stored`, `Income`
@@ -242,7 +244,8 @@ type PlayerData = {   -- exactly Types.PlayerData
              bestCashPerSecond: number, robuxSpent: number, totalEarned: number },
     flags: { [string]: boolean },  -- onboarding funnel milestones, one-time rewards (`social_groupWelcome`),
                                    -- tutorial progress (`tutorial_<step>`, `tutorial_done`), settings (`settings_<key>`),
-                                   -- redeemed codes (`code_<CODE>`)
+                                   -- redeemed codes (`code_<CODE>`), achievements paid (`ach_<id>`),
+                                   -- maps played on (`map_<id>`)
     firstJoin: number, lastSeen: number,
     gifts: { day: number, seconds: number, claimed: { number } },  -- playtime gifts today (v4)
     spin: { nextFreeAt: number, spins: number, total: number },     -- the Lucky Spin (v4)
