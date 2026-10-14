@@ -4,9 +4,10 @@
 
 	If ReplicatedStorage.CreatureModels contains a Model named exactly `def.modelName`, that model is cloned
 	(drop your own art there; it should face -Z and stand on y = 0 with a PrimaryPart) and scaled by the rarity's
-	modelScale. Otherwise the creature's recipe in Config/CreatureLooks is built: Logic/CreatureRecipe turns it into
-	a list of parts (already at the rarity's scale) and this module makes them: Ball / Block / Cylinder parts,
-	WedgeParts, and Block parts with a Sphere SpecialMesh for ellipsoids. No asset ids are needed.
+	modelScale. Otherwise the creature's polished model in Config/CreatureParts is built, or failing that its recipe
+	in Config/CreatureLooks: Logic/CreatureRecipe turns either into a list of parts (already at the rarity's scale)
+	and this module makes them: Ball / Block / Cylinder parts, WedgePart, and Block parts with a Sphere SpecialMesh
+	for ellipsoids. No asset ids are needed.
 
 	Every model returned has a PrimaryPart called "Root" at its feet, all other parts welded to it, and no
 	collisions, so it can be anchored on a podium, moved along the belt, or welded above a thief's head.
@@ -24,6 +25,7 @@ local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CreatureLooks = require("./Config/CreatureLooks")
+local CreatureParts = require("./Config/CreatureParts")
 local CreatureRecipe = require("./Logic/CreatureRecipe")
 local Types = require("./Types")
 local UiTheme = require("./UiTheme")
@@ -138,9 +140,8 @@ local function makePart(spec: CreatureRecipe.PartSpec): BasePart
 	return part
 end
 
--- The recipe model at the given scale (the rarity's modelScale), standing on y = 0 and facing -Z.
-local function buildFromRecipe(look: Types.CreatureLook, scale: number): Model
-	local compiled = CreatureRecipe.compile(look, scale)
+-- A compiled model (an imported model's or a recipe's parts), standing on y = 0 and facing -Z.
+local function buildCompiled(compiled: CreatureRecipe.Compiled): Model
 	local model = Instance.new("Model")
 	local base = math.max(compiled.base, 0.5)
 	local root = newPart("Part", {
@@ -335,8 +336,10 @@ function CreatureVisuals.build(def: Types.CreatureDef, rarity: Types.RarityDef, 
 		if rarity.modelScale ~= 1 then
 			model:ScaleTo(rarity.modelScale)
 		end
+	elseif CreatureParts[def.id] then
+		model = buildCompiled(CreatureRecipe.compileImported(CreatureParts[def.id], rarity.modelScale))
 	else
-		model = buildFromRecipe(CreatureLooks[def.id] or FALLBACK_LOOK, rarity.modelScale)
+		model = buildCompiled(CreatureRecipe.compile(CreatureLooks[def.id] or FALLBACK_LOOK, rarity.modelScale))
 	end
 	model.Name = def.id
 	model:SetAttribute("CreatureId", def.id)

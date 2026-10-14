@@ -1,9 +1,11 @@
 --!strict
--- Snackling models (Config/CreatureLooks built by Logic/CreatureRecipe) and the roster's tier bands.
+-- Snackling models (the polished models in Config/CreatureParts and the recipes in Config/CreatureLooks, both built
+-- by Logic/CreatureRecipe) and the roster's tier bands.
 local T = require("./TestKit")
 local Catalog = require("../src/shared/Logic/Catalog")
 local CreatureRecipe = require("../src/shared/Logic/CreatureRecipe")
 local CreatureLooks = require("../src/shared/Config/CreatureLooks")
+local CreatureParts = require("../src/shared/Config/CreatureParts")
 local Creatures = require("../src/shared/Config/Creatures")
 local Rarities = require("../src/shared/Config/Rarities")
 local Types = require("../src/shared/Types")
@@ -22,10 +24,9 @@ local TIER_BANDS: { [string]: Band } = {
 	Secret = { price = { 1800000000, 3200000000 }, income = { 360000, 620000 }, payback = { 5000, 5162 } },
 }
 
--- Models must fit the bases (Config/Gameplay.map): neighbouring podiums stand podiumRowSpacing = 6.6 studs apart
--- side to side, and the podium billboard floats 8.5 studs above the podium (a model starts 0.7 above that point).
-local MAX_WIDTH = 6.6
-local MAX_HEIGHT = 7.4
+-- Models must fit the bases: side to side between neighbouring podiums, and under the podium billboard.
+local MAX_WIDTH = CreatureRecipe.PODIUM_FIT.width
+local MAX_HEIGHT = CreatureRecipe.PODIUM_FIT.height
 
 local FACE_NAMES = {
 	Eye = true,
@@ -53,6 +54,33 @@ local function finite(value: number): boolean
 	return value == value and value ~= math.huge and value ~= -math.huge
 end
 
+-- Every model the game can build at `scale(rarity)`: each polished model and each recipe (the recipes are the
+-- fallback, so they must stay buildable too).
+type Build = { label: string, creature: Types.CreatureDef, compiled: CreatureRecipe.Compiled }
+local function allBuilds(scale: (Types.RarityDef) -> number): { Build }
+	local list: { Build } = {}
+	for _, creature in Creatures do
+		local rarity = rarityById[creature.rarity]
+		local imported = CreatureParts[creature.id]
+		if imported then
+			local compiled = CreatureRecipe.compileImported(imported, scale(rarity))
+			table.insert(list, { label = creature.id, creature = creature, compiled = compiled })
+		end
+		local look = CreatureLooks[creature.id]
+		if look then
+			local compiled = CreatureRecipe.compile(look, scale(rarity))
+			table.insert(list, { label = `{creature.id} (recipe)`, creature = creature, compiled = compiled })
+		end
+	end
+	return list
+end
+local function unitScale(_: Types.RarityDef): number
+	return 1
+end
+local function rarityScale(rarity: Types.RarityDef): number
+	return rarity.modelScale
+end
+
 T.describe("Snackling model recipes", function()
 	T.it("every Snackling has a recipe and every recipe belongs to a Snackling", function()
 		local ids: { [string]: boolean } = {}
@@ -78,27 +106,34 @@ T.describe("Snackling model recipes", function()
 		end
 	end)
 
-	T.it("stays inside its rarity's part budget (30 / 40 / 50, Root and aura included)", function()
-		T.expect(CreatureRecipe.budgetFor(1)).toBe(30)
-		T.expect(CreatureRecipe.budgetFor(2)).toBe(30)
-		T.expect(CreatureRecipe.budgetFor(3)).toBe(40)
-		T.expect(CreatureRecipe.budgetFor(4)).toBe(40)
+	T.it("stays inside its rarity's part budget (40 / 50 / 60, Root and aura included)", function()
+		T.expect(CreatureRecipe.budgetFor(1)).toBe(40)
+		T.expect(CreatureRecipe.budgetFor(2)).toBe(40)
+		T.expect(CreatureRecipe.budgetFor(3)).toBe(50)
+		T.expect(CreatureRecipe.budgetFor(4)).toBe(50)
 		for order = 5, 7 do
-			T.expect(CreatureRecipe.budgetFor(order)).toBe(50)
+			T.expect(CreatureRecipe.budgetFor(order)).toBe(60)
 		end
 		for _, creature in Creatures do
 			local order = rarityById[creature.rarity].order
-			local count = CreatureRecipe.partCount(CreatureLooks[creature.id], order)
 			local budget = CreatureRecipe.budgetFor(order)
-			if count > budget then
-				error(`{creature.id} has {count} parts, over its {creature.rarity} budget of {budget}`)
+			local counts: { [string]: number } =
+				{ recipe = CreatureRecipe.partCount(CreatureLooks[creature.id], order) }
+			local imported = CreatureParts[creature.id]
+			if imported then
+				counts.model = CreatureRecipe.importedPartCount(imported, order)
+			end
+			for kind, count in counts do
+				if count > budget then
+					error(`{creature.id}'s {kind} has {count} parts, over its {creature.rarity} budget of {budget}`)
+				end
 			end
 		end
 	end)
 
 	T.it("builds only well-formed parts", function()
-		for id, look in CreatureLooks do
-			local compiled = CreatureRecipe.compile(look, 1)
+		for _, build in allBuilds(unitScale) do
+			local id, compiled = build.label, build.compiled
 			T.expect(#compiled.parts).toBeGreaterThan(5)
 			local bodies = 0
 			for _, part in compiled.parts do
@@ -135,8 +170,8 @@ T.describe("Snackling model recipes", function()
 	end)
 
 	T.it("stands on its feet: nothing below y = 0 and something touching the ground", function()
-		for id, look in CreatureLooks do
-			local compiled = CreatureRecipe.compile(look, 1)
+		for _, build in allBuilds(unitScale) do
+			local id, compiled = build.label, build.compiled
 			if compiled.minY < -1e-6 or compiled.minY > 0.05 then
 				error(`{id}: lowest point is at y = {compiled.minY}`)
 			end
@@ -144,8 +179,8 @@ T.describe("Snackling model recipes", function()
 	end)
 
 	T.it("has a face on its front that mutations never restyle", function()
-		for id, look in CreatureLooks do
-			local compiled = CreatureRecipe.compile(look, 1)
+		for _, build in allBuilds(unitScale) do
+			local id, compiled = build.label, build.compiled
 			local eyes, faceZ, faceCount, allZ = 0, 0, 0, 0
 			for _, part in compiled.parts do
 				allZ += part.cf[3]
@@ -167,13 +202,13 @@ T.describe("Snackling model recipes", function()
 	end)
 
 	T.it("fits a podium at its rarity's scale (width between neighbours, height under the billboard)", function()
-		for _, creature in Creatures do
-			local compiled = CreatureRecipe.compile(CreatureLooks[creature.id], rarityById[creature.rarity].modelScale)
+		for _, build in allBuilds(rarityScale) do
+			local compiled = build.compiled
 			if compiled.width > MAX_WIDTH then
-				error(`{creature.id} is {compiled.width} studs wide (max {MAX_WIDTH})`)
+				error(`{build.label} is {compiled.width} studs wide (max {MAX_WIDTH})`)
 			end
 			if compiled.maxY > MAX_HEIGHT then
-				error(`{creature.id} is {compiled.maxY} studs tall (max {MAX_HEIGHT})`)
+				error(`{build.label} is {compiled.maxY} studs tall (max {MAX_HEIGHT})`)
 			end
 		end
 	end)
@@ -226,6 +261,159 @@ T.describe("Snackling model recipes", function()
 		T.expect(#kinds.skins).toBe(15)
 		T.expect(#kinds.features).toBe(30)
 		T.expect(#kinds.toppings).toBe(20)
+	end)
+end)
+
+T.describe("Polished Snackling models (Config/CreatureParts)", function()
+	local function model(parts: { { any } }): Types.ImportedModel
+		return { scale = 2, parts = parts }
+	end
+	local EYES: { { any } } = {
+		{ "Eye", "sphere", { 0.2, 0.2, 0.1 }, { -0.2, 1, -0.5 }, { 0, 0, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+		{ "Eye", "sphere", { 0.2, 0.2, 0.1 }, { 0.2, 1, -0.5 }, { 0, 0, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+	}
+	local function withEyes(parts: { { any } }): { { any } }
+		local list = table.clone(parts)
+		for _, eye in EYES do
+			table.insert(list, eye)
+		end
+		return list
+	end
+
+	T.it("belongs to a Snackling and passes the import rules within its rarity's budget", function()
+		for id, imported in CreatureParts do
+			local creature: Types.CreatureDef? = nil
+			for _, def in Creatures do
+				if def.id == id then
+					creature = def
+				end
+			end
+			if creature == nil then
+				error(`polished model {id} has no Snackling in Config/Creatures`)
+			end
+			local order = rarityById[(creature :: Types.CreatureDef).rarity].order
+			local allowance = CreatureRecipe.budgetFor(order) - 1 - (if order >= 6 then 1 else 0)
+			local problems = CreatureRecipe.validateImported(imported, allowance)
+			if #problems > 0 then
+				error(`{id}: {table.concat(problems, "; ")}`)
+			end
+		end
+	end)
+
+	T.it("turns design shapes into Roblox parts: cylinders run along X, everything else keeps its frame", function()
+		local compiled = CreatureRecipe.compileImported(
+			model(withEyes({
+				{ "Body", "cylinder", { 0.4, 1, 0.4 }, { 0, 0.5, 0 }, { 0, 0, 0 }, "#FF0000", "SmoothPlastic", "body" },
+				{ "Hat", "wedge", { 0.5, 0.3, 0.6 }, { 0, 1.15, 0 }, { 0, 90, 0 }, "#00FF00", "Neon", "detail", 0.2 },
+				{ "Paw", "box", { 0.2, 0.1, 0.3 }, { 0.3, 0.05, 0 }, { 0, 0, 0 }, "#0000FF", "Wood", "body" },
+			})),
+			1
+		)
+		local body, hat, paw = compiled.parts[1], compiled.parts[2], compiled.parts[3]
+		-- a 1-unit-tall cylinder at scale 2: 2 studs long along its local X, which points up
+		T.expect(body.shape).toBe("Cylinder")
+		T.expect(body.size).toEqual({ 2, 0.8, 0.8 })
+		T.expect(body.cf[4]).toBeNear(0, 1e-9) -- R00: local X has no world-x part...
+		T.expect(body.cf[7]).toBeNear(1, 1e-9) -- R10: ...and points straight up
+		T.expect(body.cf[2]).toBeNear(1, 1e-9) -- centre 0.5 u up = 1 stud
+		T.expect(body.material).toBeNil() -- SmoothPlastic is the default
+		-- a wedge keeps its own frame; ry(90) turns its local Z (the back face) to world -X
+		T.expect(hat.shape).toBe("Wedge")
+		T.expect(hat.size).toEqual({ 1, 0.6, 1.2 })
+		T.expect(hat.cf[6]).toBeNear(1, 1e-9) -- R02 = sin(90)
+		T.expect(hat.cf[12]).toBeNear(0, 1e-9) -- R22 = cos(90)
+		T.expect(hat.material).toBe("Neon")
+		T.expect(hat.transparency).toBe(0.2)
+		T.expect(paw.shape).toBe("Block")
+		T.expect(paw.material).toBe("Wood")
+		T.expect(compiled.parts[4].shape).toBe("Ellipsoid")
+	end)
+
+	T.it("applies rotations in three.js XYZ order (rx * ry * rz, like CFrame.Angles)", function()
+		local compiled = CreatureRecipe.compileImported(
+			model(withEyes({
+				{ "Body", "box", { 1, 0.2, 0.4 }, { 0, 0.6, 0 }, { 90, 90, 0 }, "#FFFFFF", "SmoothPlastic", "body" },
+			})),
+			1
+		)
+		local cf = compiled.parts[1].cf
+		-- rx(90) * ry(90) = { 0, 0, 1; 1, 0, 0; 0, 1, 0 }
+		local expected = { 0, 0, 1, 1, 0, 0, 0, 1, 0 }
+		for i = 1, 9 do
+			T.expect(cf[3 + i]).toBeNear(expected[i], 1e-9)
+		end
+	end)
+
+	T.it("scales by the model's scale times the rarity's, and stands exactly on y = 0", function()
+		local raised = model(withEyes({
+			{ "Body", "sphere", { 1, 1, 1 }, { 0, 0.52, 0 }, { 0, 0, 0 }, "#FFFFFF", "SmoothPlastic", "body" },
+		}))
+		local compiled = CreatureRecipe.compileImported(raised, 1.5)
+		T.expect(compiled.parts[1].size).toEqual({ 3, 3, 3 }) -- 1 u x 2 x 1.5
+		T.expect(compiled.minY).toBe(0)
+		T.expect(compiled.parts[1].cf[2]).toBeNear(1.5, 1e-9) -- lowered by the 0.02 u it floated
+		T.expect(compiled.maxY).toBeNear((1.1 - 0.02) * 3, 1e-9) -- the eyes' tops (1.1 u) are the highest point
+		-- the big body casts a shadow and breathes with the idle squash, on its upright axis
+		T.expect(compiled.parts[1].shadow).toBe(true)
+		T.expect(compiled.parts[1].squashAxis).toBe(2)
+	end)
+
+	T.it("squashes one body part and lets at most the three biggest cast shadows", function()
+		for id, imported in CreatureParts do
+			local compiled = CreatureRecipe.compileImported(imported, 1)
+			local squashed, shadows = 0, 0
+			for _, part in compiled.parts do
+				if part.squashAxis then
+					squashed += 1
+				end
+				if part.shadow then
+					shadows += 1
+				end
+			end
+			if squashed > 1 or shadows > CreatureRecipe.IMPORT.shadowCasters then
+				error(`{id}: {squashed} squashed parts, {shadows} shadow casters`)
+			end
+		end
+	end)
+
+	T.it("reports broken models instead of building them", function()
+		local broken = model({
+			{ "Body", "cone", { 1, 1, 1 }, { 0, 0.5, 0 }, { 0, 0, 0 }, "#FFFFFF", "SmoothPlastic", "body" },
+			{ "Leg", "cylinder", { 0.4, 1, 0.2 }, { 0, 0.5, 0 }, { 0, 0, 0 }, "#FFFFFF", "Plastic", "body" },
+			{ "Eye", "sphere", { 0.2, 0.2, 0.2 }, { 0, 1, -0.5 }, { 0, 0, 0 }, "red", "SmoothPlastic", "detail" },
+			{ "Fin", "box", { 0.5, 0.5, 0.5 }, { 1.2, 0.25, 0 }, { 0, 0, 0 }, "#FFFFFF", "SmoothPlastic", "fin" },
+			{ "Toe", "box", { 0.01, 0.5, 0.5 }, { 0, -0.2, 0 }, { 0, 0, 0 }, "#FFFFFF", "SmoothPlastic", "body", 0.9 },
+		})
+		local problems = CreatureRecipe.validateImported(broken, 4)
+		local text = table.concat(problems, "\n")
+		for _, expected in
+			{
+				"5 parts",
+				"unknown shape cone",
+				"cylinder must be circular",
+				"unknown material Plastic",
+				"colour must be",
+				"face role",
+				"unknown role fin",
+				"smaller than",
+				"transparency",
+				"two eyes",
+			}
+		do
+			if string.find(text, expected, 1, true) == nil then
+				error(`expected a problem mentioning "{expected}", got:\n{text}`)
+			end
+		end
+		local floating = model(withEyes({
+			{ "Body", "sphere", { 1, 1, 1 }, { 0, 0.8, 0 }, { 0, 0, 0 }, "#FFFFFF", "SmoothPlastic", "body" },
+		}))
+		local floatingText = table.concat(CreatureRecipe.validateImported(floating, 10), " ")
+		T.expect(string.find(floatingText, "stand on y = 0", 1, true) ~= nil).toBe(true)
+		local noBody = model(withEyes({
+			{ "Torso", "sphere", { 1, 1, 1 }, { 0, 0.5, 0 }, { 0, 0, 0 }, "#FFFFFF", "SmoothPlastic", "body" },
+		}))
+		local noBodyText = table.concat(CreatureRecipe.validateImported(noBody, 10), " ")
+		T.expect(string.find(noBodyText, "exactly one part called Body", 1, true) ~= nil).toBe(true)
 	end)
 end)
 

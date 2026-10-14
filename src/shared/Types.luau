@@ -187,6 +187,14 @@ export type CreatureLook = {
 	toppings: { LookTopping }, -- may be empty
 }
 
+-- A polished Snackling model imported from Claude Design (Config/CreatureParts, Logic/CreatureRecipe.compileImported).
+export type ImportedModel = {
+	scale: number, -- studs per design unit at rarity scale 1
+	-- { name, shape, size {x, y, z}, position {x, y, z}, rotation {x, y, z} degrees, color, material, role,
+	-- transparency? }
+	parts: { { any } },
+}
+
 -- Config: mutations (rare variants of any creature) --------------------------------------------------------------
 
 -- How a mutation changes a model, on top of its rarity flair. Applied to every visible part except the face
