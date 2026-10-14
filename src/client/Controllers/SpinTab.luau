@@ -134,7 +134,7 @@ function SpinTab.build(content: Frame): (state: Types.ClientState) -> ()
 	UiKit.new("Frame", {
 		Name = "Marker",
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 0),
+		Position = UDim2.fromScale(0.5, 0),
 		Size = UDim2.new(0, 4, 1, 0),
 		BackgroundColor3 = UiTheme.palette("gold"),
 		ZIndex = 3,
