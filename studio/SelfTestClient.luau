@@ -4,8 +4,11 @@
 	studio/SelfTest.luau).
 
 	  1. Press Play and wait for the HUD. (To try a phone: Test > Device, e.g. an iPhone in landscape, before Play.)
-	  2. Switch the Command Bar to Client, paste this whole file and press Enter.
-	  3. A few seconds later, read the lines starting "SELFTEST client" at the end of the Output.
+	  2. Put the Command Bar (View > Command Bar) on the client: until you pick a side it runs in Studio's edit view.
+	     The Test tab's view button does it (Toggle Client View / Toggle Server View: its name flips each click).
+	  3. Paste this whole file into the Command Bar and press Enter (the file itself: HttpService can't fetch on the
+	     client). If it ran on the wrong side it says so in one line: click the view button and paste again.
+	  4. A few seconds later, read the lines starting "SELFTEST client" at the end of the Output.
 
 	It measures the real HUD as Roblox drew it: every frame HudController places (each carries its layout id as the
 	attribute HudId) and the TAG button, by AbsolutePosition and AbsoluteSize, against where Logic/ScreenLayout puts
@@ -33,11 +36,13 @@ local SETTLE_TRIES = 6 -- an element mid pop-in or pulse is measured again, 0.2 
 
 type Rect = { x: number, y: number, w: number, h: number }
 
+-- "SELFTEST client <text>" (or "SELFTEST client: ..." when `text` starts with a colon), as a warning when it failed.
 local function line(text: string, failed: boolean)
+	local full = if string.sub(text, 1, 1) == ":" then PREFIX .. text else `{PREFIX} {text}`
 	if failed then
-		warn(`{PREFIX} {text}`)
+		warn(full)
 	else
-		print(`{PREFIX} {text}`)
+		print(full)
 	end
 end
 
@@ -65,11 +70,13 @@ end
 
 local function main()
 	if not RunService:IsRunning() then
-		print(`{PREFIX}: press Play first, then paste this into the Command Bar with it set to Client.`)
+		print(
+			`{PREFIX}: this ran in Studio's edit view. Press Play, pick the client view (Test tab), then paste again.`
+		)
 		return
 	end
 	if not RunService:IsClient() then
-		print(`{PREFIX}: the Command Bar is on Server: switch it to Client (studio/SelfTest.luau is the Server one).`)
+		print(`{PREFIX}: this ran on the server view. Click Test > Toggle Client View, then paste again.`)
 		return
 	end
 	local player = Players.LocalPlayer
@@ -321,8 +328,8 @@ local function main()
 	local labels, smallest = 0, math.huge
 	for _, id in ids do
 		local object = placed[id]
-		if not visible(object) then
-			continue
+		if id == "actionArea" or not visible(object) then
+			continue -- (the action area only holds TAG, which is checked as itself)
 		end
 		local candidates: { Instance } = { object }
 		for _, descendant in object:GetDescendants() do
@@ -390,7 +397,7 @@ local function main()
 		#textProblems > 0
 	)
 
-	line(` DONE: {#problems} problem(s), {#warnings} warning(s)`, #problems > 0)
+	line(`DONE: {#problems} problem(s), {#warnings} warning(s)`, #problems > 0)
 	for index = 1, math.min(3, #problems) do
 		line(`  {index}. {problems[index]}`, true)
 	end

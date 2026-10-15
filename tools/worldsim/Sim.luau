@@ -932,15 +932,18 @@ function TextService.FilterStringAsync(_self: any, text: string, _fromUserId: nu
 	return result
 end
 
--- LogService: MessageOut(message, messageType) for everything the game prints or warns (see `globals` below), and for
--- whatever a test logs with Sim.log (e.g. an error the engine would print).
+-- LogService: MessageOut(message, messageType) fires for everything the game prints or warns (see `globals` below)
+-- and for whatever a test logs with Sim.log (e.g. an error the engine would print); GetLogHistory returns all of it,
+-- oldest first, as { message, messageType, timestamp } like Roblox's.
 Sim.logOut = Sim.signal()
+Sim.logHistory = {} :: { { message: string, messageType: any, timestamp: number } }
 function Sim.log(text: string, messageType: any)
+	table.insert(Sim.logHistory, { message = text, messageType = messageType, timestamp = os.time() })
 	Sim.logOut:Fire(text, messageType)
 end
 local LogService: any = { MessageOut = Sim.logOut }
 function LogService.GetLogHistory(_self: any): { any }
-	return {}
+	return table.clone(Sim.logHistory)
 end
 
 local serviceStubs: { [string]: any } = {
@@ -1124,13 +1127,13 @@ local globals: { [string]: any } = {
 	end,
 	print = function(...: any)
 		realPrint(...)
-		Sim.logOut:Fire(joinArgs(...), roblox.Enum.MessageType.MessageOutput)
+		Sim.log(joinArgs(...), roblox.Enum.MessageType.MessageOutput)
 	end,
 	warn = function(...: any)
 		local text = joinArgs(...)
 		table.insert(Sim.warnings, text)
 		realPrint(`[warn] {text}`)
-		Sim.logOut:Fire(text, roblox.Enum.MessageType.MessageWarning)
+		Sim.log(text, roblox.Enum.MessageType.MessageWarning)
 	end,
 }
 

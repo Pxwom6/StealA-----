@@ -12,9 +12,12 @@
 	run(runner):
 	  1. Refuses outside Studio, with Studio API access on (the game would save what the test makes happen into real
 	     data: a map played on, coins picked up), when the services aren't the running game's, or when a run is going.
-	  2. Captures LogService.MessageOut for the whole run: every Error and Warning, and other output with "error" in
-	     it. An error or a warning logged while a section runs counts against it, as in the offline tests (the game's
-	     loops turn the errors they catch into warnings). Its own lines start with "SELFTEST" and are left out.
+	  2. Reads what the server logged before the test (LogService:GetLogHistory: since the server started, or since the
+	     last run): an error is a problem, a warning a warning. Then captures LogService.MessageOut for the whole run:
+	     every Error and Warning, and other output with "error" in it. An error or a warning logged while a section runs
+	     counts against it, as in the offline tests (the game's loops turn the errors they catch into warnings). What
+	     Studio logs with API access off that says nothing about the game (Kit.STUDIO_NOISE) is listed apart and never
+	     counted; its own lines start with "SELFTEST" and are left out.
 	  3. Runs the sections in pcall, timed, each printing `SELFTEST <section>: ok|FAIL <short detail>`: Assets, Maps,
 	     Modifiers, Events, Snacklings, Remotes, Players (SelfTest/*.luau). A running modifier is ended first.
 	  4. Puts the session back (each section's clean-up steps, in reverse): the first map, modifiers and events ended,
@@ -45,8 +48,9 @@ SelfTest.PREFIX = "SELFTEST"
 SelfTest.REPORT_NAME = "SelfTestReport"
 
 local PREFIX = SelfTest.PREFIX
-local MAX_MESSAGES = 300 -- captured messages kept for the report
+local MAX_MESSAGES = 300 -- logged messages kept for the report
 local SUMMARY_PROBLEMS = 3 -- problems listed under the DONE line
+local BEFORE = "Before the test"
 
 local SECTIONS: { Kit.Section } = {
 	require(script.Assets),
@@ -67,8 +71,11 @@ SelfTest.DEFAULTS = table.freeze({
 })
 
 type Entry = { section: string, text: string }
+type LogEntry = { message: string, messageType: Enum.MessageType, timestamp: number }
 
 local running = false
+-- The last log entry a run saw, so the next run reads only what came after it.
+local lastSeen: { message: string, timestamp: number }? = nil
 
 local function attributeNumber(runner: Instance?, name: string, default: number): number
 	local value = if runner then runner:GetAttribute(name) else nil
@@ -128,10 +135,40 @@ local function refusal(): string?
 		return "Studio API access is on, so the game would save to real data. Game Settings > Security: turn off "
 			.. "Enable Studio Access to API Services, then Play and paste studio/SelfTest.luau again."
 	elseif not liveServices() then
-		return "these are not the running game's services. Start it with studio/SelfTest.luau in the Command Bar "
-			.. "(Server) during Play, not by requiring this module."
+		return "these are not the running game's services. Start it by pasting studio/SelfTest.luau into the Command "
+			.. "Bar on the server view (Test > Toggle Server View) during Play, not by requiring this module."
 	end
 	return nil
+end
+
+local function logHistory(): { LogEntry }
+	local ok, entries = pcall(function(): any
+		return LogService:GetLogHistory()
+	end)
+	return if ok and type(entries) == "table" then entries :: { LogEntry } else {}
+end
+
+-- What the server logged since the last run (everything, the first time).
+local function unseenHistory(): { LogEntry }
+	local entries = logHistory()
+	local first = 1
+	local seen = lastSeen
+	if seen then
+		for index = #entries, 1, -1 do
+			local entry = entries[index]
+			if entry.message == seen.message and entry.timestamp == seen.timestamp then
+				first = index + 1
+				break
+			end
+		end
+	end
+	return table.move(entries, first, #entries, 1, {})
+end
+
+local function rememberLastSeen()
+	local entries = logHistory()
+	local last = entries[#entries]
+	lastSeen = if last then { message = last.message, timestamp = last.timestamp } else nil
 end
 
 local function writeReport(text: string)
@@ -160,11 +197,14 @@ local function runAll(options: Kit.Options)
 	local warnings: { Entry } = {}
 	local notes: { Entry } = {}
 	local messages: { Kit.Message } = {}
+	local noise: { Entry } = {}
+	local repeats: { [string]: number } = {} -- before the test: how often each message came
 	local dropped = 0
 	local cleanups: { () -> () } = {}
-	local current = "Start"
+	local current = BEFORE
 
-	local connection = LogService.MessageOut:Connect(function(message: string, messageType: Enum.MessageType)
+	-- One logged message: left out (own lines, noise to its own list), or kept under the section running now.
+	local function record(message: string, messageType: Enum.MessageType)
 		if string.sub(message, 1, #PREFIX) == PREFIX then
 			return
 		end
@@ -179,12 +219,32 @@ local function runAll(options: Kit.Options)
 		if kind == nil then
 			return
 		end
+		local text = Kit.short(message, 300)
+		if Kit.isStudioNoise(message) then
+			if #noise < MAX_MESSAGES then
+				table.insert(noise, { section = current, text = `{kind}: {text}` })
+			end
+			return
+		end
+		if current == BEFORE then
+			local key = `{kind}|{text}`
+			if repeats[key] then
+				repeats[key] += 1
+				return
+			end
+			repeats[key] = 1
+		end
 		if #messages >= MAX_MESSAGES then
 			dropped += 1
 			return
 		end
-		table.insert(messages, { text = Kit.short(message, 300), kind = kind, section = current, handled = false })
-	end)
+		table.insert(messages, { text = text, kind = kind, section = current, handled = false })
+	end
+
+	for _, entry in unseenHistory() do
+		record(entry.message, entry.messageType)
+	end
+	local connection = LogService.MessageOut:Connect(record)
 
 	local function contextFor(name: string): Kit.Context
 		return {
@@ -223,23 +283,30 @@ local function runAll(options: Kit.Options)
 	end
 
 	-- Whatever was logged under `name` and not taken: errors and warnings are its problems, other output a warning.
+	-- Before the test only an error is a problem: the warnings came from playing, not from anything the test did.
 	local function settle(name: string)
 		local ctx = contextFor(name)
 		for _, message in messages do
 			if message.section == name and not message.handled then
 				message.handled = true
+				local count = repeats[`{message.kind}|{message.text}`] or 1
+				local text = if count > 1 then `{message.text} (x{count})` else message.text
 				if message.kind == "output" then
-					ctx.warning(`logged: {message.text}`)
+					ctx.warning(`logged: {text}`)
+				elseif message.kind == "warning" and name == BEFORE then
+					ctx.warning(`warning: {text}`)
 				else
-					ctx.problem(`{message.kind}: {message.text}`)
+					ctx.problem(`{message.kind}: {text}`)
 				end
 			end
 		end
 	end
+	settle(BEFORE)
 
 	local startMap = MapThemeService.current()
 	local startSeason = SeasonService.currentTheme()
 	local startCtx = contextFor("Start")
+	current = "Start"
 	local runningModifier = ModifierService.current()
 	if runningModifier then
 		Kit.endModifier()
@@ -251,7 +318,8 @@ local function runAll(options: Kit.Options)
 			table.insert(chosen, section)
 		end
 	end
-	print(`{PREFIX}: started, {#chosen} sections (about 2 minutes). The summary ends with "{PREFIX} DONE".`)
+	local length = if #chosen == #SECTIONS then ", about 2 minutes" else ""
+	print(`{PREFIX}: started ({#chosen} section(s){length}). The summary ends with "{PREFIX} DONE".`)
 
 	local lines: { string } = {}
 	for _, section in chosen do
@@ -311,9 +379,8 @@ local function runAll(options: Kit.Options)
 
 	-- The summary: at most 12 lines, the verdict and the first problems last.
 	local total = seconds(os.clock() - started)
-	print(
-		`{PREFIX} ===== summary: {#lines} sections in {total}; full report: ServerStorage.{SelfTest.REPORT_NAME} =====`
-	)
+	local ignored = if #noise > 0 then `, {#noise} Studio message(s) ignored` else ""
+	print(`{PREFIX} ===== summary: {#lines} sections in {total}{ignored}; report: ServerStorage.{SelfTest.REPORT_NAME}`)
 	for _, line in lines do
 		if string.find(line, ": FAIL ", 1, true) then
 			warn(line)
@@ -367,17 +434,21 @@ local function runAll(options: Kit.Options)
 	block("Notes", notes)
 	if #messages > 0 then
 		table.insert(report, "")
-		table.insert(report, `Logged during the test ({#messages}: errors, warnings and output with "error"):`)
+		table.insert(report, `Logged by the server ({#messages}: errors, warnings and output with "error"):`)
 		for _, message in messages do
 			table.insert(report, `  [{message.section}] {message.kind}: {message.text}`)
 		end
 	end
+	block("Studio messages left out (expected with Studio API access off; not counted)", noise)
 	writeReport(table.concat(report, "\n"))
 end
 
 -- Runs the whole self-test (see the header). `runner` is the Script studio/SelfTest.luau made: its attributes may
 -- change the timings. Never throws.
 function SelfTest.run(runner: Instance?)
+	if runner then
+		runner:SetAttribute("Started", true) -- the paste watches for it
+	end
 	local reason = refusal()
 	if reason then
 		print(`{PREFIX}: {reason}`)
@@ -385,6 +456,7 @@ function SelfTest.run(runner: Instance?)
 	end
 	running = true
 	local ok, err = pcall(runAll :: (Kit.Options) -> ...any, optionsFrom(runner))
+	rememberLastSeen()
 	running = false
 	if not ok then
 		warn(`{PREFIX} DONE: the self-test itself failed: {Kit.short(tostring(err), 300)}`)

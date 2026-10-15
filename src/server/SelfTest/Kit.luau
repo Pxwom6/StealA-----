@@ -55,6 +55,26 @@ export type Context = {
 
 export type Section = { name: string, run: (ctx: Context) -> string }
 
+-- What Studio logs, with Studio API access off, that says nothing about the game: DataStore requests refused, Roblox's
+-- own CorePackages, and PlayerLifecycle's Max Players warning (a Studio test server has its own Max Players; the live
+-- place's is 8). Lower case, found anywhere in a message. The report lists them apart and nothing counts them.
+Kit.STUDIO_NOISE = table.freeze({
+	"studioaccesstoapisnotallowed",
+	"studio access to api",
+	"corepackages",
+	"[playerlifecycle] max players is",
+})
+
+function Kit.isStudioNoise(text: string): boolean
+	local lower = string.lower(text)
+	for _, pattern in Kit.STUDIO_NOISE do
+		if string.find(lower, pattern, 1, true) then
+			return true
+		end
+	end
+	return false
+end
+
 -- One line of at most `max` characters (default 160).
 function Kit.short(text: string, max: number?): string
 	local line = string.gsub(string.gsub(text, "%s+", " "), "^ ", "")

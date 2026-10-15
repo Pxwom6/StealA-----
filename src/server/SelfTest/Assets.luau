@@ -254,13 +254,28 @@ local Assets: Kit.Section = {
 		while not allDone() and os.clock() < deadline do
 			task.wait(0.05)
 		end
-		local failed: { string } = {}
+		local failed: { Asset } = {}
+		local builtIn, builtInLoaded = 0, 0
 		for _, asset in assets do
-			local status = asset.status or `TimedOut (no answer in {ctx.options.assetTimeoutSeconds} s)`
-			if status ~= "Success" then
+			asset.status = asset.status or `TimedOut (no answer in {ctx.options.assetTimeoutSeconds} s)`
+			if asset.status ~= "Success" then
+				table.insert(failed, asset)
+			end
+			if string.sub(asset.id, 1, 11) == "rbxasset://" then
+				builtIn += 1
+				builtInLoaded += if asset.status == "Success" then 1 else 0
+			end
+		end
+		if #failed == #assets and #assets > 1 and builtIn > 0 and builtInLoaded == 0 then
+			-- Not even the files that ship with Roblox: it is the request, not the assets.
+			ctx.problem(
+				`nothing loaded, not even Roblox's own files: ContentProvider can't fetch here ({failed[1].id}: `
+					.. `{failed[1].status}; see the Output)`
+			)
+		else
+			for _, asset in failed do
 				local more = if asset.places > 1 then ` (+{asset.places - 1} more uses)` else ""
-				ctx.problem(`{asset.key} {asset.id}: {status}{more}`)
-				table.insert(failed, asset.id)
+				ctx.problem(`{asset.key} {asset.id}: {asset.status}{more}`)
 			end
 		end
 		-- What the engine logged about the assets it couldn't load says the same as the lines above.

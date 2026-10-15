@@ -75,15 +75,17 @@ local Section: Kit.Section = {
 			local ok, info = pcall(function(): any
 				return PolicyService:GetPolicyInfoForPlayerAsync(player)
 			end)
-			local allowed = PaidRandomItems.allowedByPolicy(ok, info)
-			if ok then
-				answered += 1
-			else
+			if not ok then
+				-- Studio may not answer. The code counts that as restricted, so either published value is one the
+				-- code made: true from an earlier answer, false from a failed lookup.
 				failed += 1
 				ctx.note(`PolicyService failed for {player.Name} (counts as restricted): {Kit.short(tostring(info))}`)
+				continue
 			end
+			answered += 1
+			local allowed = PaidRandomItems.allowedByPolicy(true, info)
 			if published ~= allowed then
-				if ok and published == false then
+				if published == false then
 					ctx.warning(
 						`{player.Name}: PolicyService answers now, but the join lookup failed (a retry publishes it)`
 					)

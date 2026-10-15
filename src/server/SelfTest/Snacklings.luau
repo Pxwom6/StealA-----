@@ -8,8 +8,9 @@
 	billboard) and, plain, stays inside its rarity's part budget; a mutated one carries its look (the Variant attribute
 	and its particle preset). Every model is destroyed straight after it is measured.
 
-	Sizes are measured like Logic/CreatureRecipe's own (the box of each part, a Ball as round), leaving out the Root and
-	the rarity's aura ring, so a number here can be compared with the CI check's.
+	Sizes are measured like Logic/CreatureRecipe.compileImported's own (each part by its real shape: an ellipsoid or a
+	cylinder exactly, a wedge by its corners, a box by its box), leaving out the Root and the rarity's aura ring, so a
+	number here can be compared with the CI check's.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -30,7 +31,57 @@ local SPACING = 12 -- studs between test models
 type Job = { def: Types.CreatureDef, mutation: Types.MutationDef?, label: string }
 type Measure = { lowest: number, height: number, width: number }
 
--- The model's extents from its feet, like CreatureRecipe's: lowest and highest point, and width side to side.
+-- A wedge's corners in its own space (half sizes): the bottom face and the top edge at the back (+Z).
+local WEDGE_CORNERS = {
+	Vector3.new(-1, -1, -1),
+	Vector3.new(1, -1, -1),
+	Vector3.new(-1, -1, 1),
+	Vector3.new(1, -1, 1),
+	Vector3.new(-1, 1, 1),
+	Vector3.new(1, 1, 1),
+}
+
+local function isEllipsoid(part: BasePart): boolean
+	local mesh = part:FindFirstChildOfClass("SpecialMesh")
+	return mesh ~= nil and mesh.MeshType == Enum.MeshType.Sphere
+end
+
+-- How far `part` reaches from its centre along world X and Y (low and high), by its real shape, as
+-- CreatureRecipe's import measures it.
+local function reach(part: BasePart): (number, number, number, number)
+	local size = part.Size
+	local hx, hy, hz = size.X / 2, size.Y / 2, size.Z / 2
+	local _, _, _, r00, r01, r02, r10, r11, r12 = part.CFrame:GetComponents()
+	if part:IsA("WedgePart") then
+		local lowX, highX, lowY, highY = math.huge, -math.huge, math.huge, -math.huge
+		for _, corner in WEDGE_CORNERS do
+			local x = r00 * corner.X * hx + r01 * corner.Y * hy + r02 * corner.Z * hz
+			local y = r10 * corner.X * hx + r11 * corner.Y * hy + r12 * corner.Z * hz
+			lowX, highX = math.min(lowX, x), math.max(highX, x)
+			lowY, highY = math.min(lowY, y), math.max(highY, y)
+		end
+		return lowX, highX, lowY, highY
+	end
+	local shape = if part:IsA("Part") then part.Shape else nil
+	local ex, ey
+	if shape == Enum.PartType.Ball then
+		ex, ey = hx, hx
+	elseif shape == Enum.PartType.Cylinder then
+		-- along its X, round in Y and Z
+		local radius = math.min(hy, hz)
+		ex = math.abs(r00) * hx + radius * math.sqrt(math.max(0, 1 - r00 * r00))
+		ey = math.abs(r10) * hx + radius * math.sqrt(math.max(0, 1 - r10 * r10))
+	elseif isEllipsoid(part) then
+		ex = math.sqrt((r00 * hx) ^ 2 + (r01 * hy) ^ 2 + (r02 * hz) ^ 2)
+		ey = math.sqrt((r10 * hx) ^ 2 + (r11 * hy) ^ 2 + (r12 * hz) ^ 2)
+	else
+		ex = math.abs(r00) * hx + math.abs(r01) * hy + math.abs(r02) * hz
+		ey = math.abs(r10) * hx + math.abs(r11) * hy + math.abs(r12) * hz
+	end
+	return -ex, ex, -ey, ey
+end
+
+-- The model's extents from its feet: lowest and highest point, and width side to side.
 local function measure(model: Model): Measure?
 	local root = model.PrimaryPart
 	if root == nil then
@@ -43,19 +94,11 @@ local function measure(model: Model): Measure?
 		if not part:IsA("BasePart") or part == root or part.Name == "Aura" or part.Transparency >= 1 then
 			continue
 		end
-		local cf, size = part.CFrame, part.Size
-		local hx, hy, hz = size.X / 2, size.Y / 2, size.Z / 2
-		local ex, ey
-		if part:IsA("Part") and part.Shape == Enum.PartType.Ball then
-			ex, ey = hx, hx
-		else
-			local _, _, _, r00, r01, r02, r10, r11, r12 = cf:GetComponents()
-			ex = math.abs(r00) * hx + math.abs(r01) * hy + math.abs(r02) * hz
-			ey = math.abs(r10) * hx + math.abs(r11) * hy + math.abs(r12) * hz
-		end
-		lowest = math.min(lowest, cf.Y - ey)
-		highest = math.max(highest, cf.Y + ey)
-		wide = math.max(wide, math.abs(cf.X - centreX) + ex)
+		local position = part.Position
+		local lowX, highX, lowY, highY = reach(part)
+		lowest = math.min(lowest, position.Y + lowY)
+		highest = math.max(highest, position.Y + highY)
+		wide = math.max(wide, math.abs(position.X - centreX + lowX), math.abs(position.X - centreX + highX))
 	end
 	if lowest > highest then
 		return nil

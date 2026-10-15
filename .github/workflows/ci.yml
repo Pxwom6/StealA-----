@@ -80,6 +80,9 @@ jobs:
       - name: Cosmetics test (titles, base skins and What's New through the real remotes, offline)
         run: lune run tools/worldsim/cosmetics.luau
 
+      - name: Studio self-test, offline (the Command Bar paste on the offline server, the HUD check on a stand-in HUD)
+        run: lune run tools/selfTestOffline.luau
+
       - name: Studio sync script test (pulls this checkout into Rojo-built places offline)
         run: |
           mkdir -p build

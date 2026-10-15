@@ -69,8 +69,10 @@ local function differences(before: { [string]: string }, now: { [string]: string
 	return list
 end
 
--- The decoration MapBuilder adds outside the scenery (plot trims, belt chevrons, board frames): visible parts that
--- never collide, are never touched and are invisible to raycasts. It never changes when the map does.
+-- The decoration MapBuilder adds outside the scenery (plot trims, pad rings, belt chevrons, board frames), which its
+-- budget counts with the scenery: the parts that never collide, are never touched and are invisible to raycasts,
+-- hidden ones too, but for each plot's Dome (the lock's force field, a gameplay part built the same way). It never
+-- changes when the map does.
 local function decorationOutsideScenery(map: Instance): number
 	local scenery = map:FindFirstChild("Scenery")
 	local skip = creatureParts(map)
@@ -83,7 +85,7 @@ local function decorationOutsideScenery(map: Instance): number
 			and not descendant.CanCollide
 			and not descendant.CanTouch
 			and not descendant.CanQuery
-			and descendant.Transparency < 1
+			and descendant.Name ~= "Dome"
 		then
 			count += 1
 		end
@@ -194,7 +196,7 @@ local Maps: Kit.Section = {
 		if fewest > most then
 			return `{#order} maps`
 		end
-		return `{#order} maps, scenery {fewest}-{most} parts (+{decoration} on the plots) of {Scenery.partBudget}`
+		return `{#order} maps, decoration {fewest + decoration}-{most + decoration} parts of {Scenery.partBudget}`
 	end,
 }
 
