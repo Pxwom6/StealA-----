@@ -102,7 +102,9 @@ ScreenLayout.SIZE = table.freeze({
 	event = { w = 220, h = 58 }, -- event pill: the banner (two lines) over its countdown
 	modifier = { w = 165, h = 52 }, -- the running modifier: a button (tap for its description)
 	luck = { w = 165, h = 30 }, -- server luck
-	corner = { button = 52, lock = 104, gap = 8, top = 4 },
+	-- `badge`: the "+20%" tag under the Friends button (SocialController), centred, from `rise` above the button's
+	-- bottom edge; it ends where the status band starts (under the cash pill), so it never reaches into it
+	corner = { button = 52, lock = 104, gap = 8, top = 4, badge = { w = 54, h = 18, rise = 6 } },
 	side = { w = 76, h = 52, gap = 6, tightGap = 2, columns = 2, left = 10 },
 	tag = { size = 120, pad = 15, right = 24, bottom = 185 }, -- right / bottom: from the HUD's edges
 	-- The round gadget buttons around TAG (GadgetController): `gap` between them and from TAG, at least `clear` from
@@ -396,6 +398,12 @@ function ScreenLayout.cornerRow(device: Device, widths: { number }): ({ Rect }, 
 	return rects, moved and #widths > 0
 end
 
+-- The "+20%" tag hanging under the Friends button `button` (while friends or the group give a bonus).
+function ScreenLayout.friendsBadge(button: Rect): Rect
+	local B = ScreenLayout.SIZE.corner.badge
+	return rect(button.x + (button.w - B.w) / 2, button.y + button.h - B.rise, B.w, B.h)
+end
+
 -- The 2x2 grid of feature buttons (Shop, Rebirth, Rewards, Snackdex): under Roblox's top-left buttons (and under the
 -- corner row when it moved there), so the bottom-left stays the thumbstick's. Where the room between the top bar and
 -- the thumbstick is short (a 320 px tall phone with a home indicator) the grid tightens, down to `tightGap` above and
@@ -407,7 +415,7 @@ function ScreenLayout.sideGrid(device: Device, count: number, cornerMoved: boole
 	local columns = math.min(S.columns, math.max(1, count))
 	local top, between = device.topBar + C.top, S.gap
 	if cornerMoved then
-		top += C.button + S.gap
+		top += C.button + (C.badge.h - C.badge.rise) + S.gap -- clear of the Friends button's "+20%" too
 	else
 		local thumb = ScreenLayout.thumbstickArea(device)
 		local room = if thumb then thumb.y - device.topBar - rows * S.h else math.huge
@@ -576,7 +584,7 @@ end
 -- every gadget (SIZE.gadget.slots):
 --   1. one row under TAG, from its right edge leftwards
 --   2. that row, then a column left of TAG from its bottom upwards
---   3. that row, then a row over TAG
+--   3. that row, then a row over TAG (or over its right half, past the Friends button's "+20%" hanging there)
 --   4. a 2x2 block left of TAG, bottom row first (beside a big jump button, as on tablets)
 --   5. a column left of TAG
 -- Every slot is a full touch target, stays `clear` away from everything the HUD can show there (gadgetReserved) and at
@@ -612,15 +620,15 @@ function ScreenLayout.gadgetSlots(device: Device, count: number): { Rect }
 		end
 		return clearOf(r, reserved, clear) and clearOf(r, taken, clear)
 	end
-	-- How many buttons fit in a row at height y beside TAG, and the row's right end: TAG's right edge when that leaves
-	-- room for `want` of them.
-	local function rowSpan(y: number, want: number): (number, number)
-		local left, right = ScreenLayout.lane(device, reserved, y - clear, y + size + clear, cx)
+	-- How many buttons fit in a row at height y beside TAG (in the free lane around x `at`, TAG's middle unless given),
+	-- and the row's right end: TAG's right edge when that leaves room for `want` of them.
+	local function rowSpan(y: number, want: number, at: number?): (number, number)
+		local left, right = ScreenLayout.lane(device, reserved, y - clear, y + size + clear, at or cx)
 		local n = math.max(0, math.min(want, math.floor((right - left + gap) / (size + gap))))
 		return n, math.clamp(tag.x + tag.w, left + n * (size + gap) - gap, math.max(right, left))
 	end
-	local function row(y: number, want: number, into: { Rect })
-		local n, xr = rowSpan(y, want)
+	local function row(y: number, want: number, into: { Rect }, at: number?)
+		local n, xr = rowSpan(y, want, at)
 		for k = 0, n - 1 do
 			table.insert(into, rect(xr - size - k * (size + gap), y, size, size))
 		end
@@ -668,6 +676,12 @@ function ScreenLayout.gadgetSlots(device: Device, count: number): { Rect }
 			local list = {}
 			row(below, underRow, list)
 			row(tag.y - clear - size, total - #list, list) -- a little closer to TAG under a crowded corner row
+			return list
+		end,
+		function()
+			local list = {}
+			row(below, underRow, list)
+			row(tag.y - gap - size, total - #list, list, tag.x + tag.w) -- past the Friends badge over TAG's middle
 			return list
 		end,
 		function()
@@ -860,6 +874,11 @@ function ScreenLayout.layout(device: Device, state: HudState): Layout
 	for index, r in corner do
 		add(ids[index], "button", r)
 		table.insert(obstacles, r)
+		if ids[index] == "friends" then
+			local badge = ScreenLayout.friendsBadge(r)
+			add("friendsBadge", "info", badge, "friends")
+			table.insert(obstacles, badge)
+		end
 	end
 	local grid = ScreenLayout.sideGrid(device, 4, moved)
 	table.insert(obstacles, grid)

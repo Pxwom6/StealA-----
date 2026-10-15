@@ -282,6 +282,31 @@ T.describe("ScreenLayout", function()
 		end
 	end)
 
+	T.it("keeps the Friends button's +20% clear of the gadgets and the band, its text readable (review 2)", function()
+		-- on the 640 x 360 phone gadget 4 sat over TAG right where the tag hangs; it now goes past it
+		local slots = ScreenLayout.gadgetSlots(ScreenLayout.device(spec("640x360 phone")), #Gadgets.order)
+		T.expect(#slots).toBe(#Gadgets.order)
+		for _, entry in ScreenLayout.DEVICES do
+			local device = ScreenLayout.device(entry)
+			local layout = ScreenLayout.layout(device, { friends = true, event = true, modifier = true, tag = true })
+			local friends, badge = layout.byId.friends, layout.byId.friendsBadge
+			T.expect(badge).toEqual(ScreenLayout.friendsBadge(friends))
+			T.expect(badge.y + badge.h).toBeGreaterThan(friends.y + friends.h) -- it hangs under the button
+			for _, r in ScreenLayout.gadgetSlots(device, #Gadgets.order) do
+				T.expect(ScreenLayout.overlaps(r, badge)).toBe(false)
+			end
+			if not layout.cornerMoved then
+				T.expect(badge.y + badge.h).toBeAtMost(ScreenLayout.bandTop(device) + 1e-9)
+			end
+			T.expect(layout.byId.friendsBadge ~= nil).toBe(true)
+		end
+		T.expect(ScreenLayout.layout(ScreenLayout.device(spec("640x360 phone")), {}).byId.friendsBadge).toBeNil()
+		-- the biggest bonus (three friends and the group: +40%) at 12 UI or more, in the label SocialController draws
+		local B = S.corner.badge
+		local widest = Format.template(Theme.text.socialBadge, { percent = 40 })
+		T.expect(TextFit.fit(widest, B.w - 6, B.h - 2, false)).toBeAtLeast(TEXT.minSize)
+	end)
+
 	T.it("keeps the gadget buttons away from the jump button and its thumb", function()
 		for _, entry in ScreenLayout.DEVICES do
 			local device = ScreenLayout.device(entry)

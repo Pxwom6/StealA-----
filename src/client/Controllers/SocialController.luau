@@ -39,7 +39,7 @@ local SocialController = {}
 
 local CORNER = ScreenLayout.SIZE.corner
 local ICON = "👥"
-local BADGE_SIZE = Vector2.new(54, 20)
+local BADGE = ScreenLayout.SIZE.corner.badge -- the "+20%" tag's size, and how far it rises into the button
 
 local localPlayer = Players.LocalPlayer
 local groupEnabled = SocialRules.groupEnabled(Social.group)
@@ -261,13 +261,13 @@ function SocialController.start()
 	badge = UiKit.new("Frame", {
 		Name = "Bonus",
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 1, -4),
-		Size = UDim2.fromOffset(BADGE_SIZE.X, BADGE_SIZE.Y),
+		Position = UDim2.new(0.5, 0, 1, -BADGE.rise),
+		Size = UDim2.fromOffset(BADGE.w, BADGE.h),
 		BackgroundColor3 = UiTheme.palette("success"),
 		Visible = false,
 		Parent = button,
 	}) :: Frame
-	UiKit.corner(BADGE_SIZE.Y / 2).Parent = badge
+	UiKit.corner(BADGE.h / 2).Parent = badge
 	UiKit.stroke(2).Parent = badge
 	badgeLabel = UiKit.label({
 		Size = UDim2.new(1, -6, 1, -2),
