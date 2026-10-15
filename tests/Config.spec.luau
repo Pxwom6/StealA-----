@@ -178,6 +178,11 @@ local RELEASED_MUTATION_IDS = {
 	"porcelain",
 	"syrupy",
 	"maple", -- Harvest Feast 2026 (event-only)
+	-- map signatures of the four maps after Pancake Peaks
+	"nectar",
+	"gumdrop",
+	"lantern",
+	"barbecue",
 }
 
 T.describe("Config integrity", function()
