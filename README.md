@@ -313,11 +313,13 @@ both); BALANCE.md has the numbers. Studio: `/playtime <minutes>` unlocks gifts, 
 
 ### Achievements
 
-The Rewards panel's **Trophies** tab lists 25 achievements (buying, stealing, the Snackdex, rarities, mutations,
-earnings, rebirths, maps, the Lucky Spin) with progress bars. Each pays once per account the moment it is reached
-(cash sized from income, Lucky Spins or a lucky Snackling) with a toast; nothing to claim. They are counted from what
-the save already keeps, and marked with flags (`ach_<id>`, plus `map_<id>` for maps played on), so there is no
-save-format change.
+The Rewards panel's **Trophies** tab lists 53 achievements (buying, stealing and being robbed, the Snackdex and its
+tiers, limited Snacklings, rarities, mutations, earnings and income, rebirths, maps, the Lucky Spin, time played, the
+daily streak, redeem codes, and the server modifiers: a Supply Crate, a runaway, a Snack Attack giant) with progress
+bars. Each pays once per account the moment it is reached (cash sized from income, Lucky Spins or a lucky Snackling)
+with a toast; nothing to claim. They are counted from what the save already keeps, and marked with flags (`ach_<id>`,
+plus `map_<id>` for maps played on and `did_<milestone>` for the one-off things no counter keeps, recorded from the
+release that added them), so there is no save-format change.
 
 * **Add one** in `src/shared/Config/Achievements.luau`; CI checks it and keeps a list of shipped ids (never rename
   one: it would pay again).

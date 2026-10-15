@@ -13,6 +13,9 @@
 	  steal         a steal was delivered (creatureId, variant)                       StealService
 	  discover      a new Snackdex entry: a new Snackling, or a new mutation of one   SnackdexService
 	                (creatureId, variant)
+	  milestone     something an achievement asks for once (milestone: an id of       DropService, BossService
+	                AchievementRules.MILESTONES): a crate opened, a runaway caught,
+	                a Snack Attack takedown shared or led
 
 	Listeners run at once, in the order they subscribed (the bootstrap starts TutorialService first), each in its own
 	pcall: a listener's bug can only ever cost that listener, never the gameplay code that emitted the event or the
@@ -23,13 +26,14 @@ local Sessions = require(script.Parent.Sessions)
 
 type Session = Sessions.Session
 
-export type Kind = "beltPurchase" | "acquired" | "collect" | "sell" | "lock" | "steal" | "discover"
+export type Kind = "beltPurchase" | "acquired" | "collect" | "sell" | "lock" | "steal" | "discover" | "milestone"
 
 export type Event = {
 	kind: Kind,
 	creatureId: string?,
 	variant: string?, -- mutation id, nil for a plain Snackling
 	amount: number?, -- cash, for "collect"
+	milestone: string?, -- for "milestone"
 }
 
 export type Listener = (session: Session, event: Event) -> ()

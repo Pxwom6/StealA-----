@@ -4,8 +4,9 @@
 	seconds, and within a second of anything a goal counts (GameEvents: purchases, steals, new Snackdex entries...).
 	An achievement reached for the first time sets its flag ach_<id> before paying, so it pays once per account; its
 	prize goes through PrizeService, a toast says what it was, and its Roblox badge (if it has one) is awarded. The map
-	a player is on is recorded as the flag map_<id> for the map goals. The Trophies tab asks for the progress list
-	(GetAchievements → AchievementSync).
+	a player is on is recorded as the flag map_<id> for the map goals, and each GameEvents "milestone" as the flag
+	did_<milestone> for the milestone goals. The Trophies tab asks for the progress list (GetAchievements →
+	AchievementSync).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -87,7 +88,11 @@ function AchievementService.start()
 	do
 		warn(`[Achievements] config problem: {problem}`)
 	end
-	GameEvents.on("AchievementService", function(session: Session)
+	GameEvents.on("AchievementService", function(session: Session, event: GameEvents.Event)
+		local milestone = event.milestone
+		if event.kind == "milestone" and milestone and AchievementRules.MILESTONES[milestone] then
+			session.data.flags[AchievementRules.milestoneFlagKey(milestone)] = true
+		end
 		pending[session] = true
 	end)
 	Remotes.onIntent("GetAchievements", onGet)

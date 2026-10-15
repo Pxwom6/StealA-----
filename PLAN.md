@@ -245,7 +245,7 @@ type PlayerData = {   -- exactly Types.PlayerData
     flags: { [string]: boolean },  -- onboarding funnel milestones, one-time rewards (`social_groupWelcome`),
                                    -- tutorial progress (`tutorial_<step>`, `tutorial_done`), settings (`settings_<key>`),
                                    -- redeemed codes (`code_<CODE>`), achievements paid (`ach_<id>`),
-                                   -- maps played on (`map_<id>`)
+                                   -- maps played on (`map_<id>`), achievement milestones (`did_<id>`)
     firstJoin: number, lastSeen: number,
     gifts: { day: number, seconds: number, claimed: { number } },  -- playtime gifts today (v4)
     spin: { nextFreeAt: number, spins: number, total: number },     -- the Lucky Spin (v4)

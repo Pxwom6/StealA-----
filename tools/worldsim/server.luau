@@ -226,6 +226,7 @@ local function scenario()
 	check((DropService.counts()) == 0, "holding it open takes the crate")
 	check(#bobSession.data.creatures == bobCreatures + 1, "a Snackling lands in the opener's base")
 	check(bobSession.data.cash > bobCash, "plus some cash")
+	check(bobSession.data.flags.did_crate == true, "and it counts for Crate Cracker")
 	Sim.fireServer(alice, "CrateOpen", crateId)
 	task.wait(0.1)
 	check(#aliceSession.data.creatures == 2, "nobody else gets it")
@@ -311,6 +312,7 @@ local function scenario()
 		"walking into a runaway catches it"
 	)
 	check(runawayCount == 1, "and only that one")
+	check(bobSession.data.flags.did_runaway == true, "catching it counts for Gotcha!")
 	Sim.chat(alice, "/mod off")
 	task.wait(0.2)
 	for _ = 1, 4 do
@@ -370,6 +372,11 @@ local function scenario()
 	check(BossService.current() == nil, `tapping it takes it down ({rounds} taps)`)
 	check(bobSession.data.cash > bobBeforeBoss, "the helper is paid")
 	check(aliceSession.data.cash == aliceBeforeBoss, "and the one who never hit it is not")
+	check(
+		bobSession.data.flags.did_snackAttack == true and bobSession.data.flags.did_snackAttackTop == true,
+		"the takedown counts for Giant Slayer and MVP"
+	)
+	check(aliceSession.data.flags.did_snackAttack == nil, "but not for a player who never hit it")
 
 	-- Northern Lights and Heatwave: their skies, and their mutations only while they run
 	for _, id in { "northernLights", "heatwave" } do
@@ -478,6 +485,11 @@ local function scenario()
 	check(flags.ach_stickyFingers == nil, "Sticky Fingers waits for a steal (Alice never stole)")
 	check(bobSession.data.flags.ach_stickyFingers == nil, "nor Bob: his steal was tagged, so it never landed")
 	check(flags["map_" .. workspace:GetAttribute("MapTheme")] == true, "the current map is recorded")
+	local bobFlags = bobSession.data.flags
+	check(
+		bobFlags.ach_crateCracker and bobFlags.ach_gotcha and bobFlags.ach_giantSlayer and bobFlags.ach_mvp,
+		"Bob's crate, runaway and Snack Attack paid their achievements"
+	)
 	cash = aliceSession.data.cash
 	Sim.server("Services/AchievementService").check(aliceSession)
 	check(aliceSession.data.cash == cash, "nothing pays twice")

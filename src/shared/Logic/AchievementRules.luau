@@ -1,12 +1,18 @@
 --!strict
 --[[
 	Achievement rules (Config/Achievements): how far a player is with each goal, read from what the save already keeps
-	(stats, the Snackdex, rebirths, Lucky Spins, map flags), which ones are done, and validation. A finished one is
-	marked with the flag ach_<id> (no save-format change) and paid once (AchievementService).
+	(stats, the Snackdex, rebirths, Lucky Spins, the daily streak, redeemed codes, map and milestone flags), which ones
+	are done, and validation. A finished one is marked with the flag ach_<id> (no save-format change) and paid once
+	(AchievementService).
+
+	Milestones are things done at least once that no counter keeps (opening a Supply Crate, taking down a Snack Attack
+	giant...): the service where it happens emits a GameEvents "milestone" and AchievementService sets the flag
+	did_<milestone>. They count from the day they shipped (nothing earlier was recorded).
 	Pure: no Roblox APIs.
 ]]
 
 local Types = require("../Types")
+local CodeRules = require("./CodeRules")
 
 type AchievementDef = Types.AchievementDef
 type AchievementsConfig = Types.AchievementsConfig
@@ -15,6 +21,17 @@ local AchievementRules = {}
 
 AchievementRules.FLAG_PREFIX = "ach_"
 AchievementRules.MAP_FLAG_PREFIX = "map_"
+AchievementRules.MILESTONE_FLAG_PREFIX = "did_"
+
+-- The milestones a "milestone" goal can ask for, and where each is recorded.
+AchievementRules.MILESTONES = table.freeze({
+	crate = true, -- opened a Supply Crate (DropService)
+	runaway = true, -- caught a runaway Snackling (DropService)
+	snackAttack = true, -- shared in a Snack Attack takedown: landed its minimum hits (BossService)
+	snackAttackTop = true, -- the top hitter on a Snack Attack giant that went down (BossService)
+} :: { [string]: boolean })
+
+local SECONDS_PER_HOUR = 3600
 
 AchievementRules.GOALS = table.freeze({
 	beltPurchases = true,
@@ -27,6 +44,14 @@ AchievementRules.GOALS = table.freeze({
 	rarity = true,
 	mutations = true,
 	maps = true,
+	stolenFrom = true,
+	income = true,
+	playHours = true,
+	limited = true,
+	tiers = true,
+	streak = true,
+	codes = true,
+	milestone = true,
 } :: { [string]: boolean })
 
 -- What the goals are counted from, gathered once per check (AchievementRules.context).
@@ -42,6 +67,14 @@ export type Context = {
 	bestRarityOrder: number, -- the rarest rarity ever owned (its order), 0 for none
 	mutations: number,
 	maps: number,
+	stolenFrom: number,
+	income: number, -- the best steady income per second ever reached
+	playHours: number, -- fractional
+	limited: number, -- limited (event) Snacklings discovered
+	tiers: number, -- Snackdex tiers completed
+	streak: number,
+	codes: number,
+	milestones: { [string]: boolean }, -- milestone ids done
 }
 
 function AchievementRules.flagKey(id: string): string
@@ -52,13 +85,21 @@ function AchievementRules.mapFlagKey(themeId: string): string
 	return AchievementRules.MAP_FLAG_PREFIX .. themeId
 end
 
+function AchievementRules.milestoneFlagKey(milestone: string): string
+	return AchievementRules.MILESTONE_FLAG_PREFIX .. milestone
+end
+
+local function startsWith(text: string, prefix: string): boolean
+	return string.sub(text, 1, #prefix) == prefix
+end
+
 -- Gathers the counts from a save. `creatures` / `rarities` are the catalog's (by id).
 function AchievementRules.context(
 	data: Types.PlayerData,
 	creatures: { [string]: Types.CreatureDef },
 	rarities: { [string]: Types.RarityDef }
 ): Context
-	local discovered, regularFound, regularTotal, best = 0, 0, 0, 0
+	local discovered, regularFound, regularTotal, best, limited = 0, 0, 0, 0, 0
 	for id, def in creatures do
 		if def.eventId == nil then
 			regularTotal += 1
@@ -76,6 +117,9 @@ function AchievementRules.context(
 			if rarity then
 				best = math.max(best, rarity.order)
 			end
+			if def and def.eventId ~= nil then
+				limited += 1
+			end
 		end
 	end
 	for _, set in data.snackdex.variants do
@@ -85,13 +129,26 @@ function AchievementRules.context(
 			end
 		end
 	end
-	local mutationCount, maps = 0, 0
+	local mutationCount, maps, codes, tiers = 0, 0, 0, 0
 	for _ in mutations do
 		mutationCount += 1
 	end
+	local milestones: { [string]: boolean } = {}
 	for key, value in data.flags do
-		if value and string.sub(key, 1, #AchievementRules.MAP_FLAG_PREFIX) == AchievementRules.MAP_FLAG_PREFIX then
+		if not value then
+			continue
+		end
+		if startsWith(key, AchievementRules.MAP_FLAG_PREFIX) then
 			maps += 1
+		elseif startsWith(key, CodeRules.FLAG_PREFIX) then
+			codes += 1
+		elseif startsWith(key, AchievementRules.MILESTONE_FLAG_PREFIX) then
+			milestones[string.sub(key, #AchievementRules.MILESTONE_FLAG_PREFIX + 1)] = true
+		end
+	end
+	for _, claimed in data.snackdex.tiers do
+		if claimed then
+			tiers += 1
 		end
 	end
 	return {
@@ -106,6 +163,14 @@ function AchievementRules.context(
 		bestRarityOrder = best,
 		mutations = mutationCount,
 		maps = maps,
+		stolenFrom = data.stats.timesStolenFrom,
+		income = data.stats.bestCashPerSecond,
+		playHours = data.stats.playTime / SECONDS_PER_HOUR,
+		limited = limited,
+		tiers = tiers,
+		streak = data.daily.streak,
+		codes = codes,
+		milestones = milestones,
 	}
 end
 
@@ -123,6 +188,9 @@ function AchievementRules.progress(
 	elseif goal == "rarity" then
 		local rarity = if def.rarity then rarities[def.rarity] else nil
 		value = if rarity and ctx.bestRarityOrder >= rarity.order then 1 else 0
+		target = 1
+	elseif goal == "milestone" then
+		value = if def.milestone and ctx.milestones[def.milestone] then 1 else 0
 		target = 1
 	else
 		value = (ctx :: any)[goal] or 0
@@ -204,6 +272,9 @@ function AchievementRules.validate(
 		end
 		if def.goal == "rarity" and (def.rarity == nil or rarities[def.rarity] == nil) then
 			table.insert(problems, `{name} needs a rarity that exists`)
+		end
+		if def.goal == "milestone" and (def.milestone == nil or not AchievementRules.MILESTONES[def.milestone]) then
+			table.insert(problems, `{name} needs a milestone that exists`)
 		end
 		if def.goal == "maps" and def.target > mapCount then
 			table.insert(problems, `{name} needs more maps than there are ({mapCount})`)

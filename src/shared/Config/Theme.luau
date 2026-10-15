@@ -545,6 +545,7 @@ local Theme = {
 		achievementRewardCreature = "a {luck}x Lucky Snackling",
 		achievementRewardMutated = "a {mutation} Snackling",
 		achievementLoading = "Loading...",
+		achievementHours = "{progress} / {target} h", -- the time-played goals' progress
 
 		-- Redeem codes (server/Codes.luau): the Codes dialog (from Settings) and its answers
 		settingsCodes = "🎟️ Codes",

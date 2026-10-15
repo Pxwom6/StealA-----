@@ -34,6 +34,10 @@ type Built = {
 
 local built: Built? = nil
 local latest: { Types.AchievementView } = {}
+local defs: { [string]: Types.AchievementDef } = {}
+for _, def in Achievements.list do
+	defs[def.id] = def
+end
 
 -- What a prize gives, for the row's reward line.
 local function rewardText(reward: Types.PrizeReward, income: number): string
@@ -54,6 +58,21 @@ local function rewardText(reward: Types.PrizeReward, income: number): string
 	return Format.template(Theme.text.achievementRewardCreature, { luck = Format.number(reward.luck) })
 end
 
+-- The bar's text: cash for the money goals, hours (to a tenth) for time played, a count otherwise.
+local function progressText(entry: Types.AchievementView): string
+	local def = defs[entry.id]
+	local goal = if def then def.goal else nil
+	if goal == "earned" or goal == "income" then
+		return `{UiTheme.cash(entry.progress)} / {UiTheme.cash(entry.target)}`
+	elseif goal == "playHours" then
+		return Format.template(
+			Theme.text.achievementHours,
+			{ progress = Format.number(entry.progress), target = Format.number(entry.target) }
+		)
+	end
+	return `{Format.number(entry.progress)} / {Format.number(entry.target)}`
+end
+
 local function show(list: { Types.AchievementView })
 	latest = list
 	local current = built
@@ -70,9 +89,7 @@ local function show(list: { Types.AchievementView })
 			local share = if entry.target > 0 then math.clamp(entry.progress / entry.target, 0, 1) else 0
 			row.fill.Size = UDim2.fromScale(if entry.done then 1 else share, 1)
 			row.fill.BackgroundColor3 = if entry.done then UiTheme.palette("gold") else UiTheme.palette("success")
-			row.progress.Text = if entry.done
-				then "✓"
-				else `{Format.number(entry.progress)} / {Format.number(entry.target)}`
+			row.progress.Text = if entry.done then "✓" else progressText(entry)
 			row.frame.BackgroundColor3 = if entry.done then UiTheme.palette("panel") else UiTheme.palette("panelLight")
 		end
 	end

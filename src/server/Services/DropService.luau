@@ -42,6 +42,7 @@ local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local Guard = require(ReplicatedStorage.Shared.Logic.Guard)
 local Announcer = require(script.Parent.Announcer)
 local EconomyService = require(script.Parent.EconomyService)
+local GameEvents = require(script.Parent.GameEvents)
 local ModifierService = require(script.Parent.ModifierService)
 local PositionTracker = require(script.Parent.PositionTracker)
 local PrizeService = require(script.Parent.PrizeService)
@@ -264,6 +265,7 @@ local function open(session: Session, crate: Crate)
 	end
 	EconomyService.addCash(session, cash, "Gameplay", "SupplyCrate")
 	removeCrate(crate)
+	GameEvents.emit(session, { kind = "milestone", milestone = "crate" }) -- achievements
 end
 
 local function onBegin(player: Player, idArg: unknown)
@@ -449,6 +451,7 @@ local function catch(session: Session, runaway: Runaway, position: Vector3)
 		kind = "drop",
 	})
 	Remotes.fireAll("Effect", { kind = "runaway", position = position, rarity = def.rarity })
+	GameEvents.emit(session, { kind = "milestone", milestone = "runaway" }) -- achievements
 end
 
 -- Plans each runaway's next leg as the last one ends (sprinting while someone is near), and lets uncaught ones get

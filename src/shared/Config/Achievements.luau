@@ -4,7 +4,8 @@
 	per account the moment it is reached (AchievementService), with a toast. Plain data only.
 
 	id       saved as the flag ach_<id>: never rename or remove one that has shipped (CI keeps a released list)
-	goal     what it counts (Types.AchievementGoal), with `target` (and `rarity` for "rarity")
+	goal     what it counts (Types.AchievementGoal), with `target` (and `rarity` for "rarity", `milestone` for
+	         "milestone": one of AchievementRules.MILESTONES, recorded only from the day it shipped)
 	reward   a prize (Types.PrizeReward): cash sized from steady income, Lucky Spins or a lucky Snackling
 	badgeId  optional: a Roblox badge awarded too. Create one in the Creator Hub (Associated Items > Badges) and paste
 	         its id here; nil awards none.
@@ -47,6 +48,15 @@ local Achievements: Types.AchievementsConfig = {
 			target = 250,
 			reward = { kind = "spin", count = 3 },
 		},
+		{
+			id = "conveyorKing",
+			title = "Conveyor King",
+			description = "Buy 1,000 Snacklings from the belt",
+			icon = "🚚",
+			goal = "beltPurchases",
+			target = 1000,
+			reward = { kind = "creature", luck = 5 },
+		},
 		-- Stealing
 		{
 			id = "stickyFingers",
@@ -75,6 +85,34 @@ local Achievements: Types.AchievementsConfig = {
 			target = 150,
 			reward = { kind = "creature", luck = 4 },
 		},
+		{
+			id = "phantomThief",
+			title = "Phantom Thief",
+			description = "Steal 500 Snacklings",
+			icon = "🥷",
+			goal = "steals",
+			target = 500,
+			reward = { kind = "creature", luck = 6, mutation = "diamond" },
+		},
+		-- ...and being stolen from (a consolation)
+		{
+			id = "robbed",
+			title = "Robbed!",
+			description = "Have a Snackling stolen from you",
+			icon = "😱",
+			goal = "stolenFrom",
+			target = 1,
+			reward = cash(60, 300),
+		},
+		{
+			id = "thickSkin",
+			title = "Thick Skin",
+			description = "Have 10 Snacklings stolen from you",
+			icon = "🛡️",
+			goal = "stolenFrom",
+			target = 10,
+			reward = cash(300, 3000),
+		},
 		-- The Snackdex
 		{
 			id = "collector",
@@ -102,6 +140,52 @@ local Achievements: Types.AchievementsConfig = {
 			goal = "allRegular",
 			target = 1,
 			reward = { kind = "creature", luck = 4, mutation = "rainbow" },
+		},
+		{
+			id = "archivist",
+			title = "Archivist",
+			description = "Discover 50 Snacklings",
+			icon = "🗃️",
+			goal = "discovered",
+			target = 50,
+			reward = { kind = "spin", count = 3 },
+		},
+		{
+			id = "fullSet",
+			title = "Full Set",
+			description = "Complete a Snackdex tier",
+			icon = "📚",
+			goal = "tiers",
+			target = 1,
+			reward = { kind = "spin", count = 2 },
+		},
+		{
+			id = "snackdexScholar",
+			title = "Snackdex Scholar",
+			description = "Complete 5 Snackdex tiers",
+			icon = "🎓",
+			goal = "tiers",
+			target = 5,
+			reward = { kind = "creature", luck = 5 },
+		},
+		-- Limited (event) Snacklings: one event has 4, so the second needs two events
+		{
+			id = "limitedEdition",
+			title = "Limited Edition",
+			description = "Discover a limited Snackling",
+			icon = "🎟️",
+			goal = "limited",
+			target = 1,
+			reward = cash(120, 2000),
+		},
+		{
+			id = "seasonCollector",
+			title = "Season Collector",
+			description = "Discover 8 limited Snacklings",
+			icon = "🎁",
+			goal = "limited",
+			target = 8,
+			reward = { kind = "creature", luck = 5 },
 		},
 		-- Rarities
 		{
@@ -182,6 +266,15 @@ local Achievements: Types.AchievementsConfig = {
 			target = 16,
 			reward = { kind = "creature", luck = 4, mutation = "diamond" },
 		},
+		{
+			id = "mutationManiac",
+			title = "Mutation Maniac",
+			description = "Own 24 different mutations",
+			icon = "🧬",
+			goal = "mutations",
+			target = 24,
+			reward = { kind = "creature", luck = 6, mutation = "rainbow" },
+		},
 		-- Earnings
 		{
 			id = "pocketMoney",
@@ -210,6 +303,43 @@ local Achievements: Types.AchievementsConfig = {
 			target = 1e9,
 			reward = { kind = "spin", count = 5 },
 		},
+		{
+			id = "trillionaire",
+			title = "Trillionaire",
+			description = "Earn $1T in total",
+			icon = "🤑",
+			goal = "earned",
+			target = 1e12,
+			reward = { kind = "creature", luck = 8, mutation = "rainbow" },
+		},
+		-- Income (the best steady income per second ever reached)
+		{
+			id = "moneyMachine",
+			title = "Money Machine",
+			description = "Reach an income of $1K/s",
+			icon = "📈",
+			goal = "income",
+			target = 1000,
+			reward = cash(120, 2000),
+		},
+		{
+			id = "cashCannon",
+			title = "Cash Cannon",
+			description = "Reach an income of $100K/s",
+			icon = "🚀",
+			goal = "income",
+			target = 1e5,
+			reward = { kind = "spin", count = 3 },
+		},
+		{
+			id = "snackEmpire",
+			title = "Snack Empire",
+			description = "Reach an income of $1M/s",
+			icon = "🏰",
+			goal = "income",
+			target = 1e6,
+			reward = { kind = "creature", luck = 6 },
+		},
 		-- Rebirths
 		{
 			id = "bornAgain",
@@ -229,6 +359,15 @@ local Achievements: Types.AchievementsConfig = {
 			target = 5,
 			reward = { kind = "spin", count = 5 },
 		},
+		{
+			id = "sevenLives",
+			title = "Seven Lives",
+			description = "Rebirth 7 times",
+			icon = "🌀",
+			goal = "rebirths",
+			target = 7,
+			reward = { kind = "creature", luck = 8, mutation = "diamond" },
+		},
 		-- Maps and the Lucky Spin
 		{
 			id = "tourist",
@@ -238,6 +377,15 @@ local Achievements: Types.AchievementsConfig = {
 			goal = "maps",
 			target = 5,
 			reward = cash(120, 1000),
+		},
+		{
+			id = "explorer",
+			title = "Explorer",
+			description = "Play on 12 different maps",
+			icon = "🧭",
+			goal = "maps",
+			target = 12,
+			reward = { kind = "spin", count = 2 },
 		},
 		{
 			id = "globetrotter",
@@ -256,6 +404,121 @@ local Achievements: Types.AchievementsConfig = {
 			goal = "spins",
 			target = 10,
 			reward = cash(180, 2000),
+		},
+		{
+			id = "highRoller",
+			title = "High Roller",
+			description = "Spin the Lucky Spin 50 times",
+			icon = "🎲",
+			goal = "spins",
+			target = 50,
+			reward = { kind = "creature", luck = 4 },
+		},
+		-- Time played and the daily reward
+		{
+			id = "snackBreak",
+			title = "Snack Break",
+			description = "Play for 1 hour",
+			icon = "⏰",
+			goal = "playHours",
+			target = 1,
+			reward = cash(120, 1000),
+		},
+		{
+			id = "regular",
+			title = "Regular",
+			description = "Play for 10 hours",
+			icon = "⌛",
+			goal = "playHours",
+			target = 10,
+			reward = { kind = "spin", count = 2 },
+		},
+		{
+			id = "veteran",
+			title = "Veteran",
+			description = "Play for 50 hours",
+			icon = "🎖️",
+			goal = "playHours",
+			target = 50,
+			reward = { kind = "creature", luck = 5 },
+		},
+		{
+			id = "weekStreak",
+			title = "Week Streak",
+			description = "Claim the daily reward 7 days in a row",
+			icon = "📅",
+			goal = "streak",
+			target = 7,
+			reward = { kind = "spin", count = 2 },
+		},
+		{
+			id = "devoted",
+			title = "Devoted",
+			description = "Claim the daily reward 30 days in a row",
+			icon = "🗓️",
+			goal = "streak",
+			target = 30,
+			reward = { kind = "creature", luck = 5 },
+		},
+		-- Redeem codes
+		{
+			id = "insider",
+			title = "Insider",
+			description = "Redeem a code",
+			icon = "🔑",
+			goal = "codes",
+			target = 1,
+			reward = cash(60, 500),
+		},
+		{
+			id = "codeCracker",
+			title = "Code Cracker",
+			description = "Redeem 5 codes",
+			icon = "🗝️",
+			goal = "codes",
+			target = 5,
+			reward = { kind = "spin", count = 2 },
+		},
+		-- Server modifiers (milestones: recorded from when they shipped)
+		{
+			id = "crateCracker",
+			title = "Crate Cracker",
+			description = "Open a Supply Crate",
+			icon = "📦",
+			goal = "milestone",
+			milestone = "crate",
+			target = 1,
+			reward = cash(120, 2000),
+		},
+		{
+			id = "gotcha",
+			title = "Gotcha!",
+			description = "Catch a runaway Snackling",
+			icon = "🏃",
+			goal = "milestone",
+			milestone = "runaway",
+			target = 1,
+			reward = cash(120, 2000),
+		},
+		{
+			id = "giantSlayer",
+			title = "Giant Slayer",
+			description = "Help take down a Snack Attack giant",
+			icon = "⚔️",
+			goal = "milestone",
+			milestone = "snackAttack",
+			target = 1,
+			reward = { kind = "spin", count = 2 },
+		},
+		{
+			id = "mvp",
+			title = "MVP",
+			description = "Land the most hits on a giant that goes down",
+			icon = "🏆",
+			goal = "milestone",
+			milestone = "snackAttackTop",
+			target = 1,
+			reward = { kind = "spin", count = 3 },
 		},
 	},
 }

@@ -31,6 +31,7 @@ local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local RateLimiter = require(ReplicatedStorage.Shared.Logic.RateLimiter)
 local Announcer = require(script.Parent.Announcer)
 local EconomyService = require(script.Parent.EconomyService)
+local GameEvents = require(script.Parent.GameEvents)
 local ModifierService = require(script.Parent.ModifierService)
 local PositionTracker = require(script.Parent.PositionTracker)
 local PrizeService = require(script.Parent.PrizeService)
@@ -112,6 +113,7 @@ local function defeat(giant: Giant)
 				Format.template(Theme.text.bossReward, { cash = UiTheme.cash(cash) }),
 				"success"
 			)
+			GameEvents.emit(session, { kind = "milestone", milestone = "snackAttack" }) -- achievements
 		end
 	end
 	local top = shares[1]
@@ -120,6 +122,9 @@ local function defeat(giant: Giant)
 	local prizeDef, prizeVariant = nil, nil
 	if winnerSession then
 		prizeDef, prizeVariant = PrizeService.rollCreature(Boss.luck, Boss.mutationChance, nil)
+	end
+	if winnerSession then
+		GameEvents.emit(winnerSession, { kind = "milestone", milestone = "snackAttackTop" }) -- achievements
 	end
 	if winnerSession and prizeDef then
 		local name = GameData.displayName(prizeDef, prizeVariant)

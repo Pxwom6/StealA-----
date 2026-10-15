@@ -668,6 +668,14 @@ export type SpinConfig = {
 --   rarity        owning a Snackling of `rarity` or rarer (target 1)
 --   mutations     different mutations owned (on any Snackling)
 --   maps          different maps played on
+--   stolenFrom    times a Snackling was stolen from the player
+--   income        the best steady income per second ever reached
+--   playHours     hours played (fractional, so the bar moves)
+--   limited       limited (event) Snacklings in the Snackdex
+--   tiers         Snackdex tiers completed
+--   streak        the daily reward streak (consecutive days claimed)
+--   codes         redeem codes used
+--   milestone     something done at least once, recorded where it happens (`milestone`; target 1)
 export type AchievementGoal =
 	"beltPurchases"
 	| "steals"
@@ -679,6 +687,14 @@ export type AchievementGoal =
 	| "rarity"
 	| "mutations"
 	| "maps"
+	| "stolenFrom"
+	| "income"
+	| "playHours"
+	| "limited"
+	| "tiers"
+	| "streak"
+	| "codes"
+	| "milestone"
 
 export type AchievementDef = {
 	id: string, -- saved as the flag ach_<id>: never rename one that has shipped
@@ -688,6 +704,7 @@ export type AchievementDef = {
 	goal: AchievementGoal,
 	target: number,
 	rarity: string?, -- for goal "rarity"
+	milestone: string?, -- for goal "milestone": one of AchievementRules.MILESTONES
 	reward: PrizeReward,
 	badgeId: number?, -- a Roblox badge to award too (create it in the Creator Hub, paste its id); nil = none
 }
