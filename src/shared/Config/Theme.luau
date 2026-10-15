@@ -405,6 +405,10 @@ local Theme = {
 		lockPillLocked = "Locked {time}",
 		lockPillCooldown = "Lock in {time}",
 		lockPillToken = "Instant lock x{count}",
+		-- toasts when the lock button is tapped (Logic/LockRules.pillTap): locking happens at the base's door
+		lockPillWalk = "Walk to the 🔒 button at your door",
+		lockPillWait = "Lock ready in {time}",
+		lockPillWaitShop = "Lock ready in {time} · Instant Lock is in the Shop", -- a second tap opens the Shop
 		luckBanner = "{multiplier}x LUCK {time}",
 		eventEndsIn = "{event} ends in {time}", -- under the event banner: "Halloween ends in 3d 4h"
 		eventFallbackTitle = "Event", -- {event} for an event without a `title`
