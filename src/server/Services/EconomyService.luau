@@ -6,7 +6,8 @@
 	  `stored` cash (saved, so it survives rejoining). "Income" and "price" always mean the creature's mutated
 	  values (GameData.income / GameData.price with the record's variant).
 	* Collecting: 4×/s the server checks whether each owner's character stands on one of their collect pads and
-	  moves that podium's stored cash into their wallet. Purely position-based: no client remote can collect.
+	  moves that podium's stored cash into their wallet. Purely position-based: no client remote can collect. The
+	  Snack Magnet gadget (GadgetService) collects every pad at once through the same path (collectPad).
 	* Intents: BuyPodium, SellCreature.
 	All cash changes go through addCash / trySpend so the HUD is marked dirty and analytics are logged.
 ]]
@@ -33,6 +34,7 @@ local CashOfferService = require(script.Parent.CashOfferService)
 local GameEvents = require(script.Parent.GameEvents)
 local LiveOps = require(ReplicatedStorage.Shared.Config.LiveOps)
 local LiveOpsService = require(script.Parent.LiveOpsService)
+local MapBuilder = require(script.Parent.MapBuilder)
 local ModifierService = require(script.Parent.ModifierService)
 local PlotService = require(script.Parent.PlotService)
 local Remotes = require(script.Parent.Remotes)
@@ -177,6 +179,34 @@ function EconomyService.collect(session: Session, podium: number): number
 	return amount
 end
 
+-- Collects one pad the way stepping on it does: the podium's stored cash into the wallet, the floating "+$X" over the
+-- pad, and the "collect" gameplay event (tutorial, quests). The pad check and the Snack Magnet both come here.
+-- Returns the amount.
+function EconomyService.collectPad(session: Session, podium: MapBuilder.PodiumRefs): number
+	local amount = EconomyService.collect(session, podium.index)
+	if amount > 0 then
+		Remotes.fire(session.player, "Effect", {
+			kind = "collect",
+			amount = amount,
+			position = podium.padPosition,
+		})
+		-- Only a pad collect is this event (not selling, not leaving): tutorial, quests.
+		GameEvents.emit(session, { kind = "collect", amount = amount })
+	end
+	return amount
+end
+
+-- What collecting every active pad would pay right now (the Snack Magnet checks there is something first).
+function EconomyService.collectable(session: Session): number
+	local total = 0
+	for _, record in session.data.creatures do
+		if record.podium <= session.capacity and record.stored >= 1 then
+			total += math.floor(record.stored)
+		end
+	end
+	return total
+end
+
 local function incomeTick(dt: number)
 	for _, session in Sessions.all() do
 		if session.plot == 0 then
@@ -226,16 +256,7 @@ local function padCheck()
 			end
 		end
 		if nearest then
-			local amount = EconomyService.collect(session, nearest.index)
-			if amount > 0 then
-				Remotes.fire(session.player, "Effect", {
-					kind = "collect",
-					amount = amount,
-					position = nearest.padPosition,
-				})
-				-- Only a pad collect is this event (not selling, not leaving): tutorial, quests.
-				GameEvents.emit(session, { kind = "collect", amount = amount })
-			end
+			EconomyService.collectPad(session, nearest)
 		end
 	end
 end

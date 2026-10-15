@@ -8,8 +8,12 @@
 	          Ownership does NOT change yet — the creature is "in transit" and still in the victim's save.
 	Deliver:  when the thief's character is inside their own plot the creature moves to their save (one atomic,
 	          non-yielding transfer) and both profiles are asked to save.
-	Fail:     tagged by anyone, timeout, death, leaving, the victim locking while the thief is still inside, or an
-	          implausible movement speed (speed exploits) → the creature runs home.
+	Fail:     tagged by anyone, timeout, death, leaving, the victim locking while the thief is still inside, slipping
+	          on the victim's banana peel (a gadget: GadgetService calls StealService.slipped), or an implausible
+	          movement speed (speed exploits) → the creature runs home.
+	Shield:   a thief with a Bubble Shield up (a gadget) can't be tagged; the tagger is told "Shielded!".
+	Speeds:   every walking speed (carrying or not, a modifier, a speed gadget, frozen after a slip) comes from
+	          Movement, and so does what the carry budget allows.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -20,6 +24,7 @@ local GameData = require(ReplicatedStorage.Shared.GameData)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local CreatureVisuals = require(ReplicatedStorage.Shared.CreatureVisuals)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
+local GadgetRules = require(ReplicatedStorage.Shared.Logic.GadgetRules)
 local Guard = require(ReplicatedStorage.Shared.Logic.Guard)
 local Inventory = require(ReplicatedStorage.Shared.Logic.Inventory)
 local LockRules = require(ReplicatedStorage.Shared.Logic.LockRules)
@@ -32,6 +37,7 @@ local EconomyService = require(script.Parent.EconomyService)
 local GameEvents = require(script.Parent.GameEvents)
 local LockService = require(script.Parent.LockService)
 local ModifierService = require(script.Parent.ModifierService)
+local Movement = require(script.Parent.Movement)
 local PlotService = require(script.Parent.PlotService)
 local PositionTracker = require(script.Parent.PositionTracker)
 local Remotes = require(script.Parent.Remotes)
@@ -47,35 +53,19 @@ local StealService = {}
 
 local CFG = Gameplay.steal
 
--- The carry movement budget: carrying speed, scaled by what a speed modifier allows right now (see
--- ModifierService.walkSpeedAllowance).
-local function carryLimits(): StealRules.CarryLimits
+-- The carry movement budget: carrying speed, scaled by what a speed modifier and the thief's speed gadget allow right
+-- now (Movement.allowance, capped).
+local function carryLimits(session: Session): StealRules.CarryLimits
 	return {
-		maxSpeed = Gameplay.walkSpeed * ModifierService.walkSpeedAllowance() * CFG.carrySpeedMultiplier,
+		maxSpeed = Gameplay.walkSpeed * Movement.allowance(session) * CFG.carrySpeedMultiplier,
 		tolerance = CFG.speedCheckTolerance,
 		budgetSeconds = CFG.speedBudgetSeconds,
 		leeway = CFG.speedCheckLeeway,
 	}
 end
 
--- Walking and carrying speeds, with a running modifier (Sugar Rush).
-local function walkSpeed(): number
-	return Gameplay.walkSpeed * ModifierService.effects().walkSpeed
-end
-
-local function carrySpeed(): number
-	return walkSpeed() * CFG.carrySpeedMultiplier
-end
-
 local function now(): number
 	return workspace:GetServerTimeNow()
-end
-
-local function setWalkSpeed(session: Session, speed: number)
-	local humanoid = Sessions.humanoid(session)
-	if humanoid then
-		humanoid.WalkSpeed = speed
-	end
 end
 
 local function attachCarryVisuals(session: Session, carry: Carry)
@@ -143,7 +133,7 @@ local function clearCarry(session: Session)
 		carry.marker:Destroy()
 	end
 	session.player:SetAttribute("Carrying", nil)
-	setWalkSpeed(session, walkSpeed())
+	Movement.apply(session) -- walking speed again (or frozen, after a slip)
 	Replication.markDirty(session)
 end
 
@@ -162,7 +152,7 @@ function StealService.cancel(thief: Session, reason: CancelReason, taggerName: s
 
 	local def = GameData.catalog.creatures[carry.creatureId]
 	local creatureName = GameData.displayName(def, carry.variant)
-	if reason == "tagged" then
+	if reason == "tagged" or reason == "slipped" then
 		thief.stealCooldownUntil = now() + CFG.thiefCooldownAfterTagSeconds
 		Remotes.fire(thief.player, "Effect", { kind = "tagged" })
 	end
@@ -350,7 +340,13 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 		creatureId = record.id,
 		variant = record.variant,
 		startedAt = t,
-		track = StealRules.newCarryTrack(root.Position.X, root.Position.Y, root.Position.Z, os.clock(), carryLimits()),
+		track = StealRules.newCarryTrack(
+			root.Position.X,
+			root.Position.Y,
+			root.Position.Z,
+			os.clock(),
+			carryLimits(thief)
+		),
 		model = nil,
 		marker = nil,
 	}
@@ -361,7 +357,7 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 		LockService.endGrace(thief) -- stealing forfeits your own new-player protection
 		attachCarryVisuals(thief, carry)
 		player:SetAttribute("Carrying", record.id)
-		setWalkSpeed(thief, carrySpeed())
+		Movement.apply(thief) -- the carry slowdown
 		Replication.markDirty(thief)
 
 		local def = GameData.catalog.creatures[record.id]
@@ -400,7 +396,7 @@ local function onTag(player: Player, targetArg: unknown)
 		return
 	end
 	local t = now()
-	local ok = StealRules.canTag({
+	local ok, reason = StealRules.canTag({
 		now = t,
 		taggerUserId = tagger.userId,
 		thiefUserId = thief.userId,
@@ -419,8 +415,16 @@ local function onTag(player: Player, targetArg: unknown)
 			taggerRoot.Position,
 			if thief.carry then thief.carry.startedAt else t
 		),
+		thiefShielded = GadgetRules.isShielded(thief.gadgets, t), -- a Bubble Shield: checked last
 	})
 	if not ok then
+		if reason == "shielded" then
+			-- The tag would have landed: say why it didn't (at most once per tag cooldown, like a tag).
+			tagger.tagCooldownUntil = t + CFG.tagCooldownSeconds
+			Remotes.notify(player, Theme.text.shieldBlocked, "info")
+			Remotes.fire(player, "Effect", { kind = "shieldBlock", position = thiefRoot.Position })
+			Analytics.custom(thief, "gadget_effect", nil, { thief.gadgets.shieldId or "", "shieldBlock" })
+		end
 		return
 	end
 	tagger.tagCooldownUntil = t + CFG.tagCooldownSeconds
@@ -471,7 +475,9 @@ local function checkCarry(thief: Session, allowDeliver: boolean)
 		-- after the client catches up (so is the push, unless it was made as the lock started; see LockService).
 		return
 	end
-	if not StealRules.stepCarryTrack(carry.track, position.X, position.Y, position.Z, os.clock(), carryLimits()) then
+	if
+		not StealRules.stepCarryTrack(carry.track, position.X, position.Y, position.Z, os.clock(), carryLimits(thief))
+	then
 		StealService.cancel(thief, "speed")
 		return
 	end
@@ -495,6 +501,18 @@ local function checkCarries()
 			end)
 		end
 	end
+end
+
+-- `thief` slipped on `owner`'s banana peel (GadgetService): if they were carrying one of the owner's Snacklings it
+-- runs home exactly as after a tag (same path, cooldown and toasts; the owner hears that the peel saved it). Returns
+-- true when a Snackling was dropped.
+function StealService.slipped(thief: Session, owner: Session): boolean
+	local carry = thief.carry
+	if carry == nil or carry.victimUserId ~= owner.userId then
+		return false
+	end
+	StealService.cancel(thief, "slipped", Theme.text.peelTagger)
+	return true
 end
 
 -- Cancels every carry involving `session` (as thief or as victim). Used on leave and rebirth.
@@ -526,7 +544,7 @@ function StealService.start()
 	-- A speed modifier starting or ending: everyone's speed follows at once (thieves keep their carrying slowdown).
 	ModifierService.onChanged(function()
 		for _, session in Sessions.all() do
-			setWalkSpeed(session, if session.carry then carrySpeed() else walkSpeed())
+			Movement.apply(session)
 		end
 	end)
 	Remotes.onIntent("StealBegin", onStealBegin)

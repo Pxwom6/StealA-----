@@ -24,6 +24,7 @@
 	  /runaway [here]       a Snackling escapes now, as in Great Escape (far from everyone); /runaway here lets it out
 	                        right beside you, to test catching it
 	  /boss [hp]            a Snack Attack giant appears over the belt now (tap it to test), e.g. /boss 20 for a quick one
+	  /gadgets [off]        own every gadget (Config/Gadgets) and recharge them all now; /gadgets off removes them again
 
 	Map themes (MapThemeService; admins can use these in live servers too, that server only):
 	  /map <id>             switch to that map now, e.g. /map candy, /map volcano
@@ -49,6 +50,7 @@ local BossService = require(script.Parent.BossService)
 local DevGallery = require(script.Parent.DevGallery)
 local DropService = require(script.Parent.DropService)
 local EconomyService = require(script.Parent.EconomyService)
+local GadgetService = require(script.Parent.GadgetService)
 local GiftService = require(script.Parent.GiftService)
 local LockService = require(script.Parent.LockService)
 local Replication = require(script.Parent.Replication)
@@ -265,11 +267,24 @@ function DevCommands.start()
 			Remotes.notify(player, "[Studio] no Snackling could play the giant", "error")
 		end
 	end)
+	add("gadgets", function(player: Player, args: { string })
+		local session = Sessions.get(player)
+		if session == nil then
+			return
+		end
+		local off = string.lower(args[1] or "") == "off"
+		GadgetService.devSet(session, not off)
+		Remotes.notify(
+			player,
+			if off then "[Studio] gadgets removed" else "[Studio] every gadget owned and recharged",
+			"info"
+		)
+	end)
 	print(
 		"[DevCommands] Studio commands enabled: /cash <n>, /spawn <creatureId> [mutationId], /noshield, /friends <n|off>,"
 			.. " /tutorial, /gallery [mutationId|off], /sky <clockTime>,"
 			.. " /quests reset, /dex fill <rarity|event>, /map <id|vote|list>, /playtime <min>, /spins <n|free>,"
-			.. " /runaway [here], /boss [hp]"
+			.. " /runaway [here], /boss [hp], /gadgets [off]"
 			.. " (LiveOps: /event <id> [minutes], /event off, /luck <x> <min>)"
 	)
 end

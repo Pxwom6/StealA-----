@@ -60,7 +60,7 @@ local Gadgets: Types.GadgetsConfig = {
 			color = "#B07CFF",
 			nameKey = "gadgetMagnetName",
 			descriptionKey = "gadgetMagnetInfo",
-			price = 1500000,
+			price = 2500000,
 			cooldownSeconds = 60,
 		},
 	},

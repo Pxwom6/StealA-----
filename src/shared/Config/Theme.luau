@@ -271,6 +271,8 @@ local Theme = {
 		shackWood = "#8A6A4A",
 		shackRoof = "#5A4A6A",
 		shackWindow = "#FFD27A",
+		-- Gadgets (GadgetService): the banana peel's flap tips and stem (the peel itself is its gadget's colour)
+		bananaPeelTip = "#6B4A2E",
 	},
 
 	-- One colour per plot (index = plot number).
