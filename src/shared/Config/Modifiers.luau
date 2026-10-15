@@ -102,14 +102,14 @@ local HEAT: Types.SeasonLighting = {
 -- A total eclipse in the late afternoon: the sun goes (each client draws the eclipsed sun in its place), the day
 -- turns to a violet dusk and the horizon glows all round like a sunset (bright enough to play on every map).
 local ECLIPSE: Types.SeasonLighting = {
-	clockTime = 15.8,
-	brightness = 1.1,
-	ambient = "#5A4E7A",
-	outdoorAmbient = "#7A6C9E",
-	colorShiftTop = "#FFB88A",
-	atmosphere = { density = 0.3, offset = 0.25, color = "#C88AB8", decay = "#3A2A5E", glare = 0, haze = 1.4 },
-	colorCorrection = { tint = "#EADFFF", brightness = 0, contrast = 0.12, saturation = -0.15 },
-	clouds = { cover = 0.2, density = 0.35, color = "#5A4A7A" },
+	clockTime = 16.6, -- the sun low enough in the west to sit in view, high enough to clear the bases
+	brightness = 0.95,
+	ambient = "#544A78",
+	outdoorAmbient = "#6E6496",
+	colorShiftTop = "#FFA982", -- the corona's warm light along the tops of things
+	atmosphere = { density = 0.33, offset = 0.25, color = "#E08A9A", decay = "#2A2050", glare = 0, haze = 1.6 },
+	colorCorrection = { tint = "#E2D6FF", brightness = -0.05, contrast = 0.15, saturation = -0.12 },
+	clouds = { cover = 0.18, density = 0.3, color = "#4A3E6E" },
 	hideSun = true,
 }
 

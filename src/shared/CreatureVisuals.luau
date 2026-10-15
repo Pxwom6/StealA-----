@@ -522,7 +522,7 @@ local WING_LEAN = math.rad(32)
 -- Snackling is the dark moon in a ring of fire, with one bright bead on the ring like the sun peeking out
 -- (MutationLook.corona).
 local CORONA_SEGMENTS = 14
-local CORONA_COLOR = "#FFB347"
+local CORONA_COLOR = "#FF9A3C" -- Neon glows: this reads as a ring of fire
 local CORONA_BEAD = "#FFF4D6"
 
 -- Whether `name` is a particle preset this module can build (MutationLook.particles).

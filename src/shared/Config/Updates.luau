@@ -19,7 +19,7 @@ local Updates: Types.UpdatesConfig = {
 			title = "The Big Snack Update!",
 			highlights = {
 				"🗺️ 27 maps! Vote for the next one every 20 minutes",
-				"⛈️ 20 server twists: storms, coin rain, runaways, Snack Attack",
+				"⛈️ 24 server twists: eclipses, bounty hunts, treasure hunts",
 				"✨ New mutations, gadgets, free gifts and the Lucky Spin",
 				"🏆 50+ trophies, plus titles and base skins to earn",
 				"🎉 Admin drops, and Valentine's and Easter events on the way!",

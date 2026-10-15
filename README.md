@@ -205,10 +205,10 @@ design.
 **What a private server's owner gets (in their own server only):**
 
 * **🗺️ Map**: switch to any map (once a minute) and turn rotation off to stay on it, or back on.
-* **✨ Modifiers**: start or stop Sugar Rush, Quick Hands, Fortress or Snack Patrol (one every 10 minutes). These are
-  the modifiers marked `hostable = true` in `src/shared/Config/Modifiers.luau`. CI refuses to mark any modifier that
-  raises luck, mutations or income, cuts prices, speeds up the belt, drops things or unlocks a mutation, so a private
-  server is never a better farm than a public one.
+* **✨ Modifiers**: start or stop Sugar Rush, Quick Hands, Fortress, Snack Patrol or Gadget Frenzy (one every 10
+  minutes). These are the modifiers marked `hostable = true` in `src/shared/Config/Modifiers.luau`. CI refuses to mark
+  any modifier that raises luck, mutations or income, cuts prices, speeds up the belt, drops things, pays bounties or
+  unlocks a mutation, so a private server is never a better farm than a public one.
 * No belt drops, boosts, gifts, messages or All servers.
 
 **Enabling private servers (Creator Hub):** the experience must be public first. Then:
@@ -291,20 +291,28 @@ what grows on the tree spots, ten landmarks outside the wall and the weather; ga
 
 ### Server modifiers
 
-Every 4-8 minutes a server runs a 5-minute twist (`src/shared/Config/Modifiers.luau`): Rush Hour, Clearance Sale,
-Golden Hour, Lucky Breeze, Cash Splash, Sugar Rush, Quick Hands, Fortress, Snack Patrol, the rare Snack Party and
-Jackpot (double cash), weather (a Thunderstorm with rain, lightning and Electric Snacklings; a Meteor Shower with
-shooting stars and Galaxy Snacklings; Toxic Fog with Toxic Snacklings; Northern Lights with an aurora and Aurora
-Snacklings; a Heatwave with Toasted Snacklings), drops (a Supply Drop of crates to race for, a Coin Rain, or a Great
-Escape: Snacklings break out of the factory and run along the walkways, and whoever catches one keeps it) or a Snack
-Attack (giant Snacklings hover over the belt and everyone taps them down together for a share of the reward; the top
-hitter wins a Snackling). Change an effect, a name or the schedule there (CI keeps every effect inside `limits`);
+Every 4-8 minutes a server runs a 5-minute twist (`src/shared/Config/Modifiers.luau`), twenty-four in all: Rush
+Hour, Clearance Sale, Golden Hour, Lucky Breeze, Cash Splash, Sugar Rush, Quick Hands, Fortress, Snack Patrol, the rare
+Snack Party and Jackpot (double cash), Gadget Frenzy (gadgets recharge twice as fast), weather (a Thunderstorm with
+rain, lightning and Electric Snacklings; a Meteor Shower with shooting stars and Galaxy Snacklings; Toxic Fog with
+Toxic Snacklings; Northern Lights with an aurora and Aurora Snacklings; a Heatwave with Toasted Snacklings; an Eclipse:
+the sun goes black in a ring of fire, the afternoon turns to a violet dusk, and Eclipse Snacklings appear), drops (a
+Supply Drop of crates to race for, a Coin Rain, a Great Escape: Snacklings break out of the factory and run along the
+walkways, and whoever catches one keeps it; or a Treasure Hunt: golden forks hidden one at a time around the walkways
+and the plaza, each worth cash or a Lucky Spin to whoever finds it), a Snack Attack (giant Snacklings hover over the
+belt and everyone taps them down together for a share of the reward; the top hitter wins a Snackling) or a Bounty Hunt
+(the server's top earner wears a 🎯 BOUNTY: tag them while they carry, or rob their base, for a payout sized from your
+own income). Change an effect, a name or the schedule there (CI keeps every effect inside `limits`);
 `schedule.enabled = false` turns them off and `weight = 0` keeps one for `/mod` only. BALANCE.md "Server modifiers"
 has the numbers.
 
-* **A new weather:** a modifier with `weather` (particles), `lighting` (an overlay like a seasonal one) and/or
-  `skyEffect` (`lightning`, `meteors`, `aurora`), and a mutation with `modifierId = "<its id>"` (its description
-  should name the mutation; CI checks).
+* **A new weather:** a modifier with `weather` (particles), `lighting` (an overlay like a seasonal one; `hideSun = true`
+  takes the sky's sun away) and/or `skyEffect` (`lightning`, `meteors`, `aurora`, `eclipse`), and a mutation with
+  `modifierId = "<its id>"` (its description should name the mutation; CI checks).
+* **The eclipsed sun:** its sizes and colours are the `ECLIPSE_*` numbers at the top of
+  `src/client/Controllers/WeatherController.luau` (a billboard far out where the sun is, built from round frames: no
+  image assets). It slides over the sun as the Eclipse starts, then its streamers turn slowly; with Reduce effects it
+  stands still.
 * **Thunder:** `world.thunder` in `src/shared/Config/Sounds.luau` is a slowed-down whoosh for now; paste a real
   thunder clap from the sound library there when you find one you like.
 * **Drops:** what crates and coins pay, how long crates take to fall and to open, where they land, and how fast and
@@ -312,6 +320,18 @@ has the numbers.
   checks both). In Studio, `/runaway` lets one out now and `/runaway here` right beside you.
 * **Snack Attack:** the giants' health, tap rate, reach, rewards and how long they stay are in
   `src/shared/Config/Boss.luau` (CI checks it); `/boss` sends one in Studio (`/boss 20` for a quick one).
+* **Treasure Hunt:** the hiding places, what a fork pays (3 in 4: 40 s of the finder's income, at least $400; 1 in 4: a
+  Lucky Spin), when its marker shows and how long it stays are `treasure` in `src/shared/Config/Drops.luau`. Each
+  hiding place names what the banner says (`treasureWhere*` in `Theme.text`), and CI checks every one against the real
+  map: on open ground, clear of the belt, the bases, the plaza's furniture, every map's trees and every seasonal
+  decoration. A fork is found by walking into it at a position the server trusts as for a steal, so a teleport there
+  wins nothing. `/fork` hides one now in Studio, `/fork 6` at hiding place 6.
+* **Bounty Hunt:** what a claim pays (a tag 60 s of the tagger's income, at least $500; a steal 90 s of the thief's, at
+  least $750), how many claims each hunter gets (1) and how long it rests after one (30 s) are in
+  `src/shared/Config/Bounty.luau` (CI checks it). The target's Roblox friends never claim it, nor does the target.
+* **Gadget Frenzy:** `gadgetCooldown = 0.5` in its effects. A recharge never drops under the gadget's fairness floor
+  (`GadgetRules.cooldownSeconds`: a speed gadget runs at most a third of the time, a shield a fifth), so the Fizzy Soda
+  recharges in 18 s rather than 17.5.
 
 ### First-time tutorial
 
@@ -505,7 +525,9 @@ none until one is bought, and none during the first-time tutorial.
 | 🧲 Snack Magnet | $2.5M | collects the cash on all your pads from anywhere, as if you walked over them | 60 s |
 
 The Auto Collect pass does the Snack Magnet's job every 5 s, so for its owners the magnet's button says AUTO (a tap
-explains) and the Gadgets tab doesn't sell it to them.
+explains) and the Gadgets tab doesn't sell it to them. While the Gadget Frenzy modifier runs, every gadget recharges in
+half the time (the soda in 18 s, never on more than a third of the time), and one already recharging when it starts
+finishes the rest twice as fast.
 
 * **Tune one:** `src/shared/Config/Gadgets.luau` (price, cooldown, duration, speed, slip, peel radius). CI keeps
   every number inside `GadgetRules.validate`: the Bubble Shield at most 5 s and recharging at least 5x as long, any
@@ -640,6 +662,8 @@ These work in Studio only (`src/server/Services/DevCommands.luau`):
   `/mod supplyDrop` (first crate after 10 s); admins too, that server only)
 * `/runaway` (a Snackling escapes now, as in Great Escape), `/runaway here` (right beside you, to try catching it)
 * `/boss [hp]` (a Snack Attack giant over the belt now; tap it, e.g. `/boss 20` for a quick one)
+* `/fork [n]` (a Treasure Hunt golden fork hides now, away from everyone, or at hiding place n, e.g. `/fork 6`; try
+  `/mod eclipse`, `/mod treasureHunt`, `/mod bountyHunt` and `/mod gadgetFrenzy` for the newest modifiers)
 * `/gadgets` (own every gadget and recharge them all now), `/gadgets off` (none again)
 * `/hostas owner`, `/hostas none`, `/hostas admin` (try the host panel as a private server's owner, as a player with
   no panel, or as an admin again; reopen Settings after)

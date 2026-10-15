@@ -1461,3 +1461,66 @@ Golden Hour check would need its bound raised or a rarer event mutation.
 **Why:** "a ton of extra maps". Four moods no map had (a bright hive among lavender, a sugary village at sundown, a
 misty hot spring at dawn, a barbecue at twilight), and four more mutations to collect on the vote.
 **Reversal cost:** none — `weight = 0` keeps a map for `/map` only; never remove the mutation ids (they are in saves).
+
+### 55. Four more modifiers: Eclipse, Gadget Frenzy, Treasure Hunt, Bounty Hunt
+
+* **What:** modifiers 21-24, twenty-four in all. **Eclipse** is a weather: the sky's sun goes, the afternoon turns to
+  a violet dusk with a rosy horizon, and where the sun was hangs a black disc with a white-hot rim, a corona from gold
+  through rose to violet, long pale streamers and one bright bead (the "diamond ring"); **Eclipse** Snacklings can roll.
+  **Gadget Frenzy**: every gadget recharges in half the time. **Treasure Hunt**: seven golden forks, one at a time, hide
+  around the walkways and the spawn plaza; whoever walks into one first wins cash or a Lucky Spin. **Bounty Hunt**: the
+  server's top earner wears a 🎯 BOUNTY for the five minutes; tagging them while they carry, or robbing their base,
+  pays the claimer.
+* **The eclipsed sun is built, not painted:** no image asset. The overlay's new `hideSun` makes WorldLighting turn the
+  sky's sun off (`Sky.CelestialBodiesShown`), and each client draws a BillboardGui 1,200 studs out along
+  `Lighting:GetSunDirection()` (so it keeps its place and size as the camera moves, and follows the sun while the
+  lighting changes): round frames for the disc, rim, glow rings and bead, UIGradient streamers. Depth-tested, so hills
+  and buildings in front hide it. When it starts while you are there, the disc slides across the bright sun in the 4 s
+  the lighting darkens, then the corona lights up and the streamers turn 1.5° a second; with Reduce effects it stands
+  still, already eclipsed. Nothing flashes. Eclipse Snacklings (2%, x4, announced, order 41 so no other roll changes)
+  are near-black with a gold glow, embers drifting off, and a ring of fire standing behind the body (`corona`: 14 Neon
+  segments and a bead, kept out of the tint), so on a podium the Snackling is the dark moon in its own eclipse.
+* **Gadget Frenzy keeps every gadget rule:** a recharge is the gadget's cooldown x 0.5 (`gadgetCooldown`, a new
+  effect inside `limits`), never under its kind's fairness floor (`GadgetRules.cooldownSeconds`: a speed gadget at
+  least 3x its duration, a shield 5x, as validate already asks; nothing under 5 s). So the soda recharges in 18 s, not
+  17.5; the peel 22.5, the shield 20, the magnet 30. Speeds, durations, the 1.5x cap and the movement checks are
+  untouched. A gadget already recharging when it starts finishes the rest twice as fast (never sooner than its floor
+  after it was used); when it ends, nothing gets slower. The button's disc runs from `usedAt`, new in the gadgets view.
+  It is the fifth hostable modifier: it changes how chases play and no number in the economy (CI's hostable checks).
+* **Treasure Hunt hides forks where they can be found:** 23 hiding places in `Config/Drops` (behind benches, by the
+  fountain, in the flower beds, behind the What's New board and the leaderboards, by the archway, beside the Snack
+  Factory, at the walkways' far ends, deep in the gaps between bases). A fork goes to one at least 30 studs from every
+  player and never the last one used; the banner says roughly where (each place names a `Theme.text` line); a marker
+  shows it after 18 s; unfound, it goes after 36 s, before the next one comes 42 s after it. CI checks every place
+  against the real map: inside the wall, clear of the belt, the bases, the factory and chute, the plaza's furniture,
+  any map's flora on the tree spots and every seasonal decoration. The server finds a fork for whoever walks into it
+  (a distance check every 0.1 s like coins) at a position trusted as for a steal, not the coins' lighter check: the
+  hiding places are in a public config, so a teleport there must win nothing. Three in four pay 40 s of the finder's
+  income (at least $400), one in four a Lucky Spin, through PrizeService.
+* **Bounty Hunt is fair to the target and can't be farmed:** the target is the most steady income (`packIncome`: no
+  boost or friend bonus decides it) among players with a base and no tutorial, ties to whoever joined first; if they
+  leave, the next top earner (announced). Nametags shows the bounty in the title's place (seen 450 studs away, hidden
+  from the target) with a gold outline; while the target carries, StealService's THIEF! marker says BOUNTY. Claims
+  come only from what StealService decided, through GameEvents (a new `tag` event; `steal` now says whose base): a tag
+  only lands on a carrying thief, so nothing pays for waiting by the target's spawn. Refused: the target, their Roblox
+  friends (SocialService's cached answers, so nothing yields: no trading tags for payouts), a hunter's second claim in
+  one hunt, and any claim during the 30 s the bounty rests after one. A claim pays the claimer from their own income
+  (a tag 60 s, at least $500; a steal 90 s, at least $750), never from the target. Nobody claimed it: the target gets a
+  banner for getting through. Not hostable (it pays cash; CI refuses it).
+* **Banners fit:** names in the new banners are shortened like shout-outs' (15 characters), so two long names still
+  fit the narrowest banner (CI), as does every hiding place's line.
+* **Checked offline:** unit tests (BountyRules; where a fork hides, what it pays and every hiding place on the real
+  map; Gadget Frenzy's recharges and floors; the Eclipse roll at 2% changing no other roll); the server test (a fork
+  hidden away from everyone and found by walking in, a teleport onto one finding nothing, `/fork`; the eclipse taking
+  the sun and an Eclipse Snackling's ring on its podium; a whole Bounty Hunt with five players: a tag claim, the rest,
+  a friend and a second claim refused, a steal claim delivered home, the bounty moving on when the target leaves); the
+  gadgets test (Gadget Frenzy). The eclipse was composited onto preview renders of the map under its lighting (from
+  the walkway, a base and the plaza; the script reads WeatherController's numbers), the forks rendered at their
+  hiding places from a player's height, and Eclipse Snacklings set beside Galaxy, Moonlit and the others: the first
+  body tint read as Galaxy purple, so it went near-black.
+
+**Why:** "a ton of extra modifiers", each something the mix didn't have: a sky event with a mutation to race for, a
+gear twist that makes chases wild, a hunt around the plaza, and a twist that gives everyone a reason to go after the
+leader (and the leader a reason to defend).
+**Reversal cost:** none — `weight = 0` keeps any of them for `/mod` only. Never remove the `eclipse` mutation id (it is
+in saves). `hideSun`, the `tag` event and the gadgets view's `usedAt` are additive.

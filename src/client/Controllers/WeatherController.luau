@@ -72,22 +72,25 @@ local ECLIPSE_MOON = 0.27
 local ECLIPSE_MOON_COLOR = "#0B0814"
 local ECLIPSE_SUN_COLOR = "#FFF6DC"
 local ECLIPSE_GLOW = {
-	{ size = 1, color = "#6A3CC8", transparency = 0.94 },
-	{ size = 0.8, color = "#B44DFF", transparency = 0.9 },
-	{ size = 0.62, color = "#FF5FA0", transparency = 0.84 },
-	{ size = 0.48, color = "#FF9A5A", transparency = 0.72 },
-	{ size = 0.37, color = "#FFC870", transparency = 0.5 },
-	{ size = 0.31, color = "#FFE6A8", transparency = 0.25 },
+	{ size = 1, color = "#7A3CE0", transparency = 0.9 },
+	{ size = 0.78, color = "#C84DFF", transparency = 0.84 },
+	{ size = 0.6, color = "#FF5FA0", transparency = 0.74 },
+	{ size = 0.47, color = "#FF8F57", transparency = 0.6 },
+	{ size = 0.37, color = "#FFC870", transparency = 0.4 },
+	{ size = 0.31, color = "#FFE9B0", transparency = 0.15 },
 }
 local ECLIPSE_RIM = { { size = 0.292, color = "#FFB347" }, { size = 0.281, color = "#FFF8E8" } }
 local ECLIPSE_STREAMERS = {
-	{ angle = 12, length = 0.95, width = 0.016 },
-	{ angle = 64, length = 0.7, width = 0.012 },
-	{ angle = 103, length = 0.86, width = 0.014 },
-	{ angle = 147, length = 0.62, width = 0.011 },
+	{ angle = 12, length = 0.95, width = 0.02 },
+	{ angle = 58, length = 0.72, width = 0.015 },
+	{ angle = 103, length = 0.88, width = 0.018 },
+	{ angle = 141, length = 0.66, width = 0.013 },
+	{ angle = 172, length = 0.8, width = 0.016 },
 }
 local ECLIPSE_STREAMER_COLOR = "#FFE9B8"
-local ECLIPSE_BEAD = { angle = -40, size = 0.034, glow = 0.1 }
+local ECLIPSE_STREAMER_FADE =
+	{ { 0, 1 }, { 0.22, 0.75 }, { 0.38, 0.25 }, { 0.5, 0.15 }, { 0.62, 0.25 }, { 0.78, 0.75 }, { 1, 1 } }
+local ECLIPSE_BEAD = { angle = 140, size = 0.034, glow = 0.1 } -- upper left: the last of the sun as the disc arrives
 local ECLIPSE_IN_SECONDS = 4
 local ECLIPSE_TURN = 1.5
 local ECLIPSE_STEP = 1 / 20
@@ -836,15 +839,7 @@ local function buildEclipse(): (Part, (progress: number, t: number?) -> ())
 		frame.BorderSizePixel = 0
 		frame.ZIndex = #ECLIPSE_GLOW + 1
 		local fade = Instance.new("UIGradient")
-		fade.Transparency = sequence({
-			{ 0, 1 },
-			{ 0.25, 0.8 },
-			{ 0.4, 0.4 },
-			{ 0.5, 0.3 },
-			{ 0.6, 0.4 },
-			{ 0.75, 0.8 },
-			{ 1, 1 },
-		})
+		fade.Transparency = sequence(ECLIPSE_STREAMER_FADE)
 		fade.Parent = frame
 		frame.Parent = gui
 		table.insert(corona, { frame = frame, transparency = 0 })

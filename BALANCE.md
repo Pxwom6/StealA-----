@@ -222,6 +222,7 @@ the store stay exact. Golden Hour (a server modifier) is the only thing that mul
 | Gumdrop | on Gingerbread Hollow | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
 | Lantern | on Ramen Hot Springs | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
 | Barbecue | on Smokehouse Ranch | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Eclipse | during Eclipse | 2% | 28.8 | x4 | x2.5 | x0.63 | spawn |
 
 "Per server-hour" is while the mutation can roll. Any mutation on an ordinary spawn (the map's signature included,
 no modifier): 5.15% of spawns (74.2 per server-hour). Expected value of one spawn: income x1.0885, price x1.0435.
@@ -244,6 +245,9 @@ no modifier): 5.15% of spawns (74.2 per server-hour). Expected value of one spaw
   exactly as it was).
 * **Weather mutations** (`modifierId`): only while their weather modifier runs (5 minutes, a few times a day per
   server), about 2–3 per storm, each announced to the whole server so everyone races to the belt. x4 like Diamond.
+  There are six (Electric, Galaxy, Toxic, Aurora, Toasted, Eclipse), all 2%: one more weather adds no mutation chance
+  to any spawn outside its own five minutes, and the worst cases below are unchanged (only one modifier runs at a
+  time, and the strongest is still 2%). The simulation's tables only gained the Eclipse row.
 * **Event-only mutations** (with an `eventId`) roll only while that LiveOps event runs.
 * **The worst case stays small.** Only one map and one modifier are ever live, so CI checks any one seasonal event
   plus the strongest map and modifier together (9.15% today) against 10%, every event at once (only possible if an
@@ -563,11 +567,11 @@ after about 7½ minutes (a Cranberry Crane). Re-run with `lune run tools/simulat
 ## Server modifiers
 
 A modifier runs for 5 minutes, then the server waits 4-8 minutes (6 on average) before the next one
-(`Config/Modifiers.luau` `schedule`), so one is running about **45% of the time**. Twenty modifiers share the picks
-by weight (eighteen at 1, Snack Party at 0.5, Jackpot at 0.35), never the same twice in a row: each regular one runs
-about **1.45 minutes per server-hour**, Snack Party about 0.7 and Jackpot about 0.5. A player in a 30-minute session
-sees about three: a weather one more often than not, a drop one (crates, coins, runaways or a Snack Attack) about
-half the time.
+(`Config/Modifiers.luau` `schedule`), so one is running about **45% of the time**. Twenty-four modifiers share the
+picks by weight (twenty-two at 1, Snack Party at 0.5, Jackpot at 0.35), never the same twice in a row: each regular
+one runs about **1.2 minutes per server-hour**, Snack Party about 0.6 and Jackpot about 0.4. A player in a 30-minute
+session sees about three: a weather one (six of them) more often than not, a drop one (crates, coins, runaways,
+golden forks or a Snack Attack) about half the time, and a Bounty Hunt about one session in nine.
 
 | Modifier | Effect while it runs | Effect over a server-hour |
 | --- | --- | --- |
@@ -591,6 +595,10 @@ half the time.
 | Coin Rain | 8 showers of 12 coins over the walkways; walk through them | see below |
 | Great Escape | 6 Snacklings break out (one every 50 s) and run along the walkways; walk into one to catch it | see below |
 | Snack Attack | 3 giant Snacklings (one every 100 s) hover over the belt; everyone taps them down together | see below |
+| Eclipse | the sun goes black in a ring of fire and the afternoon turns violet; Eclipse Snacklings can roll (2%) | about 2–3 Eclipse per eclipse |
+| Gadget Frenzy | every gadget recharges in half the time, never under its floor: soda 18 s (not 17.5), peel 22.5 s, shield 20 s, magnet 30 s | – (gadgets change no number in the economy) |
+| Treasure Hunt | 7 golden forks (one every 42 s, one at a time) hide around the walkways and the plaza; walk into one to find it | see below |
+| Bounty Hunt | the top earner wears a bounty: tag them while they carry, or rob their base, for a payout from your own income | see below |
 
 They are spice, not an economy change: the biggest, Golden Hour, adds under a tenth to a server's mutations per hour.
 
@@ -616,11 +624,25 @@ the player's steady income:
   120 s x their share of the taps): four even helpers get about 50 seconds of income each, a solo takedown 140
   seconds. The top hitter also wins a Snackling rolled like a crate's (3x luck, 2x mutation chance). A server sees
   about one giant an hour.
-* Pickups, catches and taps are checked against the player's trusted position (no teleporting to coins, runaways or
-  the giant) and a crate's hold is re-checked like a steal's.
+* **A golden fork** (Treasure Hunt) pays the finder 40 seconds of their own income (at least $400) three times in
+  four, else a Lucky Spin (25%; a spin is worth about 90 s of income in cash on average, plus a 30% chance of a
+  Snackling, see "The Lucky Spin"). So a fork is worth about 50 s of income, and a whole hunt, seven forks for the
+  whole server to share, about six minutes of one player's income: a little more than a Coin Rain, for a lot more
+  running. It hides at least 30 studs from everyone (never twice running in the same place), the banner says roughly
+  where, and after 18 s a marker shows it; unfound, it goes after 36 s. The server finds it for whoever walks into it,
+  at a position trusted as for a steal, since the hiding places are known: a teleport there wins nothing.
+* **A bounty** (Bounty Hunt, `Config/Bounty.luau`) pays the claimer, never from the target: a tag on the target while
+  they carry is 60 seconds of the tagger's income (at least $500), robbing their base 90 seconds of the thief's (at
+  least $750), each on top of what the tag or the steal does anyway. Each hunter claims it once a hunt, the target's
+  Roblox friends never, and after any claim it rests 30 s, so a hunt pays at most one claim per other player (seven
+  in a full server) and usually two or three: for a hunter a minute or two of income, more than a Supply Crate's cash;
+  for the target a few more steal attempts than usual, and a banner when they get through unclaimed. A Bounty Hunt
+  comes up about once every four server-hours.
+* Pickups, catches and taps are checked against the player's trusted position (no teleporting to coins, runaways,
+  forks or the giant) and a crate's hold is re-checked like a steal's.
 The weather ones change only the sky (a lighting overlay above the map's and a seasonal theme's, the client's
 particles and sky effects) and unlock their mutation; lightning flashes are soft, at most two in a quarter second,
-and off with Reduce effects.
+and off with Reduce effects (the eclipsed sun never flashes; with Reduce effects it stands still).
 Every effect is clamped by `limits` (CI), and a speed modifier widens the server's movement checks by exactly its own
 multiplier (and keeps the faster speed allowed for 4 s after it ends), so the anti-cheat never flags a player for
 running at a speed the server gave them.
