@@ -74,7 +74,8 @@ local function place(object: GuiObject, r: Rect)
 end
 
 local function itemOf(view: Types.StyleView, kind: StyleRules.Kind, id: string): Types.StyleItemView?
-	for _, item in if kind == "title" then view.titles else view.skins do
+	local items: { Types.StyleItemView } = if kind == "title" then view.titles else view.skins
+	for _, item in items do
 		if item.id == id then
 			return item
 		end
@@ -288,7 +289,7 @@ end
 local function buildTab(current: Dialog)
 	current.content:ClearAllChildren()
 	table.clear(current.cards)
-	local tab = current.tab
+	local tab: Tab = current.tab
 	for id, button in current.tabs do
 		button.BackgroundColor3 = if id == tab then UiTheme.palette("gold") else UiTheme.palette("panelLight")
 	end
@@ -399,9 +400,10 @@ function StyleController.open(tab: Tab?)
 		BackgroundTransparency = 1,
 		Parent = modal.body,
 	}) :: Frame
+	local first: Tab = if tab ~= nil then tab else "titles"
 	local current: Dialog = {
 		modal = modal,
-		tab = tab or "titles",
+		tab = first,
 		tabs = tabs,
 		content = content,
 		now = nowLabel,

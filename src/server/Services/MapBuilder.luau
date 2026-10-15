@@ -260,7 +260,7 @@ function MapBuilder.paintPlot(plot: PlotRefs, look: Types.SkinLook?, vip: boolea
 	plot.rug.Color = if look then UiTheme.color(look.rug) else accent:Lerp(WHITE, 0.15)
 	plot.rug.Material = if look then materialNamed(look.rugMaterial, Enum.Material.Fabric) else Enum.Material.Fabric
 
-	local wallSource, capSource = StyleRules.trimSources(look, vip)
+	local wallSource: StyleRules.TrimSource, capSource: StyleRules.TrimSource = StyleRules.trimSources(look, vip)
 	local count = #plot.wallTrims + #plot.caps
 	local function paintTrim(trim: BasePart, source: StyleRules.TrimSource, order: number)
 		local color, material, rainbow = UiTheme.world("wall"), Enum.Material.SmoothPlastic, false
@@ -405,7 +405,7 @@ local function buildPlot(index: number, parent: Instance): PlotRefs
 				CastShadow = false,
 				Parent = decorFolder,
 			})
-			table.insert(tiles, { part = tile, row = row, side = sideIndex })
+			table.insert(tiles, { part = tile :: BasePart, row = row, side = sideIndex })
 		end
 	end
 
