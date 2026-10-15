@@ -1219,3 +1219,72 @@ and more to steal, without moving the economy curve.
 **Reversal cost:** medium. Shipped ids can never be removed or renamed (saves, gifts and codes refer to them), but
 one can be made rarer by lowering its `beltWeight` and giving the rest to its tier; a model can be redone by
 replacing `batch-7.json` and re-running the importer.
+
+### 51. Titles, base skins and What's New: earned looks to show off, and update notes players see
+
+* **What:** 22 titles (`Config/Titles`) and 8 base skins (`Config/Skins`), picked in a Style dialog (Settings → 🎨
+  Style, with Titles and Base tabs), and What's New (`Config/Updates`): a one-time card for returning players and a
+  board on the spawn plaza. `Logic/StyleRules`, `Logic/UpdateRules`, `Logic/StyleLayout`, `Logic/NewsLayout`;
+  `StyleService`, `Nametags`, `NewsService`; `StyleController`, `WhatsNewController`. No new HUD button.
+* **Earned, never bought:** each title and skin comes from an achievement (its `ach_<id>` flag, or its goal already
+  reached), a number of rebirths (titles at 1, 5 and 7; skins at 2 and 4) or of Snackdex tiers completed (titles at 3
+  and all 7; Mint Chip at the first), all read from the save. Nothing is sold. VIP's golden trim stays VIP's: it is
+  the Classic look for VIP players, who keep the gold corner caps under any other skin. Classic and "no title" are
+  free. After every achievement check (`AchievementService.onChecked`) each newly unlocked one gets a toast ("🦹 New
+  title unlocked: Master Thief — equip it in Settings ▸ Style"); what a player had when they joined gets none.
+* **Saved as flags, no schema bump:** `title_<id>` and `skin_<id>`, at most one of each (Classic is no flag). On join
+  `StyleRules.normalize` clears extras, unknown ids and anything locked. `EquipStyle(kind, id)` checks the kind, that
+  the id is a config key (or "" for none) and that it is unlocked, then swaps the flag, with nothing yielding in
+  between. `GetStyle` answers with `StyleSync` (what is worn, what is unlocked, and progress shown like the Trophies
+  tab). Analytics: `style_equipped` (01 = `title` | `skin`, 02 = the id, "" for none).
+* **The nametag:** one BillboardGui per character, on the Head (`Nametags`), built by the server only when the choice
+  changes or the character respawns. It is sized in pixels like Roblox's names (220×26, text at most 20 px with a
+  dark outline), sits 0.9 studs above the head and hides beyond 70 studs. It hides while its wearer carries a
+  Snackling (the loot and the THIEF! marker sit there) and is never shown to its wearer (`PlayerToHideFrom`), as
+  Roblox hides your own name. Texts and colours come from config, never from players, so nothing needs filtering. CI
+  keeps every title at 16 characters or fewer, at 14 px or more on its tag, and light enough to read over its
+  outline. The chat tag (`ChatTagController`) adds `[🦹 Master Thief]` in the title's colour after `[VIP]`, from the
+  player attribute `Title`.
+* **Skins paint only cosmetic surfaces:** `MapBuilder.paintPlot` recolours a base's floor tiles, the rug down the
+  aisle, the wall tops and the corner caps. The walls keep the plot's colour; the sign, podiums, collect pads, lock
+  button and upgrade pad never change. CI keeps every floor colour about as far from the collect pads' green as the
+  Classic floors are (redmean 150 or more; Classic's are 164 or more) and every material on a short list. A skin goes
+  on when the plot becomes its owner's (`PlotService.setSkin`, plot attribute `Skin`), and Classic goes back on
+  release. `MapBuilder.restyle` never touches plots, so a skin stays through map changes. Rainbow Swirl's trims carry
+  the `MutationRainbow` tag with a hue offset each, so `MutationFxController` cycles them (not with Reduce effects);
+  when the tag goes, clients put back the `RestColor` attribute.
+* **The Style dialog:** 700×336 UI like the host panel, laid out by `Logic/StyleLayout`: two 52 UI tabs, a line saying
+  what is worn, and a scrolling grid of 96 UI cards (titles in 3 columns, skins in 2 with a swatch of the floor and
+  trim). A locked card says how to earn it and how far the player is ("Steal 25 Snacklings", "🔒 12 / 25"); tapping
+  one says so again in a toast. Settings' last row is now in thirds (🎨 Style, 🎟️ Codes and, for hosts, 🛠️ Host
+  panel), so the dialog keeps its height. `tools/layoutCheck.luau` now also checks the Style dialog, the What's New
+  card and the host panel on all five screens.
+* **What's New:** `Config/Updates` lists updates newest first (number, date, title, 3-5 highlights, each starting with
+  an emoji and at most 64 characters; CI checks they fit the card and the board). A returning player (whose save was
+  saved before) who hasn't seen the newest number is sent `WhatsNew` once their client is ready. The client opens the
+  card only when nothing is in the way: at least 6 s after the first state, no tutorial, not carrying, no other dialog
+  (`Modal.isAnyOpen`, checked every second; the welcome-back popup and the daily reward come first). Then
+  `SeenNews(number)` sets `news_<number>` (older `news_` flags go). A first session, or a player still in the
+  tutorial, counts the update as seen without a card: new players get the tutorial instead. A card that was never
+  shown comes next time. Analytics: `news_seen` (value = the number).
+* **The board:** a 14×9-stud sign with a SurfaceGui (header, title, highlights, number and date), in the gap of the
+  plaza's tree ring at 126°, 33 studs out, facing the fountain and readable from the spawn. Four parts, built by
+  `MapBuilder` outside the Scenery folder like the leaderboards, so a restyle repaints its frame and legs and never
+  rebuilds it. `SceneryLayout` places and checks it like any plaza prop (off the plots, belt, walkway and spawn, clear
+  of seasonal props).
+* **Checked offline:** `tools/worldsim/cosmetics.luau` (CI) boots the server and plays all of it through the real
+  remotes with a new player, a returning VIP, a returning player still in the tutorial, one who saw the update and
+  one with `/style all`: the card once and never again, titles earned, worn and seen by others (attribute and
+  nametag; hidden while carrying), skins painted, kept through a map change and reset on leave, and every refused
+  equip. `tools/worldsim/exportSkins.luau` exports a map with one skin per base for `tools/preview`: the skins were
+  rendered on Sunny Meadow, Midnight Market and Frosty Peaks, and the paler ones deepened where bright maps washed
+  them out.
+
+**Why:** showing off what you have done is a big part of why players come back to the top Roblox games: a title over
+your head and a fancier base are flex that money can't buy here, and each one is a goal on the way to things players
+already chase (steals, rarities, rebirths, the Snackdex). And many players never notice new content unless the game
+tells them: a short card once per update, and a board everyone passes, do that without getting in the way.
+**Reversal cost:** low. All of it is data and flags: take a title or skin out of its list (its flag is cleared on
+join) or turn `chatTag` off. What's New only ever shows the newest entry, once, so not adding one shows nothing more.
+Never rename a shipped title or skin id (saves hold `title_<id>` and `skin_<id>`; CI keeps released lists) and never
+reuse an update number.

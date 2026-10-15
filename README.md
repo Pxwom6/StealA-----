@@ -62,7 +62,7 @@ Studio test purchases, etc.).
 | Command | What it does |
 | --- | --- |
 | `lune run tests/run.luau` | Unit tests for all pure game logic (no Studio needed) |
-| `lune run tools/layoutCheck.luau [--all]` | Where every HUD element lands on five phone, tablet and computer screens, and any overlap, play-zone button or small touch target (CI runs this too) |
+| `lune run tools/layoutCheck.luau [--all]` | Where every HUD element lands on five phone, tablet and computer screens, and any overlap, play-zone button or small touch target; also whether the Style, What's New and host panel dialogs fit (CI runs this too) |
 | `lune run tools/simulate.luau` | Economy simulation used to write `BALANCE.md` |
 | `lune run tools/importParts.luau` | Import the polished Snackling models from `art/snackling-parts/` |
 | `lune run tools/worldsim/smoke.luau` | Build the map offline in every map theme and check it (CI runs this too) |
@@ -73,6 +73,8 @@ Studio test purchases, etc.).
 | `lune run tools/worldsim/host.luau` | The host panel, cross-server messages and shout-outs as admin, owner and player, offline (CI) |
 | `lune run tools/worldsim/prelaunch.luau` | The pre-launch server fixes on the offline server, with a virtual clock (CI runs this too) |
 | `lune run tools/worldsim/gadgets.luau` | Every gadget through the real remotes on the offline server, with a virtual clock (CI runs this too) |
+| `lune run tools/worldsim/cosmetics.luau` | Titles, base skins and What's New through the real remotes on the offline server (CI) |
+| `lune run tools/worldsim/exportSkins.luau [mapId] [out.json] [--vip]` | Dump a map with a different base skin on every base, for a 3D preview |
 | `rojo build -o build/sync.rbxl` then `lune run tools/syncTest.luau build/sync.rbxl` | Check the Studio sync script (`studio/SyncFromGitHub.luau`) offline |
 | `stylua src tests tools studio` | Format |
 | `selene src tests tools studio` | Lint |
@@ -111,7 +113,9 @@ tools               Lune scripts (balance simulation, model import, worldsim: th
    are off and hidden; the friends bonus works either way.
 6. Optional: music and your own sounds in `src/shared/Config/Sounds.luau` (see "Sounds and music" below), models in
    `ReplicatedStorage/CreatureModels`.
-7. **Before the game goes public, make the GitHub repo private** (GitHub → the repo → Settings → General → Danger
+7. **What's New:** before each publish, put a note about what changed at the top of
+   `src/shared/Config/Updates.luau` (see "Titles, base skins and What's New").
+8. **Before the game goes public, make the GitHub repo private** (GitHub → the repo → Settings → General → Danger
    Zone → Change visibility). While it is public anyone can read `src/server/Codes.luau`, so codes you haven't posted
    yet are not secret. The Studio sync script then needs a token: see "Updating a place in Studio straight from
    GitHub" above.
@@ -377,8 +381,9 @@ once and are saved per player in the save's `flags` map (`settings_musicOff`, `s
 `settings_reduceEffects`; no save-format change). Reduce effects switches off particles, the belt / factory
 animations, Bloom and SunRays on that device; client code can read it with `ClientSettings.reduceEffects()` (or the
 LocalPlayer attribute `ReduceEffects`). Whatever the setting, lights and particles on podium Snacklings far from the
-camera are switched off to save phones the work (`podiumFx` in `src/shared/Config/Gameplay.luau`). Its last row opens 🎟️ Codes,
-and for admins and a private server's owner also 🛠️ Host panel (see "Host panel and live events").
+camera are switched off to save phones the work (`podiumFx` in `src/shared/Config/Gameplay.luau`). Its last row opens 🎨 Style
+(see "Titles, base skins and What's New") and 🎟️ Codes, and for admins and a private server's owner also 🛠️ Host
+panel (see "Host panel and live events").
 
 ### HUD layout (phones first)
 
@@ -470,6 +475,78 @@ none until one is bought, and none during the first-time tutorial.
 * **Studio:** `/gadgets` owns every gadget and recharges them; offline, `lune run tools/worldsim/gadgets.luau` (CI)
   plays every gadget through the real remotes.
 
+### Titles, base skins and What's New
+
+Settings (⚙) → **🎨 Style** opens a dialog with two tabs (DECISIONS.md #51). **Titles:** a short line under the
+player's name over their head, also shown as a chat tag after `[VIP]`; a player wears one or none. **Base:** a look
+for their own base (the floor's tiles, the rug, the wall tops and the corner caps; never the podiums, pads, sign or
+lock button). Both are earned, never bought: from achievements, rebirths and Snackdex tiers. Locked ones say how to
+earn them and how far the player is, and a toast says when one unlocks ("New title unlocked: Master Thief — equip it
+in Settings ▸ Style"). What is worn is a flag of each (`title_<id>`, `skin_<id>`; no save-format change).
+
+| Title | Earned by | Title | Earned by |
+| --- | --- | --- | --- |
+| 🫳 Sticky Fingers | steal a Snackling | 🎓 Snack Scholar | complete 3 Snackdex tiers |
+| 🛒 Snack Shopper | buy 25 from the belt | 👑 Legendary Bandit | steal 150 |
+| 📖 Collector | discover 10 Snacklings | 🔁 Five Lives | rebirth 5 times |
+| 🔑 Insider | redeem a code | 🌍 Globetrotter | play on every map |
+| 🦹 Master Thief | steal 25 | 💯 Completionist | discover every regular Snackling |
+| 💰 Millionaire | earn $1M in total | 🤫 Secret Keeper | own a Secret |
+| ♻️ Born Again | rebirth once | 🏦 Billionaire | earn $1B in total |
+| ⚔️ Giant Slayer | help take down a Snack Attack giant | 🏆 MVP | land the most hits on a giant that goes down |
+| 🧪 Mutation Hunter | own 8 different mutations | 📚 Snackdex Master | complete all 7 Snackdex tiers |
+| 🧭 Explorer | play on 12 maps | 🥷 Phantom Thief | steal 500 |
+| | | 🌀 Seven Lives | rebirth 7 times |
+| | | 🎖️ Veteran | play for 50 hours |
+
+| Base skin | Look | Earned by |
+| --- | --- | --- |
+| 🏠 Classic | the base's own colours (VIP: the golden trim) | every base starts with it |
+| 🍩 Sprinkle Pink | pink tiles, cream rug, hot-pink trim | own an Epic |
+| 🍨 Mint Chip | mint tiles, chocolate rug and trim | complete a Snackdex tier |
+| 🫐 Blueberry | blue tiles, deep blue rug, pale trim | own a Legendary |
+| 🥐 Golden Crust | golden tiles, butter rug, crust-brown trim | play for 1 hour |
+| 🖤 Licorice Night | dark slate tiles, red rug, glowing pink trim | rebirth twice |
+| 🌈 Rainbow Swirl | rainbow stripes, white rug, a trim that cycles the rainbow (not with Reduce effects) | own 16 different mutations |
+| 💎 Diamond | icy marble tiles, white marble rug, glowing ice trim | rebirth 4 times |
+
+VIP players keep their gold corner caps under any other skin. A skin goes on when the player gets their base, stays
+through map changes and comes off (back to Classic) when they leave.
+
+* **Add a title:** an entry in `src/shared/Config/Titles.luau`: an id, the text (at most 16 characters), an emoji, a
+  colour (`#RRGGBB`, light enough to read over the outline) and how it is earned:
+  `{ kind = "achievement", id = "<an id in Config/Achievements>" }`, `{ kind = "rebirths", count = 3 }` or
+  `{ kind = "tiers", count = 2 }` (Snackdex tiers). Its place in the list is its place in the tab (easiest first).
+  Add its id to `RELEASED_TITLE_IDS` in `tests/StyleRules.spec.luau`. CI checks it fits a phone's nametag, the card
+  and the toast. Never rename a shipped id: whoever wears it would wear nothing.
+* **Add a base skin:** an entry in `src/shared/Config/Skins.luau`: an id, a name (at most 16 characters), an emoji,
+  how it is earned (like a title) and a look: two or more floor tile colours (two make a checker, more make stripes),
+  a rug colour, a trim colour, and materials from `StyleRules.FLOOR_MATERIALS` and `TRIM_MATERIALS` (`rainbow = true`
+  makes the trims cycle). Add its id to `RELEASED_SKIN_IDS`. CI keeps every floor colour far enough from the collect
+  pads' green. To look at the skins on a map: `lune run tools/worldsim/exportSkins.luau meadow build/skins.json`
+  (one skin per base; add `--vip` for VIP's caps), then
+  `node tools/preview/render.mjs build/skins.json build/skins --shots plots`.
+* **The nametag:** `Titles.nametag` sets its size, height over the head and how far away it shows; `chatTag = false`
+  turns the chat tag off. It hides while its wearer carries a Snackling, and a player never sees their own.
+
+**Publishing an update note (before each publish):**
+
+1. Open `src/shared/Config/Updates.luau`.
+2. Copy the first entry of `list` and paste the copy above it, so the new one is at the top.
+3. Give it the next `number` (2, then 3...; never reuse one, or players who saw that number miss the new note), the
+   publish `date` (`YYYY-MM-DD`), a `title` (at most 40 characters) and 3 to 5 `highlights`. Each highlight starts
+   with an emoji and is at most 64 characters. Keep them short, fun and true: what players can do now.
+4. Leave the older entries below it as a history. Only the top one is shown.
+5. Run `lune run tests/run.luau` (CI does too): it checks the order, the lengths, and that every line fits the card
+   on the smallest phone and the board.
+
+Returning players get the card once, on their next join, after the welcome-back and daily reward popups. It never
+comes in a first session (new players get the tutorial), during the tutorial, over another dialog or while carrying.
+The board on the spawn plaza, beside where players spawn, always shows the newest note. Studio: `/news`
+shows the card again (without API access every Studio session counts as a first one, so it never comes by itself);
+`/style` unlocks every title and skin for you for that session, and `/style off` goes back to what you earned.
+Offline: `lune run tools/worldsim/cosmetics.luau` (CI) plays it all through the real remotes.
+
 ### Studio test commands
 
 These work in Studio only (`src/server/Services/DevCommands.luau`):
@@ -491,6 +568,8 @@ These work in Studio only (`src/server/Services/DevCommands.luau`):
 * `/gadgets` (own every gadget and recharge them all now), `/gadgets off` (none again)
 * `/hostas owner`, `/hostas none`, `/hostas admin` (try the host panel as a private server's owner, as a player with
   no panel, or as an admin again; reopen Settings after)
+* `/style` (every title and base skin unlocked for you this session, not saved), `/style off` (only what you earned),
+  `/news` (the What's New card again)
 
 To test a seasonal event in Studio: `/event Halloween2026 5` turns Halloween on for 5 minutes (decorations, dusk
 lighting, banner with countdown, event Snacklings and Haunted on the belt), and `/event off` ends it early.
