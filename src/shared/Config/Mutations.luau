@@ -16,7 +16,8 @@
 	                  mutations are rolled in, so append new ones with a higher order to keep existing rolls as they are
 	chance            probability per belt spawn, 0 < chance < 1; all chances together, event ones included, must stay
 	                  below 1 (CI keeps any one event's with the strongest map and modifier below 10%, every event's
-	                  together below 12%)
+	                  together below 20%, and Golden Hour's x3 of what can roll beside it below 50%; BALANCE.md
+	                  "Harvest Feast" has today's numbers)
 	incomeMultiplier  × the creature's base income (>= 1)
 	priceMultiplier   × the creature's belt price, rounded to a whole number (>= 1); sell value follows it
 	announce*         server-wide banner on spawn / buy / steal (in addition to the rarity's own flags)

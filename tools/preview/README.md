@@ -16,6 +16,10 @@ node tools/preview/render.mjs build/candy.json build/candy
 node tools/preview/render.mjs build/candy.json build/candy --shots plaza,plots
 node tools/preview/render.mjs build/candy.json build/candy --cam 0,80,200:0,10,60:50    # x,y,z:tx,ty,tz:fov
 
+# A map with a seasonal event's theme on (its decorations and lighting), e.g. the Harvest Feast
+lune run tools/worldsim/exportSeason.luau meadow Harvest2026 build/harvest-meadow.json
+node tools/preview/render.mjs build/harvest-meadow.json build/harvest-meadow --shots plots,belt
+
 # Snacklings in a row: front, threeQuarter, back, side, top
 lune run tools/worldsim/exportCreatures.luau build/lineup.json pizza_pup pizza_pup:golden matcha_manta
 lune run tools/worldsim/exportCreatures.luau build/lineup.json rarity:Mythic
