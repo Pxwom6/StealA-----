@@ -62,6 +62,9 @@ jobs:
       - name: Server test (boots the server offline and plays a short session)
         run: lune run tools/worldsim/server.luau
 
+      - name: Host test (the host panel, cross-server LiveOps and shout-outs, offline)
+        run: lune run tools/worldsim/host.luau
+
       - name: Studio sync script test (pulls this checkout into Rojo-built places offline)
         run: |
           mkdir -p build

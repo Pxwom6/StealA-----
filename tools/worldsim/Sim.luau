@@ -16,6 +16,10 @@
 	It is not a game server: there are no players, physics or remotes. It runs what builds the world (MapBuilder,
 	SceneryBuilder, the world themes, seasonal decorations) so CI can catch runtime errors there
 	(tools/worldsim/smoke.luau) and the result can be exported for an offline 3D preview (tools/worldsim/export.luau).
+
+	Online services: MessagingService is a loopback for one server of a game (Sim.messaging, Sim.deliver), TextService
+	filters with Sim.filter, and game.PrivateServerId / PrivateServerOwnerId / JobId can be set (Sim.gameProperties).
+	The rest throw, as during an outage.
 ]]
 
 local fs = require("@lune/fs")
@@ -825,6 +829,83 @@ local AnalyticsService: any = setmetatable({}, {
 	end,
 })
 
+-- MessagingService: a loopback for this one server of a game. PublishAsync records each message
+-- (Sim.messaging.published) and, as Roblox does, delivers it a moment later to every subscriber of its topic, this
+-- server's own included; Sim.deliver hands this server a message "from another server". (A second Sim server can't
+-- run beside this one: Lune's roblox library, which every instance comes from, is shared by the whole process.)
+-- Sim.messaging.online = false makes every call fail, as in Studio without API access or during an outage. Roblox's
+-- 1 KB message limit applies.
+Sim.messaging = {
+	online = true,
+	published = {} :: { { topic: string, data: any, at: number } },
+}
+local subscribers: { [string]: { (any) -> () } } = {}
+
+-- Delivers `data` on `topic` to this server's subscribers, as MessagingService would ({ Data, Sent }).
+function Sim.deliver(topic: string, data: any, sent: number?)
+	local list: { (any) -> () } = subscribers[topic] or {}
+	local packet = { Data = data, Sent = sent or Sim.now }
+	for _, callback in table.clone(list) do
+		task.spawn(function()
+			callback(packet)
+		end)
+	end
+end
+
+local MessagingService: any = {}
+function MessagingService.PublishAsync(_self: any, topic: string, data: any)
+	if not Sim.messaging.online then
+		error("MessagingService.PublishAsync failed: the service is unavailable")
+	end
+	local encoded = if type(data) == "string" then data else serde.encode("json", data)
+	if #encoded > 1024 then
+		error(`MessagingService.PublishAsync: message too large ({#encoded} bytes)`)
+	end
+	local at = Sim.now
+	table.insert(Sim.messaging.published, { topic = topic, data = data, at = at })
+	task.defer(function()
+		Sim.deliver(topic, data, at)
+	end)
+end
+function MessagingService.SubscribeAsync(_self: any, topic: string, callback: (any) -> ()): any
+	if not Sim.messaging.online then
+		error("MessagingService.SubscribeAsync failed: the service is unavailable")
+	end
+	local list = subscribers[topic] or {}
+	subscribers[topic] = list
+	table.insert(list, callback)
+	local connection = { Connected = true }
+	function connection.Disconnect(_: any)
+		connection.Connected = false
+		local index = table.find(list, callback)
+		if index then
+			table.remove(list, index)
+		end
+	end
+	return connection
+end
+
+-- TextService: Roblox's text filter, offline. Sim.filter turns a text into what everyone may see (default: as it
+-- is); Sim.filterOnline = false makes filtering fail.
+Sim.filterOnline = true
+Sim.filter = function(text: string): string
+	return text
+end
+local TextService: any = {}
+function TextService.FilterStringAsync(_self: any, text: string, _fromUserId: number, _context: any?): any
+	if not Sim.filterOnline then
+		error("TextService.FilterStringAsync failed: the filter is unavailable")
+	end
+	local result: any = {}
+	function result.GetNonChatStringForBroadcastAsync(_: any): string
+		return Sim.filter(text)
+	end
+	function result.GetNonChatStringForUserAsync(_: any, _toUserId: number): string
+		return Sim.filter(text)
+	end
+	return result
+end
+
 local serviceStubs: { [string]: any } = {
 	TweenService = TweenService,
 	RunService = RunService,
@@ -832,13 +913,13 @@ local serviceStubs: { [string]: any } = {
 	CollectionService = CollectionService,
 	HttpService = HttpService,
 	DataStoreService = unavailable("DataStoreService"),
-	MessagingService = unavailable("MessagingService"),
+	MessagingService = MessagingService,
 	MarketplaceService = MarketplaceService,
 	BadgeService = unavailable("BadgeService"),
 	SocialService = unavailable("SocialService"),
 	GroupService = unavailable("GroupService"),
 	AnalyticsService = AnalyticsService,
-	TextService = unavailable("TextService"),
+	TextService = TextService,
 }
 
 local services: { [string]: any } = {}
@@ -866,7 +947,8 @@ local function getService(_self: any, name: string): any
 	return service
 end
 
--- DataModel properties a place file doesn't store (Lune can't read them): what a fresh Studio session would say.
+-- DataModel properties a place file doesn't store (Lune can't read them): what a fresh Studio session would say. A
+-- test may change them, e.g. PrivateServerId and PrivateServerOwnerId to play a private server.
 local GAME_PROPERTIES: { [string]: any } = {
 	PlaceId = 0,
 	GameId = 0,
@@ -876,6 +958,7 @@ local GAME_PROPERTIES: { [string]: any } = {
 	PrivateServerId = "",
 	PrivateServerOwnerId = 0,
 }
+Sim.gameProperties = GAME_PROPERTIES
 
 -- Functions game:BindToClose registered (Sim.close runs them).
 local closeCallbacks: { () -> () } = {}
