@@ -16,6 +16,22 @@ T.describe("Inventory", function()
 		T.expect(Inventory.findFreePodium(owner.creatures, 3)).toBeNil()
 		T.expect(Inventory.findFreePodium(owner.creatures, 4)).toBe(4)
 	end)
+	T.it("counts free podiums, and keeps a carrying thief's last one out of automatic prizes", function()
+		local owner: Inventory.Owner = { creatures = {}, nextUid = 1 }
+		T.expect(Inventory.freePodiumCount(owner.creatures, 8)).toBe(8)
+		for podium = 1, 7 do
+			Inventory.add(owner, "a", podium, 0)
+		end
+		Inventory.add(owner, "parked", 12, 0) -- beyond capacity (a refunded pass): not on an active podium
+		T.expect(Inventory.freePodiumCount(owner.creatures, 8)).toBe(1)
+		-- Bob, 7 of 8 podiums used, steals a Secret and brushes a runaway: the runaway is sold, the Secret gets home
+		T.expect(Inventory.prizeMayTakePodium(owner.creatures, 8, true)).toBe(false)
+		T.expect(Inventory.prizeMayTakePodium(owner.creatures, 8, false)).toBe(true)
+		T.expect(Inventory.prizeMayTakePodium(owner.creatures, 9, true)).toBe(true) -- two free: one each
+		Inventory.add(owner, "b", 8, 0)
+		T.expect(Inventory.freePodiumCount(owner.creatures, 8)).toBe(0)
+		T.expect(Inventory.prizeMayTakePodium(owner.creatures, 8, false)).toBe(false)
+	end)
 	T.it("assigns increasing uids and finds by podium / uid", function()
 		local owner: Inventory.Owner = { creatures = {}, nextUid = 7 }
 		local record = Inventory.add(owner, "a", 2, 123)

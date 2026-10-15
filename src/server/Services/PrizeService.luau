@@ -23,6 +23,7 @@ local Types = require(ReplicatedStorage.Shared.Types)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local EconomyMath = require(ReplicatedStorage.Shared.Logic.EconomyMath)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
+local Inventory = require(ReplicatedStorage.Shared.Logic.Inventory)
 local MutationRules = require(ReplicatedStorage.Shared.Logic.MutationRules)
 local RarityRoll = require(ReplicatedStorage.Shared.Logic.RarityRoll)
 local SpinRules = require(ReplicatedStorage.Shared.Logic.SpinRules)
@@ -85,15 +86,17 @@ function PrizeService.rollCreature(
 	return def, variant
 end
 
--- Puts `def` (with `variant`) on a free podium, or pays its sell value when the base is full. Returns whether it was
--- given and the cash paid instead (0 when given).
+-- Puts `def` (with `variant`) on a free podium, or pays its sell value when the base is full. A thief carrying a
+-- Snackling home keeps their last free podium for it: the prize is sold instead (Inventory.prizeMayTakePodium).
+-- Returns whether it was given and the cash paid instead (0 when given).
 function PrizeService.giveOrSell(
 	session: Session,
 	def: Types.CreatureDef,
 	variant: string?,
 	sku: string
 ): (boolean, number)
-	if EconomyService.giveCreature(session, def.id, variant) then
+	local mayTake = Inventory.prizeMayTakePodium(session.data.creatures, session.capacity, session.carry ~= nil)
+	if mayTake and EconomyService.giveCreature(session, def.id, variant) then
 		return true, 0
 	end
 	local value = EconomyMath.sellValue(GameData.price(def, variant), Economy.sellRefund)
