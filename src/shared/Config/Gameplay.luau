@@ -148,6 +148,8 @@ local Gameplay = {
 		ClaimGift = { burst = 6, perSecond = 2 }, -- playtime gifts: each pays once a day (GiftRules.claim)
 		Spin = { burst = 2, perSecond = 0.5 }, -- the Lucky Spin (SpinService also waits for the reel)
 		GetAchievements = { burst = 3, perSecond = 0.5 }, -- the Trophies tab asking for progress
+		-- The host panel (HostService): admins and private-server owners only; owners also have cooldowns per action.
+		HostAction = { burst = 4, perSecond = 1 },
 	} :: { [string]: RateLimit },
 }
 

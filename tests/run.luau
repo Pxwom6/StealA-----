@@ -43,5 +43,7 @@ require("./CodeRules.spec")
 require("./GiftRules.spec")
 require("./SpinRules.spec")
 require("./AchievementRules.spec")
+require("./HostRules.spec")
+require("./CrossServerRules.spec")
 
 T.finish()

@@ -453,6 +453,7 @@ T.describe("Config integrity", function()
 				"InvitePrompted",
 				"SkipTutorial",
 				"DevGrantProduct",
+				"HostAction",
 			}
 		do
 			local limit = Gameplay.rateLimits[name]
