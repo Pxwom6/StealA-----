@@ -3672,7 +3672,7 @@ local landmarks: { [string]: LandmarkBuilder } = {
 		local pool = kit.decor({
 			Name = "Syrup",
 			Shape = Enum.PartType.Cylinder,
-			Size = cylinderSize(0.6 * s, 24 * s),
+			Size = cylinderSize(0.6 * s, 26 * s),
 			CFrame = frame * CFrame.new(0, syrupTop, 0) * UPRIGHT,
 			Color = syrup,
 			Parent = parent,
@@ -3680,19 +3680,19 @@ local landmarks: { [string]: LandmarkBuilder } = {
 		pool.Reflectance = 0.2
 		kit.decor({
 			Name = "Butter",
-			Size = Vector3.new(7, 3, 7) * s,
-			CFrame = frame * CFrame.new(0, syrupTop + 1.6 * s, 0) * CFrame.Angles(0, math.rad(20), 0),
+			Size = Vector3.new(9, 4, 9) * s,
+			CFrame = frame * CFrame.new(0, syrupTop + 2 * s, 0) * CFrame.Angles(0, math.rad(20), 0),
 			Color = world("butter"),
 			Parent = parent,
 		})
+		-- runs of syrup down the side, from the pool on top
 		for i = 0, 2 do
 			local yaw = i * 2.2 + 0.4
+			local length = (7 + i * 2.5) * s
 			local drip = kit.decor({
 				Name = "Drip",
-				Size = Vector3.new(3, 9, 2) * s,
-				CFrame = frame
-					* CFrame.Angles(0, yaw, 0)
-					* CFrame.new(0, syrupTop - (4 + i * 1.5) * s, -(14.3 - i * 0.3) * s),
+				Size = Vector3.new(3.2 * s, length, 1.4 * s),
+				CFrame = frame * CFrame.Angles(0, yaw, 0) * CFrame.new(0, syrupTop - length / 2 + 0.4 * s, -13.3 * s),
 				Color = syrup,
 				Parent = parent,
 			})

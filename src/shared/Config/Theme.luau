@@ -297,7 +297,7 @@ local Theme = {
 		-- Pancake Peaks
 		pancake = "#E8B060",
 		pancakeEdge = "#C8803A",
-		syrup = "#B8641A",
+		syrup = "#94420F",
 		fork = "#C8CCD8",
 		blueberry = "#3A4AA8",
 		berryBush = "#4A9A4A",
