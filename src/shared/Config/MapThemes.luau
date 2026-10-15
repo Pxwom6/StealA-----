@@ -1862,7 +1862,7 @@ local MapThemes: MapThemesConfig = {
 				candy4 = "#A86BFF",
 			},
 			lighting = {
-				clockTime = 17.9,
+				clockTime = 18.1,
 				geographicLatitude = 45,
 				brightness = 2.2,
 				exposureCompensation = 0.2,

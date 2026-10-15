@@ -733,6 +733,28 @@ T.describe("Map and weather mutations", function()
 		return sum
 	end
 
+	T.it("rolls the four newest maps' signatures at their chance, never changing any other roll", function()
+		for _, themeId in { "hive", "gingerbread", "ramen", "ranch" } do
+			local signature = MutationRules.forMap(Mutations, themeId) :: Types.MutationDef
+			T.expect(signature ~= nil).toBe(true)
+			T.expect(signature.chance).toBe(0.012)
+			T.expect(signature.incomeMultiplier).toBe(3)
+			local a, b = T.seededRandom(31), T.seededRandom(31)
+			local hits, rolls = 0, 40000
+			for _ = 1, rolls do
+				local on = MutationRules.roll(Mutations, MutationRules.conditions({}, themeId, nil), a)
+				local off = MutationRules.roll(Mutations, {}, b)
+				if on == signature.id then
+					hits += 1
+				else
+					-- rolled after every other mutation, so every other result is the same with or without it
+					T.expect(on).toBe(off)
+				end
+			end
+			T.expect(hits / rolls).toBeNear(signature.chance, 0.003)
+		end
+	end)
+
 	T.it("gives every map exactly one signature mutation, and names only real maps", function()
 		for _, themeId in MapThemes.order do
 			local count = 0
