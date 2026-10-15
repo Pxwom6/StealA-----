@@ -6,12 +6,19 @@
 	functions, so this is what players see. CI runs it; it exits with an error when anything overlaps, leaves the
 	screen, sits in the play zone or is too small to tap. The unit tests (tests/ScreenLayout.spec.luau) check the same.
 
+	Then the dialogs laid out by pure modules (the Style dialog, the What's New card, the host panel): each must fit
+	every screen below Roblox's top bar. What is inside them (touch targets, text sizes) is checked by their unit tests
+	(tests/StyleLayout.spec.luau, tests/NewsLayout.spec.luau, tests/HostPanelLayout.spec.luau).
+
 	Usage: lune run tools/layoutCheck.luau [--all]   (--all lists every element in every scenario, in screen pixels)
 ]]
 
 local process = require("@lune/process")
 
+local HostPanelLayout = require("../src/shared/Logic/HostPanelLayout")
+local NewsLayout = require("../src/shared/Logic/NewsLayout")
 local ScreenLayout = require("../src/shared/Logic/ScreenLayout")
+local StyleLayout = require("../src/shared/Logic/StyleLayout")
 
 local verbose = table.find(process.args, "--all") ~= nil
 
@@ -84,8 +91,25 @@ for _, spec in ScreenLayout.DEVICES do
 	end
 end
 
+type FitCheck = (width: number, height: number, topBar: number, margin: number) -> { string }
+local DIALOGS: { { name: string, fit: FitCheck } } = {
+	{ name = "Style dialog", fit = StyleLayout.fitProblems },
+	{ name = "What's New card", fit = NewsLayout.fitProblems },
+	{ name = "host panel", fit = HostPanelLayout.fitProblems },
+}
+print("Dialogs (below Roblox's top bar, 8 UI from the sides):")
+for _, spec in ScreenLayout.DEVICES do
+	local device = ScreenLayout.device(spec)
+	for _, dialog in DIALOGS do
+		local problems = dialog.fit(device.width, device.height, device.topBar, ScreenLayout.EDGE)
+		total += #problems
+		local verdict = if #problems == 0 then "ok" else table.concat(problems, "; ")
+		print(string.format("  %-16s %-16s %s", spec.name, dialog.name, verdict))
+	end
+end
+
 if total > 0 then
 	print(`\n{total} layout problems`)
 	process.exit(1)
 end
-print("\nHUD layout: no problems on any screen")
+print("\nHUD and dialog layout: no problems on any screen")
