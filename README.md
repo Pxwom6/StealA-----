@@ -283,12 +283,15 @@ already had progress when it shipped never see it. Steps finish only when the se
 
 Every Snackling is a 3D "living snack" built in code from plain Roblox parts (no meshes or asset ids).
 
-* **Polished models:** all 76 have one. The first 64 were designed in Claude Design from the prompts in
+* **The roster:** 80 permanent Snacklings (13 Common, 13 Uncommon, 13 Rare, 12 Epic, 11 Legendary, 10 Mythic and 8
+  Secret) plus 16 event ones (four each for Halloween, Winter, Valentine's and Easter, Rare to Mythic). Prices, odds
+  and the share of each tier are in BALANCE.md ("The roster").
+* **Polished models:** all 96 have one. The first 64 were designed in Claude Design from the prompts in
   `art/snackling-parts/`; the four Winter 2026 Snacklings (`batch-4.json`), the four Valentine's 2027 ones
-  (`batch-5.json`) and the four Easter 2027 ones (`batch-6.json`) were built by hand in the same format and checked
-  from every side in an offline 3D preview (`prompt-batch-4.md` to `prompt-batch-6.md` can redo them in Claude
-  Design). Imported
-  with `lune run tools/importParts.luau`, which checks them, sizes them and writes
+  (`batch-5.json`), the four Easter 2027 ones (`batch-6.json`) and the 20 permanent ones added in batch 7
+  (`batch-7.json`, DECISIONS.md #50) were built by hand in the same format and checked from every side in an offline
+  3D preview, next to their tier's other models (`prompt-batch-4.md` to `prompt-batch-7.md` can redo them in Claude
+  Design). Imported with `lune run tools/importParts.luau`, which checks them, sizes them and writes
   `src/shared/Config/CreatureParts.luau` (generated: edit a `batch-*.json` and re-run the tool). See DECISIONS.md #28.
 * **Recipes (the fallback):** a Snackling without a polished model builds from its recipe in
   `src/shared/Config/CreatureLooks.luau`, which picks a body plan (blob, biped, quadruped, swimmer, tentacled), the food its
