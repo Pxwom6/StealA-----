@@ -613,6 +613,8 @@ export type ModifierSchedule = {
 	gapMinSeconds: number, -- a random break between two modifiers
 	gapMaxSeconds: number,
 	firstDelaySeconds: number, -- a new server waits this long before the first one
+	-- after a change, actions are checked against the kinder of the old and new effects for this long (ModifierRules.lenient)
+	changeGraceSeconds: number,
 }
 
 export type ModifiersConfig = {

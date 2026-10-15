@@ -110,6 +110,46 @@ T.describe("ModifierRules prices and the belt", function()
 	end)
 end)
 
+T.describe("ModifierRules.lenient (just after a modifier starts or ends)", function()
+	local none = ModifierRules.none()
+	local grace = Modifiers.schedule.changeGraceSeconds
+	local function at(current: any, previous: any, secondsAfter: number): ModifierRules.Effects
+		return ModifierRules.lenient(current, previous, 100, 100 + secondsAfter, grace)
+	end
+
+	T.it("lasts about a second and a half", function()
+		T.expect(grace).toBeAtLeast(1)
+		T.expect(grace).toBeAtMost(2)
+	end)
+
+	T.it("charges the sale price for a moment after Clearance Sale ends, then the full price", function()
+		local sale = ModifierRules.effects(Modifiers, "clearanceSale")
+		T.expect(ModifierRules.beltPrice(1000, at(none, sale, 0.3))).toBe(700) -- the client still showed $700
+		T.expect(ModifierRules.beltPrice(1000, at(none, sale, grace))).toBe(1000)
+		T.expect(ModifierRules.beltPrice(1000, at(sale, none, 0.3))).toBe(700) -- a sale starting: the lower price at once
+	end)
+
+	T.it("accepts a Quick Hands hold that finishes just after it ends", function()
+		local quick = ModifierRules.effects(Modifiers, "quickHands")
+		T.expect(at(none, quick, 0.5).stealHold).toBe(quick.stealHold)
+		T.expect(at(none, quick, grace + 0.01).stealHold).toBe(1)
+		T.expect(at(quick, none, 0.5).stealHold).toBe(quick.stealHold)
+	end)
+
+	T.it("keeps Snack Patrol's tag reach for a moment after it ends", function()
+		local patrol = ModifierRules.effects(Modifiers, "snackPatrol")
+		T.expect(patrol.tagRange).toBeGreaterThan(1)
+		T.expect(at(none, patrol, 1).tagRange).toBe(patrol.tagRange)
+		T.expect(at(none, patrol, grace).tagRange).toBe(1)
+	end)
+
+	T.it("changes nothing else, and nothing at all without a change", function()
+		local rush = ModifierRules.effects(Modifiers, "rushHour")
+		T.expect(at(none, rush, 0.2).spawnInterval).toBe(1) -- the belt, income and the rest follow the server at once
+		T.expect(ModifierRules.lenient(rush, none, -math.huge, 100, grace)).toEqual(rush)
+	end)
+end)
+
 T.describe("ModifierRules.pick", function()
 	T.it("never repeats the last modifier", function()
 		for _, last in Modifiers.order do

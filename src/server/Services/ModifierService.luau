@@ -11,7 +11,9 @@
 	as a LiveOps boost (source "modifier"), so the HUD's luck pill shows it and the usual cap applies.
 
 	Movement checks never trust a speed the client might not have yet: walkSpeedAllowance() is the larger of the
-	current and the previous multiplier for a few seconds after every change.
+	current and the previous multiplier for a few seconds after every change. In the same way, actionEffects() is what
+	a belt purchase, a steal hold and a tag are checked against: for a moment after a change, the kinder of the old and
+	new price, hold and reach (Logic/ModifierRules.lenient), since clients show the old ones for 0.1-0.3 s.
 
 	Weather modifiers (Thunderstorm, Meteor Shower, Toxic Fog) unlock a mutation while they run (BeltService passes
 	the running id into the mutation roll) and put their lighting over the map's through WorldLighting (above a
@@ -58,6 +60,8 @@ local last: string? = nil
 local endsAt = 0
 local nextAt = 0
 local effects = ModifierRules.none()
+local previousEffects = ModifierRules.none()
+local changedAt = -math.huge
 local previousWalk = 1
 local previousWalkUntil = 0
 local listeners: { () -> () } = {}
@@ -84,6 +88,12 @@ function ModifierService.endsAt(): number
 	return if current then endsAt else 0
 end
 
+-- What a player's action is checked against right now (belt prices, the steal hold, tag reach): the current effects,
+-- or for Config/Modifiers schedule.changeGraceSeconds after a change the kinder of the old and new values.
+function ModifierService.actionEffects(): ModifierRules.Effects
+	return ModifierRules.lenient(effects, previousEffects, changedAt, now(), Modifiers.schedule.changeGraceSeconds)
+end
+
 -- The walking-speed multiplier movement checks should allow right now: the current one, or the previous one for a
 -- few seconds after a change if that was faster.
 function ModifierService.walkSpeedAllowance(): number
@@ -107,6 +117,8 @@ end
 local function setEffects(id: string?)
 	local before = effects
 	effects = ModifierRules.effects(Modifiers, id)
+	previousEffects = before
+	changedAt = now()
 	if effects.walkSpeed ~= before.walkSpeed then
 		previousWalk = before.walkSpeed
 		previousWalkUntil = now() + SPEED_GRACE_SECONDS
