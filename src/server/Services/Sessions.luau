@@ -94,6 +94,7 @@ export type Session = {
 	social: Social, -- written by SocialService, read by EconomyService and Replication
 	tutorial: TutorialRun?, -- written by TutorialService, read by Replication
 	cashOfferAt: number, -- os.clock() of the last "Need $X more?" offer (CashOfferService), -inf: never
+	host: Types.HostView?, -- what this player may host (HostService; nil: nothing), read by Replication
 }
 
 local Sessions = {}

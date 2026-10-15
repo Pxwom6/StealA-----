@@ -34,6 +34,8 @@ type Session = Sessions.Session
 local Replication = {}
 
 local questDefs = QuestRules.index(Quests.pool)
+-- Most players may host nothing: the Settings row stays hidden.
+local NO_HOST: Types.HostView = { role = "", studio = false, mapReadyAt = 0, modifierReadyAt = 0, giftReadyAt = 0 }
 
 function Replication.markDirty(session: Session)
 	session.dirty = true
@@ -134,6 +136,7 @@ function Replication.snapshot(session: Session): Types.ClientState
 			ready = SpinRules.source(data.spin, now) ~= nil,
 			rewards = spinRewards(session.packIncome),
 		},
+		host = session.host or NO_HOST, -- HostService: the host panel's role and cooldowns
 	}
 end
 

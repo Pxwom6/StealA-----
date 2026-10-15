@@ -146,6 +146,7 @@ local function onPlayerAdded(player: Player)
 		social = { friends = 0, groupMember = false },
 		tutorial = nil,
 		cashOfferAt = -math.huge,
+		host = nil,
 	}
 	Sessions.add(session)
 

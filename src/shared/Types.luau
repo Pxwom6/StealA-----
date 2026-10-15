@@ -1190,6 +1190,7 @@ export type ClientState = {
 	quests: QuestsView,
 	gifts: GiftsView,
 	spin: SpinView,
+	host: HostView,
 }
 
 export type BeltItem = { id: number, creatureId: string, spawnAt: number, variant: string? }

@@ -8,19 +8,19 @@
 
 	Runtime control without publishing:
 	  * remote config: event list JSON in a DataStore entry, re-read every few minutes
-	  * admin chat commands (/luck, /event <id> [minutes], /event off [id], /announce), broadcast to every server
-	    with MessagingService. In Studio anyone may use them and they apply to that Studio session only.
+	  * admin actions: startLuck, startEvent, endEvents and announce, run by HostService for the host panel and the
+	    admin chat commands (/luck, /event <id> [minutes], /event off [id], /announce), in this server or, through
+	    CrossServer, every server
 ]]
 
 local DataStoreService = game:GetService("DataStoreService")
 local HttpService = game:GetService("HttpService")
-local MessagingService = game:GetService("MessagingService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local TextChatService = game:GetService("TextChatService")
 local TextService = game:GetService("TextService")
 
 local LiveOps = require(ReplicatedStorage.Shared.Config.LiveOps)
+local Theme = require(ReplicatedStorage.Shared.Config.Theme)
+local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local LiveOpsRules = require(ReplicatedStorage.Shared.Logic.LiveOpsRules)
 local Types = require(ReplicatedStorage.Shared.Types)
 local Announcer = require(script.Parent.Announcer)
@@ -245,150 +245,64 @@ local function loadRemoteConfig()
 	LiveOpsService.setRemoteEvents(events)
 end
 
--- Admin commands -----------------------------------------------------------------------------------------------
+-- Admin actions (HostService: the host panel and the admin chat commands) ------------------------------------------
 
-type Command = { kind: string, multiplier: number?, minutes: number?, eventId: string?, text: string? }
-
-local MAX_EVENT_MINUTES = 7 * 24 * 60
-
-local function applyCommand(command: Command)
-	if command.kind == "luck" then
-		local multiplier = math.clamp(command.multiplier or 2, 1, LiveOps.limits.maxLuckMultiplier)
-		local minutes = math.clamp(command.minutes or 15, 1, 24 * 60)
-		LiveOpsService.addLuckBoost(minutes * 60, multiplier, "admin")
-		Announcer.broadcast({ text = `{multiplier}x LUCK for {minutes} minutes!`, rarity = "Legendary", kind = "luck" })
-	elseif command.kind == "event" and command.eventId then
-		local event = LiveOpsService.findConfiguredEvent(command.eventId)
-		if event then
-			local seconds = if type(command.minutes) == "number" and command.minutes == command.minutes
-				then math.clamp(math.floor(command.minutes), 1, MAX_EVENT_MINUTES) * 60
-				else event.durationSeconds or 1800
-			LiveOpsService.startEventNow(event, seconds)
-			print(`[LiveOps] /event: {event.id} running for at least {seconds // 60} min`)
-			if event.bannerText then
-				Announcer.broadcast({ text = event.bannerText, rarity = "Mythic", kind = "admin" })
-			end
-		else
-			warn(`[LiveOps] /event: no configured event "{command.eventId}"`)
+-- Every configured event id (Config/LiveOps and remote config): the events an admin may start or end.
+function LiveOpsService.configuredEventIds(): { [string]: boolean }
+	local ids: { [string]: boolean } = {}
+	for _, list in { configEvents, remoteEvents } do
+		for _, event in list do
+			ids[event.id] = true
 		end
-	elseif command.kind == "eventOff" then
-		local ended = LiveOpsService.endStartedEvents(command.eventId)
-		print(`[LiveOps] /event off: ended {ended} started event(s)`)
-	elseif command.kind == "announce" and command.text then
-		Announcer.broadcast({ text = command.text, kind = "admin" })
 	end
+	return ids
 end
 
--- Publishes to every server (including this one); falls back to applying locally if publishing fails. In Studio a
--- command only ever applies to the Studio session: anyone may use the commands there (isAdmin), and with Studio API
--- access on, publishing would reach every live server.
-local function broadcastCommand(command: Command)
-	if RunService:IsStudio() then
-		applyCommand(command)
-		return
-	end
-	local ok = pcall(function()
-		MessagingService:PublishAsync(LiveOps.messagingTopic, HttpService:JSONEncode(command))
-	end)
-	if not ok then
-		applyCommand(command)
-	end
+-- An admin luck boost: `multiplier`x luck for `minutes` (already clamped by HostRules), with its banner.
+function LiveOpsService.startLuck(multiplier: number, minutes: number)
+	LiveOpsService.addLuckBoost(minutes * 60, multiplier, "admin")
+	Announcer.broadcast({
+		text = Format.template(Theme.text.adminLuck, { multiplier = multiplier, minutes = minutes }),
+		rarity = "Legendary",
+		kind = "luck",
+	})
 end
 
-local function isAdmin(userId: number): boolean
-	return RunService:IsStudio() or table.find(LiveOps.adminUserIds, userId) ~= nil
+-- Starts configured event `id` now, for `minutes` or else its own durationSeconds (30 minutes without one), with
+-- its banner. Returns false when no event has that id.
+function LiveOpsService.startEvent(id: string, minutes: number?): boolean
+	local event = LiveOpsService.findConfiguredEvent(id)
+	if event == nil then
+		return false
+	end
+	local seconds = if minutes then minutes * 60 else event.durationSeconds or 1800
+	LiveOpsService.startEventNow(event, seconds)
+	print(`[LiveOps] {event.id} running for at least {seconds // 60} min`)
+	if event.bannerText then
+		Announcer.broadcast({ text = event.bannerText, rarity = "Mythic", kind = "admin" })
+	end
+	return true
 end
 
-local function filterForBroadcast(text: string, fromUserId: number): string?
+-- Ends events started by an admin (every one, or only `id`); returns how many.
+function LiveOpsService.endEvents(id: string?): number
+	local ended = LiveOpsService.endStartedEvents(id)
+	print(`[LiveOps] ended {ended} started event(s)`)
+	return ended
+end
+
+-- A banner for everyone. `text` must already be filtered (filterForBroadcast).
+function LiveOpsService.announce(text: string)
+	Announcer.broadcast({ text = text, kind = "admin" })
+end
+
+-- `text` as Roblox's filter lets everyone see it, or nil when the filter can't be reached. Text shown to every player
+-- goes through it, even from admins. Yields.
+function LiveOpsService.filterForBroadcast(text: string, fromUserId: number): string?
 	local ok, result = pcall(function(): string
 		return TextService:FilterStringAsync(text, fromUserId):GetNonChatStringForBroadcastAsync()
 	end)
 	return if ok then result else nil
-end
-
-local function addCommand(alias: string, handler: (userId: number, args: { string }, rawArgs: string) -> ())
-	local command = Instance.new("TextChatCommand")
-	command.Name = "LiveOps" .. alias
-	command.PrimaryAlias = "/" .. alias
-	command.AutocompleteVisible = false
-	command.Parent = TextChatService
-	command.Triggered:Connect(function(source: TextSource, text: string)
-		if not isAdmin(source.UserId) then
-			return
-		end
-		local rawArgs = string.match(text, "^%S+%s*(.*)$") or ""
-		local args: { string } = {}
-		for word in string.gmatch(rawArgs, "%S+") do
-			table.insert(args, word)
-		end
-		handler(source.UserId, args, rawArgs)
-	end)
-end
-
--- Subscribes to admin commands from other servers. MessagingService can fail (limits, outages; in Studio it is
--- usually unavailable), so keep retrying with a growing delay (5 s, 10 s, ... capped at 60 s) until it works. Only
--- the first failure warns; the retries are quiet, so a Studio session's output isn't flooded once a minute.
-local function subscribeToCommands()
-	local attempt = 0
-	while true do
-		attempt += 1
-		local ok, err = pcall(function()
-			MessagingService:SubscribeAsync(LiveOps.messagingTopic, function(message: any)
-				local decodeOk, decoded = pcall(function(): any
-					return HttpService:JSONDecode(message.Data)
-				end)
-				if decodeOk and type(decoded) == "table" and type(decoded.kind) == "string" then
-					applyCommand(decoded :: Command)
-				end
-			end)
-		end)
-		if ok then
-			if attempt > 1 then
-				print(`[LiveOps] subscribed to admin commands after {attempt} attempts`)
-			end
-			return
-		end
-		if attempt == 1 then
-			warn(`[LiveOps] could not subscribe to admin commands, retrying quietly in the background: {err}`)
-		end
-		task.wait(math.min(60, 5 * 2 ^ (attempt - 1)))
-	end
-end
-
-local function startAdminTools()
-	task.spawn(subscribeToCommands)
-
-	addCommand("luck", function(_userId: number, args: { string })
-		broadcastCommand({ kind = "luck", multiplier = tonumber(args[1]), minutes = tonumber(args[2]) })
-	end)
-	-- /event <eventId> [minutes]   start a configured event now (for its durationSeconds, or `minutes`)
-	-- /event off [eventId]         end the events started this way (all of them, or just that one)
-	addCommand("event", function(_userId: number, args: { string })
-		local first = args[1]
-		if first == nil or #first > 64 then
-			return
-		end
-		if string.lower(first) == "off" then
-			local id = args[2]
-			if id and #id > 64 then
-				return
-			end
-			broadcastCommand({ kind = "eventOff", eventId = id })
-		else
-			broadcastCommand({ kind = "event", eventId = first, minutes = tonumber(args[2]) })
-		end
-	end)
-	addCommand("announce", function(userId: number, _args: { string }, rawArgs: string)
-		local text = string.sub(rawArgs, 1, 120)
-		if #text == 0 then
-			return
-		end
-		-- Text shown to every player must go through Roblox filtering, even from admins.
-		local filtered = filterForBroadcast(text, userId)
-		if filtered then
-			broadcastCommand({ kind = "announce", text = filtered })
-		end
-	end)
 end
 
 function LiveOpsService.start()
@@ -407,7 +321,6 @@ function LiveOpsService.start()
 			end
 		end)
 	end
-	startAdminTools()
 end
 
 return LiveOpsService

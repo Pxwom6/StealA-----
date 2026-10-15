@@ -10,11 +10,14 @@
 	scenery rebuilt, the lighting faded. Nothing that plays changes, and nobody is moved.
 
 	Clients read it all from workspace attributes: MapTheme (id), MapThemeEndsAt (server time of the next change; 0 =
-	no rotation), MapVoteEndsAt (0 = no vote running), MapVoteCandidates ("candy,winter,desert") and MapVoteCounts
-	("2,0,1").
+	no rotation), MapRotation (false: this server stays on its map), MapVoteEndsAt (0 = no vote running),
+	MapVoteCandidates ("candy,winter,desert") and MapVoteCounts ("2,0,1").
+
+	Rotation can be switched off and on for this server (setRotation: the host panel, for admins and a private
+	server's owner); it starts as Config/MapThemes.rotation.enabled says.
 
 	Commands, this server only: /map <id> switches now, /map vote starts a vote, /map list. Anyone in Studio; in live
-	servers the admins in Config/LiveOps.adminUserIds.
+	servers the admins in Config/LiveOps.adminUserIds. The host panel (HostService) calls the same functions.
 ]]
 
 local Players = game:GetService("Players")
@@ -43,6 +46,7 @@ local current = MapThemes.order[1]
 local switchAt = 0
 local vote: Vote? = nil
 local published = ""
+local rotationOn = MapThemes.rotation.enabled
 
 local function nextRandom(): number
 	return random:NextNumber()
@@ -81,18 +85,19 @@ local function publish()
 	end
 	local state = {
 		theme = current,
-		endsAt = if MapThemes.rotation.enabled or running then switchAt else 0,
+		endsAt = if rotationOn or running then switchAt else 0,
 		voteEndsAt = if running then running.endsAt else 0,
 		candidates = if running then table.concat(running.candidates, ",") else "",
 		counts = table.concat(countText, ","),
 	}
-	local key = `{state.theme}|{state.endsAt}|{state.voteEndsAt}|{state.candidates}|{state.counts}`
+	local key = `{state.theme}|{state.endsAt}|{rotationOn}|{state.voteEndsAt}|{state.candidates}|{state.counts}`
 	if key == published then
 		return
 	end
 	published = key
 	workspace:SetAttribute("MapTheme", state.theme)
 	workspace:SetAttribute("MapThemeEndsAt", state.endsAt)
+	workspace:SetAttribute("MapRotation", rotationOn)
 	workspace:SetAttribute("MapVoteEndsAt", state.voteEndsAt)
 	workspace:SetAttribute("MapVoteCandidates", state.candidates)
 	workspace:SetAttribute("MapVoteCounts", state.counts)
@@ -135,6 +140,25 @@ function MapThemeService.openVote(seconds: number?)
 	publish()
 end
 
+function MapThemeService.rotationOn(): boolean
+	return rotationOn
+end
+
+-- Switches this server's rotation off (it stays on its map; a vote already running is dropped) or back on (a full
+-- `rotation.mapSeconds` until the next change).
+function MapThemeService.setRotation(on: boolean)
+	if on == rotationOn then
+		return
+	end
+	rotationOn = on
+	if on then
+		switchAt = now() + MapThemes.rotation.mapSeconds
+	else
+		vote = nil
+	end
+	publish()
+end
+
 local function closeVote()
 	local running = vote
 	if running == nil then
@@ -157,7 +181,7 @@ local function step()
 		if t >= running.endsAt then
 			closeVote()
 		end
-	elseif MapThemes.rotation.enabled and t >= MapThemeRules.voteOpensAt(switchAt, MapThemes.rotation) then
+	elseif rotationOn and t >= MapThemeRules.voteOpensAt(switchAt, MapThemes.rotation) then
 		MapThemeService.openVote(switchAt - t)
 	end
 	publish()

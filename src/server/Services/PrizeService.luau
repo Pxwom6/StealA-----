@@ -26,6 +26,7 @@ local RarityRoll = require(ReplicatedStorage.Shared.Logic.RarityRoll)
 local SpinRules = require(ReplicatedStorage.Shared.Logic.SpinRules)
 local BeltService = require(script.Parent.BeltService)
 local EconomyService = require(script.Parent.EconomyService)
+local GameEvents = require(script.Parent.GameEvents)
 local LiveOpsService = require(script.Parent.LiveOpsService)
 local ModifierService = require(script.Parent.ModifierService)
 local Replication = require(script.Parent.Replication)
@@ -83,19 +84,21 @@ function PrizeService.rollCreature(
 end
 
 -- Puts `def` (with `variant`) on a free podium, or pays its sell value when the base is full. Returns whether it was
--- given and the cash paid instead (0 when given).
+-- given and the cash paid instead (0 when given). Either way it was found (GameEvents "found", source `sku`).
 function PrizeService.giveOrSell(
 	session: Session,
 	def: Types.CreatureDef,
 	variant: string?,
 	sku: string
 ): (boolean, number)
-	if EconomyService.giveCreature(session, def.id, variant) then
-		return true, 0
+	local given = EconomyService.giveCreature(session, def.id, variant) ~= nil
+	local value = 0
+	if not given then
+		value = EconomyMath.sellValue(GameData.price(def, variant), Economy.sellRefund)
+		EconomyService.addCash(session, value, "Gameplay", sku)
 	end
-	local value = EconomyMath.sellValue(GameData.price(def, variant), Economy.sellRefund)
-	EconomyService.addCash(session, value, "Gameplay", sku)
-	return false, value
+	GameEvents.emit(session, { kind = "found", creatureId = def.id, variant = variant, source = sku }) -- shout-outs
+	return given, value
 end
 
 -- Pays `reward` to `session`. `sku` names the source for analytics ("Gift", "Spin"...).
