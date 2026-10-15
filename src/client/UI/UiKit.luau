@@ -80,8 +80,14 @@ function UiKit.padding(pixels: number): UIPadding
 	return UiKit.new("UIPadding", { PaddingTop = p, PaddingBottom = p, PaddingLeft = p, PaddingRight = p }) :: UIPadding
 end
 
+-- The safe area's bottom inset in px (a home indicator), measured from the screens that keep to the device's safe area
+-- (UiKit.screen): a phone shorter than 360 px scales to the room its safe area leaves (Logic/ScreenLayout.scaleFor),
+-- and HudController.device measures the same inset, so the layout check and the screens agree.
+local safeInsetBottom = 0
+local scaleUpdates: { () -> () } = {}
+
 function UiKit.scaleFor(viewport: Vector2): number
-	return ScreenLayout.scaleFor(viewport.X, viewport.Y)
+	return ScreenLayout.scaleFor(viewport.X, viewport.Y, safeInsetBottom)
 end
 
 -- Height of Roblox's top bar in pixels (58 with the current experience controls; 0 if a game hides it).
@@ -108,9 +114,24 @@ function UiKit.screen(name: string, displayOrder: number, insets: Enum.ScreenIns
 	local function update()
 		scale.Scale = UiKit.scaleFor(camera.ViewportSize)
 	end
+	table.insert(scaleUpdates, update)
 	camera:GetPropertyChangedSignal("ViewportSize"):Connect(update)
 	update()
 	gui.Parent = playerGui
+	if insets == Enum.ScreenInsets.DeviceSafeInsets then
+		-- as HudController.device measures it: what the safe area leaves below itself
+		local function measure()
+			local bottom = math.max(0, camera.ViewportSize.Y - gui.AbsoluteSize.Y)
+			if gui.AbsoluteSize.Y > 0 and math.abs(bottom - safeInsetBottom) > 0.5 then
+				safeInsetBottom = bottom
+				for _, rescale in scaleUpdates do
+					rescale()
+				end
+			end
+		end
+		gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(measure)
+		task.defer(measure)
+	end
 	return gui
 end
 

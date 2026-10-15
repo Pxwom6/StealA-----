@@ -7,9 +7,10 @@
 	  admins   Config/LiveOps.adminUserIds: everything, in any server, for "This server" or "All servers". In Studio
 	           anyone is an admin, and "All servers" only ever reaches that Studio session.
 	  owner    a private server's owner (game.PrivateServerId ~= "" and game.PrivateServerOwnerId == their UserId),
-	           in their own server only: switch the map (cooldown `owner.mapCooldownSeconds`), map rotation on/off,
-	           and start or stop a modifier marked `hostable = true` in Config/Modifiers (cooldown
-	           `owner.modifierCooldownSeconds`). No belt drops, boosts, gifts, broadcasts or "All servers".
+	           in their own server only: switch the map (cooldown `owner.mapCooldownSeconds`, the rotation's turn),
+	           map rotation on/off, and start a modifier marked `hostable = true` in Config/Modifiers when none runs
+	           (cooldown `owner.modifierCooldownSeconds`), and stop or replace one they started. No belt drops, boosts,
+	           gifts, broadcasts or "All servers".
 	  everyone else: nothing (the Settings row stays hidden and the HostAction intent is refused).
 
 	limits are the ones the chat commands have always used (/mod 0.25-60 minutes, /luck up to the LiveOps luck cap for
@@ -36,7 +37,9 @@ local Types = require("../Types")
 
 local Host: Types.HostConfig = {
 	owner = {
-		mapCooldownSeconds = 60,
+		-- as long as the rotation keeps a map (Config/MapThemes rotation.mapSeconds, CI): picking maps is never a
+		-- faster way through them (the map achievements) or their signature mutations than the rotation
+		mapCooldownSeconds = 20 * 60,
 		modifierCooldownSeconds = 10 * 60,
 	},
 	admin = {

@@ -69,6 +69,70 @@ local function now(): number
 	return workspace:GetServerTimeNow()
 end
 
+type MarkerLine = { text: string, color: Color3, height: number }
+
+-- The marker over a carrying thief, everyone sees it: "THIEF!", the mutation's name in its colour underneath when
+-- the loot is mutated ("GOLDEN"), and "🎯 BOUNTY" when the thief wears the Bounty Hunt's bounty (the Player
+-- attribute Bounty, BountyService). Replaces any marker the carry had.
+local function buildMarker(session: Session, carry: Carry)
+	local character = session.player.Character
+	local head = character and character:FindFirstChild("Head")
+	local model = carry.model
+	if head == nil or not head:IsA("BasePart") or model == nil then
+		return
+	end
+	if carry.marker then
+		carry.marker:Destroy()
+		carry.marker = nil
+	end
+	local mutation = GameData.mutation(carry.variant)
+	local bounty = session.player:GetAttribute("Bounty")
+	local lines: { MarkerLine } = { { text = Theme.text.carryMarker, color = UiTheme.palette("danger"), height = 44 } }
+	if mutation then
+		table.insert(
+			lines,
+			{ text = string.upper(mutation.displayName), color = UiTheme.color(mutation.color), height = 24 }
+		)
+	end
+	if bounty == "on" or bounty == "resting" then
+		table.insert(lines, {
+			text = if bounty == "on" then Theme.text.bountyMarker else Theme.text.bountyMarkerResting,
+			color = UiTheme.world(if bounty == "on" then "bounty" else "bountyResting"),
+			height = 24,
+		})
+	end
+	local total = 0
+	for _, line in lines do
+		total += line.height
+	end
+	local marker = Instance.new("BillboardGui")
+	marker.Name = "ThiefMarker"
+	marker.Size = UDim2.fromOffset(150, total)
+	marker.StudsOffsetWorldSpace = Vector3.new(0, CreatureVisuals.height(model) + 3.5, 0)
+	marker.AlwaysOnTop = true
+	marker.MaxDistance = 250
+	marker.LightInfluence = 0
+	local top = 0
+	for _, line in lines do
+		local label = Instance.new("TextLabel")
+		label.Position = UDim2.fromScale(0, top / total)
+		label.Size = UDim2.fromScale(1, line.height / total)
+		label.BackgroundTransparency = 1
+		label.FontFace = UiTheme.displayFont
+		label.TextScaled = true
+		label.Text = line.text
+		label.TextColor3 = line.color
+		label.Parent = marker
+		local stroke = Instance.new("UIStroke")
+		stroke.Thickness = 3
+		stroke.Color = UiTheme.palette("stroke")
+		stroke.Parent = label
+		top += line.height
+	end
+	marker.Parent = head
+	carry.marker = marker
+end
+
 local function attachCarryVisuals(session: Session, carry: Carry)
 	local character = session.player.Character
 	local head = character and character:FindFirstChild("Head")
@@ -87,38 +151,15 @@ local function attachCarryVisuals(session: Session, carry: Carry)
 	model.Name = "CarriedCreature"
 	model.Parent = character
 	carry.model = model
+	buildMarker(session, carry)
+end
 
-	-- "THIEF!", plus the mutation's name in its colour underneath when the loot is mutated ("GOLDEN").
-	local marker = Instance.new("BillboardGui")
-	marker.Name = "ThiefMarker"
-	marker.Size = UDim2.fromOffset(150, if mutation then 68 else 44)
-	marker.StudsOffsetWorldSpace = Vector3.new(0, CreatureVisuals.height(model) + 3.5, 0)
-	marker.AlwaysOnTop = true
-	marker.MaxDistance = 250
-	marker.LightInfluence = 0
-	local function addLabel(text: string, color: Color3, top: number, height: number)
-		local label = Instance.new("TextLabel")
-		label.Position = UDim2.fromScale(0, top)
-		label.Size = UDim2.fromScale(1, height)
-		label.BackgroundTransparency = 1
-		label.FontFace = UiTheme.displayFont
-		label.TextScaled = true
-		label.Text = text
-		label.TextColor3 = color
-		label.Parent = marker
-		local stroke = Instance.new("UIStroke")
-		stroke.Thickness = 3
-		stroke.Color = UiTheme.palette("stroke")
-		stroke.Parent = label
+-- The bounty on `session` started, rested, came back or ended (BountyService): a carry's marker says so at once.
+function StealService.refreshMarker(session: Session)
+	local carry = session.carry
+	if carry and carry.model then
+		buildMarker(session, carry)
 	end
-	if mutation then
-		addLabel(Theme.text.carryMarker, UiTheme.palette("danger"), 0, 0.62)
-		addLabel(string.upper(mutation.displayName), UiTheme.color(mutation.color), 0.62, 0.38)
-	else
-		addLabel(Theme.text.carryMarker, UiTheme.palette("danger"), 0, 1)
-	end
-	marker.Parent = head
-	carry.marker = marker
 end
 
 local function clearCarry(session: Session)
@@ -226,8 +267,11 @@ local function deliver(thief: Session)
 	if podiumRefs then
 		Remotes.fire(thief.player, "Effect", { kind = "stolen", position = podiumRefs.standCFrame.Position })
 	end
-	-- Tutorial, quests. Before FirstSteal: the funnel logs TutorialComplete first.
-	GameEvents.emit(thief, { kind = "steal", creatureId = moved.id, variant = moved.variant })
+	-- Tutorial, quests, Bounty Hunt. Before FirstSteal: the funnel logs TutorialComplete first.
+	GameEvents.emit(
+		thief,
+		{ kind = "steal", creatureId = moved.id, variant = moved.variant, otherUserId = victim.userId }
+	)
 	if Analytics.milestone(thief, "FirstSteal") then
 		Analytics.custom(thief, "first_steal_rarity", rarity.order)
 	end
@@ -443,6 +487,7 @@ local function onTag(player: Player, targetArg: unknown)
 	)
 	Remotes.fire(player, "Effect", { kind = "tag", position = thiefRoot.Position })
 	Analytics.custom(tagger, "tag")
+	GameEvents.emit(tagger, { kind = "tag", otherUserId = thief.userId }) -- Bounty Hunt
 end
 
 -- One check of one carry: owner still here, thief alive, not timed out, height, movement budget, then delivery.

@@ -78,6 +78,9 @@ export type Session = {
 	walk: StealRules.WalkTrack?, -- server-observed movement (PositionTracker); nil until the first sample
 	flaggedAt: number, -- server time of the last step the walk budget couldn't pay for (-inf: never)
 	teleportedAt: number, -- server time of the last gross overrun, i.e. a teleport (-inf: never)
+	-- server time of the last sign of play: the character moving (PositionTracker) or a giant hit (BossService);
+	-- -inf until then. A Snack Attack giant's health counts only players active recently (Logic/BossRules.counts).
+	activeAt: number,
 	settle: StealRules.Settle?, -- a server move whose stale samples are still being ignored (PositionTracker)
 	joinedAt: number,
 	lastSeenAtJoin: number, -- the save's lastSeen when it was loaded (offline earnings)

@@ -10,11 +10,12 @@
 	  "none"   everyone else: every action is refused
 
 	Actions (HostRules.ACTIONS; any other kind is refused):
-	  mapSwitch    { id = map }                 admin; owner (cooldown "map")
+	  mapSwitch    { id = map }                 admin; owner (cooldown "map", as long as the rotation's turn)
 	  mapVote      {}                           admin
 	  mapRotation  { on = boolean }             admin; owner. Always this server only.
-	  modStart     { id = modifier, minutes? }  admin; owner if the modifier is hostable (cooldown "modifier")
-	  modStop      {}                           admin; owner if the running modifier is hostable
+	  modStart     { id = modifier, minutes? }  admin; owner if the modifier is hostable and nothing runs but the
+	                                            owner's own (cooldown "modifier")
+	  modStop      {}                           admin; owner if the owner started the running modifier
 	  beltDrop     { id = creature, mutation? } admin: an admin drop on the belt, announced
 	  luck         { multiplier?, minutes? }    admin
 	  eventStart   { id = event, minutes? }     admin (no minutes: the event's own durationSeconds)
@@ -102,7 +103,7 @@ HostRules.ORDER = {
 } :: { string }
 
 -- Refusals `check` can give (each has a Theme.text line: "hostRefused" .. the key with its first letter upper case).
-HostRules.REFUSALS = { "notAllowed", "adminOnly", "notHostable" } :: { string }
+HostRules.REFUSALS = { "notAllowed", "adminOnly", "notHostable", "notYours" } :: { string }
 
 function HostRules.role(input: RoleInput): Role
 	if input.studio or table.find(input.admins, input.userId) ~= nil then
@@ -269,13 +270,16 @@ local function hostable(modifiers: { [string]: Types.ModifierDef }, id: string?)
 end
 
 -- Why `role` may not run `command` for `scope` (a HostRules.REFUSALS key), or nil when it may. `running` is the
--- modifier running now (modStop).
+-- modifier running now, `runningIsOwners` whether this server's owner started it. An owner may start a hostable
+-- modifier when none runs or over their own, and stop only their own: the random schedule's (and an admin's) run to
+-- their end, so an owner can't cut them short to roll the next one sooner.
 function HostRules.check(
 	role: Role,
 	command: Command,
 	scope: Scope,
 	modifiers: { [string]: Types.ModifierDef },
-	running: string?
+	running: string?,
+	runningIsOwners: boolean?
 ): string?
 	if role == "admin" then
 		return nil
@@ -286,10 +290,15 @@ function HostRules.check(
 	if def == nil or not def.owner or scope == "all" then
 		return "adminOnly"
 	end
-	if command.kind == "modStart" and not hostable(modifiers, command.id) then
-		return "notHostable"
-	elseif command.kind == "modStop" and running ~= nil and not hostable(modifiers, running) then
-		return "notHostable"
+	local someoneElses = running ~= nil and runningIsOwners ~= true
+	if command.kind == "modStart" then
+		if not hostable(modifiers, command.id) then
+			return "notHostable"
+		elseif someoneElses then
+			return "notYours"
+		end
+	elseif command.kind == "modStop" and someoneElses then
+		return "notYours"
 	end
 	return nil
 end
@@ -377,6 +386,9 @@ function HostRules.hostableProblems(config: Types.ModifiersConfig, unlocks: { [s
 		end
 		if def.drops ~= nil then
 			table.insert(problems, `{name} drops things`)
+		end
+		if def.bounty == true then
+			table.insert(problems, `{name} pays bounties`)
 		end
 		if unlocks[id] then
 			table.insert(problems, `{name} unlocks a mutation`)

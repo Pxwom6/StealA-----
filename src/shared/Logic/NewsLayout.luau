@@ -27,7 +27,8 @@ NewsLayout.BOARD = table.freeze({ w = 14, h = 9, pixelsPerStud = 50, lift = 3 })
 NewsLayout.BOARD_PAD = 24 -- px from the panel's edges
 NewsLayout.BOARD_LINE = 44 -- px per highlight
 -- The smallest text the board may show, in px at its resolution: 18 px at 50 px a stud is a letter about 0.36 studs
--- tall, readable from across the plaza.
+-- tall, readable on a phone from about 12-16 studs, so once a player walks up to it (not from the spawn: the card is
+-- how most players read an update).
 NewsLayout.BOARD_MIN_TEXT = 18
 
 local function rect(x: number, y: number, w: number, h: number): Rect

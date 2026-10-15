@@ -24,6 +24,8 @@
 	  /runaway [here]       a Snackling escapes now, as in Great Escape (far from everyone); /runaway here lets it out
 	                        right beside you, to test catching it
 	  /boss [hp]            a Snack Attack giant appears over the belt now (tap it to test), e.g. /boss 20 for a quick one
+	  /fork [n]             a Treasure Hunt golden fork hides now (away from everyone), or at hiding place n of
+	                        Config/Drops treasure.spots, e.g. /fork 3
 	  /gadgets [off]        own every gadget (Config/Gadgets) and recharge them all now; /gadgets off removes them again
 	  /starter [reset|offer]
 	                        the Starter Pack again: reset forgets it was bought and its offer was shown; offer also
@@ -273,6 +275,13 @@ function DevCommands.start()
 			Remotes.notify(player, "[Studio] no Snackling could escape", "error")
 		end
 	end)
+	add("fork", function(player: Player, args: { string })
+		local index = tonumber(args[1])
+		local spot = if index then math.floor(index) else nil
+		if DropService.hideTreasure(spot) == nil then
+			Remotes.notify(player, "[Studio] no such hiding place", "error")
+		end
+	end)
 	add("hostas", function(player: Player, args: { string })
 		local session = Sessions.get(player)
 		local wanted = string.lower(args[1] or "")
@@ -357,7 +366,7 @@ function DevCommands.start()
 		"[DevCommands] Studio commands enabled: /cash <n>, /spawn <creatureId> [mutationId], /noshield, /friends <n|off>,"
 			.. " /tutorial, /gallery [mutationId|off], /sky <clockTime>,"
 			.. " /quests reset, /dex fill <rarity|event>, /map <id|vote|list>, /playtime <min>, /spins <n|free>,"
-			.. " /runaway [here], /boss [hp], /gadgets [off], /hostas <owner|none|admin>, /style [off], /news,"
+			.. " /runaway [here], /boss [hp], /fork [n], /gadgets [off], /hostas <owner|none|admin>, /style [off], /news,"
 			.. " /starter [reset|offer]"
 			.. " (LiveOps: /event <id> [minutes], /event off, /luck <x> <min>)"
 	)

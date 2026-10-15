@@ -6,14 +6,16 @@
 	dialog: NotificationController). If the panel was closed meanwhile, the toast shows at once.
 
 	"Odds" swaps the reel for a grid of every prize with its exact chance (UI/OddsGrid, readable at a glance), and
-	"Back" returns. While the base is full a warning says Snackling prizes will be sold.
+	"Back" returns. While the grid shows, SPIN! makes way for "Details", which opens the list of every outcome of a
+	spin, every Snackling included, with its exact chance (UI/OddsDetails, Logic/SpinOdds: the odds never change).
+	While the base is full a warning says Snackling prizes will be sold.
 
 	Lucky Spin packs (Robux, Config/Monetization kind "Spins"): two buttons right of the reel, each with its spins and
 	price. They are paid random items, so they show only to a player whose Roblox policy allows those (the player
 	attribute in Logic/PaidRandomItems, so not while it is being looked up) and only once the packs exist on the Creator
 	Hub (Studio: always); the Odds view sits right beside them. A tap goes through PurchaseController (checked here, then
-	on the server, before Roblox's prompt opens); while the spin bank holds Config/Spin.paidBankFull spins they say
-	"Bank full". Where everything goes: Logic/StoreLayout.spinTab (checked on five screens by tools/layoutCheck.luau).
+	on the server, before Roblox's prompt opens); while the spin bank holds Config/Spin.maxBanked spins they say
+	"Bank full". Where everything goes: Logic/StoreLayout.spinTab (checked on every checked screen by tools/layoutCheck.luau).
 ]]
 
 local Players = game:GetService("Players")
@@ -30,6 +32,7 @@ local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local PaidRandomItems = require(ReplicatedStorage.Shared.Logic.PaidRandomItems)
 local SpinRules = require(ReplicatedStorage.Shared.Logic.SpinRules)
 local StoreLayout = require(ReplicatedStorage.Shared.Logic.StoreLayout)
+local OddsDetails = require(script.Parent.Parent.UI.OddsDetails)
 local OddsGrid = require(script.Parent.Parent.UI.OddsGrid)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local NotificationController = require(script.Parent.NotificationController)
@@ -59,11 +62,14 @@ end
 type PackButton = { key: string, button: TextButton, price: TextLabel }
 
 type Built = {
+	content: Frame,
 	reel: Frame,
 	strip: Frame,
 	odds: Frame,
 	oddsCells: Frame?,
 	oddsButton: TextButton,
+	details: TextButton, -- in SPIN!'s place while the Odds view shows
+	detailsView: GuiObject?, -- the Details list, built the first time it opens
 	button: TextButton,
 	status: TextLabel,
 	warning: TextLabel,
@@ -163,7 +169,37 @@ end
 
 local function showOdds(current: Built, shown: boolean)
 	current.odds.Visible = shown
+	current.button.Visible = not shown
+	current.details.Visible = shown
+	local view = current.detailsView
+	if view and not shown then
+		view.Visible = false
+	end
 	UiKit.setButtonText(current.oddsButton, if shown then Theme.text.spinOddsBack else Theme.text.spinOdds)
+end
+
+-- The Details list over the whole tab (built the first time), with what each cash prize pays this player now.
+local function showDetails(current: Built)
+	local view = current.detailsView
+	if view == nil then
+		local state = StateStore.get()
+		local area = StoreLayout.content(StoreLayout.REWARDS)
+		local overlay: GuiObject
+		overlay = OddsDetails.build(
+			current.content,
+			{ x = 0, y = 0, w = area.w, h = area.h },
+			20,
+			if state then state.spin.rewards else {},
+			function()
+				overlay.Visible = false
+			end
+		)
+		current.detailsView = overlay
+		view = overlay
+	end
+	if view then
+		view.Visible = true
+	end
 end
 
 -- Puts everything where StoreLayout.spinTab says, with or without the pack buttons.
@@ -177,6 +213,7 @@ local function applyLayout(current: Built, withPacks: boolean)
 	setRect(current.odds, boxes.odds.rect)
 	setRect(current.warning, boxes.warning.rect)
 	setRect(current.button, boxes.spin.rect)
+	setRect(current.details, boxes.details.rect)
 	setRect(current.oddsButton, boxes.oddsButton.rect)
 	setRect(current.status, boxes.status.rect)
 	-- The odds grid fills the reel's place, so it is rebuilt at the new width.
@@ -321,6 +358,19 @@ function SpinTab.build(content: Frame): (state: Types.ClientState) -> ()
 			showOdds(current, not current.odds.Visible)
 		end
 	end)
+	local details = UiKit.button({
+		Name = "Details",
+		BackgroundColor3 = UiTheme.palette("luck"),
+		Text = Theme.text.spinDetails,
+		Visible = false,
+		Parent = content,
+	}, function()
+		local current = built
+		if current then
+			SoundPlayer.ui("click")
+			showDetails(current)
+		end
+	end)
 	local packs: { PackButton } = {}
 	for _, key in PACKS do
 		table.insert(packs, buildPack(content, key))
@@ -330,11 +380,14 @@ function SpinTab.build(content: Frame): (state: Types.ClientState) -> ()
 	fill(strip, if state then state.spin.rewards else {}, nil, 1)
 	local refresh: (state: Types.ClientState) -> ()
 	local current: Built = {
+		content = content,
 		reel = reel,
 		strip = strip,
 		odds = odds,
 		oddsCells = nil,
 		oddsButton = oddsButton,
+		details = details,
+		detailsView = nil,
 		button = button,
 		status = status,
 		warning = warning,

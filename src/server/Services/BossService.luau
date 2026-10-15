@@ -6,9 +6,12 @@
 	  * It appears on the modifier's drop schedule (DropRules.times), never while another one is still up: a regular
 	    Snackling of one of the configured tiers, built at `scale` times its podium size, tagged for the client
 	    (BossController draws its health bar, bob, turn and hit reactions) with attributes MaxHP, HP and EndsAt.
-	  * Hits come from a ClickDetector on the model (mouse or touch). Each counts only if the player is within reach of
-	    its middle at a position the server trusts (PositionTracker), and only `hitsPerSecond` a second per player
-	    (RateLimiter, with a small burst): auto-clickers gain nothing. The HP attribute is updated ten times a second.
+	  * Hits come from a ClickDetector (a mouse click, a tap, or a gamepad's R2 at the screen's centre dot). Roblox's
+	    pointer hit-test is a spatial query, and creature models are built with CanQuery off, so the detector sits on
+	    an invisible Hitbox part around the giant that queries can hit (it collides with and touches nothing). Each hit
+	    counts only if the player is within reach of its middle at a position the server trusts (PositionTracker),
+	    and only `hitsPerSecond` a second per player (RateLimiter, with a small burst): auto-clickers gain nothing.
+	    The HP attribute is updated ten times a second.
 	  * Taken down: everyone who landed `minHits` shares the reward (BossRules: cash from their own income, more for a
 	    bigger share), the top hitter wins a Snackling rolled with extra luck, and everyone hears it. Not taken down by
 	    EndsAt: it flies off, nothing is paid.
@@ -41,6 +44,8 @@ local Sessions = require(script.Parent.Sessions)
 local BossService = {}
 
 BossService.TAG = "SnackBoss"
+-- The giant's one hit-testable part, which holds its ClickDetector (BossController finds it by this name).
+BossService.HITBOX = "Hitbox"
 
 local STEP_SECONDS = 0.1
 -- The server allows this much more than the ClickDetector's reach (a player stepping back as they tap).
@@ -63,6 +68,7 @@ local walkwayY = 0.2
 local random = Random.new()
 local limiter = RateLimiter.new(Boss.burst, Boss.hitsPerSecond)
 local runningId: string? = nil
+local runningRun = 0 -- ModifierService.run() the giants were planned for
 local pending: { number } = {}
 
 local function now(): number
@@ -179,13 +185,38 @@ local function onHit(player: Player)
 	giant.hits[key] = (giant.hits[key] or 0) + 1
 	giant.players[key] = player
 	giant.hp -= 1
+	session.activeAt = now() -- playing, even standing still (the next giant's health counts them)
 	if giant.hp <= 0 then
 		defeat(giant)
 	end
 end
 
--- A giant appears over the middle of the belt (or at `at`), with health for the players here (or `hp`: the Studio
--- command and the server test). nil when no Snackling can play it.
+-- The part the giant's ClickDetector answers for: an invisible box around it (its bounding box), welded to its root
+-- so it bobs and turns with it on every client. It is the only part of the giant a pointer can hit (CanQuery), and it
+-- never collides or touches; a box is also kinder to small fingers than the giant's outline.
+local function addHitbox(model: Model, box: CFrame, size: Vector3): BasePart
+	local hitbox = Instance.new("Part")
+	hitbox.Name = BossService.HITBOX
+	hitbox.Size = Vector3.new(math.max(size.X, 2), math.max(size.Y, 2), math.max(size.Z, 2))
+	hitbox.CFrame = box
+	hitbox.Transparency = 1
+	hitbox.CastShadow = false
+	hitbox.CanCollide = false
+	hitbox.CanTouch = false
+	hitbox.CanQuery = true
+	hitbox.Massless = true
+	hitbox.Anchored = false
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = model.PrimaryPart :: BasePart
+	weld.Part1 = hitbox
+	weld.Parent = hitbox
+	hitbox.Parent = model
+	return hitbox
+end
+
+-- A giant appears over the middle of the belt (or at `at`), with health for the players playing (BossRules.counts:
+-- not idle, not in the first-time tutorial; or `hp`: the Studio command and the server test). nil when no Snackling
+-- can play it.
 local function spawnGiant(t: number, at: Vector3?, hp: number?): Giant?
 	local def = pickCreature()
 	if def == nil then
@@ -199,7 +230,13 @@ local function spawnGiant(t: number, at: Vector3?, hp: number?): Giant?
 	local feet = at or Vector3.new(0, walkwayY + Boss.hoverHeight, 0)
 	model:PivotTo(CFrame.new(feet) * CFrame.Angles(0, random:NextNumber(0, math.pi * 2), 0))
 	local boxCentre, size = model:GetBoundingBox()
-	local players = #Players:GetPlayers()
+	local players = 0
+	for _, player in Players:GetPlayers() do
+		local session = Sessions.get(player)
+		if session and BossRules.counts(Boss, session.tutorial ~= nil, session.activeAt, t) then
+			players += 1
+		end
+	end
 	local maxHp = hp or BossRules.maxHp(Boss, players)
 	local giant: Giant = {
 		model = model,
@@ -218,7 +255,7 @@ local function spawnGiant(t: number, at: Vector3?, hp: number?): Giant?
 	model:SetAttribute("Height", size.Y)
 	local clicker = Instance.new("ClickDetector")
 	clicker.MaxActivationDistance = Boss.reach
-	clicker.Parent = model
+	clicker.Parent = addHitbox(model, boxCentre, size)
 	clicker.MouseClick:Connect(onHit)
 	CollectionService:AddTag(model, BossService.TAG)
 	model.Parent = workspace
@@ -236,8 +273,10 @@ local function step()
 	local id = ModifierService.current()
 	local def = if id then Modifiers.modifiers[id] else nil
 	local drops = if def and def.drops and def.drops.kind == "boss" then def.drops else nil
-	if id ~= runningId then
-		runningId = id
+	-- a new modifier, or Snack Attack started again for a new length: plan its giants from now
+	local run = ModifierService.run()
+	if id ~= runningId or run ~= runningRun then
+		runningId, runningRun = id, run
 		pending = {}
 		if drops then
 			for _, offset in DropRules.times(drops, math.max(0, ModifierService.endsAt() - t)) do

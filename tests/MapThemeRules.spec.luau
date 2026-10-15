@@ -71,13 +71,13 @@ T.describe("MapThemeRules: the real config", function()
 		end
 	end)
 
-	T.it("has twenty-three maps, every one in the order once", function()
+	T.it("has twenty-seven maps, every one in the order once", function()
 		local count = 0
 		for _ in MapThemes.themes do
 			count += 1
 		end
-		T.expect(count).toBe(23)
-		T.expect(#MapThemes.order).toBe(23)
+		T.expect(count).toBe(27)
+		T.expect(#MapThemes.order).toBe(27)
 	end)
 
 	T.it("keeps every map's scenery under the part budget", function()
@@ -103,6 +103,18 @@ T.describe("MapThemeRules: the real config", function()
 				`{theme.palette.ground or Theme.world.ground}|{theme.lighting.clockTime}|{theme.flora.round}`
 			T.expect(seen[signature]).toBeNil()
 			seen[signature] = id
+		end
+	end)
+
+	T.it("puts the four newest maps at times of day no other map has (at least 20 minutes apart)", function()
+		for _, id in { "hive", "gingerbread", "ramen", "ranch" } do
+			local mine = MapThemes.themes[id].lighting.clockTime
+			for other, theme in MapThemes.themes do
+				if other ~= id then
+					local gap = math.abs(theme.lighting.clockTime - mine)
+					T.expect(math.min(gap, 24 - gap)).toBeAtLeast(1 / 3)
+				end
+			end
 		end
 	end)
 end)
@@ -201,6 +213,39 @@ T.describe("MapThemeRules votes", function()
 	end)
 end)
 
+T.describe("MapThemeRules: what a map gives, at the rotation's pace", function()
+	local rotation = MapThemes.rotation
+
+	T.it("rolls a map's signature mutation for the whole of its turn, and stops after it", function()
+		T.expect(MapThemeRules.signatureLive(0, rotation)).toBe(true)
+		T.expect(MapThemeRules.signatureLive(rotation.mapSeconds - 1, rotation)).toBe(true)
+		-- the rotation's change lands a step late: still on
+		T.expect(MapThemeRules.signatureLive(rotation.mapSeconds + 1, rotation)).toBe(true)
+		-- a server kept on the map (rotation off): off, so staying is no faster a farm than the rotation
+		T.expect(MapThemeRules.signatureLive(rotation.mapSeconds + MapThemeRules.SIGNATURE_SLACK, rotation)).toBe(false)
+		T.expect(MapThemeRules.signatureLive(3 * rotation.mapSeconds, rotation)).toBe(false)
+		T.expect(MapThemeRules.signatureLive(-1, rotation)).toBe(false)
+		T.expect(MapThemeRules.SIGNATURE_SLACK).toBeLessThan(rotation.voteSeconds)
+	end)
+
+	T.it("counts a map as played on after creditSeconds on it, not for a quick switch", function()
+		T.expect(MapThemeRules.creditDue(1000, 1000 + rotation.creditSeconds - 1, rotation)).toBe(false)
+		T.expect(MapThemeRules.creditDue(1000, 1000 + rotation.creditSeconds, rotation)).toBe(true)
+		T.expect(MapThemeRules.creditDue(1000, 1060, rotation)).toBe(false) -- a minute on it
+		T.expect(rotation.creditSeconds).toBeAtLeast(60)
+		T.expect(rotation.creditSeconds).toBeAtMost(rotation.mapSeconds / 2) -- a whole turn always counts
+	end)
+
+	T.it("refuses a credit time that is too short or longer than half a turn", function()
+		for _, seconds in { 10, rotation.mapSeconds } do
+			local config = copy(MapThemes)
+			config.rotation.creditSeconds = seconds
+			T.expect(mentions(validate(config), "creditSeconds")).toBe(true)
+		end
+		T.expect(mentions(validate(MapThemes), "creditSeconds")).toBe(false)
+	end)
+end)
+
 T.describe("MapThemeRules flora and landmarks", function()
 	T.it("grows the map's kind on each tree spot", function()
 		local desert = MapThemes.themes.desert
@@ -233,6 +278,55 @@ T.describe("MapThemeRules flora and landmarks", function()
 		for kind, parts in MapThemeRules.FLORA_PARTS do
 			T.expect(MapThemeRules.FLORA_RADIUS[kind] ~= nil).toBeTruthy()
 			T.expect(parts).toBeGreaterThan(0)
+		end
+	end)
+
+	T.it("uses every flora and landmark kind on some map (no prop builders left unused)", function()
+		local flora: { [string]: boolean } = {}
+		local landmarks: { [string]: boolean } = {}
+		for _, theme in MapThemes.themes do
+			flora[theme.flora.round] = true
+			flora[theme.flora.pine] = true
+			for _, kind in theme.landmarks do
+				landmarks[kind] = true
+			end
+		end
+		for kind in MapThemeRules.FLORA_PARTS do
+			if not flora[kind] then
+				error(`flora kind {kind} grows on no map`)
+			end
+		end
+		for kind in MapThemeRules.LANDMARK_PARTS do
+			if not landmarks[kind] then
+				error(`landmark kind {kind} stands on no map`)
+			end
+		end
+	end)
+
+	T.it("gives the four newest maps flora and landmarks of their own", function()
+		local newest: { [string]: boolean } = { hive = true, gingerbread = true, ramen = true, ranch = true }
+		local usedElsewhere: { [string]: boolean } = {}
+		for id, theme in MapThemes.themes do
+			if not newest[id] then
+				usedElsewhere[theme.flora.round] = true
+				usedElsewhere[theme.flora.pine] = true
+				for _, kind in theme.landmarks do
+					usedElsewhere[kind] = true
+				end
+			end
+		end
+		for id in newest do
+			local theme = MapThemes.themes[id]
+			T.expect(usedElsewhere[theme.flora.round]).toBeNil()
+			T.expect(usedElsewhere[theme.flora.pine]).toBeNil()
+			local own = 0
+			for _, kind in theme.landmarks do
+				if not usedElsewhere[kind] then
+					own += 1
+				end
+			end
+			-- the hive keeps one of Mango Rainforest's giant flowers (recoloured as daisies) among its own
+			T.expect(own).toBeAtLeast(#theme.landmarks - 1)
 		end
 	end)
 end)

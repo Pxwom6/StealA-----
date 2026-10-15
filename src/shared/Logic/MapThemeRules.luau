@@ -81,6 +81,14 @@ MapThemeRules.FLORA_PARTS = table.freeze({
 	coneTopiary = 5,
 	blueberryBush = 6,
 	giantFork = 7,
+	giantDaisy = 6,
+	honeycombColumn = 8,
+	cookieTree = 6,
+	candyCaneLamp = 6,
+	mapleTree = 4,
+	springOnion = 6,
+	chiliPlant = 6,
+	kebab = 6,
 } :: { [string]: number })
 
 -- How far each flora kind reaches from its spot at scale 1 (studs). A kind may only stand on spots whose tree it fits
@@ -125,6 +133,14 @@ MapThemeRules.FLORA_RADIUS = table.freeze({
 	coneTopiary = 2.2,
 	blueberryBush = 4,
 	giantFork = 2.7, -- leaning a little
+	giantDaisy = 4.1, -- its head tipped a little
+	honeycombColumn = 4.7, -- a tall cell beside a short one
+	cookieTree = 4.1,
+	candyCaneLamp = 2.6, -- the hook and its lantern
+	mapleTree = 4.45, -- a lopsided canopy
+	springOnion = 3, -- three stalks leaning apart
+	chiliPlant = 3.8,
+	kebab = 1.6,
 } :: { [string]: number })
 
 -- Parts each landmark kind is built from (server/Services/ThemeProps).
@@ -179,6 +195,20 @@ MapThemeRules.LANDMARK_PARTS = table.freeze({
 	pancakeStack = 11,
 	syrupBottle = 5,
 	waffleTower = 5,
+	honeycombSlab = 23,
+	giantBee = 13,
+	beeSkep = 8,
+	honeyPot = 8,
+	gingerbreadHouse = 14,
+	gingerbreadMan = 14,
+	gumdropCottage = 10,
+	gumdrops = 5,
+	ramenBowl = 17,
+	hotSpring = 11,
+	ramenCart = 12,
+	sauceTower = 12,
+	smoker = 8,
+	campfire = 14,
 } :: { [string]: number })
 
 MapThemeRules.WEATHER = table.freeze({
@@ -203,6 +233,7 @@ MapThemeRules.WEATHER = table.freeze({
 	blossoms = true, -- Easter's (Config/Seasons); a map may use it too
 	popcorn = true,
 	steam = true,
+	smoke = true,
 } :: { [string]: boolean })
 
 -- Enum.Material names a map may use for its ground, walkway and boundary wall.
@@ -345,6 +376,23 @@ function MapThemeRules.voteOpensAt(switchAt: number, rotation: Types.MapRotation
 	return switchAt - math.min(rotation.voteSeconds, rotation.mapSeconds)
 end
 
+-- Seconds a map may stay past its turn before its signature mutation stops (the change itself lands a step late).
+MapThemeRules.SIGNATURE_SLACK = 5
+
+-- Whether the map's signature mutation rolls on a map that came up `age` seconds ago: for as long as the rotation
+-- keeps a map (`mapSeconds`), so in a server that stays on one map (a host turned the rotation off) it stops then,
+-- and choosing maps is never a faster farm for them than the rotation (with an owner's map cooldown as long:
+-- Config/Host).
+function MapThemeRules.signatureLive(age: number, rotation: Types.MapRotation): boolean
+	return age >= 0 and age < rotation.mapSeconds + MapThemeRules.SIGNATURE_SLACK
+end
+
+-- Whether a player who has been on the current map since `since` has played on it by `now` (its map_<id> flag, for
+-- the map achievements): `creditSeconds` on it, so a quick switch through every map counts for none of them.
+function MapThemeRules.creditDue(since: number, now: number, rotation: Types.MapRotation): boolean
+	return now - since >= rotation.creditSeconds
+end
+
 -- The flora kind that grows on a tree spot of `treeKind` ("round" or "pine") on this map.
 function MapThemeRules.floraFor(theme: MapThemeDef, treeKind: string): FloraKind
 	return if treeKind == "pine" then theme.flora.pine else theme.flora.round
@@ -435,6 +483,9 @@ function MapThemeRules.validate(
 		end
 		if not (rotation.candidates >= 2 and rotation.candidates <= 4 and rotation.candidates % 1 == 0) then
 			problem("rotation.candidates must be a whole number from 2 to 4")
+		end
+		if not (rotation.creditSeconds >= 30 and rotation.creditSeconds <= rotation.mapSeconds / 2) then
+			problem("rotation.creditSeconds must be at least 30 and at most half of mapSeconds")
 		end
 		if pickable < 2 then
 			problem("rotation needs at least two maps with a weight above 0")

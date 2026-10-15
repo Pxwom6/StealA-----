@@ -3,16 +3,21 @@
 	Where the store additions go inside their dialogs, in UI units. Modal gives a dialog's body 16 in from the panel's
 	sides, 58 from its top and 14 above its bottom; the Rewards panel and the Shop put their tab bar there and a tab's
 	content CONTENT_TOP below it. Pure, so tests/StoreLayout.spec.luau and tools/layoutCheck.luau hold these to the
-	HUD's rules (DECISIONS.md #47) on all five checked screens: both dialogs fit below Roblox's top bar, every button is
+	HUD's rules (DECISIONS.md #47) on every checked screen: both dialogs fit below Roblox's top bar, every button is
 	a full touch target (52 UI, 44 px on the smallest phones), every label reads at 12 UI or more (Logic/TextFit), and
 	nothing overlaps.
 
 	  Spin tab (Rewards)   the reel, and right of it the two Lucky Spin pack buttons (shown only to players whose
 	                       Roblox policy allows paid random items, once the packs exist); SPIN!, Odds and the base-full
 	                       warning under it, then the status line. Odds swaps the reel for the grid of every prize's
-	                       exact chance, so with the packs shown the chances sit right beside their buy buttons.
-	  Shop: a pack's card  its name and what it is beside the buy button, and the same odds grid across the card
+	                       exact chance, so with the packs shown the chances sit right beside their buy buttons, and
+	                       SPIN! for Details, which opens the Details list over the whole tab.
+	  Shop: a pack's card  its name and what it is beside the buy button, the same odds grid under them, and Details
+	                       beside the grid, which opens the Details list over the Shop's content
 	  Shop: Starter Pack   its name and what it is beside the buy button, then one line per thing it gives
+	  Details list         every outcome of a spin with its exact chance (Logic/SpinOdds), as Roblox's Paid Random
+	                       Items policy asks: a title and Back, then a scrolling list of rows (the reel's prizes, then
+	                       every Snackling with one chance per Snackling prize), and the rounding note
 ]]
 
 local ScreenLayout = require("./ScreenLayout")
@@ -117,6 +122,8 @@ function StoreLayout.spinTab(packs: boolean): { [string]: Box }
 		odds = box("panel", S.inset, S.top, reelW, S.reel), -- the Odds view, in the reel's place
 		warning = box("label", S.inset, S.row, S.warning.w, S.warning.h),
 		spin = box("button", (W - S.spin.w) / 2, S.row, S.spin.w, S.spin.h),
+		-- in SPIN!'s place while the Odds view shows: opens the Details list
+		details = box("button", (W - S.spin.w) / 2, S.row, S.spin.w, S.spin.h),
 		oddsButton = box("button", W - S.inset - S.odds.w, S.odds.top, S.odds.w, S.odds.h),
 		status = box("label", 0, S.status.top, W, S.status.h),
 	}
@@ -175,8 +182,9 @@ StoreLayout.CARD = table.freeze({
 	description = { y = 44, h = 36 },
 	buy = { w = 160, h = 58, right = 12, top = 14 },
 	bottom = 10,
-	-- A Lucky Spin pack: the odds grid across the card, under the buy button.
+	-- A Lucky Spin pack: the odds grid under the text, and its Details button beside it, under the buy button.
 	odds = { y = 86, h = 98 },
+	details = { h = 52 },
 	-- The Starter Pack: one line per thing it gives.
 	line = { y = 84, h = 24, gap = 2 },
 })
@@ -184,11 +192,13 @@ StoreLayout.CARD = table.freeze({
 -- A Lucky Spin pack's card: its boxes and height.
 function StoreLayout.packCard(): ({ [string]: Box }, number)
 	local C = StoreLayout.CARD
+	local buyX = C.w - C.buy.right - C.buy.w
 	local boxes: { [string]: Box } = {
 		title = box("label", C.textX, C.title.y, C.textW, C.title.h),
 		description = box("label", C.textX, C.description.y, C.textW, C.description.h),
-		buy = box("button", C.w - C.buy.right - C.buy.w, C.buy.top, C.buy.w, C.buy.h),
-		odds = box("panel", C.textX, C.odds.y, C.w - 2 * C.textX, C.odds.h),
+		buy = box("button", buyX, C.buy.top, C.buy.w, C.buy.h),
+		odds = box("panel", C.textX, C.odds.y, C.textW, C.odds.h),
+		details = box("button", buyX, C.odds.y, C.buy.w, C.details.h),
 	}
 	return boxes, C.odds.y + C.odds.h + C.bottom
 end
@@ -238,8 +248,67 @@ function StoreLayout.screenProblems(
 	return problems, placed
 end
 
--- Pairs of boxes drawn over each other on purpose: the Odds view takes the reel's place.
-StoreLayout.STACKED = table.freeze({ "odds|reel" })
+-- The Details list ---------------------------------------------------------------------------------------------------
+
+-- Over a dialog's content area (the Spin tab's, or the Shop's): a title beside Back, then the list. Rows are `row`
+-- tall, text `text` UI (not scaled), each Snackling chance in a column `chance` wide at the right (one per Snackling
+-- prize, the scroll bar's `scrollBar` beyond them), names in the rest, Snacklings `indent` in from their tier's row;
+-- every label `padX` in from its column's edges. A note row is `noteRows` rows tall and wraps.
+StoreLayout.DETAILS = table.freeze({
+	header = 52,
+	back = { w = 100, h = 52 },
+	row = 24,
+	text = 15,
+	chance = 118,
+	scrollBar = 8,
+	indent = 14,
+	padX = 6,
+	noteRows = 2,
+})
+
+-- The Details list's boxes in an area `w` x `h`.
+function StoreLayout.oddsDetails(w: number, h: number): { [string]: Box }
+	local D = StoreLayout.DETAILS
+	local top = D.header + StoreLayout.GAP
+	return {
+		title = box("label", 0, 0, w - D.back.w - StoreLayout.GAP, D.header),
+		back = box("button", w - D.back.w, 0, D.back.w, D.back.h),
+		list = box("panel", 0, top, w, h - top),
+	}
+end
+
+-- Inside a list row `w` wide (the list's width): the name column and `columns` chance columns at the right, in order,
+-- as label rects (padding taken off). `indent`: the name starts further in (a Snackling under its tier).
+function StoreLayout.detailsColumns(w: number, columns: number, indent: boolean): (Rect, { Rect })
+	local D = StoreLayout.DETAILS
+	local right = w - D.scrollBar
+	local nameEnd = right - columns * D.chance
+	local nameX = D.padX + (if indent then D.indent else 0)
+	local chances: { Rect } = {}
+	for index = 1, columns do
+		local x = nameEnd + (index - 1) * D.chance
+		table.insert(chances, rect(x + D.padX, 0, D.chance - 2 * D.padX, D.row))
+	end
+	return rect(nameX, 0, nameEnd - D.padX - nameX, D.row), chances
+end
+
+-- A row of the reel's prizes in a list `w` wide: its text, and its chance in the last column.
+function StoreLayout.detailsPrize(w: number): (Rect, Rect)
+	local D = StoreLayout.DETAILS
+	local right = w - D.scrollBar
+	return rect(D.padX, 0, right - D.chance - 2 * D.padX, D.row),
+		rect(right - D.chance + D.padX, 0, D.chance - 2 * D.padX, D.row)
+end
+
+-- A heading or note across a list `w` wide (`rows` rows tall).
+function StoreLayout.detailsLine(w: number, rows: number): Rect
+	local D = StoreLayout.DETAILS
+	return rect(D.padX, 0, w - D.scrollBar - 2 * D.padX, D.row * rows)
+end
+
+-- Pairs of boxes drawn over each other on purpose: the Odds view takes the reel's place, and Details SPIN!'s (only
+-- one of each pair shows at a time).
+StoreLayout.STACKED = table.freeze({ "odds|reel", "details|spin" })
 
 -- Every problem with `boxes` laid out in a `w` x `h` area: outside it, overlapping (but for StoreLayout.STACKED
 -- pairs), or a button too small to tap.

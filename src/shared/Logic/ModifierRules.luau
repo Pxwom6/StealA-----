@@ -26,6 +26,7 @@ export type Effects = {
 	stealHold: number,
 	lockDuration: number,
 	tagRange: number,
+	gadgetCooldown: number,
 }
 
 local ModifierRules = {}
@@ -40,10 +41,12 @@ ModifierRules.EFFECT_KEYS = table.freeze({
 	"stealHold",
 	"lockDuration",
 	"tagRange",
+	"gadgetCooldown",
 })
 
 -- Effects in the sky a weather modifier may use (the client builds them: WeatherController).
-ModifierRules.SKY_EFFECTS = table.freeze({ lightning = true, meteors = true, aurora = true } :: { [string]: boolean })
+ModifierRules.SKY_EFFECTS =
+	table.freeze({ lightning = true, meteors = true, aurora = true, eclipse = true } :: { [string]: boolean })
 
 local HEX_PATTERN = "^#%x%x%x%x%x%x$"
 
@@ -58,6 +61,7 @@ function ModifierRules.none(): Effects
 		stealHold = 1,
 		lockDuration = 1,
 		tagRange = 1,
+		gadgetCooldown = 1,
 	}
 end
 
@@ -157,7 +161,8 @@ end
 -- Problems with Config/Modifiers (an empty list means valid). `liveMutationChance(id)` is the most mutation chance per
 -- spawn that can be live at once while modifier `id` runs (MutationRules.worstCaseTotal(mutations, id)): multiplied by
 -- that modifier's own mutation multiplier it must stay well below 1. `unlocks`: the modifiers a mutation is gated on
--- (Config/Mutations modifierId); such a modifier may have no other effect.
+-- (Config/Mutations modifierId); such a modifier may have no other effect. So may one that drops things or puts a
+-- bounty on the top earner.
 function ModifierRules.validate(
 	config: ModifiersConfig,
 	liveMutationChance: (modifierId: string) -> number,
@@ -212,7 +217,10 @@ function ModifierRules.validate(
 				any = true
 			end
 		end
-		if not any and not (unlocks and unlocks[id]) and def.drops == nil then
+		if def.bounty ~= nil and type(def.bounty) ~= "boolean" then
+			problem(`{name} bounty must be true or nil`)
+		end
+		if not any and not (unlocks and unlocks[id]) and def.drops == nil and def.bounty ~= true then
 			problem(`{name} changes nothing`)
 		end
 		if def.drops then

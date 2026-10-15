@@ -3,23 +3,30 @@
 	Snack Attack on this client (the server side is BossService; Config/Boss): the giant Snackling over the belt.
 
 	  * A health bar with its name in its rarity colour and the seconds left floats above it, visible from anywhere on
-	    the map, with a "Tap to hit!" hint; a red outline marks it.
+	    the map, with a hint for the player's last input ("Tap to hit!", "Click to hit!", or aim and press R2 on a
+	    gamepad: Roblox's default controls click a ClickDetector under the screen's centre dot with R2); a red outline
+	    marks it.
 	  * It bobs and slowly turns, so both walkways see its face (here only: the server keeps it where it put it; it
 	    holds still with Reduce effects).
-	  * Your own taps (its ClickDetector) pop a sound and a sparkle; every hit anyone lands makes it flinch, and its
-	    health bar follows the server's HP attribute.
+	  * Your own taps (the ClickDetector on its invisible Hitbox part, the only part of it a pointer can hit) pop a
+	    sound and a sparkle; hits anyone lands make it flinch (a soft red pulse and a squash, at most twice a second
+	    however fast it is hit, and neither with Reduce effects: BossRules.startsFlinch), and its health bar follows
+	    the server's HP attribute.
 	  * Taken down: a big sparkle burst in its rarity colour and a sting (the server's "bossDown" effect).
 ]]
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
+local Boss = require(ReplicatedStorage.Shared.Config.Boss)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local CreatureVisuals = require(ReplicatedStorage.Shared.CreatureVisuals)
 local GameData = require(ReplicatedStorage.Shared.GameData)
 local Net = require(ReplicatedStorage.Shared.Net)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
+local BossRules = require(ReplicatedStorage.Shared.Logic.BossRules)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local ClientSettings = require(script.Parent.ClientSettings)
@@ -33,8 +40,7 @@ local TAG = "SnackBoss"
 local BOB_HEIGHT = 0.9 -- studs
 local BOB_SPEED = 1.3 -- radians per second
 local TURN_SPEED = 0.35 -- radians per second
-local FLINCH_SECONDS = 0.18
-local FLINCH_SQUASH = -0.07
+local FLINCH_SQUASH = -0.07 -- for Config/Boss `flinch.seconds` after a hit
 
 type Giant = {
 	model: Model,
@@ -46,11 +52,43 @@ type Giant = {
 	timeLabel: TextLabel,
 	highlight: Highlight,
 	lastHp: number,
-	flinchUntil: number,
+	flinchAt: number, -- os.clock() when the last flinch started
 	turn: number,
 }
 
 local giants: { [Model]: Giant } = {}
+
+local GAMEPADS: { [EnumItem]: boolean } = {}
+for _, inputType in Enum.UserInputType:GetEnumItems() do
+	if string.sub(inputType.Name, 1, 7) == "Gamepad" then
+		GAMEPADS[inputType] = true
+	end
+end
+local MOUSE: { [EnumItem]: boolean } = {
+	[Enum.UserInputType.MouseButton1] = true,
+	[Enum.UserInputType.MouseButton2] = true,
+	[Enum.UserInputType.MouseButton3] = true,
+	[Enum.UserInputType.MouseMovement] = true,
+	[Enum.UserInputType.MouseWheel] = true,
+	[Enum.UserInputType.Keyboard] = true,
+}
+
+-- The hint under the health bar for how this player last played: a tap, a click, or R2 on a gamepad (aimed with the
+-- camera: R2 clicks what is under the screen's centre dot). Before any input, what the device has decides.
+local function hintFor(inputType: EnumItem): string
+	if GAMEPADS[inputType] then
+		return Theme.text.bossHintGamepad
+	elseif inputType == Enum.UserInputType.Touch then
+		return Theme.text.bossHint
+	elseif MOUSE[inputType] or UserInputService.MouseEnabled then
+		return Theme.text.bossHintClick
+	elseif UserInputService.GamepadEnabled and not UserInputService.TouchEnabled then
+		return Theme.text.bossHintGamepad
+	end
+	return Theme.text.bossHint
+end
+
+local hint = Theme.text.bossHint
 
 local function healthBar(model: Model, height: number, def: any): (Frame, TextLabel, TextLabel)
 	local root = model.PrimaryPart :: BasePart
@@ -96,7 +134,7 @@ local function healthBar(model: Model, height: number, def: any): (Frame, TextLa
 	})
 	local timeLabel = UiKit.label({
 		Name = "Hint",
-		Text = Theme.text.bossHint,
+		Text = hint,
 		Size = UDim2.fromScale(1, 0.3),
 		Position = UDim2.fromScale(0, 0.7),
 		Parent = board,
@@ -137,11 +175,11 @@ local function onGiant(instance: Instance)
 		timeLabel = timeLabel,
 		highlight = highlight,
 		lastHp = if type(maxHp) == "number" then maxHp else 0,
-		flinchUntil = 0,
+		flinchAt = -math.huge,
 		turn = 0,
 	}
 	-- your own taps: a pop and a sparkle where you hit (the server decides whether it counted)
-	local clicker = model:FindFirstChildOfClass("ClickDetector")
+	local clicker = model:FindFirstChildWhichIsA("ClickDetector", true)
 	if clicker then
 		clicker.MouseClick:Connect(function()
 			SoundPlayer.world("bossHit")
@@ -168,8 +206,9 @@ local function step(dt: number)
 		local hp = model:GetAttribute("HP")
 		local maxHp = model:GetAttribute("MaxHP")
 		if type(hp) == "number" and type(maxHp) == "number" and maxHp > 0 then
-			if hp < giant.lastHp then
-				giant.flinchUntil = clock + FLINCH_SECONDS
+			-- hits come in 0.1 s steps from everyone: a new flinch at most twice a second, none with Reduce effects
+			if hp < giant.lastHp and BossRules.startsFlinch(Boss, giant.flinchAt, clock, reduced) then
+				giant.flinchAt = clock
 			end
 			giant.lastHp = hp
 			giant.fill.Size = UDim2.fromScale(math.clamp(hp / maxHp, 0, 1), 1)
@@ -178,10 +217,11 @@ local function step(dt: number)
 		local endsAt = model:GetAttribute("EndsAt")
 		if type(endsAt) == "number" then
 			local left = math.max(0, math.ceil(endsAt - serverNow))
-			giant.timeLabel.Text = `{Theme.text.bossHint}  ⏱ {left}s`
+			giant.timeLabel.Text = `{hint}  ⏱ {left}s`
 		end
-		local flinching = clock < giant.flinchUntil
-		giant.highlight.FillTransparency = if flinching then 0.55 else 1
+		local since = clock - giant.flinchAt
+		local flinching = not reduced and since < Boss.flinch.seconds
+		giant.highlight.FillTransparency = if flinching then BossRules.flinchFill(Boss, since) else 1
 		if reduced then
 			continue
 		end
@@ -193,6 +233,10 @@ local function step(dt: number)
 end
 
 function BossController.start()
+	hint = hintFor(UserInputService:GetLastInputType())
+	UserInputService.LastInputTypeChanged:Connect(function(inputType: Enum.UserInputType)
+		hint = hintFor(inputType)
+	end)
 	CollectionService:GetInstanceAddedSignal(TAG):Connect(onGiant)
 	CollectionService:GetInstanceRemovedSignal(TAG):Connect(function(instance: Instance)
 		if instance:IsA("Model") then

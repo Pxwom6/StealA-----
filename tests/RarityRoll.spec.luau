@@ -106,4 +106,52 @@ T.describe("RarityRoll.roll", function()
 	end)
 end)
 
+T.describe("RarityRoll.creatureOdds", function()
+	T.it("gives each creature its tier's chance times its share of the tier, adding up to 1", function()
+		local odds = RarityRoll.creatureOdds(rarities, creatures, 1, {})
+		T.expect(odds.a).toBeNear(0.9 * 0.75, 1e-12)
+		T.expect(odds.b).toBeNear(0.9 * 0.25, 1e-12)
+		T.expect(odds.r).toBeNear(0.09, 1e-12)
+		T.expect(odds.m).toBeNear(0.01, 1e-12)
+		T.expect(odds.e).toBeNil() -- its event isn't on
+		local total = 0
+		for _, chance in odds do
+			total += chance
+		end
+		T.expect(total).toBeNear(1, 1e-12)
+	end)
+
+	T.it("follows luck and events exactly as RarityRoll.odds does", function()
+		local odds = RarityRoll.creatureOdds(rarities, creatures, 4, { Halloween = true })
+		local tiers: { [string]: number } = {}
+		for _, entry in RarityRoll.odds(rarities, creatures, 4, { Halloween = true }) do
+			tiers[entry.id] = entry.chance
+		end
+		T.expect(odds.r).toBeNear(tiers.Rare, 1e-12)
+		T.expect(odds.m + odds.e).toBeNear(tiers.Mythic, 1e-12)
+		T.expect(odds.e / odds.m).toBeNear(1000, 1e-9)
+	end)
+
+	T.it("matches what RarityRoll.roll draws with the same arguments", function()
+		local rng = T.seededRandom(99)
+		local counts: { [string]: number } = {}
+		local n = 200000
+		for _ = 1, n do
+			local id = RarityRoll.roll(rarities, creatures, 3, {}, rng) :: string
+			counts[id] = (counts[id] or 0) + 1
+		end
+		for id, chance in RarityRoll.creatureOdds(rarities, creatures, 3, {}) do
+			T.expect((counts[id] or 0) / n).toBeNear(chance, 0.006)
+		end
+	end)
+
+	T.it("leaves out creatures that can never roll", function()
+		local list = { F.creature("a", "Common", 1), F.creature("zero", "Common", 0) }
+		local odds = RarityRoll.creatureOdds(rarities, list, 1, {})
+		T.expect(odds.a).toBeNear(1, 1e-12)
+		T.expect(odds.zero).toBeNil()
+		T.expect((next(RarityRoll.creatureOdds(rarities, {}, 1, {})))).toBeNil()
+	end)
+end)
+
 return nil

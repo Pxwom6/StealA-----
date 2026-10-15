@@ -49,6 +49,16 @@ It only touches `ReplicatedStorage.Shared`, `ServerScriptService.Server` and `St
 same mapping as `default.project.json`); custom models, ProfileStore and the place's settings stay as they are. CI
 checks it against Rojo builds of every commit (`tools/syncTest.luau`).
 
+**Place settings the sync never sets.** `default.project.json` gives a Rojo-built place these, but a synced place
+keeps its own, so set them once by hand (and check them before publishing):
+
+| Where | Setting | Why |
+| --- | --- | --- |
+| Explorer → Workspace → Properties | **StreamingEnabled** off | every client needs the whole generated map (DECISIONS.md #3) |
+| Explorer → Workspace → Properties | **PlayerCharacterDestroyBehavior** = Enabled, if this Studio shows it | Roblox destroys a leaving player's character (less memory in a long server). Scripts can't set it: the Command Bar says "PlayerCharacterDestroyBehavior is not a valid member of Workspace". If the panel doesn't show it either, leave it: the game already lets go of everything it holds for a leaving player |
+| Explorer → TextChatService → Properties | **ChatVersion** = TextChatService | the chat commands (`/mod`, `/boss`...) and chat titles use it |
+| Game Settings → Places (or the Creator Hub's place settings) | **Max Players** = 8 | 8 bases; the server warns in the Output when it is higher (the live place is at 12) |
+
 **A private repo:** GitHub only serves its files with a token. Make a fine-grained personal access token (GitHub →
 Settings → Developer settings → Personal access tokens → Fine-grained tokens) for this repository only, with
 read-only *Contents* access and a short expiry, and paste it between the quotes of `GITHUB_TOKEN` at the top of the
@@ -62,7 +72,7 @@ Studio test purchases, etc.).
 | Command | What it does |
 | --- | --- |
 | `lune run tests/run.luau` | Unit tests for all pure game logic (no Studio needed) |
-| `lune run tools/layoutCheck.luau [--all]` | Where every HUD element lands on five phone, tablet and computer screens, and any overlap, play-zone button or small touch target; also whether the Style, What's New and host panel dialogs fit, and the store's dialogs (CI runs this too) |
+| `lune run tools/layoutCheck.luau [--all]` | Where every HUD element lands on nine phone, tablet and computer screens (320 px tall phones and wider Roblox top bars among them), and any overlap, play-zone button or small touch target; also whether the Style, What's New and host panel dialogs fit, and the store's dialogs (CI runs this too) |
 | `lune run tools/simulate.luau [store]` | Economy simulation used to write `BALANCE.md` (`store`: only what the store items pay) |
 | `lune run tools/importParts.luau` | Import the polished Snackling models from `art/snackling-parts/` |
 | `lune run tools/worldsim/smoke.luau` | Build the map offline in every map theme and check it (CI runs this too) |
@@ -75,6 +85,7 @@ Studio test purchases, etc.).
 | `lune run tools/worldsim/gadgets.luau` | Every gadget through the real remotes on the offline server, with a virtual clock (CI runs this too) |
 | `lune run tools/worldsim/cosmetics.luau` | Titles, base skins and What's New through the real remotes on the offline server (CI) |
 | `lune run tools/worldsim/store.luau` | Auto Collect, the Lucky Spin packs and the Starter Pack through the real receipt path on the offline server (CI) |
+| `lune run tools/worldsim/review2.luau` | The second review's server fixes (drop modifiers started again, a private server's pace, Snack Attack's health) on the offline server, with a virtual clock (CI) |
 | `lune run tools/worldsim/exportSkins.luau [mapId] [out.json] [--vip]` | Dump a map with a different base skin on every base, for a 3D preview |
 | `lune run tools/worldsim/exportSeason.luau <mapId> <eventId> [out.json]` | Dump a map with a seasonal event's theme on (decorations and lighting), for a 3D preview |
 | `rojo build -o build/sync.rbxl` then `lune run tools/syncTest.luau build/sync.rbxl` | Check the Studio sync script (`studio/SyncFromGitHub.luau`) offline |
@@ -101,9 +112,11 @@ tools               Lune scripts (balance simulation, model import, worldsim: th
 
 ### Before publishing
 
-1. **Game Settings → Places → Max Players = 8, exactly.** It is a Studio setting the code can't change: the map has
-   8 bases, one per player, and a 9th player would be kicked with "server full" (DECISIONS.md #14; the server warns in
-   the Output when it is higher).
+1. **Game Settings → Places → Max Players = 8, exactly** (the live place is at 12 now). It is a Studio setting the
+   code can't change: the map has 8 bases, one per player, and a 9th player would be kicked with "server full"
+   (DECISIONS.md #14; the server warns in the Output when it is higher). While you're there, check the other **place
+   settings the sync never sets** (StreamingEnabled off, PlayerCharacterDestroyBehavior Enabled where Studio shows
+   it, ChatVersion TextChatService): see "Updating a place in Studio straight from GitHub".
 2. **Game Settings → Security → enable Studio Access to API Services** (to test saving/leaderboards in Studio).
 3. Game passes and developer products: the first 4 passes and 8 products exist on the Creator Hub and their IDs are
    in `src/shared/Config/Monetization.luau`. Change prices on the Creator Hub, not in code. Server Luck is a paid
@@ -204,12 +217,21 @@ design.
 
 **What a private server's owner gets (in their own server only):**
 
-* **🗺️ Map**: switch to any map (once a minute) and turn rotation off to stay on it, or back on.
-* **✨ Modifiers**: start or stop Sugar Rush, Quick Hands, Fortress or Snack Patrol (one every 10 minutes). These are
-  the modifiers marked `hostable = true` in `src/shared/Config/Modifiers.luau`. CI refuses to mark any modifier that
-  raises luck, mutations or income, cuts prices, speeds up the belt, drops things or unlocks a mutation, so a private
-  server is never a better farm than a public one.
+* **🗺️ Map**: switch to any map (once every 20 minutes, the rotation's own pace) and turn rotation off to stay on it,
+  or back on.
+* **✨ Modifiers**: start Sugar Rush, Quick Hands, Fortress, Snack Patrol or Gadget Frenzy (one every 10 minutes) when
+  no other modifier is running, and stop their own. These are the modifiers marked `hostable = true` in
+  `src/shared/Config/Modifiers.luau`. CI refuses to mark any modifier that raises luck, mutations or income, cuts
+  prices, speeds up the belt, drops things, pays bounties or unlocks a mutation. The random schedule's modifiers (and
+  an admin's) run to their end: an owner can't cut one short to roll the next sooner.
 * No belt drops, boosts, gifts, messages or All servers.
+* **Never faster than a public server:** in every server a map counts as played on (the map achievements and titles)
+  after 3 minutes on it, and a map's own mutation rolls for its first 20 minutes up, rotation or not
+  (`Config/MapThemes` `rotation.creditSeconds`, `mapSeconds`). Hopping between public servers is the yardstick: a
+  private server's owner gets nothing it can't.
+* **Until the server closes:** the owner's choices (rotation off, the map, a modifier) last while their server runs.
+  When it closes (everyone left, or a Roblox update), the next one starts like any server, rotation on, on a random
+  map; nothing is saved per private server (DECISIONS.md #55).
 
 **Enabling private servers (Creator Hub):** the experience must be public first. Then:
 
@@ -264,10 +286,11 @@ change:
 
 ### Map themes
 
-The same bases and belt in twenty-three worlds (`src/shared/Config/MapThemes.luau`): Sunny Meadow, Candy Kingdom,
+The same bases and belt in twenty-seven worlds (`src/shared/Config/MapThemes.luau`): Sunny Meadow, Candy Kingdom,
 Frosty Peaks, Nacho Dunes, Hot Sauce Volcano, Midnight Market, Coconut Cove, Apple Pie Orchard, Cherry Blossom Garden,
 Cookie Moon, Mango Rainforest, Neon Noodle City, Cloud Nine, Sushi Reef, Cocoa Canyon, Cotton Candy Carnival, Pizza
-Piazza, Rock Candy Caverns, Lemonade Lagoon, Bubblegum Bayou, Popcorn Drive-In, Tea Party Garden and Pancake Peaks. A
+Piazza, Rock Candy Caverns, Lemonade Lagoon, Bubblegum Bayou, Popcorn Drive-In, Tea Party Garden, Pancake Peaks,
+Honeycomb Hive, Gingerbread Hollow, Ramen Hot Springs and Smokehouse Ranch. A
 server starts on a random one and changes every 20 minutes
 after a 40-second vote in the HUD. Each map sets scenery colours, materials, lighting,
 what grows on the tree spots, ten landmarks outside the wall and the weather; gameplay positions never change.
@@ -280,33 +303,60 @@ what grows on the tree spots, ten landmarks outside the wall and the weather; ga
   signature mutation too (CI checks): add one to `src/shared/Config/Mutations.luau` with `mapTheme = "<id>"`.
 * **Signature mutations:** each map has one that only rolls while it is up (Honey, Sprinkled, Frozen, Fossil,
   Molten, Moonlit, Pearl, Candy Apple, Blossom, Lunar, Mossy, Cyber, Angelic with its halo, Abyssal, Fudge, Balloon,
-  Cheesy, Amethyst, Zesty, Bubblegum, Buttered, Porcelain, Syrupy), named on its vote button and title card. The Globetrotter achievement asks for every map, so its target
+  Cheesy, Amethyst, Zesty, Bubblegum, Buttered, Porcelain, Syrupy, Bumblebee with its bee wings, Gumdrop, Lantern,
+  Barbecue), named on its vote button and title card. The Globetrotter achievement asks for every map, so its target
   follows the number of maps.
+* **Look at one offline:** `lune run tools/worldsim/export.luau hive build/hive.json`, then
+  `node tools/preview/render.mjs build/hive.json build/hive` (overview, aerial, plaza, plots, belt and the four sides;
+  `--cam x,y,z:tx,ty,tz` for a close-up of one landmark). Every map so far was checked this way before shipping.
 * **Preview offline:** `lune run tools/worldsim/export.luau <id> out.json` writes any map as JSON for a 3D preview.
 
 ### Server modifiers
 
-Every 4-8 minutes a server runs a 5-minute twist (`src/shared/Config/Modifiers.luau`): Rush Hour, Clearance Sale,
-Golden Hour, Lucky Breeze, Cash Splash, Sugar Rush, Quick Hands, Fortress, Snack Patrol, the rare Snack Party and
-Jackpot (double cash), weather (a Thunderstorm with rain, lightning and Electric Snacklings; a Meteor Shower with
-shooting stars and Galaxy Snacklings; Toxic Fog with Toxic Snacklings; Northern Lights with an aurora and Aurora
-Snacklings; a Heatwave with Toasted Snacklings), drops (a Supply Drop of crates to race for, a Coin Rain, or a Great
-Escape: Snacklings break out of the factory and run along the walkways, and whoever catches one keeps it) or a Snack
-Attack (giant Snacklings hover over the belt and everyone taps them down together for a share of the reward; the top
-hitter wins a Snackling). Change an effect, a name or the schedule there (CI keeps every effect inside `limits`);
+Every 4-8 minutes a server runs a 5-minute twist (`src/shared/Config/Modifiers.luau`), twenty-four in all: Rush
+Hour, Clearance Sale, Golden Hour, Lucky Breeze, Cash Splash, Sugar Rush, Quick Hands, Fortress, Snack Patrol, the rare
+Snack Party and Jackpot (double cash), Gadget Frenzy (gadgets recharge twice as fast), weather (a Thunderstorm with
+rain, lightning and Electric Snacklings; a Meteor Shower with shooting stars and Galaxy Snacklings; Toxic Fog with
+Toxic Snacklings; Northern Lights with an aurora and Aurora Snacklings; a Heatwave with Toasted Snacklings; an Eclipse:
+the sun goes black in a ring of fire, the afternoon turns to a violet dusk, and Eclipse Snacklings appear), drops (a
+Supply Drop of crates to race for, a Coin Rain, a Great Escape: Snacklings break out of the factory and run along the
+walkways, and whoever catches one keeps it; or a Treasure Hunt: golden forks hidden one at a time around the walkways
+and the plaza, each worth cash or a Lucky Spin to whoever finds it), a Snack Attack (giant Snacklings hover over the
+belt and everyone taps them down together for a share of the reward; the top hitter wins a Snackling) or a Bounty Hunt
+(the server's top earner wears a 🎯 BOUNTY: tag them while they carry, or rob their base, for a payout sized from your
+own income). Change an effect, a name or the schedule there (CI keeps every effect inside `limits`);
 `schedule.enabled = false` turns them off and `weight = 0` keeps one for `/mod` only. BALANCE.md "Server modifiers"
 has the numbers.
 
-* **A new weather:** a modifier with `weather` (particles), `lighting` (an overlay like a seasonal one) and/or
-  `skyEffect` (`lightning`, `meteors`, `aurora`), and a mutation with `modifierId = "<its id>"` (its description
-  should name the mutation; CI checks).
+* **A new weather:** a modifier with `weather` (particles), `lighting` (an overlay like a seasonal one; `hideSun = true`
+  takes the sky's sun away) and/or `skyEffect` (`lightning`, `meteors`, `aurora`, `eclipse`), and a mutation with
+  `modifierId = "<its id>"` (its description should name the mutation; CI checks).
+* **The eclipsed sun:** its sizes and colours are the `ECLIPSE_*` numbers at the top of
+  `src/client/Controllers/WeatherController.luau` (a billboard far out where the sun is, built from round frames: no
+  image assets). It slides over the sun as the Eclipse starts, then its streamers turn slowly; with Reduce effects it
+  stands still.
 * **Thunder:** `world.thunder` in `src/shared/Config/Sounds.luau` is a slowed-down whoosh for now; paste a real
   thunder clap from the sound library there when you find one you like.
 * **Drops:** what crates and coins pay, how long crates take to fall and to open, where they land, and how fast and
   how cleverly a runaway runs are in `src/shared/Config/Drops.luau`; how often they come is the modifier's `drops` (CI
   checks both). In Studio, `/runaway` lets one out now and `/runaway here` right beside you.
 * **Snack Attack:** the giants' health, tap rate, reach, rewards and how long they stay are in
-  `src/shared/Config/Boss.luau` (CI checks it); `/boss` sends one in Studio (`/boss 20` for a quick one).
+  `src/shared/Config/Boss.luau` (CI checks it); `/boss` sends one in Studio (`/boss 20` for a quick one). Its health
+  counts the players playing (moved or hit it in the last `activeSeconds`, out of the first-time tutorial). Players
+  tap it on a phone, click it with a mouse, or aim at it and press R2 on a gamepad; the hint under its health bar
+  says which.
+* **Treasure Hunt:** the hiding places, what a fork pays (3 in 4: 40 s of the finder's income, at least $400; 1 in 4: a
+  Lucky Spin), when its marker shows and how long it stays are `treasure` in `src/shared/Config/Drops.luau`. Each
+  hiding place names what the banner says (`treasureWhere*` in `Theme.text`), and CI checks every one against the real
+  map: on open ground, clear of the belt, the bases, the plaza's furniture, every map's trees and every seasonal
+  decoration. A fork is found by walking into it at a position the server trusts as for a steal, so a teleport there
+  wins nothing. `/fork` hides one now in Studio, `/fork 6` at hiding place 6.
+* **Bounty Hunt:** what a claim pays (a tag 60 s of the tagger's income, at least $500; a steal 90 s of the thief's, at
+  least $750), how many claims each hunter gets (1) and how long it rests after one (30 s) are in
+  `src/shared/Config/Bounty.luau` (CI checks it). The target's Roblox friends never claim it, nor does the target.
+* **Gadget Frenzy:** `gadgetCooldown = 0.5` in its effects. A recharge never drops under the gadget's fairness floor
+  (`GadgetRules.cooldownSeconds`: a speed gadget runs at most a third of the time, a shield a fifth), so the Fizzy Soda
+  recharges in 18 s rather than 17.5.
 
 ### First-time tutorial
 
@@ -420,8 +470,8 @@ The gear button at the right end of the top-right row (lock, 👥 Friends, ⚙; 
 its player list fills that corner on computers) opens Music, Sound effects and Reduce effects switches. They apply at
 once and are saved per player in the save's `flags` map (`settings_musicOff`, `settings_sfxOff`,
 `settings_reduceEffects`; no save-format change). Reduce effects switches off particles, the belt / factory
-animations, Bloom and SunRays on that device; client code can read it with `ClientSettings.reduceEffects()` (or the
-LocalPlayer attribute `ReduceEffects`). Whatever the setting, lights and particles on podium Snacklings far from the
+animations, Bloom and SunRays, lightning flashes and a Snack Attack giant's red flinch on that device; client code
+can read it with `ClientSettings.reduceEffects()` (or the LocalPlayer attribute `ReduceEffects`). Whatever the setting, lights and particles on podium Snacklings far from the
 camera are switched off to save phones the work (`podiumFx` in `src/shared/Config/Gameplay.luau`). Its last row opens 🎨 Style
 (see "Titles, base skins and What's New") and 🎟️ Codes, and for admins and a private server's owner also 🛠️ Host
 panel (see "Host panel and live events").
@@ -436,8 +486,13 @@ around it, the map vote at the bottom. Nothing tappable goes in the middle of th
 
 * **Moving or adding a HUD element:** give it a size in `ScreenLayout.SIZE` and a place in `ScreenLayout.layout`,
   hand its frame to `HudController.place`, and keep `lune run tools/layoutCheck.luau` green: it checks 640×360,
-  667×375 and 844×390 phones, a tablet and a computer window in the busiest states (no overlaps, nothing off screen,
-  no button in the play zone or under Roblox's buttons, 44 px touch targets).
+  667×375 and 844×390 phones, 320 px tall phones (568×320, and 693×320 with a home indicator), the two common phones
+  with wider Roblox top-bar buttons, a tablet and a computer window in the busiest states (no overlaps, nothing off
+  screen, no button in the play zone or under Roblox's buttons, 44 px touch targets).
+* **320 px tall phones** (an iPhone SE in landscape, or a bigger phone with Display Zoom): the HUD scales down to fit
+  the room under Roblox's top bar, so buttons are 36-38 px there (52 UI, as everywhere); the status band rises into
+  the top bar's strip under the cash pill, the cash pill narrows between Roblox's buttons and the corner row, and on
+  the 568×320 phone three gadget buttons fit beside TAG (the fourth hides).
 * **Text:** HUD text is measured with the game font's real metrics (`src/shared/Logic/TextFit.luau`); the tests keep
   every map name, banner, chip, toast and offer at 12 UI (10 px) or more, so a longer name or banner that would be
   too small fails CI.
@@ -446,9 +501,12 @@ around it, the map vote at the bottom. Nothing tappable goes in the middle of th
 
 The Rewards panel (🎁) has four tabs: Daily, Quests, **Gifts** (six gifts a day that unlock with time in game: cash,
 Lucky Spins, lucky Snacklings) and **Spin** (the Lucky Spin reel: a free spin every 12 hours, plus spins from gifts;
-"Odds" lists every chance). Tune them in `src/shared/Config/Gifts.luau` and `src/shared/Config/Spin.luau` (CI checks
-both); BALANCE.md has the numbers. Studio: `/playtime <minutes>` unlocks gifts, `/spins <n>` banks spins and
-`/spins free` makes the free spin ready.
+"Odds" lists every prize's chance, and "📋 Details" every single outcome: each cash prize, and each Snackling a 🎁
+can be, with its exact chance). A spin's odds never change: its Snacklings are permanent ones at the segment's own
+luck (2x), never the server's, an event's or a boost's, and a Golden! or Diamond! is always that mutation, so the
+list is exactly what the server rolls (`Logic/SpinOdds`; spin packs are paid random items). Tune them in
+`src/shared/Config/Gifts.luau` and `src/shared/Config/Spin.luau` (CI checks both); BALANCE.md has the numbers.
+Studio: `/playtime <minutes>` unlocks gifts, `/spins <n>` banks spins and `/spins free` makes the free spin ready.
 
 ### Achievements
 
@@ -481,7 +539,7 @@ to one try every 5 seconds.
   Snackling or mutation outside its event. CI checks every code; changing them needs a publish.
 * **Codes ready to post:** `WELCOME` (2 minutes of income), `SNACKTIME` (a Golden Pizza Pup), `FOURTEENMAPS` (3
   minutes of income), `STORMCHASER` (an Electric Pretzel Pal), `TWENTYMAPS` (a Bubblegum Gummy Grub), `MOVIENIGHT`
-  (a Buttered Popcorn Penguin), and the event codes, which only work while their event runs: `SPOOKY26` (a Haunted
+  (a Buttered Popcorn Penguin), `BUZZBUZZ` (a Bumblebee Bumble Bun), and the event codes, which only work while their event runs: `SPOOKY26` (a Haunted
   Candy Corn Cat, 23 Oct-2 Nov), `FEAST26` (a Maple Cranberry Crane, 20-30 Nov), `JINGLE26` (a Festive Peppermint
   Puffin, 18 Dec-4 Jan), `HAPPY2027` (5 minutes of income, 31 Dec-8 Jan), `LOVE27` (a Sweetheart Candy Heart Hamster,
   5-16 Feb) and `EGGHUNT27` (a Pastel Custard Chick, 19 Mar-6 Apr).
@@ -500,7 +558,9 @@ none until one is bought, and none during the first-time tutorial.
 | 🧲 Snack Magnet | $2.5M | collects the cash on all your pads from anywhere, as if you walked over them | 60 s |
 
 The Auto Collect pass does the Snack Magnet's job every 5 s, so for its owners the magnet's button says AUTO (a tap
-explains) and the Gadgets tab doesn't sell it to them.
+explains) and the Gadgets tab doesn't sell it to them. While the Gadget Frenzy modifier runs, every gadget recharges in
+half the time (the soda in 18 s, never on more than a third of the time), and one already recharging when it starts
+finishes the rest twice as fast.
 
 * **Tune one:** `src/shared/Config/Gadgets.luau` (price, cooldown, duration, speed, slip, peel radius). CI keeps
   every number inside `GadgetRules.validate`: the Bubble Shield at most 5 s and recharging at least 5x as long, any
@@ -511,8 +571,9 @@ explains) and the Gadgets tab doesn't sell it to them.
 * **Add one:** an entry in `Gadgets.gadgets` with one of the kinds (`speed`, `peel`, `shield`, `magnet`), its id in
   `order` (its shop place, button slot and key), and its name and description in `Theme.text`. A new kind needs its
   effect in `src/server/Services/GadgetService.luau` (and its rules in `src/shared/Logic/GadgetRules.luau`). The HUD
-  makes room for `ScreenLayout.SIZE.gadget.slots` (4) buttons beside TAG on every screen; a fifth means checking
-  `lune run tools/layoutCheck.luau` still finds room on all five screens. Ids are saved in the `gadget_<id>` flags:
+  makes room for `ScreenLayout.SIZE.gadget.slots` (4) buttons beside TAG on every screen (three on the 568 x 320
+  phone, where the fourth gadget's button hides); a fifth means checking `lune run tools/layoutCheck.luau` still
+  finds room on all nine screens. Ids are saved in the `gadget_<id>` flags:
   never rename one that has shipped.
 * **Analytics:** `gadget_bought` (value = price, field = gadget id), `gadget_used` (gadget id) and `gadget_effect`
   (gadget id, and `peelDrop`, `peelSlip` or `shieldBlock`).
@@ -599,15 +660,15 @@ Three Robux items beside the original passes and cash packs (DECISIONS.md #52), 
 | Item | What the player gets | Where it is sold |
 | --- | --- | --- |
 | 🧲 Auto Collect (pass) | the cash on all their pads every 5 s, wherever they are, as if they walked over them (the "+$" floats over pads near the camera, with no sound or toast); their Snack Magnet says AUTO | the Shop's Forever perks |
-| 🎰 3 / 10 Lucky Spins | that many spins banked for the Lucky Spin (Rewards → Spin); every prize's exact chance is on the card, and in the Spin tab's Odds beside the buttons | the Shop, and two buttons beside the Spin tab's reel |
+| 🎰 3 / 10 Lucky Spins | that many spins banked for the Lucky Spin (Rewards → Spin); every prize's chance is on the card and in the Spin tab's Odds beside the buttons, and "📋 Details" on both lists every outcome with its exact chance | the Shop, and two buttons beside the Spin tab's reel |
 | 🎁 Starter Pack (once per account) | 40 minutes of their income in cash (at least $60K), a Golden Cupcake Cub, and the Fizzy Soda and Banana Peel (their cash prices if owned) | first in the Shop until bought; once, a small offer under the cash after the first rebirth or 30 minutes of play |
 
 * **Fair by design:** the spin packs only show where the player's Roblox policy allows paid random items (and the
   server refuses them otherwise); buying is refused while 40 spins are banked, but a pack that lands anyway banks
-  every spin. The Starter Pack can't be bought twice, and a second purchase that slips through pays its whole value in
+  every spin. The bank is 40 for every spin, so a bought spin never turns an earned one into cash below that. The Starter Pack can't be bought twice, and a second purchase that slips through pays its whole value in
   cash. Each purchase is checked on the server before Roblox's prompt opens, and again when the receipt arrives.
 * **Tune it:** `perks.autoCollectSeconds` and `starterPack` (its cash, Snackling, mutation, gadgets and when its offer
-  shows) in `src/shared/Config/Monetization.luau`, `paidBankFull` in `src/shared/Config/Spin.luau`; the texts are the
+  shows) in `src/shared/Config/Monetization.luau`, `maxBanked` (the spin bank's size) in `src/shared/Config/Spin.luau`; the texts are the
   `store` entries and the `spinPack*` and `starter*` keys in `src/shared/Config/Theme.luau`. CI checks them.
   `lune run tools/simulate.luau store` prints what each pays (BALANCE.md "Store additions").
 * **Analytics:** `product_viewed` (the item, and where: `store`, `spin` or `offer`), the store funnel's
@@ -628,12 +689,15 @@ These work in Studio only (`src/server/Services/DevCommands.luau`):
   missing one to `/spawn`)
 * `/gallery [mutationId|off]` (every Snackling in labelled rows past the north boundary wall, e.g. `/gallery golden`),
   `/sky <clockTime>` (preview another time of day, e.g. `/sky 18`; the next map or season change resets it)
-* `/map <id>`, `/map vote`, `/map list` (map themes; admins can use these in live servers too, that server only)
+* `/map <id>`, `/map vote`, `/map list` (map themes, e.g. `/map hive`, `/map gingerbread`, `/map ramen`, `/map ranch`;
+  admins can use these in live servers too, that server only)
 * `/playtime <minutes>` (unlock playtime gifts), `/spins <n>` / `/spins free` (Lucky Spins)
 * `/mod <id> [minutes]`, `/mod off`, `/mod list` (server modifiers, e.g. `/mod rushHour 2`, `/mod thunderstorm`,
   `/mod supplyDrop` (first crate after 10 s); admins too, that server only)
 * `/runaway` (a Snackling escapes now, as in Great Escape), `/runaway here` (right beside you, to try catching it)
 * `/boss [hp]` (a Snack Attack giant over the belt now; tap it, e.g. `/boss 20` for a quick one)
+* `/fork [n]` (a Treasure Hunt golden fork hides now, away from everyone, or at hiding place n, e.g. `/fork 6`; try
+  `/mod eclipse`, `/mod treasureHunt`, `/mod bountyHunt` and `/mod gadgetFrenzy` for the newest modifiers)
 * `/gadgets` (own every gadget and recharge them all now), `/gadgets off` (none again)
 * `/hostas owner`, `/hostas none`, `/hostas admin` (try the host panel as a private server's owner, as a player with
   no panel, or as an admin again; reopen Settings after)

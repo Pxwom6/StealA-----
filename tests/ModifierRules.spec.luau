@@ -72,6 +72,17 @@ T.describe("ModifierRules: the real config", function()
 	T.it("never runs anything stronger than the movement checks allow", function()
 		T.expect(ModifierRules.maxWalkSpeed(Modifiers)).toBeAtMost(Modifiers.limits.walkSpeed.max)
 	end)
+
+	T.it("has twenty-four modifiers, each a different twist", function()
+		T.expect(#Modifiers.order).toBe(24)
+		local seen: { [string]: boolean } = {}
+		for _, id in Modifiers.order do
+			local def = Modifiers.modifiers[id]
+			T.expect(seen[def.displayName] == nil and seen[def.icon] == nil).toBe(true)
+			seen[def.displayName] = true
+			seen[def.icon] = true
+		end
+	end)
 end)
 
 T.describe("ModifierRules.effects", function()
@@ -86,6 +97,15 @@ T.describe("ModifierRules.effects", function()
 		T.expect(effects.luck).toBe(2)
 		T.expect(effects.beltPrice).toBe(1)
 		T.expect(effects.walkSpeed).toBe(1)
+		T.expect(effects.gadgetCooldown).toBe(1)
+	end)
+
+	T.it("lets Gadget Frenzy change nothing but gadget recharges", function()
+		local effects = ModifierRules.effects(Modifiers, "gadgetFrenzy")
+		T.expect(effects.gadgetCooldown).toBe(0.5)
+		local rest = table.clone(effects)
+		rest.gadgetCooldown = 1
+		T.expect(rest).toEqual(ModifierRules.none())
 	end)
 end)
 
@@ -233,6 +253,36 @@ T.describe("ModifierRules.validate", function()
 		-- without its mutation, a storm changes nothing
 		T.expect(mentions(ModifierRules.validate(Modifiers, mutationTotal, {}), "thunderstorm changes nothing"))
 			.toBeTruthy()
+	end)
+
+	T.it("lets Bounty Hunt change nothing but the bounty", function()
+		T.expect(mentions(ModifierRules.validate(Modifiers, mutationTotal, unlocks()), "bountyHunt")).toBe(false)
+		T.expect(ModifierRules.effects(Modifiers, "bountyHunt")).toEqual(ModifierRules.none())
+		T.expect(mentions(
+			broken(function(config)
+				config.modifiers.bountyHunt.bounty = nil
+			end),
+			"bountyHunt changes nothing"
+		)).toBeTruthy()
+		T.expect(mentions(
+			broken(function(config)
+				config.modifiers.bountyHunt.bounty = "yes"
+			end),
+			"bounty must be true"
+		)).toBeTruthy()
+	end)
+
+	T.it("lets the Eclipse hide the sun and draw its own, as a weather that unlocks its mutation", function()
+		local eclipse = Modifiers.modifiers.eclipse
+		T.expect(eclipse.skyEffect).toBe("eclipse")
+		T.expect((eclipse.lighting :: Types.SeasonLighting).hideSun).toBe(true)
+		T.expect(mentions(ModifierRules.validate(Modifiers, mutationTotal, {}), "eclipse changes nothing")).toBeTruthy()
+		T.expect(mentions(
+			broken(function(config)
+				config.modifiers.eclipse.lighting.hideSun = "please"
+			end),
+			"hideSun"
+		)).toBeTruthy()
 	end)
 
 	T.it("lets a drop modifier change nothing but what it drops", function()

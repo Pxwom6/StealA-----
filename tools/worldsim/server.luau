@@ -339,10 +339,50 @@ local function scenario()
 	local giant = BossService.current()
 	check(giant ~= nil, "Snack Attack: a giant Snackling appears")
 	local maxHp = giant:GetAttribute("MaxHP")
-	check(maxHp == math.max(Boss.minHp, Boss.hpPerPlayer * 2), `with health for the two players here ({maxHp})`)
+	-- Alice and Bob never finished the first-time tutorial, so neither counts towards its health (review2.luau mixes
+	-- idle, new and playing players): the least it has
+	check(maxHp == Boss.minHp, `with the least health: nobody here is out of the tutorial ({maxHp})`)
 	check(giant:GetPivot().Position.Y > Gameplay.belt.surfaceY + 4, "hovering over the belt")
-	local clicker = giant:FindFirstChildOfClass("ClickDetector")
+	local clicker = giant:FindFirstChildWhichIsA("ClickDetector", true)
 	check(clicker ~= nil and clicker.MaxActivationDistance == Boss.reach, "anyone in reach can tap it")
+	-- Roblox only sends a click, tap or gamepad R2 to a part a spatial query can hit (CanQuery), and creature models
+	-- are built with CanQuery off: the detector must sit on the giant's one queryable part, its invisible hitbox.
+	local hitbox = giant:FindFirstChild(BossService.HITBOX)
+	local queryable, solid, otherParts = 0, 0, 0
+	for _, part in giant:GetDescendants() do
+		if part:IsA("BasePart") then
+			if part.CanQuery then
+				queryable += 1
+			end
+			if part.CanCollide or part.CanTouch then
+				solid += 1
+			end
+			if part ~= hitbox then
+				otherParts += 1
+			end
+		end
+	end
+	check(
+		hitbox ~= nil and clicker ~= nil and clicker.Parent == hitbox and Sim.clickable(clicker),
+		"a real client can tap it: the ClickDetector is on a queryable hitbox"
+	)
+	check(
+		hitbox ~= nil and hitbox.Transparency == 1 and queryable == 1 and solid == 0 and otherParts > 10,
+		`the hitbox is invisible and the only queryable part; nothing collides or touches ({queryable}, {solid})`
+	)
+	local outside = 0
+	if hitbox then
+		for _, part in giant:GetDescendants() do
+			if part:IsA("BasePart") and part ~= hitbox then
+				local at = hitbox.CFrame:PointToObjectSpace(part.Position)
+				local half = hitbox.Size / 2 + roblox.Vector3.new(0.01, 0.01, 0.01)
+				if math.abs(at.X) > half.X or math.abs(at.Y) > half.Y or math.abs(at.Z) > half.Z then
+					outside += 1
+				end
+			end
+		end
+	end
+	check(hitbox ~= nil and outside == 0, `and it covers the whole giant ({outside} parts outside)`)
 	-- Bob walks right under it; Alice stays far away at her base
 	teleport(bob, roblox.Vector3.new(6, 3, 16))
 	local bobBeforeBoss = bobSession.data.cash
@@ -368,7 +408,7 @@ local function scenario()
 	Sim.chat(alice, "/boss 20")
 	task.wait(0.2)
 	giant = BossService.current()
-	clicker = if giant then giant:FindFirstChildOfClass("ClickDetector") else nil
+	clicker = if giant then giant:FindFirstChildWhichIsA("ClickDetector", true) else nil
 	check(clicker ~= nil and giant:GetAttribute("MaxHP") == 20, "/boss 20 sends a quick one")
 	local rounds = 0
 	while BossService.current() ~= nil and rounds < 60 do
@@ -398,6 +438,82 @@ local function scenario()
 		check(BeltService.mutationConditions()[key] == nil, `and its mutation goes with it`)
 	end
 
+	-- Treasure Hunt: a golden fork hides away from everyone, announced with roughly where; walking into it finds it
+	local Theme = Sim.shared("Config/Theme")
+	local UiTheme = Sim.shared("UiTheme")
+	local function announced(text: string): boolean
+		for _, args in Sim.received(0, "Announce") do
+			if args[1].text == text then
+				return true
+			end
+		end
+		return false
+	end
+	Sim.chat(alice, "/mod treasureHunt")
+	task.wait(0.4)
+	Sim.advance(Modifiers.modifiers.treasureHunt.drops.firstSeconds + 0.5)
+	task.wait(0.4)
+	local fork = DropService.treasureModel()
+	local forkAt = DropService.treasurePosition()
+	check(fork ~= nil and forkAt ~= nil, "Treasure Hunt: a golden fork hides")
+	local hidingPlace = nil
+	for _, spot in Drops.treasure.spots do
+		if forkAt and math.abs(spot.x - forkAt.X) < 1e-3 and math.abs(spot.z - forkAt.Z) < 1e-3 then -- Vector3 is float32
+			hidingPlace = spot
+		end
+	end
+	check(hidingPlace ~= nil, "at one of the hiding places")
+	if hidingPlace then
+		local line = Sim.shared("Logic/Format").template(Theme.text.treasureHidden, {
+			where = UiTheme.text(hidingPlace.where),
+		})
+		check(announced(line), `and everyone hears roughly where ({line})`)
+	end
+	local nearestToFork = math.huge
+	for _, player in { alice, bob } do
+		local offset = (player.Character :: any).HumanoidRootPart.Position - (forkAt :: any)
+		nearestToFork = math.min(nearestToFork, roblox.Vector3.new(offset.X, 0, offset.Z).Magnitude)
+	end
+	check(
+		nearestToFork >= Drops.treasure.minPlayerDistance,
+		`never right by anyone ({math.floor(nearestToFork)} studs)`
+	)
+	local inTheWay = 0
+	for _, part in (fork :: any):GetDescendants() do
+		if part:IsA("BasePart") and (part.CanCollide or part.CanTouch or part.CanQuery or not part.Anchored) then
+			inTheWay += 1
+		end
+	end
+	check(inTheWay == 0, "it is anchored and gets in nobody's way")
+	check((fork :: any):GetAttribute("RevealAt") > workspace:GetServerTimeNow(), "and has no marker yet (RevealAt)")
+	-- Bob jumps right next to it: a teleport is only trusted after the 10 s a steal would wait
+	local bobCashFork, bobSpinsFork = bobSession.data.cash, bobSession.data.spin.spins
+	Sim.moveCharacter(bob, (forkAt :: any) + roblox.Vector3.new(1.5, 3, 0))
+	Sim.advance(1.5)
+	task.wait(0.4)
+	check(DropService.treasureModel() == fork, "teleporting onto the fork finds nothing")
+	Sim.advance(11)
+	task.wait(0.4)
+	check(DropService.treasureModel() == nil, "standing there as if he walked in finds it")
+	check(
+		bobSession.data.cash > bobCashFork or bobSession.data.spin.spins > bobSpinsFork,
+		"and pays a prize (cash or a Lucky Spin)"
+	)
+	check(
+		announced(Sim.shared("Logic/Format").template(Theme.text.treasureFound, { player = "Bob" })),
+		"announced to everyone"
+	)
+	Sim.chat(alice, "/fork 6")
+	task.wait(0.2)
+	local second = DropService.treasureModel()
+	check(second ~= nil and second ~= fork, "/fork hides another one at a chosen hiding place")
+	Sim.chat(alice, "/mod off")
+	task.wait(0.4)
+	check(DropService.treasureModel() == second, "it stays when the modifier ends, until its own time is up")
+	Sim.advance(Drops.treasure.lifetimeSeconds + 0.5)
+	task.wait(0.4)
+	check(DropService.treasureModel() == nil, "an unfound fork goes after its lifetime")
+
 	-- Stealing (with Quick Hands) and tagging --------------------------------------------------------------------------------
 	Sim.chat(bob, "/noshield")
 	local record = aliceSession.data.creatures[1]
@@ -423,6 +539,53 @@ local function scenario()
 	check(#aliceSession.data.creatures == 2, "and the owner keeps it")
 	Sim.chat(alice, "/mod off")
 	task.wait(0.1)
+
+	-- Eclipse: the sun goes (each client draws the eclipsed sun where it was), the afternoon darkens to a violet dusk,
+	-- and Eclipse Snacklings, each standing in its ring of fire, can roll only while it runs
+	local eclipseKey = MutationRules.modifierKey("eclipse")
+	local worldSky = Lighting:FindFirstChild("WorldSky")
+	check(worldSky ~= nil and worldSky.CelestialBodiesShown == true, "the sun shows on the map")
+	Sim.chat(alice, "/mod eclipse")
+	task.wait(0.1)
+	check(BeltService.mutationConditions()[eclipseKey] == true, "the Eclipse lets Eclipse Snacklings roll")
+	check(worldSky.CelestialBodiesShown == true, "the sun first moves to where the eclipse will be")
+	task.wait(5.3) -- the light's 4 s and a moment (real time: the lighting's own delay)
+	check(worldSky.CelestialBodiesShown == false, "then the eclipse takes the sky's own sun away")
+	local eclipseSky = Modifiers.modifiers.eclipse.lighting
+	check(math.abs(Lighting.ClockTime - eclipseSky.clockTime) < 1e-3, `and darkens the sky ({Lighting.ClockTime})`)
+	Sim.chat(alice, "/spawn pizza_pup eclipse")
+	task.wait(0.1)
+	local eclipsed = lastBeltItem("pizza_pup")
+	check(eclipsed ~= nil and eclipsed.variant == "eclipse", "an Eclipse Pizza Pup rides the belt")
+	local beltNow = BeltService.belt()
+	Sim.moveCharacter(alice, roblox.Vector3.new(beltNow.startX + 2, 3, Gameplay.belt.width / 2 + 3))
+	local ownedBeforeEclipse = #aliceSession.data.creatures
+	Sim.fireServer(alice, "BuyBeltItem", eclipsed.id)
+	task.wait(0.2)
+	local boughtEclipse = aliceSession.data.creatures[#aliceSession.data.creatures]
+	check(
+		#aliceSession.data.creatures == ownedBeforeEclipse + 1 and boughtEclipse.variant == "eclipse",
+		"bought, it lands in the base"
+	)
+	local ring, ringKept = 0, 0
+	local eclipsePodium = PlotService.podium(aliceSession.plot, boughtEclipse.podium)
+	for _, child in (eclipsePodium :: any).model:GetChildren() do
+		if child:IsA("Model") and child:GetAttribute("Variant") == "eclipse" then
+			for _, part in child:GetDescendants() do
+				if part:IsA("BasePart") and part.Name == "Corona" then
+					ring += 1
+					if part:GetAttribute("MutationSkip") == true and part.Material == roblox.Enum.Material.Neon then
+						ringKept += 1
+					end
+				end
+			end
+		end
+	end
+	check(ring == 15 and ringKept == 15, `its podium model stands in a glowing ring, kept out of the tint ({ring})`)
+	Sim.chat(alice, "/mod off")
+	task.wait(0.1)
+	check(worldSky.CelestialBodiesShown == true, "the sun comes back when it ends")
+	check(BeltService.mutationConditions()[eclipseKey] == nil, "and Eclipse Snacklings stop rolling")
 
 	-- Redeem codes ------------------------------------------------------------------------------------------------------
 	local function lastToast(userId: number): string
@@ -539,6 +702,94 @@ local function scenario()
 	task.wait(1.2)
 	check(workspace:GetAttribute("MapTheme") == candidates[2], `the most voted map wins ({candidates[2]})`)
 	check(workspace:GetAttribute("MapVoteEndsAt") == 0, "the vote is over")
+
+	-- The four newest maps: each one's scenery and sky, only its own signature mutation, and props that never get in
+	-- anyone's way (only the solid middle of each tree spot's prop inside the wall, like a trunk) --------------------
+	local Mutations = Sim.shared("Config/Mutations")
+	local Scenery = Sim.shared("Config/Scenery")
+	local SceneryLayout = Sim.shared("Logic/SceneryLayout")
+	local insideSpots = 0
+	for _, tree in SceneryLayout.layout(Scenery).trees do
+		if not tree.outside then
+			insideSpots += 1
+		end
+	end
+	local function solidParts(folder: any): number
+		local count = 0
+		for _, descendant in folder:GetDescendants() do
+			if descendant:IsA("BasePart") and (descendant.CanCollide or descendant.CanQuery or descendant.CanTouch) then
+				count += 1
+			end
+		end
+		return count
+	end
+	for _, id in { "hive", "gingerbread", "ramen", "ranch" } do
+		local theme = MapThemes.themes[id]
+		Sim.chat(alice, `/map {id}`)
+		task.wait(0.2)
+		check(workspace:GetAttribute("MapTheme") == id, `/map switches to {theme.displayName}`)
+		local scenery = workspace.Map.Scenery :: any
+		check(scenery:GetAttribute("MapTheme") == theme.displayName, `{id}: its scenery is built`)
+		check(
+			math.abs(Lighting.ClockTime - theme.lighting.clockTime) < 1e-3,
+			`{id}: its own sky ({Lighting.ClockTime})`
+		)
+		check(solidParts(scenery.Landmarks) == 0, `{id}: its landmarks are decoration only`)
+		check(
+			solidParts(scenery.Trees) == insideSpots,
+			`{id}: one solid core per tree spot inside the wall ({solidParts(scenery.Trees)} of {insideSpots})`
+		)
+		local signature = MutationRules.forMap(Mutations, id)
+		local conditions = BeltService.mutationConditions()
+		check(
+			signature ~= nil and conditions[MutationRules.mapKey(id)] == true,
+			`{id}: {if signature then signature.displayName else "?"} Snacklings can roll`
+		)
+		local others = 0
+		for _, other in MapThemes.order do
+			if other ~= id and conditions[MutationRules.mapKey(other)] then
+				others += 1
+			end
+		end
+		check(others == 0, `{id}: no other map's signature mutation can roll`)
+		if signature then
+			Sim.chat(alice, `/spawn pizza_pup {signature.id}`)
+			task.wait(0.1)
+			local item = lastBeltItem("pizza_pup")
+			check(item ~= nil and item.variant == signature.id, `a {signature.displayName} Pizza Pup rides the belt`)
+		end
+	end
+	-- Bumblebee (the hive's): bought from the belt, its podium model wears the two bee wings, kept out of the tint
+	Sim.chat(alice, "/map hive")
+	task.wait(0.2)
+	Sim.chat(alice, "/spawn pizza_pup bumblebee")
+	task.wait(0.1)
+	local bee = lastBeltItem("pizza_pup")
+	local beltNow = Sim.server("Services/BeltService").belt()
+	Sim.moveCharacter(alice, roblox.Vector3.new(beltNow.startX + 2, 3, Gameplay.belt.width / 2 + 3))
+	local ownedBefore = #aliceSession.data.creatures
+	Sim.fireServer(alice, "BuyBeltItem", bee.id)
+	task.wait(0.2)
+	local bought = aliceSession.data.creatures[#aliceSession.data.creatures]
+	check(
+		#aliceSession.data.creatures == ownedBefore + 1 and bought.variant == "bumblebee",
+		"a Bumblebee Pizza Pup lands in the base"
+	)
+	local wings, wingsKept = 0, 0
+	local beePodium = PlotService.podium(aliceSession.plot, bought.podium)
+	for _, child in (beePodium :: any).model:GetChildren() do
+		if child:IsA("Model") and child:GetAttribute("Variant") == "bumblebee" then
+			for _, part in child:GetDescendants() do
+				if part:IsA("BasePart") and part.Name == "Wing" then
+					wings += 1
+					if part:GetAttribute("MutationSkip") == true and part.Transparency > 0 then
+						wingsKept += 1
+					end
+				end
+			end
+		end
+	end
+	check(wings == 2 and wingsKept == 2, `its podium model has two glassy bee wings ({wings})`)
 
 	-- Seasonal events: `/event` switches a theme on (decorations, lighting, its weather), its Snacklings and mutation
 	-- can spawn, and `/event off` takes it all away again ------------------------------------------------------------
@@ -687,13 +938,246 @@ local function scenario()
 	check(BeltService.mutationConditions().Harvest2026 == nil, "and the Maple mutation with them")
 	check(math.abs(Lighting.ClockTime - mapSky.clockTime) < 1e-3, "and the map's own sky comes back")
 
-	-- Leaving -------------------------------------------------------------------------------------------------------------
+	-- Bounty Hunt: a bounty on the top earner, claimed by a tag or a steal, once per hunter, never by a friend, and
+	-- resting between claims -------------------------------------------------------------------------------------------
+	local Bounty = Sim.shared("Config/Bounty")
+	local BountyRules = Sim.shared("Logic/BountyRules")
+	local BountyService = Sim.server("Services/BountyService")
+	local EconomyService = Sim.server("Services/EconomyService")
+	local Format = Sim.shared("Logic/Format")
+	local function root(player: any): any
+		return (player.Character :: any).HumanoidRootPart
+	end
+	local function humanoid(player: any): any
+		return (player.Character :: any):FindFirstChildOfClass("Humanoid")
+	end
+	-- Moves several players at once, then lets the movement checks trust them all again (see teleport).
+	local function teleportAll(moves: { { any } })
+		for _, move in moves do
+			Sim.moveCharacter(move[1], move[2])
+		end
+		Sim.advance(1.5)
+		task.wait(0.4)
+		Sim.advance(11)
+		task.wait(0.4)
+	end
+	-- `thief` grabs the Snackling on `victim`'s podium `podiumIndex` (standing next to it, trusted).
+	local function grab(thief: any, victim: any, podiumIndex: number): any
+		local thiefSession, victimSession = sessionOf(thief), sessionOf(victim)
+		local podium = PlotService.podium(victimSession.plot, podiumIndex)
+		teleport(thief, podium.base.Position + roblox.Vector3.new(4, 2, 0))
+		Sim.fireServer(thief, "StealBegin", victimSession.plot, podiumIndex)
+		task.wait(0.05)
+		Sim.advance(Gameplay.steal.holdSeconds + 0.05)
+		task.wait(0.05)
+		Sim.fireServer(thief, "StealConfirm", victimSession.plot, podiumIndex)
+		task.wait(0.1)
+		return thiefSession.carry
+	end
+	-- Walks a carrying `thief` home the way an honest client does (tools/worldsim/prelaunch.luau has the same).
+	local function walkHome(thief: any, victim: any): string
+		local session = sessionOf(thief)
+		local from = PlotService.refs(sessionOf(victim).plot)
+		local to = PlotService.refs(session.plot)
+		local y = root(thief).Position.Y
+		local inside = to.spawnCFrame.Position
+		local route = {
+			roblox.Vector3.new(from.exitPosition.X, y, from.exitPosition.Z),
+			roblox.Vector3.new(to.exitPosition.X, y, to.exitPosition.Z),
+			roblox.Vector3.new(inside.X, y, inside.Z),
+		}
+		local position = root(thief).Position
+		local leg, elapsed, dt = 1, 0, 0.1
+		local steals = session.data.stats.steals
+		-- (this test's game clock is real time: each step takes as long as the server time it moves on)
+		while elapsed < 60 do
+			local budget = humanoid(thief).WalkSpeed * dt
+			while budget > 1e-9 and leg <= #route do
+				local target = route[leg]
+				local offset = roblox.Vector3.new(target.X - position.X, 0, target.Z - position.Z)
+				if offset.Magnitude <= budget then
+					position = roblox.Vector3.new(target.X, position.Y, target.Z)
+					budget -= offset.Magnitude
+					leg += 1
+				else
+					position += offset.Unit * budget
+					budget = 0
+				end
+			end
+			Sim.moveCharacter(thief, position)
+			Sim.advance(dt)
+			elapsed += dt
+			task.wait(dt)
+			if session.carry == nil then
+				return if session.data.stats.steals > steals then "delivered" else "cancelled"
+			end
+		end
+		return "still carrying"
+	end
+	local function tag(tagger: any, thiefId: number)
+		Sim.fireServer(tagger, "TagThief", thiefId)
+		task.wait(0.1)
+	end
+
+	Sim.friendships["1001:1003"] = true -- Alice and Cara are friends on Roblox
+	local cara = join(1003, "Cara")
+	local eve = join(1005, "Eve") -- plot 4: Dan gets plot 5, straight across the belt from Alice's
+	local dan = join(1004, "Dan")
+	local caraSession, danSession = sessionOf(cara), sessionOf(dan)
+	Sim.chat(alice, "/noshield")
+	for _, player in { alice, bob, cara, dan, eve } do
+		Sim.fireServer(player, "SkipTutorial") -- nobody in the first-time tutorial wears a bounty
+	end
+	task.wait(0.1)
+	for _ = 1, 2 do
+		EconomyService.giveCreature(danSession, "pizza_pup", nil)
+	end
+	Sim.advance(Gameplay.lock.durationSeconds + 5) -- Alice's lock from earlier is long over
+	task.wait(0.3)
+	-- Alice gets the best regular Snackling there is: she is the top earner
+	local best = nil
+	for _, def in GameData.catalog.creatureList do
+		if def.eventId == nil and (best == nil or def.income > best.income) then
+			best = def
+		end
+	end
+	EconomyService.giveCreature(aliceSession, best.id, nil)
+	task.wait(0.1)
+	check(
+		aliceSession.packIncome > bobSession.packIncome and bobSession.packIncome > danSession.packIncome,
+		"Alice earns the most, then Bob, then Dan"
+	)
+	-- a hunt nobody claims: the target got through it
+	Sim.chat(alice, "/mod bountyHunt")
+	task.wait(0.3)
+	check(alice:GetAttribute("Bounty") == "on", "Bounty Hunt: the top earner wears the bounty")
+	check(announced(Format.template(Theme.text.bountyOn, { player = "Alice" })), "and everyone hears who it is on")
+	local aliceToasts = Sim.received(1001, "Notify")
+	local toldToGuard = false
+	for index = math.max(1, #aliceToasts - 3), #aliceToasts do
+		if aliceToasts[index][1].text == Theme.text.bountyYou then
+			toldToGuard = true
+		end
+	end
+	check(toldToGuard, "Alice is told to guard her base")
+	local aliceHead = (alice.Character :: any).Head
+	local marker = aliceHead:FindFirstChild("BountyTag")
+	check(
+		marker ~= nil and marker.Enabled and marker.AlwaysOnTop and marker.MaxDistance > 300,
+		"a BOUNTY marker over her head that shows from across the map"
+	)
+	check((alice.Character :: any):FindFirstChild("BountyGlow") ~= nil, "and a gold outline round her")
+	Sim.chat(alice, "/mod off")
+	task.wait(0.3)
+	check(alice:GetAttribute("Bounty") == nil and aliceHead:FindFirstChild("BountyTag") == nil, "it goes when it ends")
+	check(
+		announced(Format.template(Theme.text.bountyEscaped, { player = "Alice" })),
+		"and nobody claimed it: Alice got through"
+	)
+
+	-- the real hunt: Bob, Cara and Dan wait by Dan's podium, where Alice comes to steal
+	Sim.chat(alice, "/mod bountyHunt")
+	task.wait(0.3)
+	local danPodium = PlotService.podium(danSession.plot, danSession.data.creatures[1].podium)
+	local podiumIndex = danSession.data.creatures[1].podium
+	local at = danPodium.base.Position
+	teleportAll({
+		{ bob, at + roblox.Vector3.new(9, 2, 0) },
+		{ cara, at + roblox.Vector3.new(8, 2, 3) },
+		{ dan, at + roblox.Vector3.new(8, 2, -3) },
+	})
+	local carry = grab(alice, dan, podiumIndex)
+	check(carry ~= nil, "Alice steals at Dan's base")
+	local thiefMarker = aliceHead:FindFirstChild("ThiefMarker")
+	local saysBounty = false
+	for _, label in (if thiefMarker then thiefMarker:GetChildren() else {}) do
+		if label:IsA("TextLabel") and label.Text == Theme.text.bountyMarker then
+			saysBounty = true
+		end
+	end
+	check(saysBounty, "her THIEF! marker says BOUNTY too")
+	check(not aliceHead.BountyTag.Enabled, "and the marker over her head steps aside for it")
+	local bobBefore = bobSession.data.cash
+	tag(bob, 1001)
+	check(aliceSession.carry == nil, "Bob tags her: the Snackling runs home")
+	local tagPay = BountyRules.payout(Bounty, "tag", bobSession.packIncome)
+	check(
+		bobSession.data.cash - bobBefore == tagPay
+			and lastToast(1002) == Format.template(Theme.text.bountyReward, { cash = UiTheme.cash(tagPay) }),
+		`and he claims the bounty, sized from his own income (+{tagPay})`
+	)
+	check(
+		announced(Format.template(Theme.text.bountyClaimedTag, { player = "Bob", target = "Alice" })),
+		"announced to everyone"
+	)
+	check(alice:GetAttribute("Bounty") == "resting", "then the bounty rests")
+
+	-- while it rests: a tag pays nothing
+	carry = grab(alice, dan, podiumIndex)
+	local danBefore = danSession.data.cash
+	tag(dan, 1001)
+	check(carry ~= nil and aliceSession.carry == nil, "Dan tags her too")
+	check(danSession.data.cash == danBefore, "but the bounty is resting: no payout")
+	check(string.find(lastToast(1004), "resting", 1, true) ~= nil, `and he is told ({lastToast(1004)})`)
+	Sim.advance(Bounty.restSeconds)
+	task.wait(Bounty.checkSeconds + 0.3)
+	check(alice:GetAttribute("Bounty") == "on", "after its rest the bounty is back")
+
+	-- a friend can't claim it, nor can a hunter twice
+	carry = grab(alice, dan, podiumIndex)
+	local caraBefore = caraSession.data.cash
+	tag(cara, 1001)
+	check(carry ~= nil and aliceSession.carry == nil, "Cara tags her friend Alice")
+	check(caraSession.data.cash == caraBefore, "no bounty between friends (no trading tags for payouts)")
+	check(lastToast(1003) == Theme.text.bountyRefusedFriend, "and she is told why")
+	carry = grab(alice, dan, podiumIndex)
+	bobBefore = bobSession.data.cash
+	tag(bob, 1001)
+	check(carry ~= nil and aliceSession.carry == nil, "Bob tags her again")
+	check(bobSession.data.cash == bobBefore, "but he already claimed this bounty")
+	check(lastToast(1002) == Theme.text.bountyRefusedClaimed, "and is told so")
+
+	-- robbing her base claims it too
+	local aliceRecord = aliceSession.data.creatures[1]
+	carry = grab(dan, alice, aliceRecord.podium)
+	check(carry ~= nil, "Dan steals from Alice's base")
+	danBefore = danSession.data.cash
+	check(walkHome(dan, alice) == "delivered", "and gets it home")
+	-- (sized from his income with the Snackling he just brought home; he may have walked over his own pads on the way)
+	local stealPay = BountyRules.payout(Bounty, "steal", danSession.packIncome)
+	local danToasts = {}
+	for _, args in Sim.received(1004, "Notify") do
+		table.insert(danToasts, args[1].text)
+	end
+	check(
+		danSession.data.cash - danBefore >= stealPay
+			and table.find(danToasts, Format.template(Theme.text.bountyReward, { cash = UiTheme.cash(stealPay) }))
+				~= nil,
+		`claiming the bounty, sized from his own income (+{stealPay})`
+	)
+	check(
+		announced(Format.template(Theme.text.bountyClaimedSteal, { player = "Dan", target = "Alice" })),
+		"announced to everyone"
+	)
+	check(BountyService.hunt() ~= nil and (BountyService.hunt() :: any).claimed == 2, "two claims this hunt")
+
+	-- Leaving: the target's bounty moves to the next top earner ----------------------------------------------------------
 	local owned = #aliceSession.data.creatures
 	Sim.removePlayer(alice)
 	task.wait(0.3)
 	local save = MockProfileStore.saves["Player_1001"]
 	check(save ~= nil and #save.creatures == owned, "leaving saves the Snacklings")
 	check(Sessions.get(alice) == nil, "the session ends")
+	local next = (BountyService.hunt() :: any).targetUserId
+	local heir = if next then Sim.service("Players"):GetPlayerByUserId(next) else nil
+	check(heir ~= nil and heir:GetAttribute("Bounty") ~= nil, "the bounty moves to the next top earner")
+	check(
+		heir ~= nil and announced(Format.template(Theme.text.bountyMoved, { player = heir.DisplayName })),
+		"and everyone hears it"
+	)
+	Sim.chat(bob, "/mod off")
+	task.wait(0.3)
+	check(heir ~= nil and heir:GetAttribute("Bounty") == nil, "when the hunt ends, nobody wears it")
 end
 
 local passed, problem = pcall(scenario :: () -> ...any)

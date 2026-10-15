@@ -178,6 +178,13 @@ local RELEASED_MUTATION_IDS = {
 	"porcelain",
 	"syrupy",
 	"maple", -- Harvest Feast 2026 (event-only)
+	-- map signatures of the four maps after Pancake Peaks
+	"bumblebee",
+	"gumdrop",
+	"lantern",
+	"barbecue",
+	-- weather modifiers after the twenty-third map
+	"eclipse",
 }
 
 T.describe("Config integrity", function()
@@ -727,6 +734,50 @@ T.describe("Map and weather mutations", function()
 		end
 		return sum
 	end
+
+	T.it("rolls the four newest maps' signatures at their chance, never changing any other roll", function()
+		for _, themeId in { "hive", "gingerbread", "ramen", "ranch" } do
+			local signature = MutationRules.forMap(Mutations, themeId) :: Types.MutationDef
+			T.expect(signature ~= nil).toBe(true)
+			T.expect(signature.chance).toBe(0.012)
+			T.expect(signature.incomeMultiplier).toBe(3)
+			local a, b = T.seededRandom(31), T.seededRandom(31)
+			local hits, rolls = 0, 40000
+			for _ = 1, rolls do
+				local on = MutationRules.roll(Mutations, MutationRules.conditions({}, themeId, nil), a)
+				local off = MutationRules.roll(Mutations, {}, b)
+				if on == signature.id then
+					hits += 1
+				else
+					-- rolled after every other mutation, so every other result is the same with or without it
+					T.expect(on).toBe(off)
+				end
+			end
+			T.expect(hits / rolls).toBeNear(signature.chance, 0.003)
+		end
+	end)
+
+	T.it("rolls Eclipse at 2% only while the Eclipse runs, never changing any other roll", function()
+		local eclipse = MutationRules.forModifier(Mutations, "eclipse") :: Types.MutationDef
+		T.expect(eclipse ~= nil and eclipse.id == "eclipse").toBe(true)
+		T.expect(eclipse.chance).toBe(0.02)
+		T.expect(eclipse.incomeMultiplier).toBe(4)
+		T.expect(eclipse.announceOnSpawn).toBe(true)
+		T.expect(eclipse.look.corona).toBe(true)
+		local a, b = T.seededRandom(41), T.seededRandom(41)
+		local hits, rolls = 0, 40000
+		for _ = 1, rolls do
+			local during = MutationRules.roll(Mutations, MutationRules.conditions({}, "meadow", "eclipse"), a)
+			local without = MutationRules.roll(Mutations, MutationRules.conditions({}, "meadow", nil), b)
+			if during == eclipse.id then
+				hits += 1
+			else
+				T.expect(during).toBe(without) -- rolled after everything else
+			end
+			T.expect(without ~= eclipse.id).toBe(true)
+		end
+		T.expect(hits / rolls).toBeNear(eclipse.chance, 0.004)
+	end)
 
 	T.it("gives every map exactly one signature mutation, and names only real maps", function()
 		for _, themeId in MapThemes.order do

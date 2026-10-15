@@ -1419,3 +1419,208 @@ players can only get then, and a luck weekend when many are off school.
 **Reversal cost:** none: move the dates, or drop the `Harvest2026` line from Config/Seasons to keep the Snacklings
 without the decorations. Never remove the creature or mutation ids (they are in players' saves). Going back to the old
 Golden Hour check would need its bound raised or a rarer event mutation.
+
+### 54. Four more maps: Honeycomb Hive, Gingerbread Hollow, Ramen Hot Springs, Smokehouse Ranch
+
+* **What:** maps 24-27, built from the same pieces as the others (#32). **Honeycomb Hive** (a golden morning): a
+  beeswax floor ringed by lavender fields and a honey lake, giant daisies and honeycomb columns on the tree spots,
+  slabs of honeycomb standing on edge with their hexagonal cells facing the map, giant bumblebees hovering over the
+  hills, a straw skep, a honey pot with its dipper and giant daisies (Mango Rainforest's giant flower, recoloured),
+  bee-striped boundary walls, golden pollen. **Gingerbread Hollow** (at sundown, windows lit): a frosting-white floor
+  (warm vanilla SmoothPlastic, not Snow) under gingerbread walkways, iced Christmas-tree cookies and candy-cane lamps on
+  the tree spots, gingerbread cottages with gumdrops along the ridge and icing round the windows, round huts under a
+  giant gumdrop roof, a gingerbread man waving at the map, heaps of sugared gumdrops, candy sprinkles. **Ramen Hot
+  Springs** (a misty dawn): mossy ground and stone paving, Japanese maples and giant spring onions, giant bowls of
+  ramen (noodles lifted on chopsticks, an egg, naruto, chashu, nori, steam), steaming hot springs with a paper lantern,
+  ramen carts with an indigo noren and a stock pot, the existing steam weather. **Smokehouse Ranch** (twilight, the
+  fires glowing): a prairie with red-dirt walkways and a wooden fence, chili plants and giant kebabs, ketchup and
+  mustard squeeze bottles as water towers, barrel smokers glowing through their vents, campfires roasting a sausage and
+  a marshmallow, and a new weather, `smoke` (barbecue smoke rolling low across the ground).
+* **New pieces:** eight flora kinds and fourteen landmark kinds (ThemeProps; counted in MapThemeRules and built exactly,
+  which the world smoke test checks), a hexagonal prism helper (three blocks turned 60° apart fill a hexagon exactly)
+  for the honeycomb, and a plume helper for steam and smoke. The heaviest map, the hive, builds about 1,405 scenery
+  parts (budget 1,500).
+* **Signature mutations** (1.2% at x3 like every map's, rolled after every other mutation so no existing roll changes):
+  **Bumblebee** (fuzzy honey yellow with two glassy bee wings on its back: a new `wings` look, like Angelic's halo),
+  **Gumdrop** (sugared emerald green, sugar crystals), **Lantern** (Neon red-orange, lit like a paper lantern, warm
+  lights rising) and **Barbecue** (a glossy mahogany glaze, smoke curling up). Code `BUZZBUZZ`: a Bumblebee Bumble
+  Bun.
+* **Kept apart from the 23 maps (renders before shipping):** every map was rendered offline from above, the plaza, the
+  plots, the belt and each landmark close up, and set beside a contact sheet of the 23 existing maps. The hive first
+  read as one gold (now lavender fields round a golden floor, deeper honey cells, white daisies); the ranch at sunset
+  was orange from end to end, too close to Hot Sauce Volcano (now a blue twilight its fires glow against); Gingerbread
+  Hollow's white floor read as snow under a cold twilight (now a warm sundown, so the frosting looks like vanilla
+  icing); the ramen bowl read as a drum (now a rounded bowl on a foot), the cookie trees as plain green cones (now one
+  iced cookie with a biscuit rim, turned to the map), and the gumdrop hut's roof hid its windows. CI keeps each new
+  map's time of day at least 20 minutes from every other map's, and its flora and landmarks its own (the hive's giant
+  daisies apart). In the mutation grid, the hive's first signature (Nectar, peach) sat between Maple and Toasted, so
+  it became Bumblebee; Lantern went from matte coral to a glowing Neon.
+* **No balance change:** every signature is 1.2% at x3, so the simulation's time to each rarity and income are the
+  same as before; BALANCE.md's mutation table gains four rows.
+
+**Why:** "a ton of extra maps". Four moods no map had (a bright hive among lavender, a sugary village at sundown, a
+misty hot spring at dawn, a barbecue at twilight), and four more mutations to collect on the vote.
+**Reversal cost:** none — `weight = 0` keeps a map for `/map` only; never remove the mutation ids (they are in saves).
+
+### 55. Review round 2 fixes: the giant tappable everywhere, fixed spin odds, short phones, fair private servers
+
+* **What:** three reviewers went through everything merged after 0ac89b8. Each finding was checked again on main
+  (e09833f), fixed, and given a test that fails without the fix.
+  * **Snack Attack taps (high):** Roblox finds what a tap, a click or a gamepad's R2 (aimed at the screen's centre
+    dot) points at with a spatial query, which never hits a part with CanQuery off, and creature models are built
+    that way (`CreatureVisuals`). So no real client could hit the giant. It now has an invisible `Hitbox` (its
+    bounding box, welded to its root, CanQuery on, never colliding or touching): its only queryable part, and the
+    ClickDetector's parent. The hint under its health bar follows the last input: "Tap to hit!", "Click to hit!" or
+    "Aim at it, press R2!". `Sim.click` refuses a detector a real client couldn't reach (`Sim.clickable`), so the
+    offline tests can no longer pass a giant nobody can tap.
+  * **Lucky Spin odds (high/medium, the Paid Random Items policy):** a spin's Snackling was rolled at 2x the server's
+    luck (events, admins, modifiers), event Snacklings included, with a mutation roll, so its odds changed with live
+    luck, and the packs showed only the reel. A spin's odds now never change. Its Snackling is a permanent one at the
+    segment's own luck, plain or always the segment's mutation (`PrizeService.rollFixed`; `SpinRules.validate` refuses
+    a gated mutation there). The Odds view and each pack's Shop card open a **📋 Details** list of every outcome: the
+    reel, each cash prize, and every Snackling per creature segment with its chance per spin (`Logic/SpinOdds`,
+    `UI/OddsDetails`, `StoreLayout.oddsDetails`). Chances are rounded four decimal places below the first non-zero
+    digit, with the policy's own "Probabilities are rounded..." line. The store test spins 250 times under 6x luck,
+    an event and Golden Hour: every roll is at the segment's 2x, with no event and no mutation roll.
+  * **The giant's flinch (medium, photosensitivity):** it flashed red on every hit, 3 to 5 times a second. Now it is
+    a soft fade at most twice a second (`Boss.flinch`, CI), and none with Reduce effects.
+  * **320 px tall phones (medium):** the HUD broke on a 568x320 phone (an iPhone SE in landscape). Below 360 px the
+    HUD scale comes from the room under Roblox's top bar and the home indicator (`SCALE.shortBelow`, `shortFloor`;
+    UiKit measures the bottom inset).
+    * The status band rises into the top bar's strip.
+    * The cash pill narrows to 160 between Roblox's buttons and the corner row, on every screen.
+    * TAG starts below the band.
+    * The side grid tightens above the thumbstick.
+    * Toasts stay below the band's buttons.
+    * The 568x320 phone has three gadget slots; a button with no slot hides.
+    The layout check went from five screens to nine: 568x320, 693x320 with a home indicator, and 640x360 and 667x375
+    with Roblox's top-left buttons at 270 and 240 px (the spec sweeps them from 200 to 280).
+    Buttons on 320 px screens are 52 UI, as everywhere, which is 36-38 px there. That is under 44, because the HUD
+    can't fit otherwise on the smallest screen Roblox runs on.
+    One known gap: on a 568x320 phone whose top-left buttons are wider than about 222 px, the tutorial banner can
+    overlap TAG, during the tutorial only.
+  * **A drop modifier started again (medium)** kept its first plan: an admin's 30-minute Supply Drop over the
+    schedule's stopped dropping after five minutes. `ModifierService.run()` counts starts, and DropService and
+    BossService plan again when it changes.
+  * **Private servers (medium): the fair rule.** Nothing a private server's owner can do beats hopping between public
+    servers.
+    * The owner may switch the map once per rotation turn (`Host.owner.mapCooldownSeconds` = `mapSeconds`, 20
+      minutes; CI).
+    * In every server, a map counts as played on (`map_<id>`, the map achievements and titles) after
+      `rotation.creditSeconds` (3 minutes) on it.
+    * A map's own mutation rolls only for its first `mapSeconds` up, rotation or not (`MapThemeRules.signatureLive`).
+    * An owner may start a hostable modifier only when none runs, and stop or replace only their own (refusal
+      `notYours`; `ModifierService.startedBy`, the `ModifierByOwner` attribute). The schedule's and an admin's
+      modifiers run to their end.
+    The reviewer's farm, a switch every minute, gave every map's achievements in 23 minutes; it now credits 2 maps.
+    An owner still chooses which map comes next, but a player hopping between public servers can find any map too.
+    Letting the server close and rejoining is just hopping: a new server, a random map, and 3 minutes before it
+    counts.
+    Of the other ideas, a longer cooldown alone left instant credit, and keeping owner-picked maps out of the
+    achievements would have punished honest owners.
+  * **The spin bank (low):** earned spins stopped at 20 while packs could be bought up to 40, so 15 banked plus a
+    10-pack turned every later earned spin into cash. The bank now has one size, `Spin.maxBanked` = 40
+    (`paidBankFull` is gone): earned spins fill it, packs can't be bought while it is full, and a receipt still
+    banks every spin.
+  * **Snack Attack health (low):** it counted every player, so six idle or tutorial players gave two active ones 720
+    taps in 75 seconds. Now it counts players out of the tutorial who moved or landed a hit in the last
+    `Boss.activeSeconds` (60; `BossRules.counts`, `session.activeAt` from PositionTracker and BossService).
+  * **Host settings after a restart (low): accepted, not saved.** A private server that closes starts the next time
+    like any server: rotation on, a random map, no modifier. Saving the settings would mean a DataStore or
+    MemoryStore keyed by the private server, which can fail and needs testing, so that owners can skip two taps.
+    The rotation-off toast now says "until the server closes", and the README says so too.
+  * **Smaller nits (low):**
+    * Starting a hostable modifier no longer ends someone else's (`notYours`).
+    * A banana peel that replaces the last one keeps its button's "running" ring (`removePeel`'s `replacedBy`).
+    * The Friends button's "+20%" tag is in the layout (`ScreenLayout.friendsBadge`; 54x18, ending where the band
+      starts). Gadget 4 on 640x360 now sits past it, and a moved corner row puts the side grid below it.
+    * The What's New board reads from 12-16 studs on a phone, not from the spawn as #51 said; the card is how players
+      read an update.
+  * **Studio place settings:** the sync script never applies `default.project.json`'s properties. The README lists
+    the ones to set by hand: StreamingEnabled off, PlayerCharacterDestroyBehavior Enabled where the Properties panel
+    shows it (scripts can't set it in this Studio), ChatVersion TextChatService, and Max Players 8 (the live place is
+    at 12). The property stays in the Rojo project, which CI builds on every run.
+* **Tests:**
+  * Unit tests: 874 → 906.
+  * `tools/worldsim/review2.luau` (new, in CI): a modifier started again, the private server's pace (the owner, a
+    guest, the map credit, the signature window, the reviewer's farm) and the giant's health with idle, new and
+    active players.
+  * Other offline tests: the server test checks the hitbox; the store test checks the fixed rolls and the shared
+    bank; the gadgets test checks the peel ring; the host test lets an admin stop the schedule's modifier.
+  * `tools/layoutCheck.luau` checks the Details list on both dialogs.
+* **No save change:** the v4 spin bank, and session-only state.
+
+**Why:** Leo plays on a phone, and the giant couldn't be tapped on one; the spin packs must meet Roblox's disclosure
+rule before they are created; the flinch broke the photosensitivity rule the game already keeps; and a private server
+or a purchase must never be a faster or worse deal than playing normally.
+**Reversal cost:**
+* Low for the numbers: `creditSeconds`, the owner cooldown, `activeSeconds`, `maxBanked` and `Boss.flinch` are data
+  (CI bounds them).
+* The fixed spin odds are the one thing to keep: rolling a paid spin with live luck again would need a live,
+  per-server odds list on every pack.
+* The hitbox and `Sim.clickable` must stay as long as creature models are non-queryable.
+
+### 56. Four more modifiers: Eclipse, Gadget Frenzy, Treasure Hunt, Bounty Hunt
+
+* **What:** modifiers 21-24, twenty-four in all. **Eclipse** is a weather: the sky's sun goes, the afternoon turns to
+  a violet dusk with a rosy horizon, and where the sun was hangs a black disc with a white-hot rim, a corona from gold
+  through rose to violet, long pale streamers and one bright bead (the "diamond ring"); **Eclipse** Snacklings can roll.
+  **Gadget Frenzy**: every gadget recharges in half the time. **Treasure Hunt**: seven golden forks, one at a time, hide
+  around the walkways and the spawn plaza; whoever walks into one first wins cash or a Lucky Spin. **Bounty Hunt**: the
+  server's top earner wears a 🎯 BOUNTY for the five minutes; tagging them while they carry, or robbing their base,
+  pays the claimer.
+* **The eclipsed sun is built, not painted:** no image asset. Each client draws a BillboardGui 1,200 studs out along
+  `Lighting:GetSunDirection()` (beyond all the world's geometry, so it keeps its place and size as the camera moves,
+  and everything in front of it hides it): round frames for the disc, rim, glow rings and bead, UIGradient streamers.
+  When it starts, the light changes first (the sun moves to where the eclipse will be over the overlay's 4 s); once the
+  time of day has stood still for half a second the client draws the bright sun there and the dark disc slides across
+  it over 4 s, then the corona lights up and the streamers turn 1.5° a second. The overlay's new `hideSun` makes
+  WorldLighting turn the sky's own sun off a second after the light has changed (`Sky.CelestialBodiesShown`), so the
+  two suns overlap for a moment rather than leaving a gap; it comes back at once when the Eclipse ends. A player who
+  joins mid-eclipse, or with Reduce effects on, sees it already eclipsed and standing still. Nothing flashes. Eclipse Snacklings (2%, x4, announced, order 41 so no other roll changes)
+  are near-black with a gold glow, embers drifting off, and a ring of fire standing behind the body (`corona`: 14 Neon
+  segments and a bead, kept out of the tint), so on a podium the Snackling is the dark moon in its own eclipse.
+* **Gadget Frenzy keeps every gadget rule:** a recharge is the gadget's cooldown x 0.5 (`gadgetCooldown`, a new
+  effect inside `limits`), never under its kind's fairness floor (`GadgetRules.cooldownSeconds`: a speed gadget at
+  least 3x its duration, a shield 5x, as validate already asks; nothing under 5 s). So the soda recharges in 18 s, not
+  17.5; the peel 22.5, the shield 20, the magnet 30. Speeds, durations, the 1.5x cap and the movement checks are
+  untouched. A gadget already recharging when it starts finishes the rest twice as fast (never sooner than its floor
+  after it was used); when it ends, nothing gets slower. The button's disc runs from `usedAt`, new in the gadgets view.
+  It is the fifth hostable modifier: it changes how chases play and no number in the economy (CI's hostable checks).
+* **Treasure Hunt hides forks where they can be found:** 23 hiding places in `Config/Drops` (behind benches, by the
+  fountain, in the flower beds, behind the What's New board and the leaderboards, by the archway, beside the Snack
+  Factory, at the walkways' far ends, deep in the gaps between bases). A fork goes to one at least 30 studs from every
+  player and never the last one used; the banner says roughly where (each place names a `Theme.text` line); a marker
+  shows it after 18 s; unfound, it goes after 36 s, before the next one comes 42 s after it. CI checks every place
+  against the real map: inside the wall, clear of the belt, the bases, the factory and chute, the plaza's furniture,
+  any map's flora on the tree spots and every seasonal decoration. The server finds a fork for whoever walks into it
+  (a distance check every 0.1 s like coins) at a position trusted as for a steal, not the coins' lighter check: the
+  hiding places are in a public config, so a teleport there must win nothing. Three in four pay 40 s of the finder's
+  income (at least $400), one in four a Lucky Spin, through PrizeService.
+* **Bounty Hunt is fair to the target and can't be farmed:** the target is the most steady income (`packIncome`: no
+  boost or friend bonus decides it) among players with a base and no tutorial, ties to whoever joined first; if they
+  leave, the next top earner (announced). Nametags shows the bounty in the title's place (seen 450 studs away, hidden
+  from the target) with a gold outline; while the target carries, StealService's THIEF! marker says BOUNTY. Claims
+  come only from what StealService decided, through GameEvents (a new `tag` event; `steal` now says whose base): a tag
+  only lands on a carrying thief, so nothing pays for waiting by the target's spawn. Refused: the target, their Roblox
+  friends (SocialService's cached answers, so nothing yields: no trading tags for payouts), a hunter's second claim in
+  one hunt, and any claim during the 30 s the bounty rests after one. A claim pays the claimer from their own income
+  (a tag 60 s, at least $500; a steal 90 s, at least $750), never from the target. Nobody claimed it: the target gets a
+  banner for getting through. Not hostable (it pays cash; CI refuses it).
+* **Banners fit:** names in the new banners are shortened like shout-outs' (15 characters), so two long names still
+  fit the narrowest banner (CI), as does every hiding place's line.
+* **Checked offline:** unit tests (BountyRules; where a fork hides, what it pays and every hiding place on the real
+  map; Gadget Frenzy's recharges and floors; the Eclipse roll at 2% changing no other roll); the server test (a fork
+  hidden away from everyone and found by walking in, a teleport onto one finding nothing, `/fork`; the eclipse taking
+  the sun and an Eclipse Snackling's ring on its podium; a whole Bounty Hunt with five players: a tag claim, the rest,
+  a friend and a second claim refused, a steal claim delivered home, the bounty moving on when the target leaves); the
+  gadgets test (Gadget Frenzy). The eclipse was composited onto preview renders of the map under its lighting (from
+  the walkway, a base and the plaza; the script reads WeatherController's numbers), the forks rendered at their
+  hiding places from a player's height, and Eclipse Snacklings set beside Galaxy, Moonlit and the others: the first
+  body tint read as Galaxy purple, so it went near-black.
+
+**Why:** "a ton of extra modifiers", each something the mix didn't have: a sky event with a mutation to race for, a
+gear twist that makes chases wild, a hunt around the plaza, and a twist that gives everyone a reason to go after the
+leader (and the leader a reason to defend).
+**Reversal cost:** none — `weight = 0` keeps any of them for `/mod` only. Never remove the `eclipse` mutation id (it is
+in saves). `hideSun`, the `tag` event and the gadgets view's `usedAt` are additive.

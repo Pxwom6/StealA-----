@@ -218,6 +218,11 @@ the store stay exact. Golden Hour (a server modifier) is the only thing that mul
 | Buttered | on Popcorn Drive-In | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
 | Porcelain | on Tea Party Garden | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
 | Syrupy | on Pancake Peaks | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Bumblebee | on Honeycomb Hive | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Gumdrop | on Gingerbread Hollow | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Lantern | on Ramen Hot Springs | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Barbecue | on Smokehouse Ranch | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Eclipse | during Eclipse | 2% | 28.8 | x4 | x2.5 | x0.63 | spawn |
 
 "Per server-hour" is while the mutation can roll. Any mutation on an ordinary spawn (the map's signature included,
 no modifier): 5.15% of spawns (74.2 per server-hour). Expected value of one spawn: income x1.0885, price x1.0435.
@@ -235,9 +240,14 @@ no modifier): 5.15% of spawns (74.2 per server-hour). Expected value of one spaw
 * **Map signatures** (`mapTheme`): each map has exactly one, only while it is up — about 6 in a 20-minute map. At
   x3 they sit between Golden and Diamond (rarer than Golden, weaker than Diamond; CI checks both), so a map is worth
   voting for (the vote buttons and the title card name its mutation) without making the permanent ones pointless.
-  Collectors chase all twenty-three through the Snackdex, which shows a pip for each one owned.
+  Collectors chase all twenty-seven through the Snackdex, which shows a pip for each one owned. Every map's is the
+  same 1.2% at x3, so adding maps changes no time or income in the simulation (the four newest left every table above
+  exactly as it was).
 * **Weather mutations** (`modifierId`): only while their weather modifier runs (5 minutes, a few times a day per
   server), about 2–3 per storm, each announced to the whole server so everyone races to the belt. x4 like Diamond.
+  There are six (Electric, Galaxy, Toxic, Aurora, Toasted, Eclipse), all 2%: one more weather adds no mutation chance
+  to any spawn outside its own five minutes, and the worst cases below are unchanged (only one modifier runs at a
+  time, and the strongest is still 2%). The simulation's tables only gained the Eclipse row.
 * **Event-only mutations** (with an `eventId`) roll only while that LiveOps event runs.
 * **The worst case stays small.** Only one map and one modifier are ever live, so CI checks any one seasonal event
   plus the strongest map and modifier together (9.15% today) against 10%, every event at once (only possible if an
@@ -557,11 +567,11 @@ after about 7½ minutes (a Cranberry Crane). Re-run with `lune run tools/simulat
 ## Server modifiers
 
 A modifier runs for 5 minutes, then the server waits 4-8 minutes (6 on average) before the next one
-(`Config/Modifiers.luau` `schedule`), so one is running about **45% of the time**. Twenty modifiers share the picks
-by weight (eighteen at 1, Snack Party at 0.5, Jackpot at 0.35), never the same twice in a row: each regular one runs
-about **1.45 minutes per server-hour**, Snack Party about 0.7 and Jackpot about 0.5. A player in a 30-minute session
-sees about three: a weather one more often than not, a drop one (crates, coins, runaways or a Snack Attack) about
-half the time.
+(`Config/Modifiers.luau` `schedule`), so one is running about **45% of the time**. Twenty-four modifiers share the
+picks by weight (twenty-two at 1, Snack Party at 0.5, Jackpot at 0.35), never the same twice in a row: each regular
+one runs about **1.2 minutes per server-hour**, Snack Party about 0.6 and Jackpot about 0.4. A player in a 30-minute
+session sees about three: a weather one (six of them) more often than not, a drop one (crates, coins, runaways,
+golden forks or a Snack Attack) about half the time, and a Bounty Hunt about one session in nine.
 
 | Modifier | Effect while it runs | Effect over a server-hour |
 | --- | --- | --- |
@@ -585,6 +595,10 @@ half the time.
 | Coin Rain | 8 showers of 12 coins over the walkways; walk through them | see below |
 | Great Escape | 6 Snacklings break out (one every 50 s) and run along the walkways; walk into one to catch it | see below |
 | Snack Attack | 3 giant Snacklings (one every 100 s) hover over the belt; everyone taps them down together | see below |
+| Eclipse | the sun goes black in a ring of fire and the afternoon turns violet; Eclipse Snacklings can roll (2%) | about 2–3 Eclipse per eclipse |
+| Gadget Frenzy | every gadget recharges in half the time, never under its floor: soda 18 s (not 17.5), peel 22.5 s, shield 20 s, magnet 30 s | – (gadgets change no number in the economy) |
+| Treasure Hunt | 7 golden forks (one every 42 s, one at a time) hide around the walkways and the plaza; walk into one to find it | see below |
+| Bounty Hunt | the top earner wears a bounty: tag them while they carry, or rob their base, for a payout from your own income | see below |
 
 They are spice, not an economy change: the biggest, Golden Hour, adds under a tenth to a server's mutations per hour.
 
@@ -604,17 +618,33 @@ the player's steady income:
   two an hour, and only the first player to reach each one gets it. It runs slower than players (9 studs/s wandering,
   14.5 while someone is within 40 studs; players walk at 16), so it is always catchable: in offline chases with these
   numbers one player catches it in about 15 s (mostly running to it), four in about 4 s, well inside its 45 seconds.
-* **A Snack Attack giant** (`Config/Boss.luau`) has 90 health per player in the server (at least 120) and the server
-  counts at most 5 taps a second from each player, so everyone tapping flat out takes about 18-24 seconds whatever
-  the server size; it flies off after 75 seconds. Everyone who landed 5 taps or more gets their own income x (20 s +
+* **A Snack Attack giant** (`Config/Boss.luau`) has 90 health per player playing when it appears (at least 120) and
+  the server counts at most 5 taps a second from each player, so everyone tapping flat out takes about 18-24 seconds
+  whatever the server size; it flies off after 75 seconds. A player counts who moved or landed a hit in the last
+  minute and has finished the first-time tutorial (`activeSeconds`): counting everyone, six idle or new players gave
+  the two playing 720 taps to land, 72 seconds flat out before walking to it. Everyone who landed 5 taps or more gets their own income x (20 s +
   120 s x their share of the taps): four even helpers get about 50 seconds of income each, a solo takedown 140
   seconds. The top hitter also wins a Snackling rolled like a crate's (3x luck, 2x mutation chance). A server sees
   about one giant an hour.
-* Pickups, catches and taps are checked against the player's trusted position (no teleporting to coins, runaways or
-  the giant) and a crate's hold is re-checked like a steal's.
+* **A golden fork** (Treasure Hunt) pays the finder 40 seconds of their own income (at least $400) three times in
+  four, else a Lucky Spin (25%; a spin is worth about 90 s of income in cash on average, plus a 30% chance of a
+  Snackling, see "The Lucky Spin"). So a fork is worth about 50 s of income, and a whole hunt, seven forks for the
+  whole server to share, about six minutes of one player's income: a little more than a Coin Rain, for a lot more
+  running. It hides at least 30 studs from everyone (never twice running in the same place), the banner says roughly
+  where, and after 18 s a marker shows it; unfound, it goes after 36 s. The server finds it for whoever walks into it,
+  at a position trusted as for a steal, since the hiding places are known: a teleport there wins nothing.
+* **A bounty** (Bounty Hunt, `Config/Bounty.luau`) pays the claimer, never from the target: a tag on the target while
+  they carry is 60 seconds of the tagger's income (at least $500), robbing their base 90 seconds of the thief's (at
+  least $750), each on top of what the tag or the steal does anyway. Each hunter claims it once a hunt, the target's
+  Roblox friends never, and after any claim it rests 30 s, so a hunt pays at most one claim per other player (seven
+  in a full server) and usually two or three: for a hunter a minute or two of income, more than a Supply Crate's cash;
+  for the target a few more steal attempts than usual, and a banner when they get through unclaimed. A Bounty Hunt
+  comes up about once every four server-hours.
+* Pickups, catches and taps are checked against the player's trusted position (no teleporting to coins, runaways,
+  forks or the giant) and a crate's hold is re-checked like a steal's.
 The weather ones change only the sky (a lighting overlay above the map's and a seasonal theme's, the client's
 particles and sky effects) and unlock their mutation; lightning flashes are soft, at most two in a quarter second,
-and off with Reduce effects.
+and off with Reduce effects (the eclipsed sun never flashes; with Reduce effects it stands still).
 Every effect is clamped by `limits` (CI), and a speed modifier widens the server's movement checks by exactly its own
 multiplier (and keeps the faster speed allowed for 4 s after it ends), so the anti-cheat never flags a player for
 running at a speed the server gave them.
@@ -627,20 +657,25 @@ at 4x luck. An hour of play collects all six: 90 seconds of income, three spins 
 gifts that were unlocked are paid at midnight, so nobody loses one by logging off.
 
 **The Lucky Spin** (`Config/Spin.luau`): a free spin every 12 hours (a new player's first is ready at once) plus the
-banked ones from gifts (up to 20; more are paid as a minute of income each).
+banked ones from gifts and achievements (the bank holds 40, bought spins included; more are paid as a minute of
+income each).
 
 | Prize | Chance | What it pays |
 | --- | --- | --- |
 | Cash | 30% | 30 s of income (at least $200) |
 | Big Cash | 25% | 90 s (at least $600) |
-| Snackling | 18% | a Snackling at 2x luck |
+| Snackling | 18% | a plain Snackling at 2x luck |
 | Huge Cash | 14% | 5 min (at least $2,000) |
-| Golden! | 8% | a Golden Snackling at 2x luck |
-| Diamond! | 3.5% | a Diamond Snackling at 2x luck (announced) |
+| Golden! | 8% | a Snackling at 2x luck, always Golden |
+| Diamond! | 3.5% | a Snackling at 2x luck, always Diamond (announced) |
 | JACKPOT | 1.5% | 20 min of income (at least $10K; announced) |
 
-One spin is worth about 90 seconds of income in cash on average, plus a 30% chance of a Snackling. At 2x luck a
-Snackling is Common 48%, Uncommon 23%, Rare 20%, Epic 7.2%, Legendary 1.9%, Mythic 0.31%, Secret 0.03%; at 4x (the
+One spin is worth about 90 seconds of income in cash on average, plus a 30% chance of a Snackling. A spin's odds never
+change, because spin packs are paid random items: the 2x is the segment's own luck (never the server's, an event's
+or a boost's), the Snackling is from the permanent roster (no event, map or weather ones) and the plain one never
+rolls a mutation, so the Spin tab's 📋 Details lists exactly what the server rolls. At 2x luck a Snackling is Common
+48%, Uncommon 23%, Rare 20%, Epic 7.2%, Legendary 1.9%, Mythic 0.31%, Secret 0.03% (so any Secret is about 0.01%
+of spins, 1 in 10,000); at 4x (the
 last gift) Rare 30%, Epic 11%, Legendary 2.9%, Mythic 0.48%. A player who plays an hour a day and spins twice gets
 roughly 9 minutes of extra income a day from gifts and spins, about +15% for that hour: a reason to come back and stay,
 not a new economy. Every prize scales with steady income like a cash pack, and the server decides every spin.
@@ -792,9 +827,13 @@ spams locks, whatever the lock length.
 player N minutes of their own steady income, by the cash-pack rule (at least $150 a minute), N from 1 to 30. So the
 biggest gift is a little under a Snack Basket (35 minutes, 49 R$) for every player, and it means the same to a newcomer
 and to a big base. It happens only when Leo runs one, so the simulation leaves it out. A 30 s cooldown keeps a double
-tap from paying twice. A private server's owner can only start Sugar Rush, Quick Hands, Fortress or Snack Patrol,
-none of which changes income, prices, luck, mutations or the belt's pace, so a private server earns exactly what a
-public one does (CI checks the hostable set).
+tap from paying twice. A private server's owner can only start Sugar Rush, Quick Hands, Fortress, Snack Patrol or
+Gadget Frenzy, none of which changes income, prices, luck, mutations or the belt's pace (nor pays a bounty), so a
+private server earns exactly what a public one does (CI checks the hostable set). They go through the maps at the rotation's pace too (DECISIONS.md #55):
+a map switch every 20 minutes, a map counted for the map achievements after 3 minutes on it, its own mutation for its
+first 20 minutes up, and the random schedule's modifiers run to their end. Switching every minute used to give a
+server every map (Tourist, Explorer, Globetrotter and their titles) in under half an hour; at 3 minutes a map,
+hopping between public servers is the fastest way, and a private server is no faster than that.
 
 **First-time tutorial** (`Config/Tutorial`): finishing it pays a one-time **$500** (the price of the cheapest
 Uncommon), usually within the first one to two minutes. Skipping it pays nothing, and players who already had progress
@@ -867,7 +906,8 @@ are about 5 minutes for 25 R$ (a third of the Snack Pack) and 10 spins about 15 
 the time (Epic 7.2%, Legendary 1.9%), a big step early on and pocket change at high income. To move them closer to
 the cash ladder, give more spins per pack (`Monetization.products`, the `spins` field) or lower the price; don't change
 the prize table, which the free spin shares and whose odds the store publishes. Buying is refused from 40 banked spins
-on (`Spin.paidBankFull`), so nobody stockpiles packs they haven't spun.
+on (`Spin.maxBanked`), so nobody stockpiles packs they haven't spun; it is the bank's one size, so bought spins never
+push gifts' and achievements' spins into cash below it (they once stopped at 20 while packs went on to 40).
 
 **The Starter Pack** (49 R$, once) beats the same-price Snack Basket at every income: 40 minutes of income instead of
 35, a floor of $60K (the price of the cheapest Epic) instead of $6K, plus the Snackling and the gadgets. For a new

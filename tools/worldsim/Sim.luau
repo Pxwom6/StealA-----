@@ -43,6 +43,9 @@ Sim.isStudio = true
 Sim.virtualClock = false
 -- Game passes each fake player owns: Sim.ownedPasses[userId][passId] = true (nobody owns any by default).
 Sim.ownedPasses = {} :: { [number]: { [number]: boolean } }
+-- Roblox friendships between fake players, by "<lower UserId>:<higher UserId>" (nobody is friends by default):
+-- Player:IsFriendsWithAsync answers from it.
+Sim.friendships = {} :: { [string]: boolean }
 -- PolicyService answers per fake player: Sim.policies[userId] = the policy table, or "error" for a failed lookup.
 -- Default: nothing restricted.
 Sim.policies = {} :: { [number]: any }
@@ -489,6 +492,10 @@ function Players.GetPlayerByUserId(_self: any, userId: number): any
 	end
 	return nil
 end
+roblox.implementMethod("Player", "IsFriendsWithAsync", function(self: any, userId: number): boolean
+	local a, b = self.UserId, userId
+	return Sim.friendships[`{math.min(a, b)}:{math.max(a, b)}`] == true
+end)
 function Players.GetFriendsAsync(_self: any, _userId: number): any
 	error("Players.GetFriendsAsync is not available offline")
 end
@@ -1318,8 +1325,32 @@ function Sim.fireServer(player: any, remoteName: string, ...: any)
 	instanceSignal(remote, "OnServerEvent"):Fire(player, ...)
 end
 
--- `player` clicks (or taps) a ClickDetector the server made.
+-- Whether a real client's pointer can land on a part this ClickDetector answers for (its parent part, or any part
+-- in its parent model or folder). Roblox's hit-test for mouse clicks, taps and a gamepad's R2 is a spatial query,
+-- which skips a part with CanQuery off (CanQuery only counts while CanCollide is off), so a detector whose parts are
+-- all non-queryable never fires in a real game.
+function Sim.clickable(clickDetector: any): boolean
+	local parent = unwrap(clickDetector).Parent
+	local function queryable(part: any): boolean
+		return part.CanCollide or part.CanQuery
+	end
+	if parent == nil then
+		return false
+	elseif parent:IsA("BasePart") then
+		return queryable(parent)
+	end
+	for _, descendant in parent:GetDescendants() do
+		if descendant:IsA("BasePart") and queryable(descendant) then
+			return true
+		end
+	end
+	return false
+end
+
+-- `player` clicks (or taps) a ClickDetector the server made. Like a real client, only on a part a pointer can hit:
+-- it fails for a detector with nothing hit-testable under it (Sim.clickable).
 function Sim.click(player: any, clickDetector: any)
+	assert(Sim.clickable(clickDetector), "a real client can't click this ClickDetector: none of its parts has CanQuery")
 	instanceSignal(unwrap(clickDetector), "MouseClick"):Fire(player)
 end
 

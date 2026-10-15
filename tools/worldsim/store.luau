@@ -14,6 +14,9 @@
 	    rejoin; a full bank refuses before the prompt, and a receipt that lands anyway banks every spin past the caps;
 	    a player whose policy restricts paid random items (or whose lookup failed) is refused before the prompt and at
 	    the receipt.
+	  * The Lucky Spin's odds never change: under 6x admin luck, an event and Golden Hour, every spin's Snackling is
+	    rolled at its segment's own luck with no events and no mutation roll (what its Details list shows), while a
+	    free gift still rolls with them.
 	  * The Starter Pack: its offer comes due at 30 minutes of play (and once shown never again); bought once, its
 	    fixed contents land (income-sized cash, a Golden Cupcake Cub on a podium, Fizzy Soda and Banana Peel), a retry
 	    adds nothing, a second purchase is refused before the prompt, and a second receipt anyway pays the whole pack's
@@ -49,6 +52,7 @@ Monetization.products.LuckySpins10.id = SPINS_10
 Monetization.products.StarterPack.id = STARTER
 
 local ALICE, BOB, CAROL, DAN, RITA, ED, FAY, GUS, HAL = 6001, 6002, 6003, 6004, 6005, 6006, 6007, 6008, 6009
+local IVY = 6010
 Sim.ownedPasses[BOB] = { [AUTO_COLLECT_PASS] = true } -- Bob bought it before: it is his from the moment he joins
 Sim.policies[RITA] = { ArePaidRandomItemsRestricted = true }
 Sim.policies[ED] = "error"
@@ -372,8 +376,19 @@ local function spinPacks()
 	end
 	check(history == 1, "and one entry in his purchase history")
 
+	-- Bought spins leave earned ones their room (review 2): 15 banked, a 10-pack, then an achievement's 5 spins. With
+	-- gifts stopping at 20 while packs stopped at 40, all 5 were paid as cash.
+	d.data.spin.spins = 15
+	check(receipt(DAN, SPINS_10, "spin-receipt-room", 69) == "PurchaseGranted", "with 15 banked a 10-pack lands")
+	local cashBefore = d.data.cash
+	local paid = Sim.server("Services/PrizeService").pay(d, { kind = "spin", count = 5 }, "Achievement")
+	check(
+		paid.spins == 5 and d.data.spin.spins == 30 and d.data.cash == cashBefore,
+		`and an achievement's 5 spins all bank after it, none paid as cash ({d.data.spin.spins} banked: {paid.text})`
+	)
+
 	-- A very full bank: refused before the prompt, and a receipt that lands anyway is never clipped.
-	local full = Sim.shared("Config/Spin").paidBankFull
+	local full = Sim.shared("Config/Spin").maxBanked
 	d.data.spin.spins = full
 	local approvedBefore = #approvals(DAN)
 	Sim.advance(3)
@@ -392,7 +407,7 @@ local function spinPacks()
 		"logged as refused, with the reason"
 	)
 	check(receipt(DAN, SPINS_10, "spin-receipt-2", 69) == "PurchaseGranted", "a 10-pack receipt lands anyway")
-	check(d.data.spin.spins == full + 10, `every spin is banked, past both caps ({d.data.spin.spins})`)
+	check(d.data.spin.spins == full + 10, `every spin is banked, past the bank's size ({d.data.spin.spins})`)
 
 	-- Views: the Spin tab's pack buttons, once per session.
 	Sim.fireServer(dan, "ClientEvent", "store_viewed", "spin")
@@ -428,6 +443,109 @@ local function spinPacks()
 			"and nothing is banked or recorded"
 		)
 	end
+end
+
+-- The Lucky Spin's odds never change (Logic/SpinOdds), so its Details list is always exact: with 6x admin luck, the
+-- Harvest Feast and Golden Hour all on, every spin's Snackling is rolled at its segment's own luck with no events and
+-- no mutation roll, while a free gift in the same moment still rolls with all of it. The game's own RarityRoll and
+-- MutationRules are wrapped to record what each roll is asked.
+local function spinOdds()
+	print("Lucky Spin odds stay fixed:")
+	local Spin = Sim.shared("Config/Spin")
+	local GameData = Sim.shared("GameData")
+	local RarityRoll = Sim.shared("Logic/RarityRoll")
+	local MutationRules = Sim.shared("Logic/MutationRules")
+	local PrizeService = Sim.server("Services/PrizeService")
+	local SpinService = Sim.server("Services/SpinService")
+	local ivy = join(IVY, "Ivy")
+	local s = sessionOf(ivy)
+	Sim.fireServer(ivy, "SkipTutorial")
+	chat(ivy, "/luck 6 60")
+	chat(ivy, "/event Harvest2026 60")
+	chat(ivy, "/mod goldenHour 60")
+	local workspace = Sim.workspace()
+	check(
+		(workspace:GetAttribute("LuckMultiplier") :: number) >= 6
+			and string.find(workspace:GetAttribute("ActiveEventIds") or "", "Harvest2026", 1, true) ~= nil
+			and workspace:GetAttribute("Modifier") == "goldenHour",
+		"6x luck, the Harvest Feast and Golden Hour are on"
+	)
+
+	-- (only the prizes' rolls: the belt keeps spawning meanwhile, at the live luck as it should)
+	local function fromPrizes(): boolean
+		return string.find(debug.traceback(), "PrizeService", 1, true) ~= nil
+	end
+	local rolls: { { luck: number, events: { [string]: boolean } } } = {}
+	local mutationRolls = 0
+	local realRoll, realMutationRoll = RarityRoll.roll, MutationRules.roll
+	RarityRoll.roll = function(rarities: any, creatures: any, luck: number, events: any, rng: any): any
+		if fromPrizes() then
+			table.insert(rolls, { luck = luck, events = events })
+		end
+		return realRoll(rarities, creatures, luck, events, rng)
+	end
+	MutationRules.roll = function(...: any): any
+		if fromPrizes() then
+			mutationRolls += 1
+		end
+		return realMutationRoll(...)
+	end
+
+	-- a free gift's Snackling right now: the live luck and events apply (it needs no disclosure)
+	PrizeService.pay(s, { kind = "creature", luck = 2 }, "Gift")
+	local gift = rolls[#rolls]
+	check(
+		gift ~= nil and gift.luck >= 12 and gift.events.Harvest2026 == true and mutationRolls == 1,
+		`a free gift's Snackling rolls with the live luck and events ({gift and gift.luck})`
+	)
+
+	local found: { { creatureId: string, variant: string? } } = {}
+	Sim.server("Services/GameEvents").on("storeTestSpins", function(session: any, event: any)
+		if session == s and event.kind == "found" and event.source == "Spin" then
+			table.insert(found, { creatureId = event.creatureId, variant = event.variant })
+		end
+	end)
+	rolls, mutationRolls = {}, 0
+	s.data.spin.spins = 300
+	local wins: { [string]: number } = {}
+	local wrongVariant, eventSnacklings, prizes = 0, 0, 0
+	for _ = 1, 250 do
+		local foundBefore = #found
+		Sim.fireServer(ivy, "Spin")
+		task.wait()
+		local results = Sim.received(IVY, "SpinResult")
+		local segment = Spin.segments[results[#results][1].index]
+		wins[segment.id] = (wins[segment.id] or 0) + 1
+		if segment.reward.kind == "creature" then
+			prizes += 1
+			local prize = found[#found]
+			if #found ~= foundBefore + 1 or prize.variant ~= segment.reward.mutation then
+				wrongVariant += 1
+			end
+			if prize and GameData.catalog.creatures[prize.creatureId].eventId ~= nil then
+				eventSnacklings += 1
+			end
+		end
+		Sim.advance(SpinService.REEL_SECONDS + 0.1)
+	end
+	RarityRoll.roll, MutationRules.roll = realRoll, realMutationRoll
+
+	local fixed = #rolls == prizes
+	for _, roll in rolls do
+		fixed = fixed and roll.luck == 2 and next(roll.events) == nil
+	end
+	check(
+		prizes > 40 and (wins.snackling or 0) > 0 and (wins.golden or 0) > 0 and (wins.diamond or 0) > 0,
+		`250 spins won {prizes} Snacklings ({wins.snackling or 0} plain, {wins.golden or 0} Golden, {wins.diamond or 0} Diamond)`
+	)
+	check(fixed, "every one was rolled at its segment's own 2x luck with no events, whatever luck is live")
+	check(
+		mutationRolls == 0 and wrongVariant == 0,
+		"with no mutation roll: plain stays plain, Golden and Diamond are theirs"
+	)
+	check(eventSnacklings == 0, "and never an event Snackling, even during the Harvest Feast")
+	chat(ivy, "/mod off")
+	chat(ivy, "/event off")
 end
 
 local function lastState(userId: number): any
@@ -565,6 +683,7 @@ local function scenario()
 	print("store test:")
 	autoCollect()
 	spinPacks()
+	spinOdds()
 	starterPack()
 	print(`  ({math.floor(Sim.now - OCTOBER_15_2026)} s of server time)`)
 end

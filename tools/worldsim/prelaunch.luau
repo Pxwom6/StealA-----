@@ -164,7 +164,9 @@ local function lastBeltItem(creatureId: string): any
 	return found
 end
 
--- Spawns `creatureId` on the belt, puts `player` beside it and buys it. Returns the cash it cost.
+-- Spawns `creatureId` on the belt, puts `player` beside it and buys it. Returns the cash it cost: cash paid in
+-- meanwhile doesn't count (an achievement the buy earns pays on AchievementService's one-second loop, which can land
+-- inside the wait; everything paid goes through EconomyService.addCash, which counts it in totalEarned).
 local function buy(player: any, creatureId: string): number
 	chat(player, `/spawn {creatureId}`)
 	local item = lastBeltItem(creatureId)
@@ -172,10 +174,10 @@ local function buy(player: any, creatureId: string): number
 	local belt = Sim.server("Services/BeltService").belt()
 	Sim.moveCharacter(player, Vector3.new(belt.startX + 2, 3, Gameplay.belt.width / 2 + 3))
 	local session = sessionOf(player)
-	local before = session.data.cash
+	local before, earned = session.data.cash, session.data.stats.totalEarned
 	Sim.fireServer(player, "BuyBeltItem", item.id)
 	task.wait(0.1)
-	return before - session.data.cash
+	return before - session.data.cash + (session.data.stats.totalEarned - earned)
 end
 
 -- `thief` grabs the Snackling on `victim`'s podium `podiumIndex` (standing next to it, trusted). Returns the carry.

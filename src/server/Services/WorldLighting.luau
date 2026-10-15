@@ -3,8 +3,8 @@
 	The world's lighting, in layers: the current map's preset at the bottom (Config/MapThemes, set by MapBuilder when it
 	builds or restyles the map), and overlays on top (a seasonal theme's mood, set by SeasonService; a weather
 	modifier's sky, set by ModifierService, above it). The highest-priority overlay decides every value it has (time of
-	day, brightness, ambient colours, haze, colour grading, and the clouds if it has them); the rest always comes from
-	the map. Every change tweens over a few seconds.
+	day, brightness, ambient colours, haze, colour grading, the clouds if it has them, and whether the sun shows); the
+	rest always comes from the map. Every change tweens over a few seconds.
 
 	This module owns the lighting instances: Lighting's own properties, its Atmosphere, Sky, Bloom, ColorCorrection and
 	SunRays children (created once, named World*), and the terrain's Clouds. Nothing else should change them, except
@@ -25,6 +25,9 @@ type Overlay = { lighting: Types.SeasonLighting, priority: number }
 local base: Types.SceneryLighting? = nil
 local overlays: { [string]: Overlay } = {}
 local running: { Tween } = {}
+-- An overlay with `hideSun` takes the sun away this long after the light has finished changing (see apply).
+local HIDE_SUN_AFTER = 1
+local hideToken = 0
 
 -- The child of Lighting called `name`, created as `className` the first time. A Lighting child of the same class
 -- that came with the place (the Baseplate template has an Atmosphere and a Sky) is adopted and renamed, so there is
@@ -148,9 +151,23 @@ function WorldLighting.apply(seconds: number)
 	}, seconds)
 
 	-- Roblox's own skybox textures (a new Sky starts with them); only the sun, moon and stars change. Sizes and star
-	-- counts are whole-number properties: set, not tweened.
+	-- counts are whole-number properties: set, not tweened. An overlay with `hideSun` (Eclipse) takes the sun (and the
+	-- moon) away once the light has changed (so the sun first moves to where the eclipse will be), a moment after
+	-- every client starts drawing the eclipsed sun there (WeatherController); without one, the sun is back at once.
 	local sky = owned("Sky", "WorldSky") :: Sky
-	sky.CelestialBodiesShown = true
+	hideToken += 1
+	if mood.hideSun ~= true then
+		sky.CelestialBodiesShown = true
+	elseif seconds <= 0 then
+		sky.CelestialBodiesShown = false
+	else
+		local token = hideToken
+		task.delay(seconds + HIDE_SUN_AFTER, function()
+			if token == hideToken then
+				sky.CelestialBodiesShown = false
+			end
+		end)
+	end
 	sky.SunAngularSize = preset.sky.sunAngularSize
 	sky.MoonAngularSize = preset.sky.moonAngularSize
 	sky.StarCount = preset.sky.starCount
