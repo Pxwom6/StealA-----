@@ -69,6 +69,9 @@ export type CarryTrack = {
 	lastT: number,
 	climbY: number, -- highest height already paid for (see stepWalkTrack)
 	budget: number, -- studs the thief may still move; refills over time, capped
+	-- Straight-line studs allowed from the grab point so far: maxSpeed x dt added up step by step, so a speed that
+	-- drops mid-carry (Sugar Rush ending) never shrinks the distance already covered at the old speed.
+	reach: number,
 }
 
 -- maxSpeed is the carry walk speed; leeway is the starting budget and the slack on the straight-line cap.
@@ -345,6 +348,7 @@ function StealRules.newCarryTrack(x: number, y: number, z: number, t: number, li
 		lastT = t,
 		climbY = y,
 		budget = limits.leeway,
+		reach = 0,
 	}
 end
 
@@ -353,7 +357,9 @@ end
 -- height gained above the highest point already paid for, so repeated jumps cost one jump); the carry fails if it
 -- goes negative. That rejects sustained speed hacks yet forgives a lag spike (positions freeze, then catch up in one
 -- jump: the budget built up while frozen pays for it). Separately the straight-line horizontal distance from the grab
--- point may never exceed maxSpeed * elapsed + leeway, which stops a teleport home right after a grab.
+-- point may never exceed `reach` + leeway, where reach adds up maxSpeed * dt over the steps (the speed allowed at
+-- each step, not the current one times the whole carry: a speed that drops mid-carry never cancels an honest
+-- thief), which stops a teleport home right after a grab.
 -- Returns ok, and a reason ("speed" | "distance") when not ok. Mutates `track`.
 function StealRules.stepCarryTrack(
 	track: CarryTrack,
@@ -363,11 +369,12 @@ function StealRules.stepCarryTrack(
 	t: number,
 	limits: CarryLimits
 ): (boolean, string?)
+	track.reach += limits.maxSpeed * math.max(0, t - track.lastT)
 	if not StealRules.stepWalkTrack(track, x, y, z, t, limits) then
 		return false, "speed"
 	end
 	local fromGrab = math.sqrt((x - track.grabX) ^ 2 + (z - track.grabZ) ^ 2)
-	if fromGrab > limits.maxSpeed * math.max(0, t - track.startedAt) + limits.leeway then
+	if fromGrab > track.reach + limits.leeway then
 		return false, "distance"
 	end
 	return true, nil
