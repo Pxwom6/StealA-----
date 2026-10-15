@@ -5,8 +5,11 @@
 	the prize by weight (chance = weight / total of all weights) and pays at once; the reel animation only shows it.
 
 	Prizes (Types.PrizeReward): cash sized from steady income like a cash pack, or a Snackling rolled at extra luck,
-	optionally always with a mutation (sold for its refund when the base is full). Balance notes: BALANCE.md
-	"Playtime gifts and the Lucky Spin". CI checks this file (Logic/SpinRules.validate).
+	optionally always with a mutation (sold for its refund when the base is full). Banked spins can be bought (Lucky
+	Spin packs, paid random items), so a spin's odds never change: a Snackling prize is a permanent Snackling at its
+	segment's own `luck` (never the server's, an event's or a boost's), plain or always its `mutation` (a permanent
+	one; no mutation roll). The Spin tab and the pack cards list every outcome's exact chance (Logic/SpinOdds).
+	Balance notes: BALANCE.md "Playtime gifts and the Lucky Spin". CI checks this file (Logic/SpinRules.validate).
 ]]
 
 local Types = require("../Types")

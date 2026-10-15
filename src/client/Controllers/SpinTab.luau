@@ -15,7 +15,7 @@
 	attribute in Logic/PaidRandomItems, so not while it is being looked up) and only once the packs exist on the Creator
 	Hub (Studio: always); the Odds view sits right beside them. A tap goes through PurchaseController (checked here, then
 	on the server, before Roblox's prompt opens); while the spin bank holds Config/Spin.paidBankFull spins they say
-	"Bank full". Where everything goes: Logic/StoreLayout.spinTab (checked on five screens by tools/layoutCheck.luau).
+	"Bank full". Where everything goes: Logic/StoreLayout.spinTab (checked on every checked screen by tools/layoutCheck.luau).
 ]]
 
 local Players = game:GetService("Players")

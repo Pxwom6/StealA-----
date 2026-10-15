@@ -79,11 +79,15 @@ function NotificationController.toast(text: string, kind: string?)
 			table.insert(toasts, child)
 		end
 	end
-	if #toasts > MAX_TOASTS then
+	-- the oldest go first, past as many as the screen has room for (fewer on a short phone: ScreenLayout.toastMax)
+	local room = math.min(MAX_TOASTS, ScreenLayout.toastMax(HudController.device()))
+	if #toasts > room then
 		table.sort(toasts, function(a: Frame, b: Frame): boolean
 			return a.LayoutOrder > b.LayoutOrder
 		end)
-		toasts[1]:Destroy()
+		for index = 1, #toasts - room do
+			toasts[index]:Destroy()
+		end
 	end
 	task.delay(TOAST_SECONDS, function()
 		if toast.Parent then

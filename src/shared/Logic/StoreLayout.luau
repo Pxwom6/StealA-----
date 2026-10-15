@@ -3,7 +3,7 @@
 	Where the store additions go inside their dialogs, in UI units. Modal gives a dialog's body 16 in from the panel's
 	sides, 58 from its top and 14 above its bottom; the Rewards panel and the Shop put their tab bar there and a tab's
 	content CONTENT_TOP below it. Pure, so tests/StoreLayout.spec.luau and tools/layoutCheck.luau hold these to the
-	HUD's rules (DECISIONS.md #47) on all five checked screens: both dialogs fit below Roblox's top bar, every button is
+	HUD's rules (DECISIONS.md #47) on every checked screen: both dialogs fit below Roblox's top bar, every button is
 	a full touch target (52 UI, 44 px on the smallest phones), every label reads at 12 UI or more (Logic/TextFit), and
 	nothing overlaps.
 

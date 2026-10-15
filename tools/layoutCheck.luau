@@ -1,10 +1,12 @@
 --!strict
 --[[
-	The HUD layout check (DECISIONS.md #47): where every HUD element lands on the five screens the game is checked on
-	(Logic/ScreenLayout.DEVICES: 640x360, 667x375, 844x390 phones, a 1024x768 tablet, a 1280x720 window), in the busiest
+	The HUD layout check (DECISIONS.md #47): where every HUD element lands on the screens the game is checked on
+	(Logic/ScreenLayout.DEVICES: 640x360, 667x375, 844x390 phones, a 1024x768 tablet, a 1280x720 window, two 320 px
+	tall phones with Display Zoom, and the two smallest phones with Roblox's top-left buttons wider), in the busiest
 	states (ScreenLayout.SCENARIOS), and what is wrong with it. HudController places the real frames with the same
 	functions, so this is what players see. CI runs it; it exits with an error when anything overlaps, leaves the
-	screen, sits in the play zone or is too small to tap. The unit tests (tests/ScreenLayout.spec.luau) check the same.
+	screen, sits in the play zone or is too small to tap (ScreenLayout.minTouchPx). The unit tests
+	(tests/ScreenLayout.spec.luau) check the same.
 	Then the dialogs laid out by pure modules (the Style dialog, the What's New card, the host panel): each must fit
 	every screen below Roblox's top bar. What is inside them (touch targets, text sizes) is checked by their unit tests
 	(tests/StyleLayout.spec.luau, tests/NewsLayout.spec.luau, tests/HostPanelLayout.spec.luau).
@@ -119,8 +121,13 @@ print("\nStore dialogs:")
 for _, spec in ScreenLayout.DEVICES do
 	local device = ScreenLayout.device(spec)
 	local problems = StoreLayout.fitProblems(device.width, device.height, device.topBar, StoreLayout.MARGIN)
-	local onScreen, placed =
-		StoreLayout.screenProblems(device.width, device.height, device.topBar, device.scale, ScreenLayout.MIN_TOUCH)
+	local onScreen, placed = StoreLayout.screenProblems(
+		device.width,
+		device.height,
+		device.topBar,
+		device.scale,
+		ScreenLayout.minTouchPx(device)
+	)
 	for _, problem in onScreen do
 		table.insert(problems, problem)
 	end
