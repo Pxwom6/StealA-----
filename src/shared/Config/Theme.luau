@@ -587,7 +587,6 @@ local Theme = {
 
 		-- Redeem codes (server/Codes.luau): the Codes dialog (from Settings) and its answers
 		settingsCodes = "🎟️ Codes",
-		settingsCodesHint = "Got a code? Redeem it here",
 		codesTitle = "Redeem a Code",
 		codesBody = "Codes give free cash and Snacklings. Each one works once.",
 		codesPlaceholder = "Type a code",

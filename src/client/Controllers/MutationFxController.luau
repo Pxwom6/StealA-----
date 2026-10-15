@@ -1,9 +1,11 @@
 --!strict
 --[[
 	Animates mutation looks on this client: every part tagged CreatureVisuals.RAINBOW_TAG (Rainbow Snacklings on
-	the belt, on podiums and carried by thieves) cycles its hue. One loop at 10 Hz over the tagged parts; Rainbow is
-	the rarest mutation, so there are only ever a handful. The colour change is local (it never replicates). Parts
-	parked out of sight (BeltController's pooled models wait at y = -500) are skipped.
+	the belt, on podiums and carried by thieves, and the trims of a base wearing the Rainbow Swirl skin) cycles its
+	hue. One loop at 10 Hz over the tagged parts; Rainbow is the rarest mutation and a base has nine trims, so there are
+	only ever a few dozen. The colour change is local (it never replicates). Parts parked out of sight (BeltController's
+	pooled models wait at y = -500) are skipped. A part that loses the tag but stays (a skin taken off) gets back the
+	colour the server gave it (its RestColor attribute, MapBuilder.paintPlot): this client's own colour would stay.
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -33,6 +35,12 @@ local function step()
 end
 
 function MutationFxController.start()
+	CollectionService:GetInstanceRemovedSignal(CreatureVisuals.RAINBOW_TAG):Connect(function(instance: Instance)
+		local rest = instance:GetAttribute("RestColor")
+		if instance:IsA("BasePart") and typeof(rest) == "Color3" then
+			instance.Color = rest
+		end
+	end)
 	task.spawn(function()
 		while true do
 			task.wait(STEP_SECONDS)
