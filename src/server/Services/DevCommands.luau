@@ -25,6 +25,9 @@
 	                        right beside you, to test catching it
 	  /boss [hp]            a Snack Attack giant appears over the belt now (tap it to test), e.g. /boss 20 for a quick one
 	  /gadgets [off]        own every gadget (Config/Gadgets) and recharge them all now; /gadgets off removes them again
+	  /hostas <owner|none|admin>
+	                        try the host panel (Settings) as a private server's owner, as a player with no panel, or
+	                        as an admin again (in Studio everyone is an admin)
 
 	Map themes (MapThemeService; admins can use these in live servers too, that server only):
 	  /map <id>             switch to that map now, e.g. /map candy, /map volcano
@@ -52,6 +55,7 @@ local DropService = require(script.Parent.DropService)
 local EconomyService = require(script.Parent.EconomyService)
 local GadgetService = require(script.Parent.GadgetService)
 local GiftService = require(script.Parent.GiftService)
+local HostService = require(script.Parent.HostService)
 local LockService = require(script.Parent.LockService)
 local Replication = require(script.Parent.Replication)
 local QuestService = require(script.Parent.QuestService)
@@ -258,6 +262,21 @@ function DevCommands.start()
 			Remotes.notify(player, "[Studio] no Snackling could escape", "error")
 		end
 	end)
+	add("hostas", function(player: Player, args: { string })
+		local session = Sessions.get(player)
+		local wanted = string.lower(args[1] or "")
+		if session == nil then
+			return
+		elseif wanted == "owner" or wanted == "none" then
+			HostService.devSetRole(session, if wanted == "owner" then "owner" else "none")
+		elseif wanted == "admin" then
+			HostService.devSetRole(session, nil)
+		else
+			Remotes.notify(player, "[Studio] usage: /hostas <owner|none|admin>", "error")
+			return
+		end
+		Remotes.notify(player, `[Studio] host panel as: {wanted}`, "info")
+	end)
 	add("boss", function(player: Player, args: { string })
 		local hp = tonumber(args[1])
 		if hp then
@@ -284,7 +303,7 @@ function DevCommands.start()
 		"[DevCommands] Studio commands enabled: /cash <n>, /spawn <creatureId> [mutationId], /noshield, /friends <n|off>,"
 			.. " /tutorial, /gallery [mutationId|off], /sky <clockTime>,"
 			.. " /quests reset, /dex fill <rarity|event>, /map <id|vote|list>, /playtime <min>, /spins <n|free>,"
-			.. " /runaway [here], /boss [hp], /gadgets [off]"
+			.. " /runaway [here], /boss [hp], /gadgets [off], /hostas <owner|none|admin>"
 			.. " (LiveOps: /event <id> [minutes], /event off, /luck <x> <min>)"
 	)
 end

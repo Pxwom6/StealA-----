@@ -4,7 +4,9 @@
 	top-left buttons when its player list fills the corner on computers; Logic/ScreenLayout) opens a dialog with three
 	switches: Music, Sound effects and Reduce
 	effects. A change applies at once and is saved per player (ClientSettings → SetSetting intent → `settings_<key>`
-	flags in the save). A last row opens the Redeem Code dialog (CodesController).
+	flags in the save). A last row opens the Redeem Code dialog (CodesController); for players who may host (an admin,
+	or this private server's owner: StateUpdate `host`) it shares that row with "🛠️ Host panel" (HostPanelController),
+	so the dialog keeps its height.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,6 +21,7 @@ local Modal = require(script.Parent.Parent.UI.Modal)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local ClientSettings = require(script.Parent.ClientSettings)
 local CodesController = require(script.Parent.CodesController)
+local HostPanelController = require(script.Parent.HostPanelController)
 local HudController = require(script.Parent.HudController)
 local SoundPlayer = require(script.Parent.SoundPlayer)
 
@@ -138,14 +141,23 @@ local function buildRow(row: Row, order: number, parent: Instance): (Types.Setti
 	return show
 end
 
--- The last row: opens the Redeem Code dialog in place of this one.
-local function buildCodesRow(order: number, parent: Instance)
+-- A row button that opens another dialog in place of this one. With a `hint`, the label is on the left and the hint
+-- on the right; without, the label fills it.
+local function buildLinkButton(
+	name: string,
+	text: string,
+	hint: string?,
+	size: UDim2,
+	position: UDim2,
+	parent: Instance,
+	open: () -> ()
+)
 	local button = UiKit.new("TextButton", {
-		Name = "Codes",
-		LayoutOrder = order,
+		Name = name,
 		AutoButtonColor = false,
 		Text = "",
-		Size = UDim2.new(1, 0, 0, 54),
+		Size = size,
+		Position = position,
 		BackgroundColor3 = UiTheme.palette("panelLight"),
 		Parent = parent,
 	}) :: TextButton
@@ -154,27 +166,55 @@ local function buildCodesRow(order: number, parent: Instance)
 	UiKit.addPressFeedback(button)
 	UiKit.label({
 		Name = "Label",
-		Text = Theme.text.settingsCodes,
-		TextXAlignment = Enum.TextXAlignment.Left,
+		Text = text,
+		TextXAlignment = if hint then Enum.TextXAlignment.Left else Enum.TextXAlignment.Center,
 		Position = UDim2.fromOffset(16, 7),
-		Size = UDim2.new(0.45, 0, 0, 40),
+		Size = if hint then UDim2.new(0.45, 0, 0, 40) else UDim2.new(1, -32, 0, 40),
 		Parent = button,
 	})
-	UiKit.label({
-		Name = "Hint",
-		Text = Theme.text.settingsCodesHint,
-		FontFace = UiTheme.bodyFont,
-		TextColor3 = UiTheme.palette("textDim"),
-		TextXAlignment = Enum.TextXAlignment.Right,
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -16, 0.5, 0),
-		Size = UDim2.new(0.5, 0, 0, 24),
-		Parent = button,
-	})
+	if hint then
+		UiKit.label({
+			Name = "Hint",
+			Text = hint,
+			FontFace = UiTheme.bodyFont,
+			TextColor3 = UiTheme.palette("textDim"),
+			TextXAlignment = Enum.TextXAlignment.Right,
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, -16, 0.5, 0),
+			Size = UDim2.new(0.5, 0, 0, 24),
+			Parent = button,
+		})
+	end
 	button.Activated:Connect(function()
 		SoundPlayer.ui("click")
-		CodesController.open()
+		open()
 	end)
+end
+
+-- The last row: the Redeem Code dialog, and beside it the host panel for players who may host.
+local function buildLastRow(order: number, parent: Instance)
+	local row = UiKit.new("Frame", {
+		Name = "LastRow",
+		LayoutOrder = order,
+		Size = UDim2.new(1, 0, 0, 54),
+		BackgroundTransparency = 1,
+		Parent = parent,
+	})
+	if not HostPanelController.mayHost() then
+		buildLinkButton(
+			"Codes",
+			Theme.text.settingsCodes,
+			Theme.text.settingsCodesHint,
+			UDim2.fromScale(1, 1),
+			UDim2.new(),
+			row,
+			CodesController.open
+		)
+		return
+	end
+	local half = UDim2.new(0.5, -4, 1, 0)
+	buildLinkButton("Codes", Theme.text.settingsCodes, nil, half, UDim2.new(), row, CodesController.open)
+	buildLinkButton("Host", Theme.text.settingsHost, nil, half, UDim2.new(0.5, 4, 0, 0), row, HostPanelController.open)
 end
 
 function SettingsController.open()
@@ -193,7 +233,7 @@ function SettingsController.open()
 	for order, row in ROWS do
 		table.insert(updaters, buildRow(row, order, modal.body))
 	end
-	buildCodesRow(#ROWS + 1, modal.body)
+	buildLastRow(#ROWS + 1, modal.body)
 	stopListening = ClientSettings.onChanged(function(settings)
 		for _, update in updaters do
 			update(settings)

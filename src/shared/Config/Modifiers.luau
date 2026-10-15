@@ -20,6 +20,12 @@
 	everyone to tap together (`drops.kind = "boss"`, Config/Boss).
 
 	Commands: /mod <id> [minutes], /mod off, /mod list (anyone in Studio; admins in live servers, that server only).
+	Admins can also start and stop any modifier from the host panel (Config/Host), in this server or all of them.
+
+	`hostable = true`: a private server's owner may start (and stop) it from the host panel, every 10 minutes at most.
+	Only the four that change how a chase plays and leave the economy alone: Sugar Rush, Quick Hands, Fortress and
+	Snack Patrol. Nothing that raises luck, mutation chances or income, cuts prices, speeds up the belt (more rare
+	spawns an hour), drops anything, or is a weather (they unlock a mutation); CI checks (HostRules.hostableProblems).
 	Balance notes: BALANCE.md "Server modifiers".
 ]]
 
@@ -136,6 +142,7 @@ local Modifiers: ModifiersConfig = {
 			color = "#FF6FB5",
 			weight = 1,
 			effects = { walkSpeed = 1.25 },
+			hostable = true, -- private-server owners may start it (Config/Host)
 		},
 		quickHands = {
 			displayName = "Quick Hands",
@@ -144,6 +151,7 @@ local Modifiers: ModifiersConfig = {
 			color = "#FF8C1A",
 			weight = 1,
 			effects = { stealHold = 0.5 },
+			hostable = true, -- private-server owners may start it (Config/Host)
 		},
 		fortress = {
 			displayName = "Fortress",
@@ -152,6 +160,7 @@ local Modifiers: ModifiersConfig = {
 			color = "#4DA8FF",
 			weight = 1,
 			effects = { lockDuration = 1.5 },
+			hostable = true, -- private-server owners may start it (Config/Host)
 		},
 		snackPatrol = {
 			displayName = "Snack Patrol",
@@ -160,6 +169,7 @@ local Modifiers: ModifiersConfig = {
 			color = "#9B6BFF",
 			weight = 1,
 			effects = { tagRange = 1.5 },
+			hostable = true, -- private-server owners may start it (Config/Host)
 		},
 		snackParty = {
 			displayName = "Snack Party",

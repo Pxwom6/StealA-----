@@ -11,6 +11,9 @@
 	BuyBeltItem(itemId) checks: item exists and is on the belt, buyer is in range of it, buyer has a free podium
 	and enough cash at the SERVER's price (mutation included). Then the creature, with its mutation, "teleports" to
 	the buyer's base.
+
+	An admin drop (adminDrop: the host panel's Belt tab) puts a chosen Snackling and mutation on the belt now, with its
+	own banner; it is bought like any other item, but finding it is no rare pull (no global shout-out).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -46,6 +49,7 @@ local BeltService = {}
 
 local belt: BeltMath.Belt
 local items: { [number]: BeltItem } = {}
+local adminDrops: { [number]: boolean } = {} -- belt item ids an admin dropped
 local nextId = 1
 local rng = Random.new()
 
@@ -65,6 +69,7 @@ local function prune(t: number)
 	for id, item in items do
 		if BeltMath.isExpired(belt, item.spawnAt, t) then
 			items[id] = nil
+			adminDrops[id] = nil
 		end
 	end
 end
@@ -99,8 +104,9 @@ local function announcement(
 	return { text = text, rarity = rarity.id, color = color, kind = kind }
 end
 
--- Spawns one rolled item, or exactly `forcedId` (with `forcedVariant`, nil = plain) for dev commands.
-local function spawnOne(forcedId: string?, forcedVariant: string?)
+-- Spawns one rolled item, or exactly `forcedId` (with `forcedVariant`, nil = plain) for dev commands and admin drops
+-- (`adminDrop`: its own banner, always shown).
+local function spawnOne(forcedId: string?, forcedVariant: string?, adminDrop: boolean?)
 	local t = now()
 	prune(t)
 	local count = 0
@@ -139,6 +145,20 @@ local function spawnOne(forcedId: string?, forcedVariant: string?)
 
 	local def = catalog.creatures[creatureId]
 	local rarity = catalog.rarities[def.rarity]
+	if adminDrop then
+		adminDrops[item.id] = true
+		local mutation = GameData.mutation(variant)
+		Announcer.broadcast({
+			text = Format.template(
+				Theme.text.announceAdminDrop,
+				{ rarity = string.upper(rarity.displayName), creature = GameData.displayName(def, variant) }
+			),
+			rarity = rarity.id,
+			color = if mutation then mutation.color else nil,
+			kind = "drop",
+		})
+		return
+	end
 	local banner = announcement(
 		Format.template(
 			Theme.text.announceSpawn,
@@ -194,6 +214,8 @@ local function onBuy(player: Player, idArg: unknown)
 	end
 
 	items[id] = nil
+	local source = if adminDrops[id] then "adminDrop" else "belt"
+	adminDrops[id] = nil
 	local record = EconomyService.giveCreature(session, def.id, item.variant)
 	if record == nil then
 		-- Cannot happen (free podium checked above, no yield in between), but never take cash for nothing.
@@ -203,6 +225,7 @@ local function onBuy(player: Player, idArg: unknown)
 	session.data.stats.beltPurchases += 1
 	Analytics.milestone(session, "FirstBeltPurchase")
 	GameEvents.emit(session, { kind = "beltPurchase", creatureId = def.id, variant = item.variant }) -- tutorial, quests
+	GameEvents.emit(session, { kind = "found", creatureId = def.id, variant = item.variant, source = source }) -- shout-outs
 	if mutation then
 		Analytics.mutationBought(session, mutation.id, mutation.order, def.id)
 	end
@@ -242,6 +265,12 @@ end
 -- events; the caller checks the ids exist.
 function BeltService.spawnCreature(creatureId: string, variant: string?)
 	spawnOne(creatureId, variant)
+end
+
+-- An admin drop (the host panel): `creatureId` with mutation `variant` (nil = plain) on the belt now, announced to
+-- the server. The caller checks the ids exist (HostRules.command).
+function BeltService.adminDrop(creatureId: string, variant: string?)
+	spawnOne(creatureId, variant, true)
 end
 
 function BeltService.belt(): BeltMath.Belt

@@ -6,8 +6,9 @@
 	  1. Add an entry to `events` below and publish (good for planned weekends / holidays).
 	  2. Edit the remote-config DataStore entry (`remoteConfig`) from the Creator Hub's Data Stores manager:
 	     servers re-read it every `refreshSeconds`, no publish needed. Same JSON shape as `events`.
-	  3. Admin chat command in any live server — broadcast to every server via MessagingService (in Studio anyone
-	     can use them, and they only affect that Studio session):
+	  3. The host panel (Settings, admins only) or an admin chat command in any live server, for that server or
+	     every server through MessagingService (Config/Host, HostService; the chat commands below always reach every
+	     server). In Studio anyone can use them, and they only affect that Studio session:
 	       /luck <multiplier> <minutes>      e.g. /luck 2 30
 	       /event <eventId> [minutes]        start a configured event now (its durationSeconds, or `minutes`); an
 	                                         event that is already running is only extended, never doubled
@@ -33,8 +34,8 @@ local Types = require("../Types")
 export type EventDef = Types.EventDef
 
 local LiveOps = {
-	-- Roblox UserIds allowed to use the admin chat commands in live servers. 723735722 = Pxwom5 (the owner).
-	-- Group-rank based admin can be added in LiveOpsService.
+	-- Roblox UserIds allowed to use the host panel and the admin chat commands in live servers. 723735722 = Pxwom5
+	-- (the owner). Group-rank based admin can be added in HostService.
 	adminUserIds = { 723735722 } :: { number },
 
 	events = {
@@ -170,8 +171,6 @@ local LiveOps = {
 		key = "events",
 		refreshSeconds = 300,
 	},
-
-	messagingTopic = "SnacklingLiveOps",
 }
 
 return LiveOps

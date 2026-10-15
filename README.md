@@ -70,6 +70,7 @@ Studio test purchases, etc.).
 | `lune run tools/worldsim/exportCreatures.luau <out.json> <ids...>` | Dump Snacklings in a row (`pizza_pup:golden`, `rarity:Mythic`, `event:Winter2026`, `mutations:pizza_pup`) |
 | `node tools/preview/render.mjs <export.json> <outPrefix>` | Render an export to PNGs offline with three.js (see [`tools/preview`](tools/preview/README.md)) |
 | `lune run tools/worldsim/server.luau` | Boot the whole server offline and play a short two-player session (CI runs this too) |
+| `lune run tools/worldsim/host.luau` | The host panel, cross-server messages and shout-outs as admin, owner and player, offline (CI) |
 | `lune run tools/worldsim/prelaunch.luau` | The pre-launch server fixes on the offline server, with a virtual clock (CI runs this too) |
 | `lune run tools/worldsim/gadgets.luau` | Every gadget through the real remotes on the offline server, with a virtual clock (CI runs this too) |
 | `rojo build -o build/sync.rbxl` then `lune run tools/syncTest.luau build/sync.rbxl` | Check the Studio sync script (`studio/SyncFromGitHub.luau`) offline |
@@ -126,12 +127,64 @@ to the live DataStore: test schema changes with it off.
 * **No publish needed:** put the same JSON list in the DataStore `LiveOpsConfig`, key `events` (Creator Hub →
   Data Stores manager). Servers re-read it every 5 minutes, e.g.
   `[{"id":"FridayLuck","startsAt":1767312000,"endsAt":1767398400,"luckMultiplier":2,"bannerText":"2x Luck Friday!"}]`
-* **Right now, every server:** admin chat commands `/luck 2 30` (2× luck for 30 min), `/event <id> [minutes]`
-  (start a configured event now), `/event off [id]` (end events started that way), `/announce <text>` (filtered).
-  In Studio anyone can use them for testing, and they only affect that Studio session.
+* **Right now, here or every server:** the host panel (next section), or the admin chat commands `/luck 2 30` (2×
+  luck for 30 min), `/event <id> [minutes]` (start a configured event now), `/event off [id]` (end events started that
+  way), `/announce <text>` (filtered), which always reach every server. In Studio anyone can use them for testing, and
+  they only affect that Studio session.
 * **Limited-time creatures:** give a creature an `eventId`; it only appears on the belt while that event runs.
 * **Event-only mutations:** give a mutation in `src/shared/Config/Mutations.luau` an `eventId` the same way (e.g.
   Halloween's "Haunted"); it only rolls while that event runs.
+
+### Host panel and live events
+
+Admins (`adminUserIds` in `src/shared/Config/LiveOps.luau`) and the owner of a private server get a **🛠️ Host panel**
+row in Settings, beside Codes. Nobody else sees it, and the server refuses everything they send. Numbers, limits,
+cooldowns and the shout-out rule are in `src/shared/Config/Host.luau` (CI checks them). DECISIONS.md #49 explains the
+design.
+
+**Running an admin event (Leo):**
+
+1. Join any live server and open ⚙ Settings → 🛠️ Host panel.
+2. Pick the scope at the right of the tabs: **📍 This server**, or **🌍 All servers** (every server runs it once; a
+   toast says if it could only run here).
+3. Use the tabs:
+   * **🗺️ Map**: switch to a map now, start a vote, or turn this server's map rotation off or on.
+   * **✨ Modifiers**: pick one, set the minutes (1 to 60), Start; or Stop the one running.
+   * **🎁 Belt**: an admin drop. Pick a Snackling (rarest first) and a mutation, then Drop it! It rides the belt with an
+     "ADMIN DROP" banner and is bought like any other.
+   * **🍀 Boosts**: luck (2x to 6x for 5 to 60 minutes); start or end a configured event (for its own length or 15 min
+     to 4 h); **Gift everyone!**: each player gets 1 to 30 minutes of their own income, like a cash pack.
+   * **📣 Message**: a banner for everyone, up to 120 characters, filtered by Roblox first.
+4. A typical session: post in your group "admin abuse at 7pm", then at 7pm in All servers: 3x luck for 15 minutes,
+   Snack Party, a Rainbow Secret drop, then a 5-minute gift to say thanks.
+
+**Rare finds everywhere:** when anyone finds a Secret Snackling, or a Diamond or Rainbow Mythic, the other servers show
+"🌍 Bob found a SECRET Gelato Griffin in another server!" (at most one sent per server every 30 s, one shown every
+20 s, never during the tutorial). Turn it off with `shoutouts.enabled = false`.
+
+**What a private server's owner gets (in their own server only):**
+
+* **🗺️ Map**: switch to any map (once a minute) and turn rotation off to stay on it, or back on.
+* **✨ Modifiers**: start or stop Sugar Rush, Quick Hands, Fortress or Snack Patrol (one every 10 minutes). These are
+  the modifiers marked `hostable = true` in `src/shared/Config/Modifiers.luau`. CI refuses to mark any modifier that
+  raises luck, mutations or income, cuts prices, speeds up the belt, drops things or unlocks a mutation, so a private
+  server is never a better farm than a public one.
+* No belt drops, boosts, gifts, messages or All servers.
+
+**Enabling private servers (Creator Hub):** the experience must be public first. Then:
+
+1. Creator Dashboard → your experience → **Audience** → **Access Settings**.
+2. Turn on **Allow private servers**.
+3. Free: leave **Requires Robux** off. Paid: turn it on and enter the monthly price in Robux.
+4. **Save Changes**.
+
+Changing the price later cancels every active private-server subscription, so pick it once. Private servers can't be
+combined with paid access. Some players under 13 can't join private servers, depending on their parental controls.
+
+**Testing in Studio:** everyone is an admin there, and All servers stays in your test session (CrossServer never
+publishes or listens in Studio). `/hostas owner` shows the owner's panel, `/hostas none` hides the row, and
+`/hostas admin` goes back (reopen Settings after each). Offline, `lune run tools/worldsim/host.luau` (in CI) plays every
+role and the cross-server messages with a MessagingService stand-in.
 
 ### Seasonal events (Halloween 2026, Winter 2026, Valentine's 2027, Easter 2027 and future ones)
 
@@ -321,7 +374,8 @@ once and are saved per player in the save's `flags` map (`settings_musicOff`, `s
 `settings_reduceEffects`; no save-format change). Reduce effects switches off particles, the belt / factory
 animations, Bloom and SunRays on that device; client code can read it with `ClientSettings.reduceEffects()` (or the
 LocalPlayer attribute `ReduceEffects`). Whatever the setting, lights and particles on podium Snacklings far from the
-camera are switched off to save phones the work (`podiumFx` in `src/shared/Config/Gameplay.luau`).
+camera are switched off to save phones the work (`podiumFx` in `src/shared/Config/Gameplay.luau`). Its last row opens 🎟️ Codes,
+and for admins and a private server's owner also 🛠️ Host panel (see "Host panel and live events").
 
 ### HUD layout (phones first)
 
@@ -432,6 +486,8 @@ These work in Studio only (`src/server/Services/DevCommands.luau`):
 * `/runaway` (a Snackling escapes now, as in Great Escape), `/runaway here` (right beside you, to try catching it)
 * `/boss [hp]` (a Snack Attack giant over the belt now; tap it, e.g. `/boss 20` for a quick one)
 * `/gadgets` (own every gadget and recharge them all now), `/gadgets off` (none again)
+* `/hostas owner`, `/hostas none`, `/hostas admin` (try the host panel as a private server's owner, as a player with
+  no panel, or as an admin again; reopen Settings after)
 
 To test a seasonal event in Studio: `/event Halloween2026 5` turns Halloween on for 5 minutes (decorations, dusk
 lighting, banner with countdown, event Snacklings and Haunted on the belt), and `/event off` ends it early.

@@ -151,6 +151,7 @@ local function onPlayerAdded(player: Player)
 		tutorial = nil,
 		cashOfferAt = -math.huge,
 		gadgets = GadgetRules.newState(),
+		host = nil,
 	}
 	Sessions.add(session)
 

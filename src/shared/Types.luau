@@ -636,6 +636,9 @@ export type ModifierDef = {
 	lighting: SeasonLighting?,
 	skyEffect: SkyEffect?,
 	drops: ModifierDrops?, -- crates, coins or runaways on the walkways (Config/Drops)
+	-- A private server's owner may start it from the host panel (Config/Host). Only modifiers that leave the economy
+	-- alone: no luck, mutations, income, sale prices, faster belt, drops or mutation-unlocking weather (CI checks).
+	hostable: boolean?,
 }
 
 -- Lights and particles on far-away Snacklings (Config/Gameplay.podiumFx, Logic/FxCulling): off beyond `offBeyond`
@@ -1175,6 +1178,69 @@ export type SnackdexSync = {
 	completed: { SnackdexTierPaid }?,
 }
 
+-- Config: the host panel, cross-server LiveOps and rare-pull shout-outs (Config/Host) ---------------------------------
+
+-- An allowed range; `default` is used when a command leaves the value out.
+export type HostRange = { min: number, max: number, default: number? }
+
+export type HostConfig = {
+	owner: { mapCooldownSeconds: number, modifierCooldownSeconds: number },
+	admin: { giftCooldownSeconds: number },
+	limits: {
+		modifierMinutes: HostRange,
+		luckMultiplier: HostRange,
+		luckMinutes: HostRange,
+		eventMinutes: HostRange,
+		giftMinutes: HostRange,
+		broadcastLength: number,
+	},
+	-- The values the panel's steppers offer (each inside its limit, ascending).
+	presets: {
+		modifierMinutes: { number },
+		luckMultiplier: { number },
+		luckMinutes: { number },
+		eventMinutes: { number },
+		giftMinutes: { number },
+	},
+	gift: { minimumPerMinute: number },
+	messaging: HostMessaging,
+	shoutouts: HostShoutouts,
+}
+
+-- Messages between servers (MessagingService): topics, the message version, expiry, dedupe and rate caps.
+export type HostMessaging = {
+	hostTopic: string, -- admin actions for "All servers"
+	shoutTopic: string, -- rare-pull shout-outs
+	version: number,
+	maxAgeSeconds: number, -- older messages are ignored
+	maxFutureSeconds: number, -- so are messages dated further ahead than this
+	rememberIds: number, -- message ids kept for spotting duplicates
+	maxBytes: number, -- the encoded message (Roblox allows 1 KB)
+	sendBurst: number, -- admin actions this server may send at once...
+	sendPerMinute: number, -- ...then this many a minute
+	receiveBurst: number, -- messages per topic a server acts on at once...
+	receivePerMinute: number, -- ...then this many a minute
+}
+
+-- Global rare-pull shout-outs: what counts, and how often a server sends and shows one.
+export type HostShoutouts = {
+	enabled: boolean,
+	rarity: string, -- any Snackling of this rarity or rarer
+	mutatedRarity: string, -- or one of `mutations` on this rarity or rarer
+	mutations: { string },
+	publishEverySeconds: number,
+	showEverySeconds: number,
+}
+
+-- What a player may host here (StateUpdate `host`, written by HostService). Owners see their cooldowns.
+export type HostView = {
+	role: string, -- "admin" | "owner" | "" (nobody: the Settings row stays hidden)
+	studio: boolean, -- a Studio session: "All servers" only ever reaches this session
+	mapReadyAt: number, -- server time an owner may switch the map again (0 = now)
+	modifierReadyAt: number, -- server time an owner may start a modifier again
+	giftReadyAt: number, -- server time an admin may gift everyone again (a double tap never pays twice)
+}
+
 -- What the server sends the owning client in StateUpdate (see server/Services/Replication.luau).
 -- Costs of -1 mean "not available" (max reached).
 export type ClientState = {
@@ -1211,6 +1277,7 @@ export type ClientState = {
 	gifts: GiftsView,
 	spin: SpinView,
 	gadgets: GadgetsView,
+	host: HostView,
 }
 
 export type BeltItem = { id: number, creatureId: string, spawnAt: number, variant: string? }

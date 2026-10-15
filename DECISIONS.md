@@ -1110,3 +1110,72 @@ everyone a convenience (magnet); each is short, visible to everyone and answerab
 make them early-to-mid-game goals, never a paywall.
 **Reversal cost:** low. Gadgets are data: raise a price or take one out of `order` (its flag stays harmless in saves).
 Never rename a shipped id (saves hold `gadget_<id>`). `Movement` is a local refactor of where speeds were set.
+
+### 49. The host panel: live events from a dialog, in one server or all of them, and private servers worth owning
+
+* **What:** a host panel (Settings → 🛠️ Host panel, shown only to players who may host) with Map, Modifiers, Belt,
+  Boosts and Message tabs; admin actions for this server or every server over MessagingService; and a banner in every
+  other server when someone finds a Secret, or a Diamond or Rainbow Mythic. `Config/Host`, `Logic/HostRules`,
+  `Logic/CrossServerRules`, `Logic/HostPanelLayout`, `HostService`, `CrossServer`, `ShoutoutService`,
+  `HostPanelController`.
+* **Who may host, decided on the server:** admins (`LiveOps.adminUserIds`; anyone in Studio, as with the dev
+  commands) may do everything, anywhere. A private server's owner (`PrivateServerId ~= ""` and `PrivateServerOwnerId`
+  is their UserId, which is 0 in reserved servers) may, in their own server only, switch the map (every 60 s), turn
+  rotation off or on, and start or stop a hostable modifier (every 10 minutes). Nobody else may do anything: there is
+  no row, and the intent is refused without a word. Owners' cooldowns are kept per UserId for the server's life, so
+  rejoining doesn't reset them.
+* **Hostable modifiers:** Sugar Rush, Quick Hands, Fortress and Snack Patrol. They change how a chase plays and touch
+  no number in the economy. Anything that raises luck, mutation chances or income, cuts prices, speeds the belt (more
+  spawns, so more rare spawns an hour), drops crates, coins, runaways or giants, or is a weather (each one unlocks a
+  mutation) stays out, and CI refuses a hostable modifier that does any of that (`HostRules.hostableProblems`).
+  Otherwise a private server would be a quieter, faster farm than the real game; the owner gets a server to style and
+  play their way, not a better economy.
+* **One intent, one whitelist:** `HostAction(kind, scope, args)` with 11 actions. `HostRules.command` checks every
+  argument: known map, modifier, Snackling, mutation and event ids; finite numbers clamped to the limits `/mod`,
+  `/luck` and `/event` always had (now in `Config/Host.limits`, shared by both); text trimmed to one line of at most
+  120 characters. The same check runs again on every message from another server. Messages are filtered by Roblox
+  before anyone sees them. That filter is the only step that yields, and it comes before any cooldown is checked, so
+  nothing yields between a check and its action. Each action is logged as the custom event `host_action` (01 the
+  action, 02 `admin` | `admin_all` | `owner`, 03 the id or ""). The services that own each thing do the work
+  (MapThemeService, ModifierService, BeltService, LiveOpsService, Announcer). The admin chat commands `/luck`,
+  `/event` and `/announce` moved from LiveOpsService to HostService and take the same path; they still reach every
+  server.
+* **All servers:** one versioned message on one topic, carrying the kind, the args, the sender's UserId, a GUID and
+  the server time. The sender runs the action at once and remembers the message id, so its own copy coming back is a
+  duplicate. Every other server checks the version and shape, and ignores the message if it is older than 60 s, dated
+  more than 15 s ahead, already seen, or not from an admin. Otherwise it validates the args again and runs the action
+  once. A server sends at most 5 such actions at once, then 6 a minute, and acts on at most 20 messages at once, then
+  30 a minute, per topic.
+* **MessagingService failures:** every call is pcall'd. If publishing fails the action has still run here, and the
+  admin is told. Studio never publishes or subscribes, because with API access on it would reach live servers (#15),
+  and it says so. Shout-outs have a topic of their own, so they can never crowd out an admin. The old
+  `SnacklingLiveOps` topic is retired: during a rolling update, old and new servers don't hear each other's admin
+  commands.
+* **Shout-outs:** they come from the GameEvents `found` event: the belt, the prizes (Lucky Spin, gifts, crates,
+  runaways, Snack Attack, achievements) and codes. A steal never counts, because the Snackling already existed, and
+  neither does an admin drop, because every server may have one. A server publishes at most one every 30 s and shows
+  at most one every 20 s, never to a player in the first-time tutorial. The message carries only the display name and
+  the creature and mutation ids. The receiver checks them against its own catalogue and builds the text itself, so no
+  server can put arbitrary words on screens. Names over 15 characters are shortened, so the banner reads at 12 UI in
+  the narrowest banner (the tablet beside its player list) even for twenty capital Ws.
+* **Gift everyone:** each player in scope gets N minutes (1 to 30) of their own steady income under the cash-pack rule
+  (`EconomyMath.cashPackAmount`, at least $150 a minute), so it means the same to a newcomer and to a big base. A 30 s
+  cooldown keeps a double tap from paying twice.
+* **The panel:** 700×336 UI, centred below the top bar. Its tabs, lists and steppers are laid out by
+  `Logic/HostPanelLayout`, which tests hold to the HUD's rules (#47) on every checked screen: it fits, every button
+  and list entry is 52 UI, and every text is 12 UI or more. Settings puts the row beside Codes, so the dialog keeps
+  its height.
+* **Checked offline:** `tools/worldsim/host.luau` (CI) runs a live server with a MessagingService loopback (Sim). It
+  drives every role through the real intent, other servers' messages (fresh, copied, stale, from the future, not from
+  an admin, of another version, per-server only), an outage, the send cap and the rate limit, the owner's cooldowns
+  across a rejoin, and shout-outs and their limits. A second Sim server can't run in the same process, because Lune's
+  roblox library is shared, so other servers are played by injected messages.
+* **No save change:** cooldowns are runtime only, and nothing new is saved.
+
+**Why:** live "admin abuse" sessions, where the developer drops a rare Snackling, starts a twist or announces
+something in every server at once, are a big growth lever for brainrot-style games, and a chat command in one server
+at a time doesn't do it. Private servers are something players buy, and choosing the map and a few twists makes them
+worth more without making them better for farming. Global shout-outs make a rare pull a moment for the whole game.
+**Reversal cost:** low. Empty `adminUserIds` means no admins outside Studio; clearing `hostable` on every modifier
+leaves owners the map only; `shoutouts.enabled = false` ends shout-outs. Topics are versioned (`SnacklingHost1`), so
+a new message format gets a new topic and old servers simply don't hear it.

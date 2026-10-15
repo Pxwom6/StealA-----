@@ -38,6 +38,7 @@ export type ClientToServer =
 	| "GetAchievements"
 	| "BuyGadget"
 	| "UseGadget"
+	| "HostAction"
 
 export type ServerToClient =
 	"StateUpdate"
@@ -83,6 +84,7 @@ local CLIENT_TO_SERVER: { ClientToServer } = {
 	"GetAchievements",
 	"BuyGadget",
 	"UseGadget",
+	"HostAction",
 }
 
 local SERVER_TO_CLIENT: { ServerToClient } = {

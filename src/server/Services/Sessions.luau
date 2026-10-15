@@ -98,6 +98,7 @@ export type Session = {
 	-- Gadget cooldowns and effects (GadgetService; Logic/GadgetRules), read by Movement and StealService. Ownership
 	-- is saved in data.flags (`gadget_<id>`); this is runtime only.
 	gadgets: GadgetRules.State,
+	host: Types.HostView?, -- what this player may host (HostService; nil: nothing), read by Replication
 }
 
 local Sessions = {}

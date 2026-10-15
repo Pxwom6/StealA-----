@@ -23,7 +23,8 @@
 	effects from the id.
 
 	Commands, this server only: /mod <id> [minutes], /mod off, /mod list. Anyone in Studio; in live servers the admins
-	in Config/LiveOps.adminUserIds.
+	in Config/LiveOps.adminUserIds. The host panel (HostService) calls the same functions, with the same limits
+	(Config/Host.limits.modifierMinutes); a private server's owner may start the `hostable` ones from it.
 ]]
 
 local Players = game:GetService("Players")
@@ -31,6 +32,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
 
+local Host = require(ReplicatedStorage.Shared.Config.Host)
 local LiveOps = require(ReplicatedStorage.Shared.Config.LiveOps)
 local Modifiers = require(ReplicatedStorage.Shared.Config.Modifiers)
 local Mutations = require(ReplicatedStorage.Shared.Config.Mutations)
@@ -220,8 +222,9 @@ local function onCommand(player: Player, args: { string })
 		return
 	end
 	local minutes = tonumber(args[2])
+	local limits = Host.limits.modifierMinutes
 	local seconds = if minutes and minutes == minutes
-		then math.clamp(minutes, 0.25, 60) * 60
+		then math.clamp(minutes, limits.min, limits.max) * 60
 		else Modifiers.schedule.durationSeconds
 	ModifierService.startModifier(id, seconds, true)
 end

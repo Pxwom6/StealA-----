@@ -159,6 +159,8 @@ local Gameplay = {
 		-- this only stops spam (four gadgets pressed one after another still fit the burst).
 		BuyGadget = { burst = 3, perSecond = 1 },
 		UseGadget = { burst = 6, perSecond = 3 },
+		-- The host panel (HostService): admins and private-server owners only; owners also have cooldowns per action.
+		HostAction = { burst = 4, perSecond = 1 },
 	} :: { [string]: RateLimit },
 }
 

@@ -16,6 +16,10 @@
 	  milestone     something an achievement asks for once (milestone: an id of       DropService, BossService
 	                AchievementRules.MILESTONES): a crate opened, a runaway caught,
 	                a Snack Attack takedown shared or led
+	  found         a new Snackling came to the player any way but a steal, kept or   BeltService, PrizeService,
+	                sold because the base was full (creatureId, variant, source:      CodeService
+	                "belt", "adminDrop", "Code", or the prize's sku: "Gift",
+	                "Spin", "SupplyCrate", "Runaway", "SnackAttack", "Achievement")
 
 	Listeners run at once, in the order they subscribed (the bootstrap starts TutorialService first), each in its own
 	pcall: a listener's bug can only ever cost that listener, never the gameplay code that emitted the event or the
@@ -26,7 +30,16 @@ local Sessions = require(script.Parent.Sessions)
 
 type Session = Sessions.Session
 
-export type Kind = "beltPurchase" | "acquired" | "collect" | "sell" | "lock" | "steal" | "discover" | "milestone"
+export type Kind =
+	"beltPurchase"
+	| "acquired"
+	| "collect"
+	| "sell"
+	| "lock"
+	| "steal"
+	| "discover"
+	| "milestone"
+	| "found"
 
 export type Event = {
 	kind: Kind,
@@ -34,6 +47,7 @@ export type Event = {
 	variant: string?, -- mutation id, nil for a plain Snackling
 	amount: number?, -- cash, for "collect"
 	milestone: string?, -- for "milestone"
+	source: string?, -- for "found": where it came from
 }
 
 export type Listener = (session: Session, event: Event) -> ()

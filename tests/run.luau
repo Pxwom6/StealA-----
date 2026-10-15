@@ -49,5 +49,8 @@ require("./SpinRules.spec")
 require("./AchievementRules.spec")
 require("./PaidRandomItems.spec")
 require("./GadgetRules.spec")
+require("./HostRules.spec")
+require("./CrossServerRules.spec")
+require("./HostPanelLayout.spec")
 
 T.finish()

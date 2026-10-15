@@ -12,12 +12,14 @@ local Analytics = require(Services.Analytics)
 local BeltService = require(Services.BeltService)
 local BossService = require(Services.BossService)
 local CodeService = require(Services.CodeService)
+local CrossServer = require(Services.CrossServer)
 local DataService = require(Services.DataService)
 local DevCommands = require(Services.DevCommands)
 local DropService = require(Services.DropService)
 local EconomyService = require(Services.EconomyService)
 local GadgetService = require(Services.GadgetService)
 local GiftService = require(Services.GiftService)
+local HostService = require(Services.HostService)
 local LeaderboardService = require(Services.LeaderboardService)
 local LiveOpsService = require(Services.LiveOpsService)
 local LockService = require(Services.LockService)
@@ -36,6 +38,7 @@ local Replication = require(Services.Replication)
 local RetentionService = require(Services.RetentionService)
 local SeasonService = require(Services.SeasonService)
 local SettingsService = require(Services.SettingsService)
+local ShoutoutService = require(Services.ShoutoutService)
 local SnackdexService = require(Services.SnackdexService)
 local SocialService = require(Services.SocialService)
 local SpinService = require(Services.SpinService)
@@ -77,6 +80,9 @@ CodeService.start() -- redeem codes (server/Codes.luau), once per account, saved
 GiftService.start() -- playtime gifts: a daily ladder that unlocks with time in game
 SpinService.start() -- the Lucky Spin: a free spin every 12 hours, plus spins from gifts
 AchievementService.start() -- achievements paid once each, checked after every game event
+HostService.start() -- the host panel (admins, private-server owners) and the admin chat commands
+ShoutoutService.start() -- rare pulls told to every other server
+CrossServer.start() -- listens for other servers' admin actions and shout-outs (never in Studio)
 DevCommands.start() -- Studio only
 
 local hooks = PlayerLifecycle.hooks()
@@ -87,6 +93,7 @@ table.insert(hooks.onJoined, RetentionService.payOfflineEarnings)
 table.insert(hooks.onJoined, SocialService.onJoined)
 table.insert(hooks.onJoined, TutorialService.onJoined) -- after the lock timers are restored
 table.insert(hooks.onJoined, QuestService.onJoined) -- after income is computed (collect targets, rewards)
+table.insert(hooks.onJoined, HostService.refresh) -- shows the host panel row to admins and a private server's owner
 table.insert(hooks.onReady, RetentionService.sendWelcome)
 table.insert(hooks.onReady, SnackdexService.onReady)
 table.insert(hooks.onLeaving, function(session)

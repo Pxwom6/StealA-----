@@ -60,7 +60,8 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | Daily quests | `QuestService` (daily roll per UserId + UTC day, progress from gameplay events, ClaimQuest, day reset) | `RewardsController` (Quests tab) | `QuestRules` |
 | Gameplay events | `GameEvents` (buy / acquired / collect / sell / lock / steal / discover, emitted by the services that applied them) | – | – |
 | Social | `Announcer` (server-wide banners), `SocialService` (friends in server, group membership, welcome gift) | `NotificationController`, `ChatTagController`, `SocialController` (👥 Friends button, invite / join group panel) | `SocialRules` |
-| LiveOps | `LiveOpsService` (scheduled events, luck boosts, admin commands, cross-server, active-event change listeners) | event pill (banner + countdown), luck pill | `LiveOpsRules` |
+| LiveOps | `LiveOpsService` (scheduled events, luck boosts, admin luck / events / announcements for HostService, active-event change listeners) | event pill (banner + countdown), luck pill | `LiveOpsRules` |
+| Host panel & cross-server | `HostService` (HostAction: roles, the whitelist, cooldowns, analytics; `/luck`, `/event`, `/announce`), `CrossServer` (MessagingService: versioned messages, dedupe, expiry, caps, pcall), `ShoutoutService` (rare pulls told to every other server) | `HostPanelController` (the dialog, from a Settings row shown only to hosts) | `HostRules`, `CrossServerRules`, `HostPanelLayout` |
 | Seasonal events | `SeasonService` (theme decorations + a lighting overlay in `WorldLighting` while a themed event runs) | event pill colour, "EVENT" tag on event Snacklings' billboards | `SeasonRules` |
 | First-time tutorial | `TutorialService` (steps finished by real purchases / collects / locks / steals, timeouts, one-time reward, existing players skipped) | `TutorialController` (banner under the cash, beam + bouncing arrow + highlight on the target, Skip) | `TutorialRules` |
 | Analytics | `Analytics` (onboarding funnel following the tutorial, store funnel, economy events) | sends whitelisted `store_opened` | – |
@@ -69,7 +70,7 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | World & scenery | `MapBuilder` (plot decor, belt chevrons, boards, lobby spawn; `restyle` for a new map theme), `SceneryBuilder` (spawn plaza, Snack Factory, chute, flora, landmarks, boundary wall, terrain), `ThemeProps` (each theme's flora and landmarks), `WorldLighting` (map lighting + seasonal overlay) | `WorldFxController` (belt chevrons, factory cog, blinking lights; Reduce effects) | `SceneryLayout` |
 | Map themes | `MapThemeService` (first map, 20-minute rotation, the vote, `/map`) | `MapThemeController` (vote strip at the bottom of the screen, new-map title card), `WeatherController` (snow / embers / leaves... around the camera) | `MapThemeRules` |
 | Server modifiers | `ModifierService` (schedule, `/mod`; belt, economy, lock, steal, movement read its effects) | `ModifierController` (HUD button among the status pills; effects for belt prices, steal hold, tag reach) | `ModifierRules` |
-| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends <n\|off>`, `/tutorial`, `/gallery [mutationId\|off]` via `DevGallery`, `/sky <clockTime>`, `/quests reset`, `/dex fill <rarity\|event>`); `/map <id\|vote\|list>` (MapThemeService); `/mod <id> [minutes]`, `/mod off`, `/mod list` (ModifierService); LiveOps `/event <id> [minutes]`, `/event off`, `/luck`, `/announce` (anyone in Studio, local only) | – | – |
+| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends <n\|off>`, `/tutorial`, `/gallery [mutationId\|off]` via `DevGallery`, `/sky <clockTime>`, `/quests reset`, `/dex fill <rarity\|event>`); `/map <id\|vote\|list>` (MapThemeService); `/mod <id> [minutes]`, `/mod off`, `/mod list` (ModifierService); LiveOps `/event <id> [minutes]`, `/event off`, `/luck`, `/announce` (HostService; anyone in Studio, local only); `/hostas <owner\|none\|admin>` (try the host panel as another role) | – | – |
 | Settings & audio | `SettingsService` (SetSetting → `settings_<key>` flags) | `ClientSettings`, `SettingsController` (the gear, top right), `SoundPlayer`, `MusicController` (looping, crossfade) | `SettingsRules`, `ScreenLayout` |
 
 ## 3. Module list
@@ -97,6 +98,7 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | `Snackdex` | collection book rewards: one-time cash per completed rarity tier (steady income, minimum), permanent income bonus per tier and its cap |
 | `Quests` | daily quests: slots per day (2 easy + 1 hard), the quest pool (kind, target or income-sized cash target, minimum rarity, text key), rewards per difficulty, all-done bonus |
 | `Gadgets` | the four gadgets (kind, icon, colour, text keys, cash price, cooldown, effect numbers), the 1.5x speed cap with a speed modifier, the speed grace, how often peels are checked |
+| `Host` | the host panel: private-server owners' cooldowns, the admin gift cooldown, the /mod, /luck and /event limits the panel and commands share, the panel's stepper presets, gift sizing, the MessagingService topics, version, expiry, dedupe and caps, and the shout-out rule and limits |
 
 ### `src/shared/Logic` (pure, unit-tested)
 
@@ -121,6 +123,9 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `DataSchema` | save template, `migrate` (versioned), `sanitise` (clamp garbage) |
 | `BeltMath` | belt item position & lifetime from spawn time |
 | `LiveOpsRules` | active events at time *t*, combined luck/cash multipliers (optionally without one boost source: prize rolls leave out bought luck), boost stacking, Server Luck preview, banner event, when the luck next changes, remote-config validation |
+| `HostRules` | who may host (admins, a private server's owner, nobody), the action whitelist, argument checks and clamping (for intents and other servers' messages alike), permissions, cooldowns, gift amounts, `Config/Host` and hostable-modifier validation |
+| `CrossServerRules` | the versioned cross-server message: strict decoding, expiry, dedupe (a bounded id list), shout-out rules and limits, display names |
+| `HostPanelLayout` | where everything goes in the host panel, held to the HUD's rules by tests (fits below the top bar, 52 UI buttons, 12 UI text) |
 | `PaidRandomItems` | Roblox's Paid Random Items policy: what a PolicyService answer means (a failure counts as restricted) and the player attribute the store reads |
 | `SeasonRules` | active seasonal theme from the active event ids, decoration layout on the map (outside plots, off the belt), part count, `Config/Seasons` validation |
 | `Inventory` | podium slot operations on the save table (free slot, place, remove, find by uid) |
@@ -154,7 +159,8 @@ LiveOpsService → SeasonService → MapThemeService → ModifierService → Rep
 BeltService →
 LockService → StealService → GadgetService → RebirthService → PlayerPolicy → MonetizationService → RetentionService →
 SocialService →
-TutorialService → SnackdexService → QuestService → LeaderboardService → SettingsService → DevCommands →
+TutorialService → SnackdexService → QuestService → LeaderboardService → SettingsService → CodeService → GiftService →
+SpinService → AchievementService → HostService → ShoutoutService → CrossServer → DevCommands →
 PlayerLifecycle`, and wires cross-service join/leave steps through `PlayerLifecycle.hooks()` (keeps services free of
 circular requires). `Sessions` holds per-player state. `Movement` (required by PositionTracker, StealService,
 PlayerLifecycle and GadgetService) gives every Humanoid its walking speed and the movement checks their allowance.
@@ -171,7 +177,8 @@ RewardsController, MutationFxController, SocialController, TutorialController, I
 MusicController, WorldFxController, SnackdexController, CashOfferController, MapThemeController, WeatherController,
 DropController, BossController, GadgetController, GadgetFxController`
 (`ModifierController` starts right after `NotificationController`)
-(UI helpers: `UI/UiKit`, `UI/Modal`; audio: `SoundPlayer`).
+(UI helpers: `UI/UiKit`, `UI/Modal`; audio: `SoundPlayer`). Dialogs opened from others need no start:
+`CodesController` and `HostPanelController` (both from Settings).
 
 ## 4. Remotes (all in `ReplicatedStorage.Remotes`, created by the server)
 
@@ -203,6 +210,7 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `GetAchievements` | – | rate limit only → `AchievementSync` with the player's progress |
 | `BuyGadget` | `id: string` | a gadget in `Config/Gadgets` (`Guard.keyOf`), not owned yet, cash ≥ its server price → `gadget_<id>` flag; a shortfall never leads to a Robux offer |
 | `UseGadget` | `id: string` | owned, no tutorial running, alive, recharged (server time, this session); a peel only on the floor of the player's own base at the trusted position the server sees (no client position), a magnet only with cash on the pads |
+| `HostAction` | `kind: string, scope: string, args: table` | the player may host (an admin, or this private server's owner), `kind` is one of `HostRules.ACTIONS`, `scope` "server" or "all", every arg checked and clamped (`HostRules.command`); owners: only the map, rotation and hostable modifiers, this server only, with cooldowns; a message is filtered first |
 | `RedeemCode` | `code: string` | at most 40 bytes before anything else, then letters and digits, at most 24 (`CodeRules.normalize`); the code exists, has started, has not expired and its `code_<CODE>` flag is unset; a Snackling code needs a free podium; rate limit 3 then 1 per 5 s |
 | `DevGrantProduct` | `key: string` | **Studio only** – runs the real receipt path with a fake receipt |
 
@@ -228,8 +236,8 @@ World state the client reads from **attributes** (replicated automatically): plo
 CollectionService tag `MutationRainbow`. LiveOps state is on `workspace`: `LuckMultiplier`, `LuckEndsAt` (when the
 luck next changes), `PurchasedLuckEndsAt`, `CashMultiplier`, `ActiveEventIds`, `EventBanner`, `EventBannerId`,
 `EventTitle`, `EventEndsAt`, and `SeasonTheme` (the seasonal theme on, "" for none). The map theme is there too:
-`MapTheme` (id), `MapThemeEndsAt` (the next change), `MapVoteEndsAt` (0 = no vote), `MapVoteCandidates`,
-`MapVoteCounts`; and the server modifier: `Modifier` (id, "" = none), `ModifierEndsAt`, `ModifierNextAt`.
+`MapTheme` (id), `MapThemeEndsAt` (the next change), `MapRotation` (false: a host turned this server's rotation off),
+`MapVoteEndsAt` (0 = no vote), `MapVoteCandidates`, `MapVoteCounts`; and the server modifier: `Modifier` (id, "" = none), `ModifierEndsAt`, `ModifierNextAt`.
 
 ## 5. Data schema (version 4)
 
@@ -285,7 +293,7 @@ type PlayerData = {   -- exactly Types.PlayerData
 ## 7. Out of scope this round (but not blocked)
 
 Trading (creatures have stable `uid`s and live in one list → a trade is two `Inventory` moves), battle pass,
-private servers, extra maps (plot geometry is data), custom models/sounds (`CreatureModels` folder + `Config/Sounds`),
+extra maps (plot geometry is data), custom models/sounds (`CreatureModels` folder + `Config/Sounds`),
 animated seasonal props (decorations are static anchored parts; a client controller could bob the bats / ghosts).
 
 ## 8. Seasonal events (Halloween 2026, Winter 2026, Valentine's 2027, Easter 2027)
@@ -398,3 +406,17 @@ Magnet** (every pad's cash, from anywhere). Each owned gadget gets a round butto
 (`GadgetRules`); `Movement` keeps every walking speed and the movement checks' allowance together (capped at 1.5x with
 a speed modifier). Ownership is the save's `gadget_<id>` flags (no schema bump); cooldowns are session-only server time.
 Studio: `/gadgets` (own all, recharged), `/gadgets off`. Offline: `lune run tools/worldsim/gadgets.luau` (CI).
+
+## 15. Host panel, cross-server LiveOps and shout-outs
+
+Admins and a private server's owner get a 🛠️ Host panel row in Settings (DECISIONS.md #49, `Config/Host`). Admins
+can switch the map, start a vote, turn rotation off or on, run or stop any modifier, drop a chosen Snackling and
+mutation on the belt, start luck or a configured event, gift everyone minutes of their own income and send a filtered
+message, in this server or in every server (one versioned MessagingService message each, run once everywhere,
+`CrossServer`). An owner gets the map (every 60 s), rotation and the four hostable modifiers (every 10 minutes) in
+their own server only. Everything goes through one rate-limited intent, `HostAction`, checked by `HostRules`, and the
+services that own each thing do it; `/luck`, `/event` and `/announce` take the same path. A Secret, or a Diamond or
+Rainbow Mythic, found any way but a steal or an admin drop, shows "🌍 Bob found a SECRET ... in another server!" in
+every other server (`ShoutoutService`; at most one sent every 30 s and one shown every 20 s, never during the
+tutorial). Studio: everyone is an admin, nothing leaves the session, `/hostas owner|none|admin`. Offline:
+`lune run tools/worldsim/host.luau` (CI).

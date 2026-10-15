@@ -19,6 +19,7 @@ local Types = require(ReplicatedStorage.Shared.Types)
 local Codes = require(script.Parent.Parent.Codes) :: Types.CodesConfig
 local Analytics = require(script.Parent.Analytics)
 local EconomyService = require(script.Parent.EconomyService)
+local GameEvents = require(script.Parent.GameEvents)
 local Remotes = require(script.Parent.Remotes)
 local Sessions = require(script.Parent.Sessions)
 
@@ -59,6 +60,10 @@ local function onRedeem(player: Player, typed: unknown)
 		end
 		session.data.flags[CodeRules.flagKey(code)] = true
 		EconomyService.giveCreature(session, creature.id, reward.variant)
+		GameEvents.emit(
+			session,
+			{ kind = "found", creatureId = creature.id, variant = reward.variant, source = "Code" }
+		)
 		Remotes.notify(
 			player,
 			Format.template(
