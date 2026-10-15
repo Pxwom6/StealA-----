@@ -6,9 +6,12 @@
 	  * It appears on the modifier's drop schedule (DropRules.times), never while another one is still up: a regular
 	    Snackling of one of the configured tiers, built at `scale` times its podium size, tagged for the client
 	    (BossController draws its health bar, bob, turn and hit reactions) with attributes MaxHP, HP and EndsAt.
-	  * Hits come from a ClickDetector on the model (mouse or touch). Each counts only if the player is within reach of
-	    its middle at a position the server trusts (PositionTracker), and only `hitsPerSecond` a second per player
-	    (RateLimiter, with a small burst): auto-clickers gain nothing. The HP attribute is updated ten times a second.
+	  * Hits come from a ClickDetector (a mouse click, a tap, or a gamepad's R2 at the screen's centre dot). Roblox's
+	    pointer hit-test is a spatial query, and creature models are built with CanQuery off, so the detector sits on
+	    an invisible Hitbox part around the giant that queries can hit (it collides with and touches nothing). Each hit
+	    counts only if the player is within reach of its middle at a position the server trusts (PositionTracker),
+	    and only `hitsPerSecond` a second per player (RateLimiter, with a small burst): auto-clickers gain nothing.
+	    The HP attribute is updated ten times a second.
 	  * Taken down: everyone who landed `minHits` shares the reward (BossRules: cash from their own income, more for a
 	    bigger share), the top hitter wins a Snackling rolled with extra luck, and everyone hears it. Not taken down by
 	    EndsAt: it flies off, nothing is paid.
@@ -41,6 +44,8 @@ local Sessions = require(script.Parent.Sessions)
 local BossService = {}
 
 BossService.TAG = "SnackBoss"
+-- The giant's one hit-testable part, which holds its ClickDetector (BossController finds it by this name).
+BossService.HITBOX = "Hitbox"
 
 local STEP_SECONDS = 0.1
 -- The server allows this much more than the ClickDetector's reach (a player stepping back as they tap).
@@ -184,6 +189,29 @@ local function onHit(player: Player)
 	end
 end
 
+-- The part the giant's ClickDetector answers for: an invisible box around it (its bounding box), welded to its root
+-- so it bobs and turns with it on every client. It is the only part of the giant a pointer can hit (CanQuery), and it
+-- never collides or touches; a box is also kinder to small fingers than the giant's outline.
+local function addHitbox(model: Model, box: CFrame, size: Vector3): BasePart
+	local hitbox = Instance.new("Part")
+	hitbox.Name = BossService.HITBOX
+	hitbox.Size = Vector3.new(math.max(size.X, 2), math.max(size.Y, 2), math.max(size.Z, 2))
+	hitbox.CFrame = box
+	hitbox.Transparency = 1
+	hitbox.CastShadow = false
+	hitbox.CanCollide = false
+	hitbox.CanTouch = false
+	hitbox.CanQuery = true
+	hitbox.Massless = true
+	hitbox.Anchored = false
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = model.PrimaryPart :: BasePart
+	weld.Part1 = hitbox
+	weld.Parent = hitbox
+	hitbox.Parent = model
+	return hitbox
+end
+
 -- A giant appears over the middle of the belt (or at `at`), with health for the players here (or `hp`: the Studio
 -- command and the server test). nil when no Snackling can play it.
 local function spawnGiant(t: number, at: Vector3?, hp: number?): Giant?
@@ -218,7 +246,7 @@ local function spawnGiant(t: number, at: Vector3?, hp: number?): Giant?
 	model:SetAttribute("Height", size.Y)
 	local clicker = Instance.new("ClickDetector")
 	clicker.MaxActivationDistance = Boss.reach
-	clicker.Parent = model
+	clicker.Parent = addHitbox(model, boxCentre, size)
 	clicker.MouseClick:Connect(onHit)
 	CollectionService:AddTag(model, BossService.TAG)
 	model.Parent = workspace

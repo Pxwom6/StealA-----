@@ -734,7 +734,10 @@ local Theme = {
 		runawayRewardFull = "🏃 Base full: {creature} sold for you. +{cash}",
 		-- Snack Attack (Config/Boss): a giant Snackling over the belt
 		bossName = "Giant {creature}",
+		-- the hint under its health bar, for the player's last input: touch, mouse, gamepad (R2 at the centre dot)
 		bossHint = "Tap to hit!",
+		bossHintClick = "Click to hit!",
+		bossHintGamepad = "Aim at it, press R2!",
 		bossAppeared = "👾 A giant {creature} is raiding the belt! Tap it together to take it down!",
 		bossDefeated = "👾 The giant {creature} is down! {player} hit hardest and won a {rarity} {prize}!",
 		bossDown = "👾 The giant {creature} is down!",

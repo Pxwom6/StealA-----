@@ -341,8 +341,46 @@ local function scenario()
 	local maxHp = giant:GetAttribute("MaxHP")
 	check(maxHp == math.max(Boss.minHp, Boss.hpPerPlayer * 2), `with health for the two players here ({maxHp})`)
 	check(giant:GetPivot().Position.Y > Gameplay.belt.surfaceY + 4, "hovering over the belt")
-	local clicker = giant:FindFirstChildOfClass("ClickDetector")
+	local clicker = giant:FindFirstChildWhichIsA("ClickDetector", true)
 	check(clicker ~= nil and clicker.MaxActivationDistance == Boss.reach, "anyone in reach can tap it")
+	-- Roblox only sends a click, tap or gamepad R2 to a part a spatial query can hit (CanQuery), and creature models
+	-- are built with CanQuery off: the detector must sit on the giant's one queryable part, its invisible hitbox.
+	local hitbox = giant:FindFirstChild(BossService.HITBOX)
+	local queryable, solid, otherParts = 0, 0, 0
+	for _, part in giant:GetDescendants() do
+		if part:IsA("BasePart") then
+			if part.CanQuery then
+				queryable += 1
+			end
+			if part.CanCollide or part.CanTouch then
+				solid += 1
+			end
+			if part ~= hitbox then
+				otherParts += 1
+			end
+		end
+	end
+	check(
+		hitbox ~= nil and clicker ~= nil and clicker.Parent == hitbox and Sim.clickable(clicker),
+		"a real client can tap it: the ClickDetector is on a queryable hitbox"
+	)
+	check(
+		hitbox ~= nil and hitbox.Transparency == 1 and queryable == 1 and solid == 0 and otherParts > 10,
+		`the hitbox is invisible and the only queryable part; nothing collides or touches ({queryable}, {solid})`
+	)
+	local outside = 0
+	if hitbox then
+		for _, part in giant:GetDescendants() do
+			if part:IsA("BasePart") and part ~= hitbox then
+				local at = hitbox.CFrame:PointToObjectSpace(part.Position)
+				local half = hitbox.Size / 2 + roblox.Vector3.new(0.01, 0.01, 0.01)
+				if math.abs(at.X) > half.X or math.abs(at.Y) > half.Y or math.abs(at.Z) > half.Z then
+					outside += 1
+				end
+			end
+		end
+	end
+	check(hitbox ~= nil and outside == 0, `and it covers the whole giant ({outside} parts outside)`)
 	-- Bob walks right under it; Alice stays far away at her base
 	teleport(bob, roblox.Vector3.new(6, 3, 16))
 	local bobBeforeBoss = bobSession.data.cash
@@ -368,7 +406,7 @@ local function scenario()
 	Sim.chat(alice, "/boss 20")
 	task.wait(0.2)
 	giant = BossService.current()
-	clicker = if giant then giant:FindFirstChildOfClass("ClickDetector") else nil
+	clicker = if giant then giant:FindFirstChildWhichIsA("ClickDetector", true) else nil
 	check(clicker ~= nil and giant:GetAttribute("MaxHP") == 20, "/boss 20 sends a quick one")
 	local rounds = 0
 	while BossService.current() ~= nil and rounds < 60 do
