@@ -6,6 +6,8 @@ local Mutations = require("../src/shared/Config/Mutations")
 local Rarities = require("../src/shared/Config/Rarities")
 local Spin = require("../src/shared/Config/Spin")
 local SpinRules = require("../src/shared/Logic/SpinRules")
+local DataSchema = require("../src/shared/Logic/DataSchema")
+local Monetization = require("../src/shared/Config/Monetization")
 local Types = require("../src/shared/Types")
 
 local catalog = Catalog.build(Creatures, Rarities, Mutations)
@@ -112,6 +114,59 @@ T.describe("SpinRules.validate", function()
 		T.expect(broken(function(config)
 			config.freeEverySeconds = 60
 		end)).toBe(1)
+		T.expect(broken(function(config)
+			config.paidBankFull = config.maxBanked - 1 -- below the free bank: packs refused before gifts are
+		end)).toBe(1)
+		T.expect(broken(function(config)
+			config.paidBankFull = SpinRules.MAX_PAID_BANK_FULL + 1
+		end)).toBe(1)
+	end)
+end)
+
+-- The packs for sale, by spins.
+local function packCounts(): { number }
+	local counts: { number } = {}
+	for _, product in Monetization.products do
+		if product.kind == "Spins" then
+			table.insert(counts, product.spins or 0)
+		end
+	end
+	return counts
+end
+
+T.describe("SpinRules: Lucky Spin packs and the bank", function()
+	T.it("bank every spin a pack paid for, past the free cap and past the buying limit", function()
+		local state: Types.SpinState = { nextFreeAt = 0, spins = Spin.maxBanked, total = 0 }
+		SpinRules.bankPaid(state, 3)
+		T.expect(state.spins).toBe(Spin.maxBanked + 3) -- gifts would have been paid as cash here
+		state.spins = Spin.paidBankFull - 1
+		SpinRules.bankPaid(state, 10)
+		T.expect(state.spins).toBe(Spin.paidBankFull + 9) -- a receipt that lands anyway is never clipped
+		SpinRules.bankPaid(state, 0 / 0)
+		SpinRules.bankPaid(state, -5)
+		T.expect(state.spins).toBe(Spin.paidBankFull + 9) -- garbage adds nothing
+		-- a gift's spins still respect the free cap, and pay the rest as cash
+		T.expect(SpinRules.bank(state, 2, Spin)).toBe(2)
+	end)
+
+	T.it("leave the buying limit above the free bank and far under the save's limit", function()
+		T.expect(Spin.paidBankFull).toBeAtLeast(Spin.maxBanked)
+		T.expect(#SpinRules.validate(Spin, catalog.mutations)).toBe(0)
+		local problems = SpinRules.validatePacks(packCounts(), Spin, DataSchema.MAX_BANKED_SPINS)
+		T.expect(table.concat(problems, "; ")).toBe("")
+		-- the worst case validatePacks allows for still saves every spin
+		local biggest = 0
+		for _, count in packCounts() do
+			biggest = math.max(biggest, count)
+		end
+		T.expect(Spin.paidBankFull - 1 + SpinRules.RECEIPT_BACKLOG * biggest).toBeAtMost(DataSchema.MAX_BANKED_SPINS)
+	end)
+
+	T.it("refuse packs that could be clipped by the save, and odd pack sizes", function()
+		T.expect(#SpinRules.validatePacks({ 3, 10 }, Spin, 100)).toBe(1)
+		T.expect(#SpinRules.validatePacks({ 0 }, Spin, 1000)).toBe(1)
+		T.expect(#SpinRules.validatePacks({ 2.5 }, Spin, 1000)).toBe(1)
+		T.expect(#SpinRules.validatePacks({ 3, 10 }, Spin, 1000)).toBe(0)
 	end)
 end)
 

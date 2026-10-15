@@ -1179,3 +1179,179 @@ worth more without making them better for farming. Global shout-outs make a rare
 **Reversal cost:** low. Empty `adminUserIds` means no admins outside Studio; clearing `hostable` on every modifier
 leaves owners the map only; `shoutouts.enabled = false` ends shout-outs. Topics are versioned (`SnacklingHost1`), so
 a new message format gets a new topic and old servers simply don't hear it.
+
+### 50. Twenty more permanent Snacklings (batch 7): a roster of 80, hand-built models
+
+* **What:** 20 new permanent Snacklings, three per tier from Common to Mythic and two Secrets: Lollipop Ladybug,
+  Bumble Bun and Onion Ring Otter (Common); Watermelon Walrus, Orange Slice Orangutan and Grilled Cheese Giraffe
+  (Uncommon); Cocoa Capybara, Animal Cracker Axolotl and Shortcake Sloth (Rare); Corn Cob Crocodile, Apple Pie
+  Armadillo and Sherbet Seahorse (Epic); Caramel Camel, Fruit Tart Flamingo and Rocky Road Rhino (Legendary); Eclair
+  Eagle, White Chocolate Wolf and Mint Chip Megalodon (Mythic); Lava Cake Leviathan and Ube Unicorn (Secret). The
+  permanent roster goes from 60 to 80 (96 with the event ones). Each has a `Config/Creatures` entry, a recipe
+  fallback in `Config/CreatureLooks` and a polished model in `art/snackling-parts/batch-7.json`, and its id is on the
+  released list.
+* **Prices and odds:** each one is priced between two existing Snacklings of its tier, inside the tier's price,
+  income and payback bands (CI checks them), dearer ones paying back a little slower as before. The tier odds don't
+  move: every tier's regular weights still add up to 100, and the new ones took their share from the rest of their
+  tier, so the two cheapest of every tier keep their 40% (the three cheapest Mythics and Secrets their 62%). In the
+  simulation every time to a rarity stays within about 5% and median income within about 4% (BALANCE.md).
+* **Models:** built by hand in the Claude Design format with a scratch helper (mirrored parts, eye sets, chains for
+  necks, tails and coils, and stripes, lattices and dustings solved to hug an ellipsoid), inside the importer's
+  budgets (at most 39 / 49 / 59 / 58 parts besides the Root and the aura ring), and checked by the helper for parts
+  that touch nothing and for standing on y = 0. Every one was looked at from five angles at podium size,
+  in its tier's lineup next to two or three existing models, and with golden, rainbow, frozen, molten and honey.
+  The leviathan's chocolate puddle is a detail part, so its rarity glow and sparkles sit on the serpent rather than
+  the floor. `prompt-batch-7.md` can replace them with a Claude Design pass.
+* **No existing model changed size:** the importer sizes a tier by the upper quartile of its recipe heights, so the
+  new recipe fallbacks were sized to leave every tier's quartile exactly where it was (unlike Winter, #37, which
+  nudged the Mythics by 0.2%). The regenerated `Config/CreatureParts` only adds lines.
+* **Nothing earned is taken away:** a Snackdex tier's reward and its +3% are paid from the claimed flag (#24), so a
+  tier completed before the update stays claimed, keeps its bonus and is not paid twice when its new Snacklings are
+  found; achievements are paid once and marked by a flag, so an earned Completionist stays done (✓) while the count
+  of regular Snacklings grows. Tests now pin both.
+* **Offline preview:** `tools/preview/scene.html` crashed on a scene without lights (a lineup of Commons): Lune
+  sends an empty list as `{}`. It now treats anything that isn't an array as none.
+* **No save change.**
+
+**Why:** collecting is the core chase, and the permanent roster was still the original 60, with only 10 Commons and
+10 Uncommons in the tiers new players see most. More Snacklings mean a longer Snackdex, more surprises on the belt
+and more to steal, without moving the economy curve.
+**Reversal cost:** medium. Shipped ids can never be removed or renamed (saves, gifts and codes refer to them), but
+one can be made rarer by lowering its `beltWeight` and giving the rest to its tier; a model can be redone by
+replacing `batch-7.json` and re-running the importer.
+
+### 51. Titles, base skins and What's New: earned looks to show off, and update notes players see
+
+* **What:** 22 titles (`Config/Titles`) and 8 base skins (`Config/Skins`), picked in a Style dialog (Settings → 🎨
+  Style, with Titles and Base tabs), and What's New (`Config/Updates`): a one-time card for returning players and a
+  board on the spawn plaza. `Logic/StyleRules`, `Logic/UpdateRules`, `Logic/StyleLayout`, `Logic/NewsLayout`;
+  `StyleService`, `Nametags`, `NewsService`; `StyleController`, `WhatsNewController`. No new HUD button.
+* **Earned, never bought:** each title and skin comes from an achievement (its `ach_<id>` flag, or its goal already
+  reached), a number of rebirths (titles at 1, 5 and 7; skins at 2 and 4) or of Snackdex tiers completed (titles at 3
+  and all 7; Mint Chip at the first), all read from the save. Nothing is sold. VIP's golden trim stays VIP's: it is
+  the Classic look for VIP players, who keep the gold corner caps under any other skin. Classic and "no title" are
+  free. After every achievement check (`AchievementService.onChecked`) each newly unlocked one gets a toast ("🦹 New
+  title unlocked: Master Thief — equip it in Settings ▸ Style"); what a player had when they joined gets none.
+* **Saved as flags, no schema bump:** `title_<id>` and `skin_<id>`, at most one of each (Classic is no flag). On join
+  `StyleRules.normalize` clears extras, unknown ids and anything locked. `EquipStyle(kind, id)` checks the kind, that
+  the id is a config key (or "" for none) and that it is unlocked, then swaps the flag, with nothing yielding in
+  between. `GetStyle` answers with `StyleSync` (what is worn, what is unlocked, and progress shown like the Trophies
+  tab). Analytics: `style_equipped` (01 = `title` | `skin`, 02 = the id, "" for none).
+* **The nametag:** one BillboardGui per character, on the Head (`Nametags`), built by the server only when the choice
+  changes or the character respawns. It is sized in pixels like Roblox's names (220×26, text at most 20 px with a
+  dark outline), sits 0.9 studs above the head and hides beyond 70 studs. It hides while its wearer carries a
+  Snackling (the loot and the THIEF! marker sit there) and is never shown to its wearer (`PlayerToHideFrom`), as
+  Roblox hides your own name. Texts and colours come from config, never from players, so nothing needs filtering. CI
+  keeps every title at 16 characters or fewer, at 14 px or more on its tag, and light enough to read over its
+  outline. The chat tag (`ChatTagController`) adds `[🦹 Master Thief]` in the title's colour after `[VIP]`, from the
+  player attribute `Title`.
+* **Skins paint only cosmetic surfaces:** `MapBuilder.paintPlot` recolours a base's floor tiles, the rug down the
+  aisle, the wall tops and the corner caps. The walls keep the plot's colour; the sign, podiums, collect pads, lock
+  button and upgrade pad never change. CI keeps every floor colour about as far from the collect pads' green as the
+  Classic floors are (redmean 150 or more; Classic's are 164 or more) and every material on a short list. A skin goes
+  on when the plot becomes its owner's (`PlotService.setSkin`, plot attribute `Skin`), and Classic goes back on
+  release. `MapBuilder.restyle` never touches plots, so a skin stays through map changes. Rainbow Swirl's trims carry
+  the `MutationRainbow` tag with a hue offset each, so `MutationFxController` cycles them (not with Reduce effects);
+  when the tag goes, clients put back the `RestColor` attribute.
+* **The Style dialog:** 700×336 UI like the host panel, laid out by `Logic/StyleLayout`: two 52 UI tabs, a line saying
+  what is worn, and a scrolling grid of 96 UI cards (titles in 3 columns, skins in 2 with a swatch of the floor and
+  trim). A locked card says how to earn it and how far the player is ("Steal 25 Snacklings", "🔒 12 / 25"); tapping
+  one says so again in a toast. Settings' last row is now in thirds (🎨 Style, 🎟️ Codes and, for hosts, 🛠️ Host
+  panel), so the dialog keeps its height. `tools/layoutCheck.luau` now also checks the Style dialog, the What's New
+  card and the host panel on all five screens.
+* **What's New:** `Config/Updates` lists updates newest first (number, date, title, 3-5 highlights, each starting with
+  an emoji and at most 64 characters; CI checks they fit the card and the board). A returning player (whose save was
+  saved before) who hasn't seen the newest number is sent `WhatsNew` once their client is ready. The client opens the
+  card only when nothing is in the way: at least 6 s after it arrives, no tutorial, not carrying, no other dialog
+  (`Modal.isAnyOpen`, checked every second; the welcome-back popup and the daily reward come first). Then
+  `SeenNews(number)` sets `news_<number>` (older `news_` flags go). A first session, or a player still in the
+  tutorial, counts the update as seen without a card: new players get the tutorial instead. A card that was never
+  shown comes next time. Analytics: `news_seen` (value = the number).
+* **The board:** a 14×9-stud sign with a SurfaceGui (header, title, highlights, number and date), in the gap of the
+  plaza's tree ring at 126°, 33 studs out, facing the fountain and readable from the spawn. Four parts, built by
+  `MapBuilder` outside the Scenery folder like the leaderboards, so a restyle repaints its frame and legs and never
+  rebuilds it. `SceneryLayout` places and checks it like any plaza prop (off the plots, belt, walkway and spawn, clear
+  of seasonal props).
+* **Checked offline:** `tools/worldsim/cosmetics.luau` (CI) boots the server and plays all of it through the real
+  remotes with a new player, a returning VIP, a returning player still in the tutorial, one who saw the update and
+  one with `/style all`: the card once and never again, titles earned, worn and seen by others (attribute and
+  nametag; hidden while carrying), skins painted, kept through a map change and reset on leave, and every refused
+  equip. `tools/worldsim/exportSkins.luau` exports a map with one skin per base for `tools/preview`: the skins were
+  rendered on Sunny Meadow, Midnight Market and Frosty Peaks, and the paler ones deepened where bright maps washed
+  them out.
+
+**Why:** showing off what you have done is a big part of why players come back to the top Roblox games: a title over
+your head and a fancier base are flex that money can't buy here, and each one is a goal on the way to things players
+already chase (steals, rarities, rebirths, the Snackdex). And many players never notice new content unless the game
+tells them: a short card once per update, and a board everyone passes, do that without getting in the way.
+**Reversal cost:** low. All of it is data and flags: take a title or skin out of its list (its flag is cleared on
+join) or turn `chatTag` off. What's New only ever shows the newest entry, once, so not adding one shows nothing more.
+Never rename a shipped title or skin id (saves hold `title_<id>` and `skin_<id>`; CI keeps released lists) and never
+reuse an update number.
+
+### 52. Store additions: Auto Collect, Lucky Spin packs and a Starter Pack, inside the fairness rules
+
+* **What:** a game pass and three developer products, all with id 0 until Leo creates them (README "Before
+  publishing"). **Auto Collect** (pass, suggested 149 R$): every 5 s the cash on all your active pads is collected,
+  wherever you are. **3 / 10 Lucky Spins** (25 / 69 R$): spins banked for the Rewards panel's reel. **Starter Pack**
+  (49 R$, once per account): 40 minutes of income in cash (at least $60K), a Golden Cupcake Cub and the Fizzy Soda and
+  Banana Peel. `Logic/StoreRules`, `Logic/AutoCollectRules`, `Logic/StarterPackRules`, `Logic/StoreLayout`;
+  `AutoCollectService`, `StoreService`; `PurchaseController`, `UI/OddsGrid`; the Spin tab, the Shop and the offer
+  strip.
+* **Unconfigured items are hidden:** outside Studio an item whose id is 0 is left out wherever it would be sold (Shop
+  cards and empty headers, the "Need $X more?" offer, the Spin tab's pack buttons), never shown as "Coming soon"; in
+  Studio it shows "(Studio) Grant", which runs the real receipt path (`StoreRules.visible`, for every store item).
+* **Checked before the prompt:** the spin packs and the Starter Pack can't always be bought, so their buttons ask the
+  server first (`RequestPurchase(key, surface)`): `StoreRules.purchaseRefusal` on the server's own state (the client
+  runs it too, to answer at once). Approved, the server answers `PurchaseApproved` and only then does the client open
+  Roblox's prompt (for a request it made in the last 15 s); in Studio a product with no id is granted on the spot.
+  Refused, the player is told why. The receipt path checks again, since any client can open a prompt itself.
+* **Auto Collect is the pad path:** `AutoCollectService` checks twice a second and collects a pass holder's pads every
+  `perks.autoCollectSeconds` (`AutoCollectRules.due`) through `EconomyService.collectPad`, the code the pad check and
+  the Snack Magnet use: the same "+$" over each pad, `collect` gameplay event (quests, the tutorial's step) and
+  analytics. Its Effects are `quiet`: no sound, and the "+$" only floats over pads within 70 studs of the camera; no
+  toast. **The Snack Magnet** is what the pass does, so for pass holders its button shows AUTO and a tap only says so;
+  the server never uses it (its cooldown never starts) and never sells it to them for $2.5M they'd waste
+  (`GadgetRules.coveredByAutoCollect`). Everything else stays as it was: stored cash was never stealable, so the pass
+  saves walking, not income.
+* **Spin packs are paid random items:** every prize's exact chance is on the pack's Shop card and in the Spin tab's
+  Odds view, which sits beside the pack buttons (`UI/OddsGrid`, from `SpinRules.chances`: the numbers the server rolls
+  with). They show only to players whose Roblox policy allows paid random items (the `PaidRandomItemsAllowed`
+  attribute, so not while it is looked up), the server refuses them before the prompt otherwise, and a receipt for
+  such a player is never granted, as for Server Luck (#46).
+* **A paid spin is never lost or clipped:** buying is refused while the bank holds `Spin.paidBankFull` (40) spins
+  ("Your spin bank is full (40 spins)! Spin some first."), but a receipt that lands anyway banks every spin it paid for,
+  past `maxBanked` and past 40 (`SpinRules.bankPaid`); CI keeps 50 such receipts on a full bank under the save's 1,000
+  (`SpinRules.validatePacks`). Gifts' spins still stop at `maxBanked` and pay the rest as cash.
+* **The Starter Pack is fixed:** nothing random, every line on its card before purchase. A gadget the buyer already owns
+  pays its cash price instead, and a base filled since the prompt gets the Snackling's belt price, so it is never
+  worth less. Once per account through the flag `starter_pack`, written in the same step as the grant. The server
+  refuses a second purchase (and a full base) before the prompt; a receipt that still arrives pays the whole pack's
+  worth in cash only (`StarterPackRules.cashValue`) and is logged (`starter_pack_duplicate` and a warning). Its cash is
+  quoted when the receipt is first seen, like a cash pack's. Gadgets are cash-buyable anyway, so it speeds a player up
+  and locks nobody out.
+* **Its offer, once per account:** after the first rebirth or 30 minutes of total play, whichever comes first
+  (`StarterPackRules.offerDue`, StateUpdate `store`; `StoreService` re-marks the state every 5 s because play time
+  grows without one), a gentle card in the cash offer's strip: "🎁 Starter Pack! Golden Cupcake Cub, 2 gadgets, cash"
+  and "See it", which opens the Shop at its card (no purchase from the strip). Never during the tutorial, over a dialog,
+  while carrying or over a cash offer (`StarterPackRules.canShowOffer`); once shown the flag `starter_offer` keeps it
+  away for good.
+* **Analytics, bounded:** `product_viewed` (01 key from `Monetization.viewTracked`, 02 surface: `store` | `spin` |
+  `offer`; once per item and surface a session), the store funnel's `ProductPrompted` (01 key, 02 surface) when a
+  checked purchase is approved, `product_refused` (01 key, 02 reason from `StoreRules.REASONS`), and the existing
+  `ProductPurchased` / `product_purchased`, which a retried receipt no longer logs twice. The store's `ClientEvent`
+  analytics moved from MonetizationService to StoreService.
+* **Layout:** the Spin tab and the new Shop cards are laid out by `Logic/StoreLayout` and held to the HUD's rules on
+  all five screens (`tests/StoreLayout.spec.luau`, `tools/layoutCheck.luau`): the reel narrows to make room for two
+  136×53 pack buttons at its right; every odds cell reads at 12 UI or more. The existing 340-tall dialogs fit below the
+  top bar with 7.6 UI to spare on the 640×360 phone, so this check uses a 4 UI margin instead of the HUD's 8.
+* **No save-format change:** `starter_pack`, `starter_offer` and the gadget flags are `flags`; spins are the v4 bank.
+
+**Why:** Leo wants the game to earn Robux, and these are the three earners of tycoon-style games: a convenience pass,
+a cheap repeatable product and a one-time starter offer. Each stays inside the young-audience rules (#9, #46): nothing
+paid makes a base un-stealable, paying only speeds things up, random items show exact odds and follow PolicyService,
+and nothing a player paid for can be lost to a cap, a retry or a full base. Asking the server before the prompt means a
+player is told "no" before Roblox asks for Robux, not after.
+**Reversal cost:** low. Leave an id at 0 and the item disappears from live servers; `perks.autoCollectSeconds`,
+`Spin.paidBankFull` and `starterPack` are data. Never rename the flags `starter_pack` and `starter_offer` (they are in
+saves), and keep the policy check while any paid random item is sold.

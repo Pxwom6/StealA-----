@@ -16,6 +16,12 @@ local SpinRules = {}
 
 export type Source = "free" | "banked"
 
+-- The highest Config/Spin.paidBankFull may go (a bank that full takes minutes to spin through).
+SpinRules.MAX_PAID_BANK_FULL = 200
+-- Receipts that could still land on a bank at paidBankFull (retries building up while a player is away, several
+-- prompts open at once): validatePacks keeps that many of the biggest pack under the save's limit.
+SpinRules.RECEIPT_BACKLOG = 50
+
 -- Which spin a player would use now: the free one when it is ready, else a banked one; nil when there is none.
 function SpinRules.source(state: SpinState, now: number): Source?
 	if now >= state.nextFreeAt then
@@ -42,6 +48,13 @@ function SpinRules.bank(state: SpinState, count: number, config: SpinConfig): nu
 	local banked = math.min(room, count)
 	state.spins += banked
 	return count - banked
+end
+
+-- Banks every spin a Lucky Spin pack paid for, past maxBanked and past paidBankFull if need be: a purchase is never
+-- lost or clipped. (Buying is refused while the bank holds paidBankFull or more, StoreRules.purchaseRefusal, but two
+-- receipts can still land together; validatePacks keeps far more than that under the save's limit.)
+function SpinRules.bankPaid(state: SpinState, count: number)
+	state.spins += math.max(0, math.floor(count))
 end
 
 -- Each segment's chance (weight / total), in order.
@@ -79,6 +92,15 @@ function SpinRules.validate(config: SpinConfig, mutations: { [string]: any }): {
 	end
 	if not (config.maxBanked >= 1 and config.maxBanked <= 1000 and config.maxBanked % 1 == 0) then
 		table.insert(problems, "maxBanked must be a whole number from 1 to 1000")
+	end
+	if
+		not (
+			config.paidBankFull >= config.maxBanked
+			and config.paidBankFull <= SpinRules.MAX_PAID_BANK_FULL
+			and config.paidBankFull % 1 == 0
+		)
+	then
+		table.insert(problems, `paidBankFull must be a whole number from maxBanked to {SpinRules.MAX_PAID_BANK_FULL}`)
 	end
 	for _, message in
 		GiftRules.rewardProblems({
@@ -120,6 +142,29 @@ function SpinRules.validate(config: SpinConfig, mutations: { [string]: any }): {
 	end
 	if not (total > 0) then
 		table.insert(problems, "the weights add up to nothing")
+	end
+	return problems
+end
+
+-- Problems with the Lucky Spin packs for sale (`counts`: spins per pack, Config/Monetization) given Config/Spin and
+-- `saveLimit`, the most spins a save keeps (DataSchema.MAX_BANKED_SPINS): a pack's spins must never be clipped, so even
+-- RECEIPT_BACKLOG of the biggest pack landing on a bank at paidBankFull stays under it.
+function SpinRules.validatePacks(counts: { number }, config: SpinConfig, saveLimit: number): { string }
+	local problems: { string } = {}
+	local biggest = 0
+	for index, count in counts do
+		if not (count >= 1 and count <= 100 and count % 1 == 0) then
+			table.insert(problems, `pack {index} must give a whole number of spins from 1 to 100`)
+		else
+			biggest = math.max(biggest, count)
+		end
+	end
+	local worst = config.paidBankFull - 1 + SpinRules.RECEIPT_BACKLOG * biggest
+	if not (worst <= saveLimit) then
+		table.insert(
+			problems,
+			`{SpinRules.RECEIPT_BACKLOG} packs of {biggest} on a full bank reach {worst} spins, over the save's {saveLimit}`
+		)
 	end
 	return problems
 end

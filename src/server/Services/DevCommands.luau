@@ -25,9 +25,16 @@
 	                        right beside you, to test catching it
 	  /boss [hp]            a Snack Attack giant appears over the belt now (tap it to test), e.g. /boss 20 for a quick one
 	  /gadgets [off]        own every gadget (Config/Gadgets) and recharge them all now; /gadgets off removes them again
+	  /starter [reset|offer]
+	                        the Starter Pack again: reset forgets it was bought and its offer was shown; offer also
+	                        makes its one-time offer card due now (enough play time), to see it come up
 	  /hostas <owner|none|admin>
 	                        try the host panel (Settings) as a private server's owner, as a player with no panel, or
 	                        as an admin again (in Studio everyone is an admin)
+	  /style [off]          every title and base skin counts as unlocked for you this session (Settings ▸ Style; not
+	                        saved); /style off: only what you really earned again
+	  /news                 the What's New card again (in Studio without API access every session is a first one,
+	                        so it never comes by itself)
 
 	Map themes (MapThemeService; admins can use these in live servers too, that server only):
 	  /map <id>             switch to that map now, e.g. /map candy, /map volcano
@@ -45,8 +52,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
 
+local Monetization = require(ReplicatedStorage.Shared.Config.Monetization)
 local GameData = require(ReplicatedStorage.Shared.GameData)
 local SnackdexRules = require(ReplicatedStorage.Shared.Logic.SnackdexRules)
+local StarterPackRules = require(ReplicatedStorage.Shared.Logic.StarterPackRules)
 
 local BeltService = require(script.Parent.BeltService)
 local BossService = require(script.Parent.BossService)
@@ -57,12 +66,14 @@ local GadgetService = require(script.Parent.GadgetService)
 local GiftService = require(script.Parent.GiftService)
 local HostService = require(script.Parent.HostService)
 local LockService = require(script.Parent.LockService)
+local NewsService = require(script.Parent.NewsService)
 local Replication = require(script.Parent.Replication)
 local QuestService = require(script.Parent.QuestService)
 local Remotes = require(script.Parent.Remotes)
 local Sessions = require(script.Parent.Sessions)
 local SnackdexService = require(script.Parent.SnackdexService)
 local SocialService = require(script.Parent.SocialService)
+local StyleService = require(script.Parent.StyleService)
 local TutorialService = require(script.Parent.TutorialService)
 
 local DevCommands = {}
@@ -299,11 +310,55 @@ function DevCommands.start()
 			"info"
 		)
 	end)
+	add("news", function(player: Player)
+		local session = Sessions.get(player)
+		if session then
+			NewsService.showAgain(session)
+		end
+	end)
+	add("style", function(player: Player, args: { string })
+		local session = Sessions.get(player)
+		if session == nil then
+			return
+		end
+		local off = string.lower(args[1] or "") == "off"
+		StyleService.setUnlockAll(session, not off)
+		Remotes.notify(
+			player,
+			if off
+				then "[Studio] titles and skins: only what you earned"
+				else "[Studio] every title and base skin unlocked this session (Settings ▸ Style)",
+			"info"
+		)
+	end)
+	add("starter", function(player: Player, args: { string })
+		local session = Sessions.get(player)
+		if session == nil then
+			return
+		end
+		local flags = session.data.flags
+		flags[StarterPackRules.OWNED_FLAG] = nil
+		flags[StarterPackRules.OFFER_FLAG] = nil
+		local offer = string.lower(args[1] or "") == "offer"
+		if offer then
+			local stats = session.data.stats
+			stats.playTime = math.max(stats.playTime, Monetization.starterPack.offer.afterPlaySeconds)
+		end
+		Replication.markDirty(session)
+		Remotes.notify(
+			player,
+			if offer
+				then "[Studio] Starter Pack reset; its offer card is due now"
+				else "[Studio] Starter Pack reset: it can be bought again",
+			"info"
+		)
+	end)
 	print(
 		"[DevCommands] Studio commands enabled: /cash <n>, /spawn <creatureId> [mutationId], /noshield, /friends <n|off>,"
 			.. " /tutorial, /gallery [mutationId|off], /sky <clockTime>,"
 			.. " /quests reset, /dex fill <rarity|event>, /map <id|vote|list>, /playtime <min>, /spins <n|free>,"
-			.. " /runaway [here], /boss [hp], /gadgets [off], /hostas <owner|none|admin>"
+			.. " /runaway [here], /boss [hp], /gadgets [off], /hostas <owner|none|admin>, /style [off], /news,"
+			.. " /starter [reset|offer]"
 			.. " (LiveOps: /event <id> [minutes], /event off, /luck <x> <min>)"
 	)
 end

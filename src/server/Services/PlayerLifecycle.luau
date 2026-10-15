@@ -34,13 +34,15 @@ export type Hooks = {
 	onReady: { (session: Session) -> () },
 	-- Called first thing on leave, while the session and plot still exist.
 	onLeaving: { (session: Session) -> () },
+	-- Called when a character spawns (the first one too, after onJoined), each in its own thread. May yield.
+	onCharacter: { (session: Session, character: Model) -> () },
 	-- Fills session.passes before anything else uses them. May yield.
 	checkPasses: ((player: Player) -> Sessions.Passes)?,
 }
 
 local PlayerLifecycle = {}
 
-local hooks: Hooks = { onJoined = {}, onReady = {}, onLeaving = {}, checkPasses = nil }
+local hooks: Hooks = { onJoined = {}, onReady = {}, onLeaving = {}, onCharacter = {}, checkPasses = nil }
 local pendingReady: { [Player]: boolean } = {}
 -- Each player's CharacterAdded connection, which holds their session: disconnected when they leave, so a Player that
 -- Roblox keeps around after leaving never keeps the session (and its save data) alive.
@@ -78,6 +80,9 @@ local function onCharacterAdded(session: Session, character: Model)
 	if humanoid and humanoid:IsA("Humanoid") then
 		Movement.apply(session) -- Sugar Rush, a Fizzy Soda still running... (Movement)
 	end
+	for _, hook in hooks.onCharacter do
+		task.spawn(hook, session, character)
+	end
 	task.defer(placeAtBase, session, character)
 end
 
@@ -111,7 +116,7 @@ local function onPlayerAdded(player: Player)
 
 	local passes: Sessions.Passes = if hooks.checkPasses
 		then hooks.checkPasses(player)
-		else { DoubleCash = false, VIP = false, ExtraPodiums = false, LongerLock = false }
+		else { DoubleCash = false, VIP = false, ExtraPodiums = false, LongerLock = false, AutoCollect = false }
 	if player.Parent ~= Players then
 		DataService.release(profile)
 		return

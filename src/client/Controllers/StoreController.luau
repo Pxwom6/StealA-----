@@ -9,9 +9,18 @@
 	    can only be bought when the player's PolicyService policy allows that (the server publishes the answer as the
 	    player attribute in Logic/PaidRandomItems); otherwise, and while that is still being looked up, it shows as
 	    blocked (the server refuses the receipt too).
-	  * Items whose id is still 0 show "Coming soon" — or, in Studio, a "(Studio) Grant" button that runs the real
-	    server receipt path, so purchases are testable before the IDs exist.
-	Opening the store and tapping an item are reported for the analytics store funnel.
+	  * The Starter Pack comes first until it is bought (then it hides): one line per thing it gives, nothing random:
+	    its cash as a receipt would quote it now, its Snackling, and each gadget (or its cash price when owned). Its
+	    buy button asks first, like the Lucky Spin packs'.
+	  * Lucky Spin packs show every prize's exact chance on the card (UI/OddsGrid, laid out by Logic/StoreLayout). They
+	    are paid random items too, so they show only to players whose policy allows them (hidden otherwise, and while
+	    it is being looked up). Their buy button asks first (PurchaseController: the client's check, then the
+	    server's, before Roblox's prompt opens) and says "Bank full" while the spin bank holds Config/Spin.paidBankFull.
+	  * Items whose id is still 0 (not created on the Creator Hub yet) are hidden outside Studio, headers too when a
+	    section has nothing to show (Logic/StoreRules.visible). In Studio they show a "(Studio) Grant" button that runs
+	    the real server receipt path, so purchases are testable before the IDs exist.
+	Opening the store and tapping an item are reported for the analytics store funnel. The cards are refilled in place
+	when what they show changes (a pass bought, the spin bank filling up...).
 
 	Two tabs: Shop (all of the above, first as it always was) and Gadgets (GadgetsTab: gear bought once with in-game
 	cash, never Robux).
@@ -23,8 +32,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
+local Gadgets = require(ReplicatedStorage.Shared.Config.Gadgets)
 local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
 local Monetization = require(ReplicatedStorage.Shared.Config.Monetization)
+local Spin = require(ReplicatedStorage.Shared.Config.Spin)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local GameData = require(ReplicatedStorage.Shared.GameData)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -35,12 +46,17 @@ local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local LiveOpsRules = require(ReplicatedStorage.Shared.Logic.LiveOpsRules)
 local PaidRandomItems = require(ReplicatedStorage.Shared.Logic.PaidRandomItems)
 local RarityRoll = require(ReplicatedStorage.Shared.Logic.RarityRoll)
+local StarterPackRules = require(ReplicatedStorage.Shared.Logic.StarterPackRules)
+local StoreLayout = require(ReplicatedStorage.Shared.Logic.StoreLayout)
+local StoreRules = require(ReplicatedStorage.Shared.Logic.StoreRules)
 local LiveOps = require(ReplicatedStorage.Shared.Config.LiveOps)
 local Modal = require(script.Parent.Parent.UI.Modal)
+local OddsGrid = require(script.Parent.Parent.UI.OddsGrid)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local GadgetsTab = require(script.Parent.GadgetsTab)
 local HudController = require(script.Parent.HudController)
 local LockController = require(script.Parent.LockController)
+local PurchaseController = require(script.Parent.PurchaseController)
 local SoundPlayer = require(script.Parent.SoundPlayer)
 local StateStore = require(script.Parent.StateStore)
 
@@ -59,6 +75,9 @@ export type Tab = "shop" | "gadgets"
 
 -- The open store's Gadgets tab, refreshed with every state update (nil while the store is closed).
 local gadgetsRefresh: ((state: Types.ClientState) -> ())? = nil
+-- The open store's Shop tab: refilled when what its cards show changes (nil while the store is closed).
+local shopRefresh: (() -> ())? = nil
+local shopShows = "" -- what the open Shop tab's cards were built from (shows)
 
 local function copyVars(): { [string]: any }
 	local perks = Monetization.perks
@@ -69,6 +88,7 @@ local function copyVars(): { [string]: any }
 		minVulnerable = Gameplay.lock.minVulnerableSeconds,
 		luckMultiplier = perks.serverLuckMultiplier,
 		luckMinutes = math.floor(perks.serverLuckSeconds / 60),
+		autoSeconds = perks.autoCollectSeconds,
 	}
 end
 
@@ -219,10 +239,7 @@ local function card(parent: Instance, spec: CardSpec, owned: boolean): Frame
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -12, 0.5, 0),
 		Size = UDim2.fromOffset(160, 58),
-		BackgroundColor3 = if owned or blocked
-			then UiTheme.palette("panel")
-			elseif configured or isStudio then UiTheme.palette("robux")
-			else UiTheme.palette("panel"),
+		BackgroundColor3 = if owned or blocked then UiTheme.palette("panel") else UiTheme.palette("robux"),
 		Text = "",
 		Parent = frame,
 	}, function()
@@ -251,10 +268,8 @@ local function card(parent: Instance, spec: CardSpec, owned: boolean): Frame
 		priceLabel.Text = spec.blockedText :: string
 	elseif configured then
 		fetchPrice(spec.kind, spec.id, priceLabel)
-	elseif isStudio then
-		priceLabel.Text = Theme.text.storeStudioGrant
 	else
-		priceLabel.Text = Theme.text.storeUnavailable
+		priceLabel.Text = Theme.text.storeStudioGrant -- only Studio shows an unconfigured item (fillCards)
 	end
 	return frame
 end
@@ -268,6 +283,163 @@ local function header(parent: Instance, order: number, text: string)
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Parent = parent,
 	})
+end
+
+local function place(object: GuiObject, r: StoreLayout.Rect)
+	object.Position = UDim2.fromOffset(r.x, r.y)
+	object.Size = UDim2.fromOffset(r.w, r.h)
+end
+
+-- What the Shop's cards show that changes while it is open (a full spin bank, the policy, passes owned...): a new
+-- value refills them.
+local function shows(state: Types.ClientState): string
+	local parts = {
+		tostring(PurchaseController.paidRandomAllowed()),
+		tostring(state.spin.spins >= Spin.paidBankFull),
+		tostring(state.store.starterOwned),
+		tostring(#state.gadgets.owned), -- the Starter Pack's card prices the gadgets it no longer unlocks
+	}
+	for _, key in Monetization.storePasses do
+		table.insert(parts, tostring((state.passes :: any)[key] == true))
+	end
+	return table.concat(parts, "|")
+end
+
+-- The Starter Pack's lines: its cash (income-sized, as a receipt now would quote it), its Snackling, and each gadget
+-- (or its cash price when already owned). Fixed contents: nothing random.
+local function starterLines(state: Types.ClientState): { string }
+	local config = Monetization.starterPack
+	local owned: { [string]: boolean } = {}
+	for _, id in state.gadgets.owned do
+		owned[id] = true
+	end
+	local contents = StarterPackRules.contents(
+		config,
+		StarterPackRules.cash(config, state.packIncome),
+		function(id: string): boolean
+			return owned[id] == true
+		end,
+		function(id: string): number
+			local def = Gadgets.gadgets[id]
+			return if def then def.price else 0
+		end
+	)
+	local lines = {
+		Format.template(
+			Theme.text.starterCashLine,
+			{ amount = UiTheme.cash(contents.cash), minutes = math.floor(config.cash.incomeSeconds / 60) }
+		),
+	}
+	local def = GameData.catalog.creatures[config.creatureId]
+	if def then
+		table.insert(
+			lines,
+			Format.template(Theme.text.starterCreatureLine, {
+				creature = GameData.displayName(def, config.variant),
+				income = UiTheme.perSecond(GameData.income(def, config.variant)),
+			})
+		)
+	end
+	local gadgets: { string } = {}
+	for _, id in config.gadgets do
+		local gadget = Gadgets.gadgets[id]
+		if gadget then
+			local vars =
+				{ icon = gadget.icon, name = UiTheme.text(gadget.nameKey), amount = UiTheme.cash(gadget.price) }
+			table.insert(
+				gadgets,
+				Format.template(if owned[id] then Theme.text.starterGadgetOwned else Theme.text.starterGadget, vars)
+			)
+		end
+	end
+	table.insert(lines, table.concat(gadgets, "  +  "))
+	return lines
+end
+
+-- A card for a product bought through PurchaseController (Logic/StoreRules.CHECKED_KINDS): a Lucky Spin pack, with
+-- the exact chance of every prize across the card, or the Starter Pack with one line per thing it gives. Its buy
+-- button asks before Roblox's prompt opens.
+local function checkedCard(parent: Instance, key: string, order: number, state: Types.ClientState): Frame
+	local copy = Theme.store[key]
+	local starter = Monetization.products[key].kind == "StarterPack"
+	local lines: { string } = if starter then starterLines(state) else {}
+	local boxes: { [string]: StoreLayout.Box }, height: number
+	if starter then
+		boxes, height = StoreLayout.starterCard(#lines)
+	else
+		boxes, height = StoreLayout.packCard()
+	end
+	local accent = if starter then UiTheme.palette("gold") else UiTheme.palette("luck")
+	local frame = UiKit.panel({
+		Name = key,
+		LayoutOrder = order,
+		Size = UDim2.new(1, -8, 0, height),
+		BackgroundColor3 = UiTheme.palette("panelLight"),
+		Parent = parent,
+	})
+	local stripe = UiKit.new("Frame", {
+		Size = UDim2.new(0, 10, 1, 0),
+		BackgroundColor3 = accent,
+		Parent = frame,
+	}) :: Frame
+	UiKit.corner(6).Parent = stripe
+	local title = UiKit.label({
+		Text = copy.name,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = accent,
+		Parent = frame,
+	})
+	place(title, boxes.title.rect)
+	local description = UiKit.label({
+		Text = copy.description,
+		FontFace = UiTheme.bodyFont,
+		TextScaled = false,
+		TextSize = 15,
+		TextWrapped = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		Parent = frame,
+	})
+	place(description, boxes.description.rect)
+	if starter then
+		for index, text in lines do
+			local line = UiKit.label({
+				Name = `Line{index}`,
+				Text = text,
+				FontFace = UiTheme.bodyFont,
+				TextScaled = false,
+				TextSize = 15,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextColor3 = UiTheme.palette("gold"),
+				Parent = frame,
+			})
+			place(line, boxes[`line{index}`].rect)
+		end
+	else
+		OddsGrid.build(frame, boxes.odds.rect, frame.ZIndex + 1)
+	end
+
+	local full = PurchaseController.refusal(key, state) == "bankFull"
+	local buy = UiKit.button({
+		Name = "Buy",
+		BackgroundColor3 = if full then UiTheme.palette("panel") else UiTheme.palette("robux"),
+		Text = "",
+		Parent = frame,
+	}, function()
+		SoundPlayer.ui("click")
+		PurchaseController.request(key, "store")
+	end)
+	place(buy, boxes.buy.rect)
+	if full then
+		UiKit.setButtonText(buy, Theme.text.spinPackFull)
+	else
+		PurchaseController.priceText(key, function(text: string)
+			if buy.Parent then
+				UiKit.setButtonText(buy, text)
+			end
+		end)
+	end
+	return frame
 end
 
 -- The Server Luck card's odds must be exact when the player buys, so while the store is open its cards are refilled
@@ -303,10 +475,27 @@ local function fillCards(scroller: ScrollingFrame): { [string]: Frame }
 		return order
 	end
 
+	-- Items not created on the Creator Hub yet only show in Studio, and a header only with something under it.
+	local isStudio = RunService:IsStudio()
+	local productKeys = StoreRules.visibleKeys(Monetization.storeProducts, Monetization.products, isStudio)
+	local passKeys = StoreRules.visibleKeys(Monetization.storePasses, Monetization.passes, isStudio)
+
 	-- Boosts first: they are the impulse buys and the server-hero moment.
-	header(scroller, nextOrder(), Theme.text.storeProductsHeader)
-	for _, key in Monetization.storeProducts do
+	if #productKeys > 0 then
+		header(scroller, nextOrder(), Theme.text.storeProductsHeader)
+	end
+	for _, key in productKeys do
 		local product = Monetization.products[key]
+		if StoreRules.CHECKED_KINDS[product.kind] then
+			-- Lucky Spin packs: paid random items, so only for players whose policy allows them (hidden otherwise).
+			-- The Starter Pack: hidden once bought.
+			local hidden = (StoreRules.PAID_RANDOM_KINDS[product.kind] and not PurchaseController.paidRandomAllowed())
+				or (product.kind == "StarterPack" and state.store.starterOwned)
+			if not hidden then
+				cards[key] = checkedCard(scroller, key, nextOrder(), state)
+			end
+			continue
+		end
 		local detail: string? = nil
 		local blockedText: string? = nil
 		local rich = false
@@ -342,8 +531,10 @@ local function fillCards(scroller: ScrollingFrame): { [string]: Frame }
 		}, false)
 	end
 
-	header(scroller, nextOrder(), Theme.text.storePassesHeader)
-	for _, key in Monetization.storePasses do
+	if #passKeys > 0 then
+		header(scroller, nextOrder(), Theme.text.storePassesHeader)
+	end
+	for _, key in passKeys do
 		local pass = Monetization.passes[key]
 		local owned = (state.passes :: any)[key] == true
 		cards[key] = card(scroller, {
@@ -351,7 +542,10 @@ local function fillCards(scroller: ScrollingFrame): { [string]: Frame }
 			kind = "pass",
 			id = pass.id,
 			order = nextOrder(),
-			accent = if key == "VIP" then UiTheme.palette("vip") else UiTheme.palette("primary"),
+			accent = if key == "VIP"
+				then UiTheme.palette("vip")
+				elseif key == "AutoCollect" then UiTheme.palette("autoCollect")
+				else UiTheme.palette("primary"),
 		}, owned)
 	end
 	return cards
@@ -366,11 +560,12 @@ function StoreController.open(focusKey: string?, tab: Tab?)
 	SoundPlayer.ui("click")
 
 	local watchers: { RBXScriptConnection } = {}
-	local modal = Modal.open(Theme.text.storeTitle, Vector2.new(640, 340), function()
+	local modal = Modal.open(Theme.text.storeTitle, Vector2.new(StoreLayout.STORE.w, StoreLayout.STORE.h), function()
 		for _, connection in watchers do
 			connection:Disconnect()
 		end
 		gadgetsRefresh = nil
+		shopRefresh = nil
 	end)
 	local tabBar = UiKit.new("Frame", {
 		Name = "Tabs",
@@ -483,6 +678,9 @@ function StoreController.open(focusKey: string?, tab: Tab?)
 	end
 
 	local cards = fillCards(scroller)
+	local opened = StateStore.get()
+	shopShows = if opened then shows(opened) else ""
+	shopRefresh = queueRefill
 	local focus = if focusKey then cards[focusKey] else nil
 	if focus then
 		task.defer(function()
@@ -506,11 +704,18 @@ function StoreController.start()
 	LockController.onPillTappedWhileRecharging = function()
 		StoreController.open("InstantLock")
 	end
-	-- Cash and ownership change while the Gadgets tab is open: its prices turn green, bought ones say "Owned".
+	-- Cash and ownership change while the Gadgets tab is open: its prices turn green, bought ones say "Owned". The Shop
+	-- tab's cards are refilled when what they show changes (a pass bought, the spin bank filling up...).
 	StateStore.onChange(function(state)
 		local refresh = gadgetsRefresh
 		if refresh then
 			refresh(state)
+		end
+		local refill = shopRefresh
+		local now = shows(state)
+		if refill and now ~= shopShows then
+			shopShows = now
+			refill()
 		end
 	end)
 end

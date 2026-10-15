@@ -54,7 +54,7 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | Base lock | `LockService` | lock button + barrier | `LockRules` |
 | Rebirth | `RebirthService` | `RebirthController` (trade-off dialog) | `RebirthMath` |
 | Base lock UI | `LockService` | `LockController` (lock button prompt, HUD button in the top-right row) | `LockRules` |
-| Monetisation | `MonetizationService` (ProcessReceipt, passes), `PlayerPolicy` (PolicyService: paid random items) | `StoreController` | `ReceiptLedger`, `EconomyMath.cashPackAmount`, `PaidRandomItems` |
+| Monetisation | `MonetizationService` (ProcessReceipt, passes; Lucky Spin packs and the Starter Pack granted there too), `PlayerPolicy` (PolicyService: paid random items), `StoreService` (the store's analytics, RequestPurchase: spin packs and the Starter Pack checked before the prompt, the Starter Pack's offer coming due), `AutoCollectService` (the Auto Collect pass, through the pad path) | `StoreController` (the Shop: odds on the spin packs' cards, the Starter Pack's lines), `PurchaseController` (ask the server, then prompt), `SpinTab` (pack buttons beside the reel), `CashOfferController` (the Starter Pack's one-time offer in the offer strip), `UI/OddsGrid` | `ReceiptLedger`, `EconomyMath.cashPackAmount`, `PaidRandomItems`, `StoreRules`, `StarterPackRules`, `AutoCollectRules`, `StoreLayout` |
 | Retention | `RetentionService` (daily streak, offline earnings), `LeaderboardService` | `RewardsController` (Rewards panel: Daily + Quests tabs) | `DailyStreak`, `OfflineEarnings` |
 | Snackdex | `SnackdexService` (discovery on every Snackling landing in a base, tier rewards claimed automatically, sync) | `SnackdexController` (rarity / Event tabs, 3D preview cards, silhouettes, NEW! toasts) | `SnackdexRules` |
 | Daily quests | `QuestService` (daily roll per UserId + UTC day, progress from gameplay events, ClaimQuest, day reset) | `RewardsController` (Quests tab) | `QuestRules` |
@@ -70,8 +70,10 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | World & scenery | `MapBuilder` (plot decor, belt chevrons, boards, lobby spawn; `restyle` for a new map theme), `SceneryBuilder` (spawn plaza, Snack Factory, chute, flora, landmarks, boundary wall, terrain), `ThemeProps` (each theme's flora and landmarks), `WorldLighting` (map lighting + seasonal overlay) | `WorldFxController` (belt chevrons, factory cog, blinking lights; Reduce effects) | `SceneryLayout` |
 | Map themes | `MapThemeService` (first map, 20-minute rotation, the vote, `/map`) | `MapThemeController` (vote strip at the bottom of the screen, new-map title card), `WeatherController` (snow / embers / leaves... around the camera) | `MapThemeRules` |
 | Server modifiers | `ModifierService` (schedule, `/mod`; belt, economy, lock, steal, movement read its effects) | `ModifierController` (HUD button among the status pills; effects for belt prices, steal hold, tag reach) | `ModifierRules` |
-| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends <n\|off>`, `/tutorial`, `/gallery [mutationId\|off]` via `DevGallery`, `/sky <clockTime>`, `/quests reset`, `/dex fill <rarity\|event>`); `/map <id\|vote\|list>` (MapThemeService); `/mod <id> [minutes]`, `/mod off`, `/mod list` (ModifierService); LiveOps `/event <id> [minutes]`, `/event off`, `/luck`, `/announce` (HostService; anyone in Studio, local only); `/hostas <owner\|none\|admin>` (try the host panel as another role) | – | – |
+| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends <n\|off>`, `/tutorial`, `/gallery [mutationId\|off]` via `DevGallery`, `/sky <clockTime>`, `/quests reset`, `/dex fill <rarity\|event>`); `/map <id\|vote\|list>` (MapThemeService); `/mod <id> [minutes]`, `/mod off`, `/mod list` (ModifierService); LiveOps `/event <id> [minutes]`, `/event off`, `/luck`, `/announce` (HostService; anyone in Studio, local only); `/hostas <owner\|none\|admin>` (try the host panel as another role); `/style [off]` (every title and skin unlocked, this session), `/news` (the What's New card again) | – | – |
 | Settings & audio | `SettingsService` (SetSetting → `settings_<key>` flags) | `ClientSettings`, `SettingsController` (the gear, top right), `SoundPlayer`, `MusicController` (looping, crossfade) | `SettingsRules`, `ScreenLayout` |
+| Titles & base skins | `StyleService` (unlocks read from the save, toasts after each achievement check, GetStyle / EquipStyle → `title_<id>` / `skin_<id>` flags), `Nametags` (the title's BillboardGui on each character), `PlotService.setSkin` + `MapBuilder.paintPlot` (a base's floor, rug and trims) | `StyleController` (the Style dialog, from a Settings row), `ChatTagController` (the title's chat tag), `MutationFxController` (Rainbow Swirl's trims) | `StyleRules`, `StyleLayout` |
+| What's New | `NewsService` (the card for returning players once, SeenNews → `news_<number>`; the plaza board's text), `MapBuilder` (the board) | `WhatsNewController` (the card, when nothing is in the way) | `UpdateRules`, `NewsLayout` |
 
 ## 3. Module list
 
@@ -80,13 +82,13 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | --- | --- |
 | `Theme` | game title, currency symbol, every UI string & template, UI palette (hex), fonts, plot colours |
 | `Rarities` | 7 tiers: order, display name, colour, belt weight, luck-affected flag, glow/particles/announce flags |
-| `Creatures` | the Snackling catalogue (60 + 4 Halloween + 4 Winter + 4 Valentine's + 4 Easter): id, name, rarity, price, income, belt weight, model name, flavour text, optional `eventId` |
+| `Creatures` | the Snackling catalogue (80 permanent + 4 Halloween + 4 Winter + 4 Valentine's + 4 Easter): id, name, rarity, price, income, belt weight, model name, flavour text, optional `eventId` |
 | `CreatureLooks` | one 3D model recipe per Snackling, keyed by id: body plan, food skins, face, animal features, toppings, size (the fallback) |
-| `CreatureParts` | GENERATED by `tools/importParts.luau`: the polished models (Claude Design batches 1-3, the hand-built Winter batch 4, Valentine's batch 5 and Easter batch 6), as primitive part lists |
+| `CreatureParts` | GENERATED by `tools/importParts.luau`: the polished models (Claude Design batches 1-3, the hand-built Winter batch 4, Valentine's batch 5, Easter batch 6 and the 20 permanent Snacklings of batch 7), as primitive part lists |
 | `Mutations` | rare variants of any creature (Golden, Diamond, Rainbow; event-only Haunted and Festive): id, name, colour, chance per spawn, income / price multipliers, announce flags, look (material, tint, sparkles, rainbow, glow light), optional `eventId` |
 | `Economy` | start cash, podium upgrade curve, sell refund, offline earnings, rebirth curve, cash packs, daily rewards |
 | `Gameplay` | belt timing, plot geometry, steal/tag ranges, carry speed, lock/grace timers, rate limits |
-| `Monetization` | game-pass and developer-product IDs (**placeholders, TODO**), perk values, store layout |
+| `Monetization` | game-pass and developer-product IDs (0 = not created on the Creator Hub yet: hidden in live servers), perk values (Auto Collect's interval), store layout, the Starter Pack's contents and offer timing, the items whose views are logged |
 | `LiveOps` | admin user IDs, scheduled events (luck / cash multipliers, banner, countdown title; Halloween 2026 and its luck weekend, Winter 2026 with Christmas luck and New Year's 2x cash, Valentine's 2027 and its luck weekend, Easter 2027 and its luck weekend), luck-boost limits |
 | `Seasons` | seasonal themes keyed by LiveOps event id (`Halloween2026` → `halloween`, `Winter2026` → `winter`, `Valentine2027` → `valentine`, `Easter2027` → `spring`): lighting mood, weather, decoration counts, colours, part budget |
 | `Sounds` | sound effects `{ id, volume, pitch }` (built-in `rbxasset://sounds/` files), music tracks (**empty, TODO**) and the crossfade time |
@@ -99,6 +101,9 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | `Quests` | daily quests: slots per day (2 easy + 1 hard), the quest pool (kind, target or income-sized cash target, minimum rarity, text key), rewards per difficulty, all-done bonus |
 | `Gadgets` | the four gadgets (kind, icon, colour, text keys, cash price, cooldown, effect numbers), the 1.5x speed cap with a speed modifier, the speed grace, how often peels are checked |
 | `Host` | the host panel: private-server owners' cooldowns, the admin gift cooldown, the /mod, /luck and /event limits the panel and commands share, the panel's stepper presets, gift sizing, the MessagingService topics, version, expiry, dedupe and caps, and the shout-out rule and limits |
+| `Titles` | the titles (id, text, emoji, colour, what earns it: an achievement, rebirths or Snackdex tiers), the nametag's size, height and distance, the chat tag switch |
+| `Skins` | the base skins (id, name, emoji, look: floor tile colours, rug, trim, materials, rainbow; what earns it) and the default (Classic) |
+| `Updates` | What's New: the update notes, newest first (number, date, title, 3-5 highlights) |
 
 ### `src/shared/Logic` (pure, unit-tested)
 
@@ -126,7 +131,15 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `HostRules` | who may host (admins, a private server's owner, nobody), the action whitelist, argument checks and clamping (for intents and other servers' messages alike), permissions, cooldowns, gift amounts, `Config/Host` and hostable-modifier validation |
 | `CrossServerRules` | the versioned cross-server message: strict decoding, expiry, dedupe (a bounded id list), shout-out rules and limits, display names |
 | `HostPanelLayout` | where everything goes in the host panel, held to the HUD's rules by tests (fits below the top bar, 52 UI buttons, 12 UI text) |
+| `StyleRules` | titles and base skins: unlocks and progress (achievement flags and goals, rebirths, Snackdex tiers), one worn at a time as `title_<id>` / `skin_<id>` flags, repair on join, can equip, the dialog's view and hints, a skin's trims with VIP and its tile pattern, colour checks, `Config/Titles` and `Config/Skins` validation |
+| `StyleLayout` | where everything goes in the Style dialog (tabs, cards, the grid) and the Settings last row in halves or thirds, held to the HUD's rules by tests |
+| `UpdateRules` | What's New: the newest update, show / count as seen / nothing on join (never a first session or the tutorial), the `news_<number>` flag, `Config/Updates` validation |
+| `NewsLayout` | where the What's New card's lines and button go, and the plaza board's, held to the HUD's rules (and a board readable from across the plaza) by tests |
 | `PaidRandomItems` | Roblox's Paid Random Items policy: what a PolicyService answer means (a failure counts as restricted) and the player attribute the store reads |
+| `StoreRules` | which store items show (an id of 0 only in Studio), who may buy a Lucky Spin pack or the Starter Pack before the prompt (`purchaseRefusal`: the policy, a full spin bank, owned, a full base), the refusal messages, the paid random kinds, the analytics surfaces |
+| `StarterPackRules` | the Starter Pack: its fixed contents (cash sized from income, its Snackling, gadgets or their cash price), its whole worth in cash (a second receipt), when its one-time offer is due and may show, `Config/Monetization.starterPack` validation |
+| `AutoCollectRules` | the Auto Collect pass's timing (first collect at once, then one per interval), its config limits |
+| `StoreLayout` | where the store additions go in their dialogs: the Spin tab with and without the pack buttons, the odds grid, a pack's and the Starter Pack's Shop cards, held to the HUD's rules on five screens (`tools/layoutCheck.luau`) |
 | `SeasonRules` | active seasonal theme from the active event ids, decoration layout on the map (outside plots, off the belt), part count, `Config/Seasons` validation |
 | `Inventory` | podium slot operations on the save table (free slot, place, remove, find by uid) |
 | `PlotAssignment` | pick a free plot, release |
@@ -157,11 +170,12 @@ aura, then the mutation look, which skips the face; tags anchored models for the
 `Remotes → DataService → MapThemeService.firstMap → MapBuilder (+ SceneryBuilder, WorldLighting) → PlotService → Analytics →
 LiveOpsService → SeasonService → MapThemeService → ModifierService → Replication → PositionTracker → EconomyService →
 BeltService →
-LockService → StealService → GadgetService → RebirthService → PlayerPolicy → MonetizationService → RetentionService →
+LockService → StealService → GadgetService → AutoCollectService → RebirthService → PlayerPolicy → MonetizationService →
+StoreService → RetentionService →
 SocialService →
 TutorialService → SnackdexService → QuestService → LeaderboardService → SettingsService → CodeService → GiftService →
-SpinService → AchievementService → HostService → ShoutoutService → CrossServer → DevCommands →
-PlayerLifecycle`, and wires cross-service join/leave steps through `PlayerLifecycle.hooks()` (keeps services free of
+SpinService → AchievementService → StyleService → NewsService → HostService → ShoutoutService → CrossServer →
+DevCommands → PlayerLifecycle`, and wires cross-service join/leave steps through `PlayerLifecycle.hooks()` (keeps services free of
 circular requires). `Sessions` holds per-player state. `Movement` (required by PositionTracker, StealService,
 PlayerLifecycle and GadgetService) gives every Humanoid its walking speed and the movement checks their allowance.
 
@@ -172,13 +186,13 @@ release plot → release profile.
 ### `src/client`
 `init.client.luau` waits for `game:IsLoaded()` then starts controllers:
 `StateStore, ClientSettings, HudController, NotificationController, BeltController, PlotController,
-InteractionController, StealController, LockController, RebirthController, StoreController, ChatTagController,
+InteractionController, StealController, LockController, RebirthController, PurchaseController, StoreController, ChatTagController,
 RewardsController, MutationFxController, SocialController, TutorialController, IdleController, SettingsController,
 MusicController, WorldFxController, SnackdexController, CashOfferController, MapThemeController, WeatherController,
-DropController, BossController, GadgetController, GadgetFxController`
+DropController, BossController, GadgetController, GadgetFxController, WhatsNewController`
 (`ModifierController` starts right after `NotificationController`)
-(UI helpers: `UI/UiKit`, `UI/Modal`; audio: `SoundPlayer`). Dialogs opened from others need no start:
-`CodesController` and `HostPanelController` (both from Settings).
+(UI helpers: `UI/UiKit`, `UI/Modal`, `UI/OddsGrid`; audio: `SoundPlayer`). Dialogs opened from others need no start:
+`CodesController`, `StyleController` and `HostPanelController` (all from Settings).
 
 ## 4. Remotes (all in `ReplicatedStorage.Remotes`, created by the server)
 
@@ -196,7 +210,8 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `LockBase` | – | owner, near lock button, `LockRules` (cooldown, or a lock token) |
 | `Rebirth` | – | `RebirthMath.canRebirth` |
 | `ClaimDaily` | – | `DailyStreak.canClaim` |
-| `ClientEvent` | `name: string, key: string?` | whitelist (`store_opened`, `store_product_clicked`, `cash_offer_clicked`); `key` only when it is a known product or pass key → analytics |
+| `ClientEvent` | `name: string, key: string?` | whitelist (`store_opened`, `store_product_clicked`, `cash_offer_clicked`, `store_viewed`); `key` only when it is a known product or pass key, `store_viewed`'s only `spin` or `offer` (the Starter Pack's offer then never shows again: `starter_offer`) → analytics (StoreService) |
+| `RequestPurchase` | `key: string, surface: string` | a Lucky Spin pack or the Starter Pack (`StoreRules.CHECKED_KINDS`), `surface` one of `StoreRules.SURFACES`; the policy looked up first (it may yield), then `StoreRules.purchaseRefusal` on server state (on the Creator Hub or Studio, paid random items allowed, fewer than `Spin.paidBankFull` spins banked, not owned, a free podium) → `PurchaseApproved` (Studio with no id: the fake receipt), or a toast saying why |
 | `CheckGroup` | – | group feature on, at most once per 10 s, not already checking → re-check membership (`IsInGroupAsync`, then `GetGroupsAsync`) |
 | `InvitePrompted` | – | analytics only (`invite_prompt_opened`); nothing is rewarded for inviting |
 | `SkipTutorial` | – | a tutorial is running → it ends with no reward (steps themselves only finish from gameplay the server saw) |
@@ -212,13 +227,16 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `UseGadget` | `id: string` | owned, no tutorial running, alive, recharged (server time, this session); a peel only on the floor of the player's own base at the trusted position the server sees (no client position), a magnet only with cash on the pads |
 | `HostAction` | `kind: string, scope: string, args: table` | the player may host (an admin, or this private server's owner), `kind` is one of `HostRules.ACTIONS`, `scope` "server" or "all", every arg checked and clamped (`HostRules.command`); owners: only the map, rotation and hostable modifiers, this server only, with cooldowns; a message is filtered first |
 | `RedeemCode` | `code: string` | at most 40 bytes before anything else, then letters and digits, at most 24 (`CodeRules.normalize`); the code exists, has started, has not expired and its `code_<CODE>` flag is unset; a Snackling code needs a free podium; rate limit 3 then 1 per 5 s |
+| `GetStyle` | – | rate limit only → `StyleSync` with what the player wears and has unlocked |
+| `EquipStyle` | `kind: string, id: string` | `kind` is `title` or `skin`; `id` a config key (or "" for none, Classic for skins) and unlocked from the save (`StyleRules.canEquip`) → swaps the `title_<id>` / `skin_<id>` flag, the nametag or the base's look, and a new `StyleSync` |
+| `SeenNews` | `number: int` | the number of the What's New card this session is waiting for → `news_<number>` (older `news_` flags cleared) |
 | `DevGrantProduct` | `key: string` | **Studio only** – runs the real receipt path with a fake receipt |
 
 Server → client:
 
 | Remote | Payload |
 | --- | --- |
-| `StateUpdate` | batched partial player state (cash, cash/sec, rebirths, multiplier, podium cap, `baseFull`, lock, passes, carry, social bonus, tutorial step, settings, today's quests, gadgets owned with their cooldowns and running effects…) |
+| `StateUpdate` | batched partial player state (cash, cash/sec, rebirths, multiplier, podium cap, `baseFull`, lock, passes, carry, social bonus, tutorial step, settings, today's quests, gadgets owned with their cooldowns and running effects, `store` = the Starter Pack owned and its offer due…) |
 | `BeltSnapshot` / `BeltSpawn` / `BeltRemove` | conveyor items `{id, creatureId, spawnAt, variant?}` (variant = mutation id) |
 | `Notify` | toast `{kind, text}` |
 | `Announce` | server-wide banner `{text, rarity, color?}` (color: a mutation's own banner) |
@@ -228,11 +246,14 @@ Server → client:
 | `Effect` | one-shot VFX cue `{kind, position, rarity}` (e.g. `tutorialComplete`, `quest`, `questsAllDone`; gadgets: `gadget`, `slip` to everyone, `shieldBlock`, `gadgetBought`) |
 | `SnackdexSync` | the whole Snackdex `{dex, discovered?, completed?}` on ready and on every change (a new entry, a tier paid) |
 | `SpinResult` | `{index, text}`: the Lucky Spin segment the server picked (the reel stops there), and the prize toast |
+| `PurchaseApproved` | `{key}`: the server checked it, so the client opens Roblox's prompt (only for its own request of the last 15 s) |
 | `AchievementSync` | `{ {id, progress, target, done} }` for the Trophies tab |
+| `StyleSync` | `{title, skin, titles, skins}`: what is worn, and `{id, unlocked, progress, target}` for each title and skin |
+| `WhatsNew` | `{number}`: show the What's New card for that update when nothing is in the way |
 
 World state the client reads from **attributes** (replicated automatically): plot `OwnerUserId`, `LockedUntil`,
-`GraceUntil`, `PodiumCount`; podium `CreatureId`, `Variant` (mutation id, "" for none), `Stored`, `Income`
-(mutation and multipliers included), `BeingStolen`; player `Carrying`, `VIP`, `PaidRandomItemsAllowed` (PlayerPolicy; the store offers Server Luck only when it is true), and the gadgets' `GadgetSpeedUntil`, `ShieldUntil`, `SlippedUntil` (server time; banana peels are models in `workspace.Gadgets`, a shield is a `GadgetShield` part on the character). Rainbow parts carry the
+`GraceUntil`, `PodiumCount`, `Skin` (the base skin's id); podium `CreatureId`, `Variant` (mutation id, "" for none), `Stored`, `Income`
+(mutation and multipliers included), `BeingStolen`; player `Carrying`, `VIP`, `Title` (the worn title's id, "" for none; its nametag is the `TitleTag` BillboardGui on the Head), `PaidRandomItemsAllowed` (PlayerPolicy; the store offers Server Luck only when it is true), and the gadgets' `GadgetSpeedUntil`, `ShieldUntil`, `SlippedUntil` (server time; banana peels are models in `workspace.Gadgets`, a shield is a `GadgetShield` part on the character). Rainbow parts (mutations, and Rainbow Swirl's base trims) carry the
 CollectionService tag `MutationRainbow`. LiveOps state is on `workspace`: `LuckMultiplier`, `LuckEndsAt` (when the
 luck next changes), `PurchasedLuckEndsAt`, `CashMultiplier`, `ActiveEventIds`, `EventBanner`, `EventBannerId`,
 `EventTitle`, `EventEndsAt`, and `SeasonTheme` (the seasonal theme on, "" for none). The map theme is there too:
@@ -266,7 +287,9 @@ type PlayerData = {   -- exactly Types.PlayerData
                                    -- tutorial progress (`tutorial_<step>`, `tutorial_done`), settings (`settings_<key>`),
                                    -- redeemed codes (`code_<CODE>`), achievements paid (`ach_<id>`),
                                    -- maps played on (`map_<id>`), achievement milestones (`did_<id>`),
-                                   -- gadgets owned (`gadget_<id>`)
+                                   -- gadgets owned (`gadget_<id>`), the worn title and base skin
+                                   -- (`title_<id>`, `skin_<id>`), the newest What's New seen (`news_<n>`),
+                                   -- the Starter Pack bought (`starter_pack`) and its offer shown (`starter_offer`)
     firstJoin: number, lastSeen: number,
     gifts: { day: number, seconds: number, claimed: { number } },  -- playtime gifts today (v4)
     spin: { nextFreeAt: number, spins: number, total: number },     -- the Lucky Spin (v4)
@@ -420,3 +443,34 @@ Rainbow Mythic, found any way but a steal or an admin drop, shows "🌍 Bob foun
 every other server (`ShoutoutService`; at most one sent every 30 s and one shown every 20 s, never during the
 tutorial). Studio: everyone is an admin, nothing leaves the session, `/hostas owner|none|admin`. Offline:
 `lune run tools/worldsim/host.luau` (CI).
+
+## 16. Titles, base skins and What's New
+
+Ways to show off, and update notes players see (DECISIONS.md #51). **Titles** (`Config/Titles`, 22) are a line under
+a player's name over their head (one BillboardGui per character, `Nametags`; hidden beyond 70 studs, while carrying
+and from its wearer) and a chat tag after `[VIP]`. **Base skins** (`Config/Skins`, 8) recolour a base's floor tiles,
+rug, wall tops and corner caps (`MapBuilder.paintPlot`; never podiums, pads, the sign or the lock button), from the
+moment the base is its owner's until they leave, through map changes. Both are earned from achievements, rebirths and
+Snackdex tiers, never bought, and picked in Settings → 🎨 Style (`StyleController`; tabs Titles and Base, laid out by
+`StyleLayout` and checked by `tools/layoutCheck.luau`); `StyleService` checks unlocks after every achievement check and
+toasts new ones. **What's New** (`Config/Updates`): a returning player who hasn't seen the newest update gets a card
+once (`NewsService`, `WhatsNewController`: never in a first session or the tutorial, over another dialog or while
+carrying), and a board on the spawn plaza (built by `MapBuilder` outside the Scenery folder, placed by `SceneryLayout`)
+shows it to everyone. All saved as flags (`title_<id>`, `skin_<id>`, `news_<number>`). Studio: `/style [off]`,
+`/news`. Offline: `lune run tools/worldsim/cosmetics.luau` (CI); `lune run tools/worldsim/exportSkins.luau` for a 3D
+preview of every skin.
+
+## 17. Store additions: Auto Collect, Lucky Spin packs and the Starter Pack
+
+Three Robux items within the fairness rules (DECISIONS.md #52), each with id 0 until Leo creates it on the Creator Hub
+(README "Store items to create on the Creator Hub"); an id of 0 is hidden in live servers and granted through the test
+receipt in Studio, for every store item (`StoreRules.visible`). **Auto Collect** (a pass): every 5 s
+`AutoCollectService` collects a holder's pads through `EconomyService.collectPad`, quietly; their Snack Magnet shows
+AUTO and is neither used nor sold to them. **3 / 10 Lucky Spins**: paid random items, so the odds are on their Shop
+card and in the Spin tab's Odds beside their buttons (`UI/OddsGrid`), they show only where PolicyService allows paid
+random items, buying is refused at `Spin.paidBankFull` banked spins and a receipt always banks every spin
+(`SpinRules.bankPaid`). **Starter Pack**: fixed contents once per account (`starter_pack`), a cash-only second receipt,
+and a one-time offer (`starter_offer`) after the first rebirth or 30 minutes of play. The spin packs and the Starter
+Pack are checked on the server before the prompt (`RequestPurchase` → `PurchaseApproved`, `StoreService`) and again at
+the receipt. Studio: "(Studio) Grant", `/spins <n>`, `/starter [reset|offer]`. Offline:
+`lune run tools/worldsim/store.luau` (CI).

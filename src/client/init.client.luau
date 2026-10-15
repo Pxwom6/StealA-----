@@ -22,6 +22,7 @@ local InteractionController = require(Controllers.InteractionController)
 local StealController = require(Controllers.StealController)
 local LockController = require(Controllers.LockController)
 local RebirthController = require(Controllers.RebirthController)
+local PurchaseController = require(Controllers.PurchaseController)
 local StoreController = require(Controllers.StoreController)
 local ChatTagController = require(Controllers.ChatTagController)
 local RewardsController = require(Controllers.RewardsController)
@@ -42,6 +43,7 @@ local DropController = require(Controllers.DropController)
 local BossController = require(Controllers.BossController)
 local GadgetController = require(Controllers.GadgetController)
 local GadgetFxController = require(Controllers.GadgetFxController)
+local WhatsNewController = require(Controllers.WhatsNewController)
 
 StateStore.start()
 ClientSettings.start() -- saved settings (music, sound effects, reduce effects) arrive with the first state
@@ -54,6 +56,7 @@ InteractionController.start()
 StealController.start()
 LockController.start()
 RebirthController.start()
+PurchaseController.start() -- buying what the server checks first (spin packs, the Starter Pack)
 StoreController.start()
 ChatTagController.start()
 RewardsController.start()
@@ -72,5 +75,6 @@ DropController.start() -- supply crates (marker, hold prompt), spinning coins an
 BossController.start() -- Snack Attack: the giant's health bar, bob and hit reactions
 GadgetController.start() -- the gadget buttons beside TAG (keys 1-4); none until a gadget is bought
 GadgetFxController.start() -- soda fizz and dizzy stars on every player, gadget sounds and bursts
+WhatsNewController.start() -- the What's New card for returning players, when nothing is in the way
 
 Net.get("ClientReady"):FireServer()

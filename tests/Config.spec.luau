@@ -105,6 +105,27 @@ local RELEASED_CREATURE_IDS = {
 	"hot_cross_bunny",
 	"lemon_meringue_lamb",
 	"jelly_bean_jackalope",
+	-- 20 more permanent Snacklings (batch 7)
+	"lollipop_ladybug",
+	"bumble_bun",
+	"onion_ring_otter",
+	"watermelon_walrus",
+	"orange_slice_orangutan",
+	"grilled_cheese_giraffe",
+	"cocoa_capybara",
+	"animal_cracker_axolotl",
+	"shortcake_sloth",
+	"corn_cob_crocodile",
+	"apple_pie_armadillo",
+	"sherbet_seahorse",
+	"caramel_camel",
+	"fruit_tart_flamingo",
+	"rocky_road_rhino",
+	"eclair_eagle",
+	"white_chocolate_wolf",
+	"mint_chip_megalodon",
+	"lava_cake_leviathan",
+	"ube_unicorn",
 	-- Harvest Feast 2026 (event-only)
 	"cranberry_crane",
 	"pecan_pie_porcupine",
@@ -472,6 +493,7 @@ T.describe("Config integrity", function()
 				"BuyGadget",
 				"UseGadget",
 				"HostAction",
+				"RequestPurchase",
 			}
 		do
 			local limit = Gameplay.rateLimits[name]

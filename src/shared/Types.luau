@@ -439,6 +439,9 @@ export type SceneryPlaza = {
 	extraFlowerBeds: { { x: number, z: number, yaw: number } },
 	treeRadius: number,
 	treeAngles: { number },
+	-- The What's New board (Config/Updates' newest update), in a gap of the tree ring, facing the lobby spawn. Built by
+	-- MapBuilder outside the Scenery folder, so a map change never rebuilds it (only recolours its frame and legs).
+	newsBoard: { angle: number, radius: number },
 }
 
 export type TreeKind = "round" | "pine"
@@ -709,7 +712,21 @@ export type SpinConfig = {
 	freeEverySeconds: number, -- a free spin this long after the last free one
 	maxBanked: number, -- spins from gifts beyond this are paid as cash instead (Logic/SpinRules)
 	bankedOverflow: { incomeSeconds: number, minimum: number }, -- that cash, per spin
+	-- Lucky Spin packs (Robux) can't be bought while this many spins are banked; a pack's receipt still banks every
+	-- spin it paid for, past maxBanked and this (SpinRules.bankPaid)
+	paidBankFull: number,
 	segments: { SpinSegment },
+}
+
+-- Config: the Starter Pack (Config/Monetization.starterPack; rules: Logic/StarterPackRules) ---------------------------
+
+export type StarterPackConfig = {
+	cash: { incomeSeconds: number, minimum: number }, -- sized from steady income like a cash pack, with a floor
+	creatureId: string, -- a Snackling of the permanent roster (no eventId)...
+	variant: string?, -- ...with this permanent mutation (no eventId, mapTheme or modifierId)
+	gadgets: { string }, -- gadgets it unlocks (Config/Gadgets ids); one already owned pays its cash price instead
+	-- The one-time offer card: after this many rebirths or this much total play time, whichever comes first.
+	offer: { afterRebirths: number, afterPlaySeconds: number, showSeconds: number },
 }
 
 -- Config: achievements (Config/Achievements) -------------------------------------------------------------------------
@@ -767,6 +784,88 @@ export type AchievementsConfig = { list: { AchievementDef } }
 
 -- One achievement as the Trophies tab shows it.
 export type AchievementView = { id: string, progress: number, target: number, done: boolean }
+
+-- Config: titles and base skins (Config/Titles, Config/Skins): looks players earn and show off, never bought ---------
+
+-- How a title or a base skin is earned (Logic/StyleRules.isUnlocked):
+--   free         everyone has it (the Classic base)
+--   achievement  that achievement of Config/Achievements is done: its ach_<id> flag is set, or its goal is reached
+--   rebirths     at least `count` rebirths
+--   tiers        at least `count` Snackdex tiers completed
+export type StyleUnlock =
+	{ kind: "free" }
+	| { kind: "achievement", id: string }
+	| { kind: "rebirths", count: number }
+	| { kind: "tiers", count: number }
+
+-- A title: a short line under the player's name over their head, and a tag beside their name in chat. Equipped, it
+-- is the flag title_<id> (never rename one that has shipped: whoever wears it would wear nothing).
+export type TitleDef = {
+	id: string,
+	text: string, -- short enough for a nametag on a phone (StyleRules.TITLE_LENGTH)
+	icon: string, -- emoji before the text
+	color: string, -- #RRGGBB, light enough to read over its dark outline (StyleRules.MIN_TITLE_LUMINANCE)
+	unlock: StyleUnlock,
+}
+
+-- The BillboardGui over each head (server/Services/Nametags): pixels, so it stays the same size on screen like
+-- Roblox's own names, and studs.
+export type NametagConfig = {
+	width: number, -- px
+	height: number, -- px
+	maxTextSize: number, -- px: short titles don't grow taller than this
+	offset: number, -- studs from the top of the head to the middle of the title (Roblox's name sits above it)
+	maxDistance: number, -- studs: hidden beyond this, like Roblox's names
+}
+
+export type TitlesConfig = {
+	list: { TitleDef }, -- in the Titles tab's order (easiest first)
+	nametag: NametagConfig,
+	chatTag: boolean, -- also show the title beside the name in chat (after [VIP])
+}
+
+-- A base skin's look: only the plot's cosmetic surfaces (the floor's checker tiles, the rug down the aisle, the wall
+-- tops and corner caps). Walls, sign, podiums, pads, the lock button and the upgrade pad keep their colours.
+export type SkinLook = {
+	tiles: { string }, -- the checker's colours, alternated over the floor (two make a checker)
+	tileMaterial: string, -- Enum.Material name (StyleRules.FLOOR_MATERIALS)
+	rug: string,
+	rugMaterial: string,
+	trim: string,
+	trimMaterial: string, -- StyleRules.TRIM_MATERIALS
+	rainbow: boolean?, -- the trims cycle through the rainbow on every client (off with Reduce effects)
+}
+
+-- A base skin. Equipped, it is the flag skin_<id>; with none, a base wears the default (Classic).
+export type SkinDef = {
+	id: string,
+	name: string,
+	icon: string,
+	look: SkinLook?, -- nil: the plot's own colours (Classic)
+	unlock: StyleUnlock,
+}
+
+export type SkinsConfig = {
+	list: { SkinDef }, -- in the Base tab's order
+	default: string, -- the skin every base has (free, no look of its own)
+}
+
+-- One title or skin as the Style dialog shows it (StyleSync).
+export type StyleItemView = { id: string, unlocked: boolean, progress: number, target: number }
+
+-- Server -> client StyleSync: what is worn and what is unlocked. `title` is "" for none.
+export type StyleView = { title: string, skin: string, titles: { StyleItemView }, skins: { StyleItemView } }
+
+-- Config: What's New (Config/Updates): a card for returning players and a board by the spawn plaza ------------------
+
+export type UpdateDef = {
+	number: number, -- 1, 2, 3...: a returning player sees the highest one once (the flag news_<number>)
+	date: string, -- "YYYY-MM-DD", the day it was published
+	title: string,
+	highlights: { string }, -- 3 to 5 short lines, each starting with an emoji
+}
+
+export type UpdatesConfig = { list: { UpdateDef } } -- newest first
 
 -- Config: redeem codes (server/Codes.luau, server-only so codes never reach a client) --------------------------------
 
@@ -1101,6 +1200,7 @@ export type Passes = {
 	VIP: boolean,
 	ExtraPodiums: boolean,
 	LongerLock: boolean,
+	AutoCollect: boolean, -- every pad collected every few seconds, wherever you are (AutoCollectService)
 }
 
 export type DailyView = {
@@ -1255,6 +1355,12 @@ export type HostView = {
 	giftReadyAt: number, -- server time an admin may gift everyone again (a double tap never pays twice)
 }
 
+-- The store's one-time items as the client sees them (Logic/StarterPackRules).
+export type StoreView = {
+	starterOwned: boolean, -- the Starter Pack was bought (save flag starter_pack): its card hides
+	starterOffer: boolean, -- its one-time offer card is due (StarterPackRules.offerDue)
+}
+
 -- What the server sends the owning client in StateUpdate (see server/Services/Replication.luau).
 -- Costs of -1 mean "not available" (max reached).
 export type ClientState = {
@@ -1292,6 +1398,7 @@ export type ClientState = {
 	spin: SpinView,
 	gadgets: GadgetsView,
 	host: HostView,
+	store: StoreView,
 }
 
 export type BeltItem = { id: number, creatureId: string, spawnAt: number, variant: string? }

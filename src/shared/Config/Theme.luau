@@ -33,6 +33,7 @@ local Theme = {
 		cash = "#8CFF6B",
 		lock = "#4DA8FF",
 		vip = "#FFD700",
+		autoCollect = "#B07CFF", -- the Auto Collect pass's card (the Snack Magnet's colour)
 		luck = "#7CFF4D",
 		social = "#FF6FB5",
 		event = "#FF8C1A", -- event pill / "EVENT" tag when the event has no seasonal theme colour (Config/Seasons)
@@ -468,13 +469,32 @@ local Theme = {
 		storePassesHeader = "Forever perks",
 		storeProductsHeader = "Boosts & cash",
 		storeOwned = "Owned",
-		storeUnavailable = "Coming soon",
-		storeStudioGrant = "(Studio) Grant",
+		storeStudioGrant = "(Studio) Grant", -- an item not created on the Creator Hub yet (only Studio shows those)
 		storeLuckMaxed = "Luck maxed",
 		storeLuckUnavailable = "Not available", -- Server Luck where the player's policy doesn't allow paid random items
 		oddsHeader = "Belt odds now -> with Server Luck",
 		oddsExtendHeader = "Server Luck is on: buying adds +{minutes} min (odds stay the same)",
 		oddsMaxedHeader = "Server Luck is on: maximum time reached",
+		-- Lucky Spin packs (Robux; Config/Monetization kind "Spins") and why a purchase can't go ahead (StoreRules)
+		spinPackName = "+{count} Spins", -- the Spin tab's pack buttons, over the price
+		spinPackBought = "🎰 +{count} Lucky Spins! Spin them in Rewards.",
+		spinPackFull = "Bank full", -- a pack button while the spin bank is full
+		storeNotYet = "That isn't in the shop yet!",
+		storeRandomRestricted = "Lucky Spin packs aren't available on your account.",
+		spinPackBankFull = "Your spin bank is full ({count} spins)! Spin some first.",
+		starterOwned = "You already have the Starter Pack!",
+		starterBaseFull = "Free a podium first: the Starter Pack's Snackling needs one!",
+		-- The Starter Pack (Config/Monetization.starterPack): its Shop card lines, what buying it says, its offer card
+		starterCashLine = "💵 +{amount} cash ({minutes} min of your income)",
+		starterCreatureLine = "✨ {creature} (earns {income})",
+		starterGadget = "{icon} {name}",
+		starterGadgetOwned = "{icon} {name}: owned, so +{amount}",
+		starterBought = "🎁 Starter Pack! {creature} and +{amount} are yours!",
+		starterBoughtFull = "🎁 Starter Pack! Base full: {creature} paid as cash, +{amount}",
+		starterDuplicate = "🎁 You already had the Starter Pack: +{amount} cash instead!",
+		starterOfferTitle = "🎁 Starter Pack!", -- the offer strip: short, it shares the strip with two buttons
+		starterOfferBody = "{creature}, {count} gadgets, cash",
+		starterOfferButton = "See it",
 
 		-- World signs (SceneryBuilder, LeaderboardService)
 		factorySign = "SNACK FACTORY",
@@ -587,7 +607,6 @@ local Theme = {
 
 		-- Redeem codes (server/Codes.luau): the Codes dialog (from Settings) and its answers
 		settingsCodes = "🎟️ Codes",
-		settingsCodesHint = "Got a code? Redeem it here",
 		codesTitle = "Redeem a Code",
 		codesBody = "Codes give free cash and Snacklings. Each one works once.",
 		codesPlaceholder = "Type a code",
@@ -599,6 +618,40 @@ local Theme = {
 		codeExpired = "That code has expired.",
 		codeUsed = "You've already redeemed that code.",
 		codeBaseFull = "Your base is full! Sell a Snackling, then redeem the code again.",
+
+		-- Titles and base skins (Config/Titles, Config/Skins): the Style dialog (from Settings) and the unlock toasts
+		settingsStyle = "🎨 Style",
+		styleTitle = "🎨 Style",
+		styleTabTitles = "🏷️ Titles",
+		styleTabBase = "🏠 Base",
+		styleWearing = "Wearing: {title}",
+		styleWearingNone = "Wearing: no title",
+		styleTitlesHint = "Everyone else sees it over your head and in chat",
+		styleBaseNow = "Your base: {skin}",
+		styleBaseHint = "Colours your base's floor and trim",
+		styleNoTitle = "No title",
+		styleNoTitleHint = "Just your name",
+		styleTapToWear = "Tap to wear",
+		styleWorn = "✓ Wearing",
+		styleTapToUse = "Tap to use",
+		styleUsed = "✓ On your base",
+		styleLocked = "🔒 {progress}", -- "12 / 25", "$1.2M / $1B", "3.4 / 10 h"
+		styleLockedHint = "Not yet! {hint}",
+		styleLoading = "Loading...",
+		styleEarnFree = "Every base starts with it",
+		styleEarnRebirthOnce = "Rebirth once",
+		styleEarnRebirths = "Rebirth {count} times",
+		styleEarnTierOnce = "Complete a Snackdex tier",
+		styleEarnTiers = "Complete {count} Snackdex tiers",
+		styleEarnTiersAll = "Complete every Snackdex tier",
+		titleUnlocked = "{icon} New title unlocked: {title} — equip it in Settings ▸ Style",
+		skinUnlocked = "{icon} New base skin unlocked: {skin} — equip it in Settings ▸ Style",
+
+		-- What's New (Config/Updates): the card returning players see once, and the board on the spawn plaza
+		whatsNewTitle = "📰 What's New!",
+		whatsNewMeta = "Update {number} · {date}",
+		whatsNewButton = "Let's go!",
+		newsBoardHeader = "📰 WHAT'S NEW",
 
 		-- The host panel (Settings, admins and private-server owners only; Config/Host) and what it says back
 		settingsHost = "🛠️ Host panel",
@@ -720,6 +773,10 @@ local Theme = {
 		shieldBlocked = "Shielded! 🫧 Wait for the bubble to pop.",
 		magnetEmpty = "Nothing to collect yet!",
 		magnetCollected = "🧲 +{amount} from your pads!",
+		-- The Auto Collect pass does the Snack Magnet's job every few seconds (GadgetRules.coveredByAutoCollect)
+		magnetAuto = "🧲 Auto Collect already brings you your pads' cash!",
+		gadgetAutoBadge = "AUTO", -- on the Snack Magnet's button for Auto Collect owners
+		gadgetAutoShop = "Auto ✓", -- the Snack Magnet's Shop button for Auto Collect owners
 		gadgetDizzy = "💫💫", -- over the head of whoever slipped on a banana peel
 
 		-- Map themes (Config/MapThemes): the vote for the next map and the change itself
@@ -734,8 +791,12 @@ local Theme = {
 	},
 
 	-- Store copy per item key (see Config/Monetization). Available placeholders: {vipBonus} {extraPodiums}
-	-- {lockSeconds} {minVulnerable} {luckMultiplier} {luckMinutes}, filled from the perk values.
+	-- {lockSeconds} {minVulnerable} {luckMultiplier} {luckMinutes} {autoSeconds}, filled from the perk values.
 	store = {
+		AutoCollect = {
+			name = "Auto Collect",
+			description = "Every {autoSeconds}s the cash on your pads comes to you, wherever you are. Forever.",
+		},
 		DoubleCash = { name = "2x Cash", description = "Double all Snackling income, forever." },
 		VIP = {
 			name = "VIP",
@@ -759,6 +820,18 @@ local Theme = {
 		ServerLuck = {
 			name = "Server Luck",
 			description = "{luckMultiplier}x rare odds on the belt for EVERYONE in this server for {luckMinutes} minutes. Buying again adds time.",
+		},
+		StarterPack = {
+			name = "Starter Pack",
+			description = "Once per account. All of this, nothing random:",
+		},
+		LuckySpins3 = {
+			name = "3 Lucky Spins",
+			description = "3 more Lucky Spins. Each spin wins one prize, with these exact chances:",
+		},
+		LuckySpins10 = {
+			name = "10 Lucky Spins",
+			description = "10 more Lucky Spins. Each spin wins one prize, with these exact chances:",
 		},
 	} :: { [string]: { name: string, description: string } },
 

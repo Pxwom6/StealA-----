@@ -4,7 +4,8 @@ How the economy is shaped, and how long each rarity takes to reach. Every number
 modules in `src/shared/Config/` and is reproduced by:
 
 ```sh
-lune run tools/simulate.luau      # ~1-2 min, prints the tables below
+lune run tools/simulate.luau        # ~1-2 min, prints the tables below
+lune run tools/simulate.luau store  # just the store additions' table (instant)
 ```
 
 Re-run it after any change to `Creatures.luau`, `Rarities.luau`, `Mutations.luau`, `Economy.luau`,
@@ -22,7 +23,7 @@ Re-run it after any change to `Creatures.luau`, `Rarities.luau`, `Mutations.luau
    every 3.5 server-hours, so everyone in the server sees the same rare spawn and races for it. That shared
    moment — announced to the whole server — is the social hook, and it is also where stealing gets exciting.
 4. **Paying speeds you up, never locks you out.** 2× Cash roughly halves *saving* time, but the belt gate is the
-   same for everyone, so a paying player reaches Legendary ~40% sooner, not 2× sooner, and free players still
+   same for everyone, so a paying player reaches Legendary about a third sooner, not 2× sooner, and free players still
    reach every tier. Nothing paid makes a base un-stealable (see DECISIONS.md, "Fairness").
 
 ## Rarity tiers (belt odds and creature stats)
@@ -31,13 +32,13 @@ Spawn every 2.5 s → 1,440 rolls per server-hour.
 
 | Rarity | Snacklings | Chance per spawn | Per server-hour | With 2× luck | Price range | Income range | Payback |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Common | 10 | 56% | 806 | 47.9% | $25 - $200 | $1 - $6/s | 25s - 33s |
-| Uncommon | 10 | 27% | 389 | 23.1% | $500 - $1.5K | $12 - $30/s | 41s - 50s |
-| Rare | 10 (+1 event) | 11.5% | 166 | 19.7% | $4.5K - $12.5K | $65 - $160/s | 1m 9s - 1m 18s |
-| Epic | 9 (+1 event) | 4.2% | 60.5 | 7.18% | $60K - $150K | $400 - $950/s | 2m 30s - 2m 37s |
-| Legendary | 8 (+1 event) | 1.1% | 15.8 | 1.88% | $1.4M - $3.4M | $2.8K - $6.5K/s | 8m 20s - 8m 43s |
-| Mythic | 7 (+1 event) | 0.18% | 2.6 | 0.308% | $50M - $85M | $35K - $56K/s | 23m 48s - 25m 17s |
-| Secret | 6 | 0.02% | 0.3 | 0.034% | $1.8B - $3.2B | $360K - $620K/s | 1h 23m - 1h 26m |
+| Common | 13 | 56% | 806 | 47.9% | $25 - $200 | $1 - $6/s | 25s - 33s |
+| Uncommon | 13 | 27% | 389 | 23.1% | $500 - $1.5K | $12 - $30/s | 41s - 50s |
+| Rare | 13 (+4 event) | 11.5% | 166 | 19.7% | $4.5K - $12.5K | $65 - $160/s | 1m 9s - 1m 18s |
+| Epic | 12 (+4 event) | 4.2% | 60.5 | 7.18% | $60K - $150K | $400 - $950/s | 2m 30s - 2m 37s |
+| Legendary | 11 (+4 event) | 1.1% | 15.8 | 1.88% | $1.4M - $3.4M | $2.8K - $6.5K/s | 8m 20s - 8m 43s |
+| Mythic | 10 (+4 event) | 0.18% | 2.6 | 0.308% | $50M - $85M | $35K - $56K/s | 23m 48s - 25m 17s |
+| Secret | 8 | 0.02% | 0.3 | 0.034% | $1.8B - $3.2B | $360K - $620K/s | 1h 23m - 1h 26m |
 
 "With 2× luck" is the Server Luck product (or a `/luck 2` admin boost): Rare-and-up weights double, so Commons
 and Uncommons become less likely. The store shows these exact numbers before purchase.
@@ -51,33 +52,34 @@ does, with the map changing every 20 minutes (so its signature mutation can roll
 
 | Rarity | Free player | 2x Cash pass | 2x Cash + VIP + Extra Podiums |
 | --- | --- | --- | --- |
-| Common | 7s | 7s | 7s |
-| Uncommon | 1m 52s | 1m 7s | 1m 2s |
+| Common | 5s | 5s | 5s |
+| Uncommon | 1m 52s | 1m 5s | 1m 2s |
 | Rare | 4m 52s | 2m 32s | 2m 25s |
-| Epic | 11m 5s | 6m 42s | 6m 2s |
-| Legendary | 30m 52s | 19m 52s | 18m 17s |
-| Mythic | 1h 57m | 1h 20m | 1h 7m |
-| Secret | 9h 35m | 5h 58m | 5h 49m |
-| First rebirth affordable | 1h 2m | 37m 52s | 33m 47s |
+| Epic | 10m 50s | 6m 42s | 6m 2s |
+| Legendary | 31m 0s | 20m 52s | 18m 17s |
+| Mythic | 1h 54m | 1h 20m | 1h 8m |
+| Secret | 9h 35m | 5h 49m | 5h 49m |
+| First rebirth affordable | 1h 2m | 38m 0s | 33m 52s |
 
 Median cash/sec after N minutes of play:
 
 | Play time | Free player | 2x Cash pass | 2x Cash + VIP + Extra Podiums |
 | --- | --- | --- | --- |
-| 10m | $1.01K/s | $5.64K/s | $7.25K/s |
-| 30m | $8.68K/s | $30.3K/s | $39.2K/s |
-| 1h | $31.5K/s | $79.3K/s | $99.2K/s |
-| 3h | $173K/s | $389K/s | $496K/s |
-| 8h | $568K/s | $1.62M/s | $1.89M/s |
-| 24h | $2.26M/s | $4.83M/s | $5.84M/s |
+| 10m | $995/s | $5.48K/s | $7.31K/s |
+| 30m | $8.58K/s | $30.7K/s | $40.7K/s |
+| 1h | $30.7K/s | $77.6K/s | $99.7K/s |
+| 3h | $169K/s | $384K/s | $480K/s |
+| 8h | $559K/s | $1.63M/s | $1.87M/s |
+| 24h | $2.22M/s | $4.82M/s | $5.8M/s |
 
 Reading it: a free player gets a Legendary in their first session, a Mythic within a couple of sessions and a
-Secret over a few days — and can shortcut any of it by stealing. A 2× Cash owner gets there roughly 35–45% sooner.
+Secret over a few days — and can shortcut any of it by stealing. A 2× Cash owner gets there roughly 30–40% sooner.
 
-## The roster (60 Snacklings)
+## The roster (80 Snacklings)
 
-Each tier has 6-10 regular Snacklings, plus one limited-time Halloween Snackling in each tier from Rare to Mythic
-(see "Halloween 2026"). Rules that keep a bigger roster from changing the chase:
+Each tier has 8-13 regular Snacklings, plus four limited-time event Snacklings (Halloween, Winter, Valentine's and
+Easter) in each tier from Rare to Mythic (see the event sections below). Rules that keep a bigger roster from changing
+the chase:
 
 * **Tier odds never change.** A new Snackling shares its tier's spawns. Each tier's regular `beltWeight`s add up to
   100 (CI checks it), so a weight reads as "% of the tier".
@@ -87,72 +89,95 @@ Each tier has 6-10 regular Snacklings, plus one limited-time Halloween Snackling
   tier's minimum), so the first Snackling of each tier comes as fast as before; Mythic and Secret keep about 60% of
   their spawns at or near their minimum price, because those tiers are where saving up matters most.
 
-Compared with the 20-Snackling roster this replaced, every time to a rarity is within about 8% (Legendary, Mythic,
-Secret and the first rebirth are unchanged) and steady income is 0-6% lower (the average Mythic and Secret on the
-belt is a little cheaper and earns a little less): the same curve, with three times as much to collect.
+Growing from 20 to 60 Snacklings kept every time to a rarity within about 8% and steady income 0-6% lower. Batch 7
+added 20 more (three per tier from Common to Mythic, two Secrets), each priced between two existing ones of its tier,
+and took their spawns from the rest of the tier, so the cheapest two (three for Mythic and Secret) keep exactly their
+share. Against the 60-Snackling roster every time to a rarity is within about 5% (most within seconds; the 2x Cash
+Legendary is a minute later and the 2x Cash Secret 9 minutes sooner, which is the belt's luck) and median income is
+within about 4%: the same curve, with a third more to collect.
 
 | Snackling | Rarity | Price | Income | Payback | Share of its tier | Per server-hour |
 | --- | --- | --- | --- | --- | --- | --- |
 | Pizza Pup | Common | $25 | $1/s | 25s | 22% | 177.4 |
 | Cookie Crab | Common | $30 | $1/s | 30s | 18% | 145.2 |
-| Marshmallow Mouse | Common | $50 | $2/s | 25s | 12% | 96.8 |
-| Pretzel Pal | Common | $60 | $2/s | 30s | 10% | 80.6 |
-| Chip Chick | Common | $75 | $3/s | 25s | 8% | 64.5 |
-| Cracker Quacker | Common | $100 | $4/s | 25s | 7% | 56.4 |
-| Gummy Grub | Common | $120 | $4/s | 30s | 7% | 56.4 |
-| Jellybean Jellyfish | Common | $140 | $5/s | 28s | 6% | 48.4 |
-| Cheese Puff Puffer | Common | $165 | $5/s | 33s | 5% | 40.3 |
-| Toast Toad | Common | $200 | $6/s | 33s | 5% | 40.3 |
+| Marshmallow Mouse | Common | $50 | $2/s | 25s | 10% | 80.6 |
+| Lollipop Ladybug | Common | $55 | $2/s | 27s | 7% | 56.4 |
+| Pretzel Pal | Common | $60 | $2/s | 30s | 7% | 56.4 |
+| Chip Chick | Common | $75 | $3/s | 25s | 6% | 48.4 |
+| Bumble Bun | Common | $90 | $3/s | 30s | 5% | 40.3 |
+| Cracker Quacker | Common | $100 | $4/s | 25s | 5% | 40.3 |
+| Gummy Grub | Common | $120 | $4/s | 30s | 5% | 40.3 |
+| Jellybean Jellyfish | Common | $140 | $5/s | 28s | 4% | 32.3 |
+| Cheese Puff Puffer | Common | $165 | $5/s | 33s | 4% | 32.3 |
+| Onion Ring Otter | Common | $180 | $6/s | 30s | 4% | 32.3 |
+| Toast Toad | Common | $200 | $6/s | 33s | 3% | 24.2 |
 | Sushi Slug | Uncommon | $500 | $12/s | 41s | 22% | 85.5 |
 | Fry Fox | Uncommon | $600 | $14/s | 42s | 18% | 70 |
-| Pudding Pug | Uncommon | $700 | $16/s | 43s | 10% | 38.9 |
-| Nacho Newt | Uncommon | $900 | $20/s | 45s | 9% | 35 |
-| Bao Bunny | Uncommon | $1K | $22/s | 45s | 8% | 31.1 |
-| Pickle Piglet | Uncommon | $1.1K | $24/s | 45s | 8% | 31.1 |
-| Mochi Moth | Uncommon | $1.2K | $25/s | 48s | 7% | 27.2 |
-| Hotdog Dachshund | Uncommon | $1.3K | $27/s | 48s | 6% | 23.3 |
-| Muffin Moose | Uncommon | $1.4K | $28/s | 50s | 6% | 23.3 |
-| Waffle Wombat | Uncommon | $1.5K | $30/s | 50s | 6% | 23.3 |
+| Pudding Pug | Uncommon | $700 | $16/s | 43s | 9% | 35 |
+| Watermelon Walrus | Uncommon | $800 | $18/s | 44s | 7% | 27.2 |
+| Nacho Newt | Uncommon | $900 | $20/s | 45s | 7% | 27.2 |
+| Bao Bunny | Uncommon | $1K | $22/s | 45s | 6% | 23.3 |
+| Pickle Piglet | Uncommon | $1.1K | $24/s | 45s | 6% | 23.3 |
+| Orange Slice Orangutan | Uncommon | $1.15K | $25/s | 46s | 5% | 19.4 |
+| Mochi Moth | Uncommon | $1.2K | $25/s | 48s | 5% | 19.4 |
+| Hotdog Dachshund | Uncommon | $1.3K | $27/s | 48s | 4% | 15.6 |
+| Muffin Moose | Uncommon | $1.4K | $28/s | 50s | 4% | 15.6 |
+| Grilled Cheese Giraffe | Uncommon | $1.45K | $29/s | 50s | 4% | 15.6 |
+| Waffle Wombat | Uncommon | $1.5K | $30/s | 50s | 3% | 11.7 |
 | Taco Turtle | Rare | $4.5K | $65/s | 1m 9s | 22% | 36.4 |
 | Cinnamon Snail | Rare | $5K | $72/s | 1m 9s | 18% | 29.8 |
-| Macaron Macaw | Rare | $6K | $85/s | 1m 10s | 10% | 16.6 |
-| Bubblegum Bulldog | Rare | $7K | $98/s | 1m 11s | 9% | 14.9 |
-| Burrito Bear | Rare | $8K | $110/s | 1m 12s | 8% | 13.2 |
-| Boba Beluga | Rare | $9K | $122/s | 1m 13s | 8% | 13.2 |
-| Gingersnap Gecko | Rare | $10K | $134/s | 1m 14s | 7% | 11.6 |
-| Brownie Beaver | Rare | $11K | $146/s | 1m 15s | 6% | 9.9 |
-| Sundae Sheep | Rare | $12K | $155/s | 1m 17s | 6% | 9.9 |
-| Cupcake Cub | Rare | $12.5K | $160/s | 1m 18s | 6% | 9.9 |
+| Macaron Macaw | Rare | $6K | $85/s | 1m 10s | 8% | 13.2 |
+| Cocoa Capybara | Rare | $6.5K | $91/s | 1m 11s | 7% | 11.6 |
+| Bubblegum Bulldog | Rare | $7K | $98/s | 1m 11s | 7% | 11.6 |
+| Burrito Bear | Rare | $8K | $110/s | 1m 12s | 6% | 9.9 |
+| Animal Cracker Axolotl | Rare | $8.5K | $116/s | 1m 13s | 6% | 9.9 |
+| Boba Beluga | Rare | $9K | $122/s | 1m 13s | 5% | 8.3 |
+| Gingersnap Gecko | Rare | $10K | $134/s | 1m 14s | 5% | 8.3 |
+| Shortcake Sloth | Rare | $10.5K | $140/s | 1m 15s | 4% | 6.6 |
+| Brownie Beaver | Rare | $11K | $146/s | 1m 15s | 4% | 6.6 |
+| Sundae Sheep | Rare | $12K | $155/s | 1m 17s | 4% | 6.6 |
+| Cupcake Cub | Rare | $12.5K | $160/s | 1m 18s | 4% | 6.6 |
 | Ramen Raccoon | Epic | $60K | $400/s | 2m 30s | 22% | 13.3 |
 | Omelet Owl | Epic | $70K | $465/s | 2m 30s | 18% | 10.9 |
-| S'more Skunk | Epic | $80K | $530/s | 2m 30s | 12% | 7.3 |
-| Tempura Tiger | Epic | $90K | $595/s | 2m 31s | 12% | 7.3 |
-| Popcorn Penguin | Epic | $100K | $650/s | 2m 33s | 11% | 6.7 |
-| Nugget Narwhal | Epic | $115K | $745/s | 2m 34s | 7% | 4.2 |
-| Hamburger Hamster | Epic | $125K | $805/s | 2m 35s | 6% | 3.6 |
-| Spaghetti Yeti | Epic | $135K | $865/s | 2m 36s | 6% | 3.6 |
-| Bagel Badger | Epic | $150K | $950/s | 2m 37s | 6% | 3.6 |
+| S'more Skunk | Epic | $80K | $530/s | 2m 30s | 9% | 5.4 |
+| Corn Cob Crocodile | Epic | $85K | $562/s | 2m 31s | 8% | 4.8 |
+| Tempura Tiger | Epic | $90K | $595/s | 2m 31s | 8% | 4.8 |
+| Popcorn Penguin | Epic | $100K | $650/s | 2m 33s | 7% | 4.2 |
+| Apple Pie Armadillo | Epic | $108K | $700/s | 2m 34s | 6% | 3.6 |
+| Nugget Narwhal | Epic | $115K | $745/s | 2m 34s | 5% | 3 |
+| Hamburger Hamster | Epic | $125K | $805/s | 2m 35s | 5% | 3 |
+| Spaghetti Yeti | Epic | $135K | $865/s | 2m 36s | 4% | 2.4 |
+| Sherbet Seahorse | Epic | $142K | $905/s | 2m 36s | 4% | 2.4 |
+| Bagel Badger | Epic | $150K | $950/s | 2m 37s | 4% | 2.4 |
 | Donut Dragon | Legendary | $1.4M | $2.8K/s | 8m 20s | 22% | 3.5 |
 | Onigiri Orca | Legendary | $1.6M | $3.18K/s | 8m 23s | 18% | 2.9 |
-| Taffy Toucan | Legendary | $1.9M | $3.77K/s | 8m 23s | 12% | 1.9 |
-| Pancake Panda | Legendary | $2.3M | $4.5K/s | 8m 31s | 12% | 1.9 |
-| Cotton Candy Koala | Legendary | $2.6M | $5.07K/s | 8m 32s | 11% | 1.7 |
-| Pavlova Peacock | Legendary | $2.9M | $5.64K/s | 8m 34s | 9% | 1.4 |
-| Milkshake Mammoth | Legendary | $3.2M | $6.17K/s | 8m 38s | 8% | 1.3 |
-| Churro Cheetah | Legendary | $3.4M | $6.5K/s | 8m 43s | 8% | 1.3 |
+| Taffy Toucan | Legendary | $1.9M | $3.77K/s | 8m 23s | 9% | 1.4 |
+| Caramel Camel | Legendary | $2.1M | $4.14K/s | 8m 27s | 8% | 1.3 |
+| Pancake Panda | Legendary | $2.3M | $4.5K/s | 8m 31s | 8% | 1.3 |
+| Fruit Tart Flamingo | Legendary | $2.45M | $4.79K/s | 8m 31s | 7% | 1.1 |
+| Cotton Candy Koala | Legendary | $2.6M | $5.07K/s | 8m 32s | 7% | 1.1 |
+| Pavlova Peacock | Legendary | $2.9M | $5.64K/s | 8m 34s | 6% | 0.95 |
+| Rocky Road Rhino | Legendary | $3.05M | $5.9K/s | 8m 36s | 5% | 0.79 |
+| Milkshake Mammoth | Legendary | $3.2M | $6.17K/s | 8m 38s | 5% | 0.79 |
+| Churro Cheetah | Legendary | $3.4M | $6.5K/s | 8m 43s | 5% | 0.79 |
 | Lasagna Lion | Mythic | $50M | $35K/s | 23m 48s | 30% | 0.78 |
 | Souffle Sphinx | Mythic | $52M | $36.3K/s | 23m 52s | 20% | 0.52 |
 | Gingerbread Golem | Mythic | $55M | $38.3K/s | 23m 56s | 12% | 0.31 |
-| Parfait Pegasus | Mythic | $62M | $42.9K/s | 24m 5s | 10% | 0.26 |
-| Hotpot Hydra | Mythic | $70M | $47.9K/s | 24m 21s | 10% | 0.26 |
-| Flambe Phoenix | Mythic | $77M | $52K/s | 24m 40s | 8% | 0.21 |
-| Dumpling Dino | Mythic | $85M | $56K/s | 25m 17s | 10% | 0.26 |
+| Eclair Eagle | Mythic | $58M | $40.3K/s | 23m 59s | 7% | 0.18 |
+| Parfait Pegasus | Mythic | $62M | $42.9K/s | 24m 5s | 6% | 0.16 |
+| White Chocolate Wolf | Mythic | $66M | $45.5K/s | 24m 10s | 6% | 0.16 |
+| Hotpot Hydra | Mythic | $70M | $47.9K/s | 24m 21s | 5% | 0.13 |
+| Flambe Phoenix | Mythic | $77M | $52K/s | 24m 40s | 5% | 0.13 |
+| Mint Chip Megalodon | Mythic | $81M | $54.2K/s | 24m 54s | 5% | 0.13 |
+| Dumpling Dino | Mythic | $85M | $56K/s | 25m 17s | 4% | 0.1 |
 | Gelato Griffin | Secret | $1.8B | $360K/s | 1h 23m | 30% | 0.09 |
 | Matcha Manta | Secret | $1.9B | $379K/s | 1h 23m | 20% | 0.06 |
 | Fortune Cookie Kitsune | Secret | $2B | $398K/s | 1h 23m | 12% | 0.03 |
-| Bonbon Behemoth | Secret | $2.3B | $456K/s | 1h 24m | 12% | 0.03 |
-| Wedding Cake Wyvern | Secret | $2.7B | $533K/s | 1h 24m | 12% | 0.03 |
-| Croissant Kraken | Secret | $3.2B | $620K/s | 1h 26m | 14% | 0.04 |
+| Bonbon Behemoth | Secret | $2.3B | $456K/s | 1h 24m | 8% | 0.02 |
+| Lava Cake Leviathan | Secret | $2.5B | $494K/s | 1h 24m | 8% | 0.02 |
+| Wedding Cake Wyvern | Secret | $2.7B | $533K/s | 1h 24m | 7% | 0.02 |
+| Ube Unicorn | Secret | $3B | $586K/s | 1h 25m | 7% | 0.02 |
+| Croissant Kraken | Secret | $3.2B | $620K/s | 1h 26m | 8% | 0.02 |
 
 ## Mutations
 
@@ -247,25 +272,25 @@ above; the last column has the luck weekend on for the whole session too):
 
 | Rarity | No event | Halloween | Halloween + 2x luck weekend |
 | --- | --- | --- | --- |
-| Common | 7s | 7s | 7s |
+| Common | 5s | 5s | 7s |
 | Uncommon | 1m 52s | 1m 52s | 2m 2s |
-| Rare | 4m 52s | 4m 50s | 4m 37s |
-| Epic | 11m 5s | 10m 52s | 10m 20s |
-| Legendary | 30m 52s | 30m 45s | 26m 40s |
-| Mythic | 1h 57m | 1h 50m | 1h 28m |
+| Rare | 4m 52s | 4m 47s | 4m 35s |
+| Epic | 10m 50s | 11m 10s | 10m 27s |
+| Legendary | 31m 0s | 30m 40s | 26m 40s |
+| Mythic | 1h 54m | 1h 53m | 1h 27m |
 | Secret | 9h 35m | 9h 22m | 5h 41m |
-| First rebirth affordable | 1h 2m | 59m 12s | 54m 32s |
+| First rebirth affordable | 1h 2m | 59m 2s | 55m 5s |
 
 | Play time | No event | Halloween | Halloween + 2x luck weekend |
 | --- | --- | --- | --- |
-| 10m | $1.01K/s | $1.13K/s | $1.53K/s |
-| 30m | $8.68K/s | $10K/s | $14.9K/s |
-| 1h | $31.5K/s | $33.6K/s | $51.9K/s |
-| 3h | $173K/s | $200K/s | $308K/s |
-| 8h | $568K/s | $624K/s | $1.11M/s |
-| 24h | $2.26M/s | $2.45M/s | $3.6M/s |
+| 10m | $995/s | $1.14K/s | $1.41K/s |
+| 30m | $8.58K/s | $10.3K/s | $14.4K/s |
+| 1h | $30.7K/s | $32.9K/s | $50.8K/s |
+| 3h | $169K/s | $191K/s | $302K/s |
+| 8h | $559K/s | $620K/s | $1.1M/s |
+| 24h | $2.22M/s | $2.45M/s | $3.6M/s |
 
-A free player buys a median of 28 event Snacklings in 24 hours of event play (30 with the luck weekend), the first
+A free player buys a median of 29 event Snacklings in 24 hours of event play (31 with the luck weekend), the first
 after about 7½ minutes (a Candy Corn Cat).
 
 * **Normal progression outside the event is untouched.** Event Snacklings are listed after every regular one and
@@ -276,11 +301,11 @@ after about 7½ minutes (a Candy Corn Cat).
   disclosure) are the same during the event; within a tier, an event Snackling takes about a quarter of the spawns.
   Their price and payback sit inside their tier's regular range (CI checks it), so they are a fun collectible and
   steal target, not a shortcut.
-* **The event itself is a gentle boost**: about +5-15% income (Haunted's expected value is +3.75% per spawn; the
-  rest is a cheaper Mythic option and more variety to upgrade into), the first Mythic ~4% sooner and the first
-  rebirth ~5% sooner. The **luck weekend** is the big lever, as any 2× luck is: belt-gated tiers come
-  much sooner (Secret 9h 35m → 5h 41m) and income is ~1.4-2× higher. It lasts about 55 hours of one weekend, so for a
-  regular player it is a burst, not a new baseline.
+* **The event itself is a gentle boost**: about +7-20% income (Haunted's expected value is +3.75% per spawn; the
+  rest is a cheaper Mythic option and more variety to upgrade into), the first Mythic about as soon (the belt gates
+  it) and the first rebirth ~5% sooner. The **luck weekend** is the big lever, as any 2× luck is: belt-gated tiers
+  come much sooner (Secret 9h 35m → 5h 41m) and income is ~1.4-2× higher. It lasts about 55 hours of one weekend, so
+  for a regular player it is a burst, not a new baseline.
 * **Server Luck during the luck weekend**: the event's 2× and a bought 2× multiply to 4× (the cap is 6×); the store's
   before/after odds include the event's luck, and a test proves they match what the server rolls exactly.
 * **After the event** event Snacklings stop spawning but owned ones (and Haunted ones) keep earning forever, sell at
@@ -313,25 +338,25 @@ column has the Christmas luck on for the whole session too):
 
 | Rarity | No event | Winter | Winter + 2x Christmas luck |
 | --- | --- | --- | --- |
-| Common | 7s | 7s | 7s |
+| Common | 5s | 5s | 7s |
 | Uncommon | 1m 52s | 1m 52s | 2m 2s |
-| Rare | 4m 52s | 4m 52s | 4m 37s |
-| Epic | 11m 5s | 10m 50s | 10m 22s |
-| Legendary | 30m 52s | 30m 45s | 26m 40s |
-| Mythic | 1h 57m | 1h 50m | 1h 28m |
+| Rare | 4m 52s | 4m 50s | 4m 35s |
+| Epic | 10m 50s | 11m 10s | 10m 35s |
+| Legendary | 31m 0s | 30m 45s | 26m 40s |
+| Mythic | 1h 54m | 1h 50m | 1h 27m |
 | Secret | 9h 35m | 9h 22m | 5h 41m |
-| First rebirth affordable | 1h 2m | 58m 35s | 54m 17s |
+| First rebirth affordable | 1h 2m | 58m 32s | 54m 30s |
 
 | Play time | No event | Winter | Winter + 2x Christmas luck |
 | --- | --- | --- | --- |
-| 10m | $1.01K/s | $1.14K/s | $1.52K/s |
-| 30m | $8.68K/s | $10.2K/s | $14.7K/s |
-| 1h | $31.5K/s | $34.4K/s | $53K/s |
-| 3h | $173K/s | $202K/s | $316K/s |
-| 8h | $568K/s | $639K/s | $1.12M/s |
-| 24h | $2.26M/s | $2.48M/s | $3.6M/s |
+| 10m | $995/s | $1.12K/s | $1.43K/s |
+| 30m | $8.58K/s | $10.2K/s | $14.9K/s |
+| 1h | $30.7K/s | $33.7K/s | $53.1K/s |
+| 3h | $169K/s | $198K/s | $308K/s |
+| 8h | $559K/s | $635K/s | $1.11M/s |
+| 24h | $2.22M/s | $2.48M/s | $3.66M/s |
 
-A free player buys a median of 29 event Snacklings in 24 hours of event play (32 with the Christmas luck), the first
+A free player buys a median of 30 event Snacklings in 24 hours of event play (32 with the Christmas luck), the first
 after about 7½ minutes (a Peppermint Puffin). Re-run with `lune run tools/simulate.luau Winter2026 WinterLuck2026
 "Christmas luck"`.
 
@@ -372,23 +397,23 @@ column has the Valentine's luck on for the whole session too):
 
 | Rarity | No event | Valentine's | Valentine's + 2x luck |
 | --- | --- | --- | --- |
-| Common | 7s | 7s | 7s |
+| Common | 5s | 5s | 7s |
 | Uncommon | 1m 52s | 1m 52s | 2m 2s |
-| Rare | 4m 52s | 4m 52s | 4m 37s |
-| Epic | 11m 5s | 11m 2s | 10m 22s |
-| Legendary | 30m 52s | 30m 45s | 26m 40s |
-| Mythic | 1h 57m | 1h 50m | 1h 29m |
-| Secret | 9h 35m | 9h 22m | 5h 41m |
-| First rebirth affordable | 1h 2m | 58m 12s | 54m 2s |
+| Rare | 4m 52s | 4m 50s | 4m 35s |
+| Epic | 10m 50s | 11m 10s | 10m 35s |
+| Legendary | 31m 0s | 30m 45s | 26m 40s |
+| Mythic | 1h 54m | 1h 50m | 1h 27m |
+| Secret | 9h 35m | 9h 22m | 5h 29m |
+| First rebirth affordable | 1h 2m | 58m 7s | 54m 15s |
 
 | Play time | No event | Valentine's | Valentine's + 2x luck |
 | --- | --- | --- | --- |
-| 10m | $1.01K/s | $1.15K/s | $1.54K/s |
-| 30m | $8.68K/s | $10.6K/s | $15K/s |
-| 1h | $31.5K/s | $35.4K/s | $53.3K/s |
-| 3h | $173K/s | $204K/s | $324K/s |
-| 8h | $568K/s | $652K/s | $1.14M/s |
-| 24h | $2.26M/s | $2.52M/s | $3.75M/s |
+| 10m | $995/s | $1.14K/s | $1.45K/s |
+| 30m | $8.58K/s | $10.5K/s | $14.8K/s |
+| 1h | $30.7K/s | $35K/s | $52.3K/s |
+| 3h | $169K/s | $200K/s | $312K/s |
+| 8h | $559K/s | $646K/s | $1.13M/s |
+| 24h | $2.22M/s | $2.51M/s | $3.68M/s |
 
 A free player buys a median of 32 event Snacklings in 24 hours of event play (35 with the Valentine's luck), the
 first after about 7½ minutes (a Candy Heart Hamster). Re-run with `lune run tools/simulate.luau Valentine2027
@@ -430,25 +455,25 @@ column has the Easter luck on for the whole session too):
 
 | Rarity | No event | Easter | Easter + 2x luck |
 | --- | --- | --- | --- |
-| Common | 7s | 7s | 7s |
+| Common | 5s | 5s | 7s |
 | Uncommon | 1m 52s | 1m 52s | 2m 2s |
-| Rare | 4m 52s | 4m 52s | 4m 37s |
-| Epic | 11m 5s | 10m 50s | 10m 22s |
-| Legendary | 30m 52s | 30m 45s | 26m 40s |
-| Mythic | 1h 57m | 1h 50m | 1h 28m |
+| Rare | 4m 52s | 4m 50s | 4m 35s |
+| Epic | 10m 50s | 11m 10s | 10m 35s |
+| Legendary | 31m 0s | 30m 45s | 26m 40s |
+| Mythic | 1h 54m | 1h 50m | 1h 27m |
 | Secret | 9h 35m | 9h 22m | 5h 41m |
-| First rebirth affordable | 1h 2m | 58m 25s | 54m 12s |
+| First rebirth affordable | 1h 2m | 58m 25s | 54m 17s |
 
 | Play time | No event | Easter | Easter + 2x luck |
 | --- | --- | --- | --- |
-| 10m | $1.01K/s | $1.14K/s | $1.52K/s |
-| 30m | $8.68K/s | $10.3K/s | $15K/s |
-| 1h | $31.5K/s | $34.7K/s | $53.3K/s |
-| 3h | $173K/s | $202K/s | $320K/s |
-| 8h | $568K/s | $644K/s | $1.13M/s |
-| 24h | $2.26M/s | $2.5M/s | $3.6M/s |
+| 10m | $995/s | $1.12K/s | $1.43K/s |
+| 30m | $8.58K/s | $10.3K/s | $15K/s |
+| 1h | $30.7K/s | $34.1K/s | $53.2K/s |
+| 3h | $169K/s | $199K/s | $309K/s |
+| 8h | $559K/s | $638K/s | $1.12M/s |
+| 24h | $2.22M/s | $2.5M/s | $3.67M/s |
 
-A free player buys a median of 31 event Snacklings in 24 hours of event play (33 with the Easter luck), the first
+A free player buys a median of 31 event Snacklings in 24 hours of event play (34 with the Easter luck), the first
 after about 7½ minutes (a Custard Chick). Re-run with `lune run tools/simulate.luau Easter2027 EasterLuck2027
 "Easter luck"`.
 
@@ -564,29 +589,29 @@ buying nothing else meanwhile:
 | Gadget | Price | Does | Recharges | Bought after (median) | Income then | Price in seconds of it |
 | --- | --- | --- | --- | --- | --- | --- |
 | 🥤 Fizzy Soda | $1.5K | +30% speed for 6 s, carrying too | 35 s | 2m 50s | $14/s | 107 |
-| 🍌 Banana Peel | $15K | a trap on your own floor for 90 s: slip 1.5 s, drop your Snackling | 45 s | 7m 2s | $132/s | 114 |
-| 🫧 Bubble Shield | $150K | no tags for 3 s | 40 s | 15m 30s | $1.43K/s | 104 |
-| 🧲 Snack Magnet | $2.5M | every pad's cash, from anywhere | 60 s | 52m 37s | $22.6K/s | 110 |
+| 🍌 Banana Peel | $15K | a trap on your own floor for 90 s: slip 1.5 s, drop your Snackling | 45 s | 7m 5s | $135/s | 111 |
+| 🫧 Bubble Shield | $150K | no tags for 3 s | 40 s | 15m 12s | $1.51K/s | 99 |
+| 🧲 Snack Magnet | $2.5M | every pad's cash, from anywhere | 60 s | 52m 10s | $22.1K/s | 113 |
 
 So the first one comes in the first few minutes, around the first Uncommon, and the last within the first hour,
 between the first Legendary and the first rebirth. What buying all four costs the chase (same model, 60 runs):
 
 | Rarity | Free player | Free player buying every gadget |
 | --- | --- | --- |
-| Uncommon | 1m 52s | 3m 45s |
-| Rare | 4m 52s | 8m 25s |
-| Epic | 11m 5s | 14m 42s |
-| Legendary | 30m 52s | 35m 0s |
-| Mythic | 1h 57m | 1h 50m |
-| Secret | 9h 35m | 8h 31m |
+| Uncommon | 1m 52s | 3m 40s |
+| Rare | 4m 52s | 8m 7s |
+| Epic | 10m 50s | 14m 17s |
+| Legendary | 31m 0s | 34m 55s |
+| Mythic | 1h 54m | 1h 55m |
+| Secret | 9h 35m | 9h 13m |
 | First rebirth affordable | 1h 2m | 1h 8m |
 
 | Play time | Free player | Free player buying every gadget |
 | --- | --- | --- |
-| 10m | $1.01K/s | $448/s |
-| 30m | $8.68K/s | $6.02K/s |
-| 1h | $31.5K/s | $25.4K/s |
-| 3h | $173K/s | $180K/s |
+| 10m | $995/s | $446/s |
+| 30m | $8.58K/s | $6.47K/s |
+| 1h | $30.7K/s | $26.5K/s |
+| 3h | $169K/s | $158K/s |
 
 A few minutes later in the first half hour and about six minutes to the first rebirth, then nothing (the Mythic and
 Secret differences are the belt's luck); real players keep buying while they save, so the delay is smaller. None of
@@ -608,6 +633,28 @@ slows a modifier alone):
 A thief is always slower than a tagger on foot (14.9 < 16), so the soda is a head start, not an escape. **The
 shield** is up at most 3 s in every 40 (7.5%; CI keeps any shield at most 5 s and recharging at least 5x as long), and
 only tags bounce off it. **A peel** is one trap per owner at a time, gone after one slip or 90 s.
+
+## Titles and base skins
+
+Titles and base skins (`Config/Titles`, `Config/Skins`, DECISIONS.md #51) are looks only: none changes income, prices,
+speed, locks or steals, and none can be bought. Their unlocks are goals spread along the curve above (a free player,
+the simulated medians):
+
+| Reached | Unlocks |
+| --- | --- |
+| First steal, 25 belt buys, 10 Snacklings discovered, a code redeemed | 🫳 Sticky Fingers, 🛒 Snack Shopper, 📖 Collector, 🔑 Insider |
+| First Epic (about 11 minutes) | 🍩 Sprinkle Pink |
+| First Legendary (about 31 minutes) | 🫐 Blueberry |
+| 1 hour played | 🥐 Golden Crust |
+| First rebirth (affordable after about an hour) | ♻️ Born Again |
+| First Snackdex tier (usually the Commons) | 🍨 Mint Chip |
+| 2 and 4 rebirths ($150M, then $5.4B) | 🖤 Licorice Night, 💎 Diamond |
+| 16 different mutations | 🌈 Rainbow Swirl |
+| The long haul: 500 steals, 50 hours, 7 rebirths, every Snackdex tier | 🥷 Phantom Thief, 🎖️ Veteran, 🌀 Seven Lives, 📚 Snackdex Master |
+
+So a new player has a skin and a few titles in their first session, and the rarest looks take many sessions. VIP's
+golden trim (a paid perk) is the Classic look for VIP players and keeps its gold corner caps under every skin, so the
+earned skins never undercut the pass.
 
 ## Other knobs
 
@@ -725,6 +772,43 @@ Snackling only fills its pip (no cash).
 A full day pays about **21 minutes of steady income** (at least $2K), between the daily streak's day-5 (18 min) and
 day-6 (25 min) rewards, and it takes a session of real play to earn (CI keeps a day under an hour). Collect targets are
 fixed from steady income when the day's quests are rolled, so they always mean a few minutes of normal play.
+
+## Store additions (Auto Collect, Lucky Spin packs, Starter Pack)
+
+Paid items (DECISIONS.md #52) at their suggested prices; Leo sets the real prices on the Creator Hub. What each pays,
+from the live config (`lune run tools/simulate.luau store`), next to the cash packs that cost about the same. A spin
+wins a Snackling (at 2x luck, Golden and Diamond included) 29.5% of the time; the cash is a spin's average. The
+Starter Pack's "all of it" column counts its Golden Cupcake Cub at its belt price ($18.7K, earning $320/s) and its two
+gadgets at their cash prices ($16.5K).
+
+| Steady income | 3 Lucky Spins (25 R$) | 10 Lucky Spins (69 R$) | Starter Pack (49 R$): cash | Starter Pack: all of it | Snack Pack (25 R$) | Snack Basket (49 R$) | Snack Crate (75 R$) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| $0/s | $1.92K + 0.9 Snacklings | $6.4K + 3.0 Snacklings | $60K | $95.2K | $2.5K | $6K | $15K |
+| $100/s | $27.4K (5 min) + 0.9 | $91.5K (15 min) + 3.0 | $240K (40 min) | $275K | $90K (15 min) | $210K (35 min) | $360K (60 min) |
+| $1K/s | $274K + 0.9 | $915K + 3.0 | $2.4M | $2.43M | $900K | $2.1M | $3.6M |
+| $10K/s | $2.74M + 0.9 | $9.15M + 3.0 | $24M | $24M | $9M | $21M | $36M |
+| $100K/s | $27.4M + 0.9 | $91.5M + 3.0 | $240M | $240M | $90M | $210M | $360M |
+| $1M/s | $274M + 0.9 | $915M + 3.0 | $2.4B | $2.4B | $900M | $2.1B | $3.6B |
+
+**Auto Collect** (149 R$) pays nothing extra: it collects the pads every 5 s, so a holder earns exactly what a free
+player who walks to their pads earns, and cash waiting on a pad was never stealable anyway. It does what the Snack
+Magnet does, so holders are never sold the magnet ($2.5M saved) and its button shows AUTO.
+
+**Lucky Spin packs** are the fun buy, not the value buy. In cash a spin pays about 90 seconds of income, so 3 spins
+are about 5 minutes for 25 R$ (a third of the Snack Pack) and 10 spins about 15 minutes for 69 R$ (a quarter of the
+75 R$ Snack Crate). The Snacklings make up the rest mainly for newer players: at 2x luck one is Rare or better 29% of
+the time (Epic 7.2%, Legendary 1.9%), a big step early on and pocket change at high income. To move them closer to
+the cash ladder, give more spins per pack (`Monetization.products`, the `spins` field) or lower the price; don't change
+the prize table, which the free spin shares and whose odds the store publishes. Buying is refused from 40 banked spins
+on (`Spin.paidBankFull`), so nobody stockpiles packs they haven't spun.
+
+**The Starter Pack** (49 R$, once) beats the same-price Snack Basket at every income: 40 minutes of income instead of
+35, a floor of $60K (the price of the cheapest Epic) instead of $6K, plus the Snackling and the gadgets. For a new
+player it is worth about 16 Baskets ($95.2K, and a $320/s Snackling when their whole base makes a few dollars a
+second); later it is a Basket and a seventh. That is the point of a starter offer, and it is once per account, so it
+can't become a better way to buy cash than the ladder. The Golden Cupcake Cub sits on a podium like any other
+Snackling and can be stolen; it is a strong Rare for a new player and earns less than any Epic (from $400/s). A test
+keeps the cash above the Basket's at every income, floor included.
 
 ## Tuning checklist
 

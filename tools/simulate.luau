@@ -23,6 +23,8 @@
 	        lune run tools/simulate.luau Winter2026 WinterLuck2026 "Christmas luck"
 	  * "Gadgets" replays the free player saving for each gadget of Config/Gadgets in shop order: once the next one
 	    costs at most GADGET_SAVE_SECONDS of their income they stop buying Snacklings and podiums until they have it
+	  * "Store additions" (exact, no simulation) is what the Lucky Spin packs and the Starter Pack pay at a few steady
+	    incomes, beside the cash packs at about the same price; `lune run tools/simulate.luau store` prints only it
 ]]
 
 local process = require("@lune/process")
@@ -45,6 +47,8 @@ local Format = require("../src/shared/Logic/Format")
 local MutationRules = require("../src/shared/Logic/MutationRules")
 local RarityRoll = require("../src/shared/Logic/RarityRoll")
 local RebirthMath = require("../src/shared/Logic/RebirthMath")
+local SpinRules = require("../src/shared/Logic/SpinRules")
+local Spin = require("../src/shared/Config/Spin")
 
 local RUNS = 60
 local HOURS = 24
@@ -54,6 +58,82 @@ local LOOKAHEAD = 10
 local GADGET_SAVE_SECONDS = 120
 
 local catalog = Catalog.build(Creatures, Rarities, Mutations)
+
+-- Store additions -------------------------------------------------------------------------------------------------
+-- What the Lucky Spin packs and the Starter Pack pay at a few steady incomes (EconomyMath.packIncome: what cash packs
+-- and prizes are sized from), beside the cash packs at about the same price. Exact: every cash prize is sized from
+-- steady income like a cash pack, so no simulation is needed.
+local function printStoreTable()
+	local chances = SpinRules.chances(Spin.segments)
+	-- One spin: its expected cash at `income`, and its chance of a Snackling.
+	local function perSpin(income: number): (number, number)
+		local cash, snackling = 0, 0
+		for index, segment in Spin.segments do
+			local reward = segment.reward
+			if reward.kind == "cash" then
+				local pack = { incomeSeconds = reward.incomeSeconds, minimum = reward.minimum }
+				cash += chances[index] * EconomyMath.cashPackAmount(income, pack)
+			elseif reward.kind == "creature" then
+				snackling += chances[index]
+			end
+		end
+		return cash, snackling
+	end
+	local starter = Monetization.starterPack
+	local creature = catalog.creatures[starter.creatureId]
+	local creaturePrice = MutationRules.price(catalog.mutations, creature, starter.variant)
+	local creatureIncome = MutationRules.income(catalog.mutations, creature, starter.variant)
+	local gadgetsPrice = 0
+	for _, id in starter.gadgets do
+		gadgetsPrice += Gadgets.gadgets[id].price
+	end
+	local function money(amount: number): string
+		return Format.cash(amount, "$")
+	end
+	local function minutes(amount: number, income: number): string
+		return if income > 0 then ` ({math.floor(amount / income / 60 + 0.5)} min)` else ""
+	end
+	local _, chance = perSpin(0)
+	print("\n## Store additions: what each pays at a few steady incomes\n")
+	print(
+		`A spin wins a Snackling {Format.percent(chance)} of the time (Golden or Diamond included); the cash below is `
+			.. "the average a spin pays. The Starter Pack's own column counts its "
+			.. `{MutationRules.displayName(catalog.mutations, creature, starter.variant, Theme.text.mutatedName)} `
+			.. `at its belt price ({money(creaturePrice)}, `
+			.. `earning {money(creatureIncome)}/s) and its gadgets at their cash prices ({money(gadgetsPrice)}).\n`
+	)
+	local small = Monetization.products.LuckySpins3.spins or 0
+	local big = Monetization.products.LuckySpins10.spins or 0
+	print(
+		`| Steady income | {small} Lucky Spins | {big} Lucky Spins | Starter Pack: cash | Starter Pack: all of it `
+			.. "| Snack Pack (25 R$) | Snack Basket (49 R$) | Snack Crate (75 R$) |"
+	)
+	print("| --- | --- | --- | --- | --- | --- | --- | --- |")
+	for _, income in { 0, 100, 1000, 10000, 100000, 1000000 } do
+		local spinCash = perSpin(income)
+		local starterCash = EconomyMath.cashPackAmount(income, starter.cash)
+		local whole = starterCash + creaturePrice + gadgetsPrice
+		local packs: { string } = {}
+		for _, key in { "CashSmall", "CashBasket", "CashMedium" } do
+			local pack = (Economy.cashPacks :: any)[key] :: Economy.CashPack
+			local amount = EconomyMath.cashPackAmount(income, pack)
+			table.insert(packs, money(amount) .. minutes(amount, income))
+		end
+		local function spins(count: number): string
+			local cash = count * spinCash
+			return `{money(cash)}{minutes(cash, income)} + {string.format("%.1f", count * chance)} Snacklings`
+		end
+		print(
+			`| {money(income)}/s | {spins(small)} | {spins(big)} | {money(starterCash)}{minutes(starterCash, income)} `
+				.. `| {money(whole)} | {table.concat(packs, " | ")} |`
+		)
+	end
+end
+
+if process.args[1] == "store" then
+	printStoreTable()
+	process.exit(0)
+end
 
 type Scenario = {
 	name: string,
@@ -517,3 +597,5 @@ printTables(
 	`\n### Median play time until the first Snackling of each rarity, with and without the gadgets ({RUNS} runs)`,
 	"### Median cash/sec after N minutes of play, with and without the gadgets"
 )
+
+printStoreTable()

@@ -71,8 +71,14 @@ jobs:
       - name: Gadgets (offline server, virtual clock, every gadget through the real remotes)
         run: lune run tools/worldsim/gadgets.luau
 
+      - name: Store (offline server, virtual clock, the store additions through the real receipt path)
+        run: lune run tools/worldsim/store.luau
+
       - name: Host test (the host panel, cross-server LiveOps and shout-outs, offline)
         run: lune run tools/worldsim/host.luau
+
+      - name: Cosmetics test (titles, base skins and What's New through the real remotes, offline)
+        run: lune run tools/worldsim/cosmetics.luau
 
       - name: Studio sync script test (pulls this checkout into Rojo-built places offline)
         run: |

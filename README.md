@@ -62,8 +62,8 @@ Studio test purchases, etc.).
 | Command | What it does |
 | --- | --- |
 | `lune run tests/run.luau` | Unit tests for all pure game logic (no Studio needed) |
-| `lune run tools/layoutCheck.luau [--all]` | Where every HUD element lands on five phone, tablet and computer screens, and any overlap, play-zone button or small touch target (CI runs this too) |
-| `lune run tools/simulate.luau` | Economy simulation used to write `BALANCE.md` |
+| `lune run tools/layoutCheck.luau [--all]` | Where every HUD element lands on five phone, tablet and computer screens, and any overlap, play-zone button or small touch target; also whether the Style, What's New and host panel dialogs fit, and the store's dialogs (CI runs this too) |
+| `lune run tools/simulate.luau [store]` | Economy simulation used to write `BALANCE.md` (`store`: only what the store items pay) |
 | `lune run tools/importParts.luau` | Import the polished Snackling models from `art/snackling-parts/` |
 | `lune run tools/worldsim/smoke.luau` | Build the map offline in every map theme and check it (CI runs this too) |
 | `lune run tools/worldsim/export.luau <mapId> [out.json]` | Dump one map theme's built world as JSON for a 3D preview |
@@ -73,6 +73,9 @@ Studio test purchases, etc.).
 | `lune run tools/worldsim/host.luau` | The host panel, cross-server messages and shout-outs as admin, owner and player, offline (CI) |
 | `lune run tools/worldsim/prelaunch.luau` | The pre-launch server fixes on the offline server, with a virtual clock (CI runs this too) |
 | `lune run tools/worldsim/gadgets.luau` | Every gadget through the real remotes on the offline server, with a virtual clock (CI runs this too) |
+| `lune run tools/worldsim/cosmetics.luau` | Titles, base skins and What's New through the real remotes on the offline server (CI) |
+| `lune run tools/worldsim/store.luau` | Auto Collect, the Lucky Spin packs and the Starter Pack through the real receipt path on the offline server (CI) |
+| `lune run tools/worldsim/exportSkins.luau [mapId] [out.json] [--vip]` | Dump a map with a different base skin on every base, for a 3D preview |
 | `rojo build -o build/sync.rbxl` then `lune run tools/syncTest.luau build/sync.rbxl` | Check the Studio sync script (`studio/SyncFromGitHub.luau`) offline |
 | `stylua src tests tools studio` | Format |
 | `selene src tests tools studio` | Lint |
@@ -101,20 +104,56 @@ tools               Lune scripts (balance simulation, model import, worldsim: th
    8 bases, one per player, and a 9th player would be kicked with "server full" (DECISIONS.md #14; the server warns in
    the Output when it is higher).
 2. **Game Settings → Security → enable Studio Access to API Services** (to test saving/leaderboards in Studio).
-3. Game passes and developer products: done. The 4 passes and 5 products exist on the Creator Hub and their IDs
-   are in `src/shared/Config/Monetization.luau`. Change prices on the Creator Hub, not in code. Server Luck is a paid
+3. Game passes and developer products: the first 4 passes and 8 products exist on the Creator Hub and their IDs are
+   in `src/shared/Config/Monetization.luau`. Change prices on the Creator Hub, not in code. Server Luck is a paid
    random item (a boost to luck): players whose Roblox policy restricts those (PolicyService) see its card as "Not
-   available" and can't buy it, and nothing needs setting up for that (DECISIONS.md #46).
+   available" and can't buy it, and nothing needs setting up for that (DECISIONS.md #46). **Four newer items are not
+   created yet** and stay hidden until they are: see "Store items to create on the Creator Hub" below.
 4. Add your UserId to `adminUserIds` in `src/shared/Config/LiveOps.luau`.
 5. **Group rewards:** paste your Roblox group's ID into `groupId` in `src/shared/Config/Social.luau`
    (`TODO(owner)`; the number in the group's URL). While it is `0` the group bonus, welcome gift and Join group button
    are off and hidden; the friends bonus works either way.
 6. Optional: music and your own sounds in `src/shared/Config/Sounds.luau` (see "Sounds and music" below), models in
    `ReplicatedStorage/CreatureModels`.
-7. **Before the game goes public, make the GitHub repo private** (GitHub → the repo → Settings → General → Danger
+7. **What's New:** before each publish, put a note about what changed at the top of
+   `src/shared/Config/Updates.luau` (see "Titles, base skins and What's New").
+8. **Before the game goes public, make the GitHub repo private** (GitHub → the repo → Settings → General → Danger
    Zone → Change visibility). While it is public anyone can read `src/server/Codes.luau`, so codes you haven't posted
    yet are not secret. The Studio sync script then needs a token: see "Updating a place in Studio straight from
    GitHub" above.
+
+#### Store items to create on the Creator Hub
+
+Auto Collect, the two Lucky Spin packs and the Starter Pack are in the game, but their ids are `0`, so live servers
+hide them (Studio shows them with a "(Studio) Grant" button). For each one:
+
+1. Creator Hub → **Creations** → Steal a Snackling → **Monetization** → **Passes** (Auto Collect) or **Developer
+   Products** (the other three) → **Create**.
+2. Upload the icon (a square image, 512×512; Roblox shows passes in a circle, so keep the art in the middle), and type
+   the name and description from the table.
+3. The price: a developer product takes it on the same page. A pass takes it afterwards: open the pass → **Sales** →
+   switch on **Item for Sale** → type the price → **Save Changes**.
+4. Copy the item's **ID** (from the list, or the number in its page's address) and paste it into
+   `src/shared/Config/Monetization.luau` in place of the `0` on the line in the last column. Keep the price comment on
+   that line in step with what you set.
+5. Publish (Rojo, or the Studio sync script). The item shows in live servers from then on.
+
+| Item | Type | Name | Description | Suggested price | Icon idea | Paste its id into |
+| --- | --- | --- | --- | --- | --- | --- |
+| Auto Collect | Game pass | Auto Collect | The cash on all your pads is collected for you every 5 seconds, wherever you are. Forever. | 149 R$ | A purple magnet pulling gold coins off a glowing green collect pad, with an "AUTO" ribbon | `passes.AutoCollect` (`AutoCollect = { id = 0 }`) |
+| 3 Lucky Spins | Developer product | 3 Lucky Spins | 3 more spins of the Lucky Spin. Prizes are random: every prize's exact chance is shown in the game before you buy. | 25 R$ | The Lucky Spin wheel with a pink "x3" badge | `products.LuckySpins3` |
+| 10 Lucky Spins | Developer product | 10 Lucky Spins | 10 more spins of the Lucky Spin. Prizes are random: every prize's exact chance is shown in the game before you buy. | 69 R$ | Three stacked wheels with a gold "x10" badge and sparkles | `products.LuckySpins10` |
+| Starter Pack | Developer product | Starter Pack | One time only: cash, a Golden Cupcake Cub and the Fizzy Soda and Banana Peel gadgets. Nothing random. | 49 R$ | A gift box with a golden Cupcake Cub peeking out, a soda can and a banana peel beside it, a "STARTER" banner | `products.StarterPack` |
+
+* **Nothing to set up for the policy check:** the Lucky Spin packs are paid random items, so players whose Roblox
+  policy restricts those never see them and can't buy them (PolicyService, as for Server Luck). If the Creator Hub's
+  experience questionnaire asks whether the game sells paid random items, the answer is yes: Server Luck and the Lucky
+  Spin packs, both with their odds shown in the game.
+* **Test it in Studio first:** while an id is `0`, "(Studio) Grant" runs the real receipt path; once it is in, Studio
+  opens Roblox's test purchase prompt (free in Studio). `/starter reset` lets you buy the Starter Pack again and
+  `/starter offer` brings its one-time offer up; `/spins 40` banks 40 spins, enough to see the packs refuse.
+* **What they pay** at a few incomes is in BALANCE.md "Store additions". Once they are live, a line about them in What's
+  New (`src/shared/Config/Updates.luau`) tells returning players.
 
 **Changing the save format:** bump `DataSchema.VERSION` whenever a saved key is added, removed, renamed or changes
 meaning, and never publish a lower VERSION than before. A rollback keeps the current save code (`DataSchema`,
@@ -283,12 +322,15 @@ already had progress when it shipped never see it. Steps finish only when the se
 
 Every Snackling is a 3D "living snack" built in code from plain Roblox parts (no meshes or asset ids).
 
-* **Polished models:** all 76 have one. The first 64 were designed in Claude Design from the prompts in
+* **The roster:** 80 permanent Snacklings (13 Common, 13 Uncommon, 13 Rare, 12 Epic, 11 Legendary, 10 Mythic and 8
+  Secret) plus 16 event ones (four each for Halloween, Winter, Valentine's and Easter, Rare to Mythic). Prices, odds
+  and the share of each tier are in BALANCE.md ("The roster").
+* **Polished models:** all 96 have one. The first 64 were designed in Claude Design from the prompts in
   `art/snackling-parts/`; the four Winter 2026 Snacklings (`batch-4.json`), the four Valentine's 2027 ones
-  (`batch-5.json`) and the four Easter 2027 ones (`batch-6.json`) were built by hand in the same format and checked
-  from every side in an offline 3D preview (`prompt-batch-4.md` to `prompt-batch-6.md` can redo them in Claude
-  Design). Imported
-  with `lune run tools/importParts.luau`, which checks them, sizes them and writes
+  (`batch-5.json`), the four Easter 2027 ones (`batch-6.json`) and the 20 permanent ones added in batch 7
+  (`batch-7.json`, DECISIONS.md #50) were built by hand in the same format and checked from every side in an offline
+  3D preview, next to their tier's other models (`prompt-batch-4.md` to `prompt-batch-7.md` can redo them in Claude
+  Design). Imported with `lune run tools/importParts.luau`, which checks them, sizes them and writes
   `src/shared/Config/CreatureParts.luau` (generated: edit a `batch-*.json` and re-run the tool). See DECISIONS.md #28.
 * **Recipes (the fallback):** a Snackling without a polished model builds from its recipe in
   `src/shared/Config/CreatureLooks.luau`, which picks a body plan (blob, biped, quadruped, swimmer, tentacled), the food its
@@ -374,8 +416,9 @@ once and are saved per player in the save's `flags` map (`settings_musicOff`, `s
 `settings_reduceEffects`; no save-format change). Reduce effects switches off particles, the belt / factory
 animations, Bloom and SunRays on that device; client code can read it with `ClientSettings.reduceEffects()` (or the
 LocalPlayer attribute `ReduceEffects`). Whatever the setting, lights and particles on podium Snacklings far from the
-camera are switched off to save phones the work (`podiumFx` in `src/shared/Config/Gameplay.luau`). Its last row opens 🎟️ Codes,
-and for admins and a private server's owner also 🛠️ Host panel (see "Host panel and live events").
+camera are switched off to save phones the work (`podiumFx` in `src/shared/Config/Gameplay.luau`). Its last row opens 🎨 Style
+(see "Titles, base skins and What's New") and 🎟️ Codes, and for admins and a private server's owner also 🛠️ Host
+panel (see "Host panel and live events").
 
 ### HUD layout (phones first)
 
@@ -450,6 +493,9 @@ none until one is bought, and none during the first-time tutorial.
 | 🫧 Bubble Shield | $150K | nobody can tag you for 3 s (a bubble everyone sees); locks and peels still work | 40 s |
 | 🧲 Snack Magnet | $2.5M | collects the cash on all your pads from anywhere, as if you walked over them | 60 s |
 
+The Auto Collect pass does the Snack Magnet's job every 5 s, so for its owners the magnet's button says AUTO (a tap
+explains) and the Gadgets tab doesn't sell it to them.
+
 * **Tune one:** `src/shared/Config/Gadgets.luau` (price, cooldown, duration, speed, slip, peel radius). CI keeps
   every number inside `GadgetRules.validate`: the Bubble Shield at most 5 s and recharging at least 5x as long, any
   speed at most 1.5x and the speed cap (`maxSpeedMultiplier`, a speed modifier and a gadget together) at most 1.5x,
@@ -466,6 +512,103 @@ none until one is bought, and none during the first-time tutorial.
   (gadget id, and `peelDrop`, `peelSlip` or `shieldBlock`).
 * **Studio:** `/gadgets` owns every gadget and recharges them; offline, `lune run tools/worldsim/gadgets.luau` (CI)
   plays every gadget through the real remotes.
+
+### Titles, base skins and What's New
+
+Settings (⚙) → **🎨 Style** opens a dialog with two tabs (DECISIONS.md #51). **Titles:** a short line under the
+player's name over their head, also shown as a chat tag after `[VIP]`; a player wears one or none. **Base:** a look
+for their own base (the floor's tiles, the rug, the wall tops and the corner caps; never the podiums, pads, sign or
+lock button). Both are earned, never bought: from achievements, rebirths and Snackdex tiers. Locked ones say how to
+earn them and how far the player is, and a toast says when one unlocks ("New title unlocked: Master Thief — equip it
+in Settings ▸ Style"). What is worn is a flag of each (`title_<id>`, `skin_<id>`; no save-format change).
+
+| Title | Earned by | Title | Earned by |
+| --- | --- | --- | --- |
+| 🫳 Sticky Fingers | steal a Snackling | 🎓 Snack Scholar | complete 3 Snackdex tiers |
+| 🛒 Snack Shopper | buy 25 from the belt | 👑 Legendary Bandit | steal 150 |
+| 📖 Collector | discover 10 Snacklings | 🔁 Five Lives | rebirth 5 times |
+| 🔑 Insider | redeem a code | 🌍 Globetrotter | play on every map |
+| 🦹 Master Thief | steal 25 | 💯 Completionist | discover every regular Snackling |
+| 💰 Millionaire | earn $1M in total | 🤫 Secret Keeper | own a Secret |
+| ♻️ Born Again | rebirth once | 🏦 Billionaire | earn $1B in total |
+| ⚔️ Giant Slayer | help take down a Snack Attack giant | 🏆 MVP | land the most hits on a giant that goes down |
+| 🧪 Mutation Hunter | own 8 different mutations | 📚 Snackdex Master | complete all 7 Snackdex tiers |
+| 🧭 Explorer | play on 12 maps | 🥷 Phantom Thief | steal 500 |
+| | | 🌀 Seven Lives | rebirth 7 times |
+| | | 🎖️ Veteran | play for 50 hours |
+
+| Base skin | Look | Earned by |
+| --- | --- | --- |
+| 🏠 Classic | the base's own colours (VIP: the golden trim) | every base starts with it |
+| 🍩 Sprinkle Pink | pink tiles, cream rug, hot-pink trim | own an Epic |
+| 🍨 Mint Chip | mint tiles, chocolate rug and trim | complete a Snackdex tier |
+| 🫐 Blueberry | blue tiles, deep blue rug, pale trim | own a Legendary |
+| 🥐 Golden Crust | golden tiles, butter rug, crust-brown trim | play for 1 hour |
+| 🖤 Licorice Night | dark slate tiles, red rug, glowing pink trim | rebirth twice |
+| 🌈 Rainbow Swirl | rainbow stripes, white rug, a trim that cycles the rainbow (not with Reduce effects) | own 16 different mutations |
+| 💎 Diamond | icy marble tiles, white marble rug, glowing ice trim | rebirth 4 times |
+
+VIP players keep their gold corner caps under any other skin. A skin goes on when the player gets their base, stays
+through map changes and comes off (back to Classic) when they leave.
+
+* **Add a title:** an entry in `src/shared/Config/Titles.luau`: an id, the text (at most 16 characters), an emoji, a
+  colour (`#RRGGBB`, light enough to read over the outline) and how it is earned:
+  `{ kind = "achievement", id = "<an id in Config/Achievements>" }`, `{ kind = "rebirths", count = 3 }` or
+  `{ kind = "tiers", count = 2 }` (Snackdex tiers). Its place in the list is its place in the tab (easiest first).
+  Add its id to `RELEASED_TITLE_IDS` in `tests/StyleRules.spec.luau`. CI checks it fits a phone's nametag, the card
+  and the toast. Never rename a shipped id: whoever wears it would wear nothing.
+* **Add a base skin:** an entry in `src/shared/Config/Skins.luau`: an id, a name (at most 16 characters), an emoji,
+  how it is earned (like a title) and a look: two or more floor tile colours (two make a checker, more make stripes),
+  a rug colour, a trim colour, and materials from `StyleRules.FLOOR_MATERIALS` and `TRIM_MATERIALS` (`rainbow = true`
+  makes the trims cycle). Add its id to `RELEASED_SKIN_IDS`. CI keeps every floor colour far enough from the collect
+  pads' green. To look at the skins on a map: `lune run tools/worldsim/exportSkins.luau meadow build/skins.json`
+  (one skin per base; add `--vip` for VIP's caps), then
+  `node tools/preview/render.mjs build/skins.json build/skins --shots plots`.
+* **The nametag:** `Titles.nametag` sets its size, height over the head and how far away it shows; `chatTag = false`
+  turns the chat tag off. It hides while its wearer carries a Snackling, and a player never sees their own.
+
+**Publishing an update note (before each publish):**
+
+1. Open `src/shared/Config/Updates.luau`.
+2. Copy the first entry of `list` and paste the copy above it, so the new one is at the top.
+3. Give it the next `number` (2, then 3...; never reuse one, or players who saw that number miss the new note), the
+   publish `date` (`YYYY-MM-DD`), a `title` (at most 40 characters) and 3 to 5 `highlights`. Each highlight starts
+   with an emoji and is at most 64 characters. Keep them short, fun and true: what players can do now.
+4. Leave the older entries below it as a history. Only the top one is shown.
+5. Run `lune run tests/run.luau` (CI does too): it checks the order, the lengths, and that every line fits the card
+   on the smallest phone and the board.
+
+Returning players get the card once, on their next join, after the welcome-back and daily reward popups. It never
+comes in a first session (new players get the tutorial), during the tutorial, over another dialog or while carrying.
+The board on the spawn plaza, beside where players spawn, always shows the newest note. Studio: `/news`
+shows the card again (without API access every Studio session counts as a first one, so it never comes by itself);
+`/style` unlocks every title and skin for you for that session, and `/style off` goes back to what you earned.
+Offline: `lune run tools/worldsim/cosmetics.luau` (CI) plays it all through the real remotes.
+
+### Store additions: Auto Collect, Lucky Spin packs and the Starter Pack
+
+Three Robux items beside the original passes and cash packs (DECISIONS.md #52), each hidden until its id is in
+`src/shared/Config/Monetization.luau` (see "Store items to create on the Creator Hub"):
+
+| Item | What the player gets | Where it is sold |
+| --- | --- | --- |
+| 🧲 Auto Collect (pass) | the cash on all their pads every 5 s, wherever they are, as if they walked over them (the "+$" floats over pads near the camera, with no sound or toast); their Snack Magnet says AUTO | the Shop's Forever perks |
+| 🎰 3 / 10 Lucky Spins | that many spins banked for the Lucky Spin (Rewards → Spin); every prize's exact chance is on the card, and in the Spin tab's Odds beside the buttons | the Shop, and two buttons beside the Spin tab's reel |
+| 🎁 Starter Pack (once per account) | 40 minutes of their income in cash (at least $60K), a Golden Cupcake Cub, and the Fizzy Soda and Banana Peel (their cash prices if owned) | first in the Shop until bought; once, a small offer under the cash after the first rebirth or 30 minutes of play |
+
+* **Fair by design:** the spin packs only show where the player's Roblox policy allows paid random items (and the
+  server refuses them otherwise); buying is refused while 40 spins are banked, but a pack that lands anyway banks
+  every spin. The Starter Pack can't be bought twice, and a second purchase that slips through pays its whole value in
+  cash. Each purchase is checked on the server before Roblox's prompt opens, and again when the receipt arrives.
+* **Tune it:** `perks.autoCollectSeconds` and `starterPack` (its cash, Snackling, mutation, gadgets and when its offer
+  shows) in `src/shared/Config/Monetization.luau`, `paidBankFull` in `src/shared/Config/Spin.luau`; the texts are the
+  `store` entries and the `spinPack*` and `starter*` keys in `src/shared/Config/Theme.luau`. CI checks them.
+  `lune run tools/simulate.luau store` prints what each pays (BALANCE.md "Store additions").
+* **Analytics:** `product_viewed` (the item, and where: `store`, `spin` or `offer`), the store funnel's
+  ProductPrompted (the item, and where), `product_refused` (the item, and why), `product_purchased` and
+  `starter_pack_duplicate`.
+* **Studio:** "(Studio) Grant" on every item without an id, `/spins <n>`, `/starter reset`, `/starter offer`. Offline:
+  `lune run tools/worldsim/store.luau` (CI) plays all of it through the real receipt path.
 
 ### Studio test commands
 
@@ -488,6 +631,9 @@ These work in Studio only (`src/server/Services/DevCommands.luau`):
 * `/gadgets` (own every gadget and recharge them all now), `/gadgets off` (none again)
 * `/hostas owner`, `/hostas none`, `/hostas admin` (try the host panel as a private server's owner, as a player with
   no panel, or as an admin again; reopen Settings after)
+* `/style` (every title and base skin unlocked for you this session, not saved), `/style off` (only what you earned),
+  `/news` (the What's New card again)
+* `/starter reset` (buy the Starter Pack again), `/starter offer` (and its one-time offer card comes up)
 
 To test a seasonal event in Studio: `/event Halloween2026 5` turns Halloween on for 5 minutes (decorations, dusk
 lighting, banner with countdown, event Snacklings and Haunted on the belt), and `/event off` ends it early.

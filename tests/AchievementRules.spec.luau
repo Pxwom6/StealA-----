@@ -290,6 +290,34 @@ T.describe("AchievementRules progress", function()
 		local view = AchievementRules.view(Achievements, ctx, data.flags, catalog.rarities)
 		T.expect(view[1]).toEqual({ id = "firstBite", progress = 1, target = 1, done = true })
 	end)
+
+	T.it("an earned Completionist stays done when new Snacklings ship", function()
+		-- Paid before the newest 20 regular Snacklings existed: everything else was found.
+		local data = save()
+		local regular: { string } = {}
+		for id, def in catalog.creatures do
+			if def.eventId == nil then
+				table.insert(regular, id)
+			end
+		end
+		table.sort(regular)
+		for i = 1, #regular - 20 do
+			data.snackdex.creatures[regular[i]] = true
+		end
+		data.flags[AchievementRules.flagKey("completionist")] = true
+		local ctx = AchievementRules.context(data, catalog.creatures, catalog.rarities)
+		T.expect(AchievementRules.isDone(byId("completionist"), ctx, catalog.rarities)).toBe(false)
+		local due: { [string]: boolean } = {}
+		for _, def in AchievementRules.newlyDone(Achievements, ctx, data.flags, catalog.rarities) do
+			due[def.id] = true
+		end
+		T.expect(due.completionist).toBeNil()
+		for _, entry in AchievementRules.view(Achievements, ctx, data.flags, catalog.rarities) do
+			if entry.id == "completionist" then
+				T.expect(entry.done).toBe(true)
+			end
+		end
+	end)
 end)
 
 T.describe("AchievementRules.validate", function()

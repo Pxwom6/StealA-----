@@ -3,7 +3,8 @@
 	The Shop's Gadgets tab (StoreController): every gadget in Config/Gadgets with its icon, name, what it does, how long
 	it recharges, and a button with its price in cash (green when affordable) that sends the BuyGadget intent, or
 	"Owned". Gadgets are bought once with in-game cash and kept forever; nothing here costs Robux. The server checks
-	the price, the cash and ownership again (GadgetService).
+	the price, the cash and ownership again (GadgetService). With the Auto Collect pass the Snack Magnet's button says
+	"Auto ✓" instead of a price: the pass already does its job, so it isn't sold to them (GadgetRules.coveredByAutoCollect).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -16,6 +17,7 @@ local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local GadgetRules = require(ReplicatedStorage.Shared.Logic.GadgetRules)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
+local NotificationController = require(script.Parent.NotificationController)
 
 local GadgetsTab = {}
 
@@ -56,6 +58,7 @@ function GadgetsTab.build(content: Frame): (state: Types.ClientState) -> ()
 
 	local cards: { Card } = {}
 	local ownedNow: { [string]: boolean } = {}
+	local coveredNow: { [string]: boolean } = {} -- not owned, and the Auto Collect pass does its job
 	for order, id in Gadgets.order do
 		local def = Gadgets.gadgets[id]
 		local accent = UiTheme.color(def.color)
@@ -128,7 +131,9 @@ function GadgetsTab.build(content: Frame): (state: Types.ClientState) -> ()
 			Text = UiTheme.cash(def.price),
 			Parent = frame,
 		}, function()
-			if not ownedNow[id] then
+			if coveredNow[id] then
+				NotificationController.toast(Theme.text.magnetAuto, "info")
+			elseif not ownedNow[id] then
 				Net.get("BuyGadget"):FireServer(id)
 			end
 		end)
@@ -149,6 +154,7 @@ function GadgetsTab.build(content: Frame): (state: Types.ClientState) -> ()
 
 	return function(state: Types.ClientState)
 		table.clear(ownedNow)
+		table.clear(coveredNow)
 		for _, id in state.gadgets.owned do
 			ownedNow[id] = true
 		end
@@ -156,6 +162,10 @@ function GadgetsTab.build(content: Frame): (state: Types.ClientState) -> ()
 			local def = Gadgets.gadgets[card.id]
 			if ownedNow[card.id] then
 				UiKit.setButtonText(card.buy, Theme.text.storeOwned)
+				card.buy.BackgroundColor3 = UiTheme.palette("panel")
+			elseif GadgetRules.coveredByAutoCollect(def, state.passes.AutoCollect == true) then
+				coveredNow[card.id] = true
+				UiKit.setButtonText(card.buy, Theme.text.gadgetAutoShop)
 				card.buy.BackgroundColor3 = UiTheme.palette("panel")
 			else
 				UiKit.setButtonText(card.buy, UiTheme.cash(def.price))
