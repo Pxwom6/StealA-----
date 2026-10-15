@@ -7,17 +7,21 @@
 	depend on MapBuilder and tests can check that nothing lands inside a plot, on the belt or on the lobby spawn.
 
 	Where each prop goes (every theme uses the same spots, so a new theme is only data):
-	  beside each plot entrance   pumpkins, then presents, then potted roses, then painted eggs, then hay bales
-	                              (alternating sides, stepping outwards)
-	  the plot's front wall       string-light bulbs hanging under its top; snowdrifts at its ends, on the walkway
-	  between neighbouring plots  lamp posts at the walkway; trees a little back, in the grass gap; blossom trees
-	                              there too, then scarecrows (each further back when there is one in front)
+	  beside each plot entrance   pumpkins, then presents, then potted roses, then painted eggs, then hay bales, then
+	                              clover patches, then swim rings, then beach balls (alternating sides, stepping
+	                              outwards)
+	  the plot's front wall       string-light bulbs hanging under its top; bunting pennants between them, a little
+	                              lower; snowdrifts at its ends, on the walkway
+	  between neighbouring plots  lamp posts at the walkway (beach umbrellas there too, or a little back when there
+	                              are lamps); trees a little back, in the grass gap; blossom trees there too, then
+	                              scarecrows, then rainbows with a pot of gold at their foot (each further back when
+	                              there is one in front)
 	  along both belt rails       small pumpkins, then small presents, then small roses, then small eggs, then small
-	                              cornucopias
+	                              cornucopias, then small pots of gold, then small beach balls
 	  above the walkway           bats; snowflakes a little higher and closer to the belt; heart balloons lower and
 	                              a little closer in; butterflies lower still, nearer the bases
 	  past both belt ends         ghosts; snowmen at the corners, a little closer in, then giant hearts, then
-	                              chocolate bunnies, then giant corn stalks
+	                              chocolate bunnies, then giant corn stalks, then sandcastles, then giant shamrocks
 ]]
 
 local MapThemeRules = require("./MapThemeRules")
@@ -50,6 +54,15 @@ export type PropKind =
 	| "scarecrow"
 	| "cornucopia"
 	| "cornStalk"
+	| "rainbow"
+	| "potOfGold"
+	| "cloverPatch"
+	| "beachUmbrella"
+	| "sandcastle"
+	| "swimRing"
+	| "beachBall"
+	| "pennant"
+	| "shamrock"
 
 -- One decoration to build. (faceX, faceZ) is the horizontal direction its front looks at.
 export type Prop = {
@@ -63,9 +76,11 @@ export type Prop = {
 	scale: number,
 	color: string?, -- bulbs: their colour (palette.bulbs); presents: the wrapping (palette.presents); roses and
 	-- balloons: their colour (palette.roses, palette.balloons); eggs: the shell (palette.eggs); blossom trees: their
-	-- blossom (palette.blossoms); butterflies: their wings (palette.butterflies)
+	-- blossom (palette.blossoms); butterflies: their wings (palette.butterflies); beach umbrellas: the canopy
+	-- (palette.umbrellas); swim rings: the ring (palette.rings); beach balls: their first panel (palette.ballPanels);
+	-- pennants: the flag (palette.pennants)
 	color2: string?, -- presents: the ribbon (palette.ribbons); roses: the middle bloom; eggs: the painted bands and
-	-- dots (palette.eggStripes); blossom trees: their second blossom colour
+	-- dots (palette.eggStripes); blossom trees: their second blossom colour; beach umbrellas: the towel under them
 }
 
 -- A plot entrance: the centre of its front wall's outer face, and the unit direction pointing out of the plot.
@@ -108,6 +123,16 @@ SeasonRules.PARTS_PER = {
 	-- a two-stroke stitched smile, a straw fringe under the hat
 	cornucopia = 10, -- three woven bands, the curled tip, the lip, the hollow, a pumpkin, an apple, grapes, an ear of corn
 	cornStalk = 8, -- the stalk, four long leaves, an ear of corn and its husk, the tassel
+	rainbow = 31, -- six bands of five segments each, a puff of cloud at its left foot
+	potOfGold = 6, -- the cauldron, its rim, a heap of chocolate gold coins, three coins standing in it
+	cloverPatch = 5, -- a low mound of clover, a four-leaf clover on it
+	beachUmbrella = 9, -- pole, canopy, four ribs across it, a band round its rim, the knob on top, a towel on the grass
+	sandcastle = 15, -- a mound, the keep and its top, three towers and their tops, a door, a flagpole and its flag, a
+	-- bucket, a spade and its handle
+	swimRing = 8, -- eight segments round the ring, in two colours
+	beachBall = 4, -- the ball, three coloured panels round it
+	pennant = 1,
+	shamrock = 10, -- its stem and three heart-shaped leaves, each two lobes and a point
 } :: { [PropKind]: number }
 
 -- The palette colours each prop kind is built with: a theme that places a kind must define these (lists need at
@@ -134,6 +159,15 @@ SeasonRules.PALETTE_KEYS = {
 	scarecrow = { "wood", "straw", "shirt", "overalls", "burlap", "hat" },
 	cornucopia = { "wicker", "produce" },
 	cornStalk = { "stalks", "corn" },
+	rainbow = { "rainbow", "cloud" },
+	potOfGold = { "cauldron", "gold" },
+	cloverPatch = { "clover" },
+	beachUmbrella = { "umbrellas", "stripe" },
+	sandcastle = { "sand", "flag", "bucket" },
+	swimRing = { "rings", "stripe" },
+	beachBall = { "ballPanels", "stripe" },
+	pennant = { "pennants" },
+	shamrock = { "clover" },
 } :: { [PropKind]: { string } }
 
 -- Every palette key and whether it holds a list of colours.
@@ -182,6 +216,19 @@ local PALETTE_LISTS: { [string]: boolean } = {
 	produce = true,
 	stalks = false,
 	corn = false,
+	rainbow = true,
+	cloud = false,
+	cauldron = false,
+	gold = false,
+	clover = false,
+	umbrellas = true,
+	stripe = false,
+	sand = false,
+	flag = false,
+	bucket = false,
+	rings = true,
+	ballPanels = true,
+	pennants = true,
 }
 
 local COUNT_KEYS = {
@@ -206,6 +253,14 @@ local COUNT_KEYS = {
 	"hayBalesPerPlot",
 	"beltCornucopiasPerSide",
 	"cornStalks",
+	"cloverPatchesPerPlot",
+	"beltPotsOfGoldPerSide",
+	"swimRingsPerPlot",
+	"beachBallsPerPlot",
+	"beltBeachBallsPerSide",
+	"pennantsPerPlot",
+	"sandcastles",
+	"shamrocks",
 }
 
 local HEX_PATTERN = "^#%x%x%x%x%x%x$"
@@ -221,6 +276,13 @@ local BLOSSOM_BEHIND_TREES = 10
 local EGG_TURNS = { 0.2, -0.3, 0.35, -0.15 }
 -- Hay bales are set down a little crooked, as if by hand (radians off the walkway direction).
 local BALE_TURNS = { 0.1, -0.14, 0.06, -0.08 }
+-- A rainbow's feet stand this far either side of its middle (the middle of its bands at scale 1: SeasonService builds
+-- them from 3.1 to 8.2 studs out); its pot of gold stands on the right one.
+SeasonRules.RAINBOW_FOOT = 5.65
+SeasonRules.RAINBOW_RADIUS = 8.2
+local RAINBOW_FOOT = SeasonRules.RAINBOW_FOOT
+-- Beach umbrellas stand at the walkway, or this far back into the grass gap when a theme has lamps there too.
+local UMBRELLA_BEHIND_LAMPS = 3
 
 -- The seasonal-theme events: the ids of the LiveOps events that switch a theme on. Only one of them runs at a time
 -- (LiveOpsRules.oneSeasonAtATime, DECISIONS.md #58), so only one's Snacklings and mutation can be live at once
@@ -320,10 +382,17 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: SeasonPalet
 	local rosesPerPlot = count(decorations.rosesPerPlot)
 	local eggsPerPlot = count(decorations.eggsPerPlot)
 	local balesPerPlot = count(decorations.hayBalesPerPlot)
+	local patchesPerPlot = count(decorations.cloverPatchesPerPlot)
+	local ringsPerPlot = count(decorations.swimRingsPerPlot)
+	local ballsPerPlot = count(decorations.beachBallsPerPlot)
 	local presentIndex = 0
 	local roseIndex = 0
 	local eggIndex = 0
 	local baleIndex = 0
+	local patchIndex = 0
+	local ringIndex = 0
+	local ballIndex = 0
+	local pennantIndex = 0
 	for _, entrance in map.entrances do
 		-- "Right" along the front wall (any perpendicular works: props are placed on both sides).
 		local rightX, rightZ = entrance.outZ, -entrance.outX
@@ -422,31 +491,94 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: SeasonPalet
 			})
 		end
 
-		-- String-light bulbs hanging along the front wall, split between both wall segments.
-		local bulbs = count(decorations.bulbsPerPlot)
+		-- Clover patches in the spots after those, each four-leaf clover turned its own way.
+		local firstPatch = firstBale + balesPerPlot
+		for k = firstPatch, firstPatch + patchesPerPlot - 1 do
+			patchIndex += 1
+			local x, z = at(slot(k), 2)
+			local turn = EGG_TURNS[(patchIndex - 1) % #EGG_TURNS + 1] * 1.5
+			add({
+				kind = "cloverPatch",
+				x = x,
+				y = map.groundY,
+				z = z,
+				faceX = entrance.outX * math.cos(turn) - entrance.outZ * math.sin(turn),
+				faceZ = entrance.outX * math.sin(turn) + entrance.outZ * math.cos(turn),
+				scale = 1.2,
+			})
+		end
+
+		-- Swim rings next, standing close to the wall and leaning back on it, facing the walkway.
+		local firstRing = firstPatch + patchesPerPlot
+		for k = firstRing, firstRing + ringsPerPlot - 1 do
+			ringIndex += 1
+			local x, z = at(slot(k), 1.2)
+			add({
+				kind = "swimRing",
+				x = x,
+				y = map.groundY,
+				z = z,
+				faceX = entrance.outX,
+				faceZ = entrance.outZ,
+				scale = 1,
+				color = cycle(palette.rings, ringIndex),
+			})
+		end
+
+		-- Then beach balls, each turned so its panels don't all line up.
+		local firstBall = firstRing + ringsPerPlot
+		for k = firstBall, firstBall + ballsPerPlot - 1 do
+			ballIndex += 1
+			local x, z = at(slot(k), 2)
+			local turn = ballIndex * 0.7
+			add({
+				kind = "beachBall",
+				x = x,
+				y = map.groundY,
+				z = z,
+				faceX = entrance.outX * math.cos(turn) - entrance.outZ * math.sin(turn),
+				faceZ = entrance.outX * math.sin(turn) + entrance.outZ * math.cos(turn),
+				scale = 1,
+				color = cycle(palette.ballPanels, ballIndex),
+			})
+		end
+
+		-- String-light bulbs hanging along the front wall, split between both wall segments; bunting pennants between
+		-- them, a little lower.
 		local segment = (map.plotWidth - map.entranceWidth) / 2
-		local perSide = { math.ceil(bulbs / 2), bulbs // 2 }
-		local index = 0
-		for sideIndex, side in { -1, 1 } do
-			local n = perSide[sideIndex]
-			for j = 1, n do
-				index += 1
-				local lateral = side * (map.entranceWidth / 2 + (j - 0.5) * segment / n)
-				local x, z = at(lateral, 0.5)
-				-- a gentle sag between the ends of each segment
-				local sag = math.sin((j - 0.5) / n * math.pi) * 0.5
-				add({
-					kind = "bulb",
-					x = x,
-					y = map.wallTopY - 0.5 - sag,
-					z = z,
-					faceX = entrance.outX,
-					faceZ = entrance.outZ,
-					scale = 1,
-					color = cycle(palette.bulbs, index),
-				})
+		local function alongWall(kind: PropKind, n: number, offset: number, drop: number)
+			local perSide = { math.ceil(n / 2), n // 2 }
+			local index = 0
+			for sideIndex, side in { -1, 1 } do
+				local m = perSide[sideIndex]
+				for j = 1, m do
+					index += 1
+					local lateral = side * (map.entranceWidth / 2 + (j - 0.5 + offset) * segment / (m + offset * 2))
+					local x, z = at(lateral, 0.5)
+					-- a gentle sag between the ends of each segment
+					local sag = math.sin((j - 0.5 + offset) / (m + offset * 2) * math.pi) * 0.5
+					local color: string? = nil
+					if kind == "bulb" then
+						color = cycle(palette.bulbs, index)
+					else
+						pennantIndex += 1
+						color = cycle(palette.pennants, pennantIndex)
+					end
+					add({
+						kind = kind,
+						x = x,
+						y = map.wallTopY - drop - sag,
+						z = z,
+						faceX = entrance.outX,
+						faceZ = entrance.outZ,
+						scale = 1,
+						color = color,
+					})
+				end
 			end
 		end
+		alongWall("bulb", count(decorations.bulbsPerPlot), 0, 0.5)
+		alongWall("pennant", count(decorations.pennantsPerPlot), 0.5, 1.4)
 
 		-- Snowdrifts against the front wall: one at each end, then further in.
 		for k = 0, count(decorations.snowPilesPerPlot) - 1 do
@@ -465,8 +597,9 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: SeasonPalet
 	end
 
 	-- Lamp posts at the walkway between neighbouring plots on the same side of the belt, trees further back, blossom
-	-- trees there too (or behind the trees).
+	-- trees there too (or behind the trees), beach umbrellas, rainbows.
 	local blossomIndex = 0
+	local umbrellaIndex = 0
 	for _, gap in gaps(map) do
 		if decorations.lampsBetweenPlots then
 			add({
@@ -524,6 +657,49 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: SeasonPalet
 				scale = 1.2, -- about 10 studs tall, its arms 6 across
 			})
 		end
+		if decorations.umbrellasBetweenPlots then
+			umbrellaIndex += 1
+			-- at the walkway where the lamps go, or a little back in the grass when there are lamps too
+			local out = if decorations.lampsBetweenPlots then -UMBRELLA_BEHIND_LAMPS else 1.5
+			add({
+				kind = "beachUmbrella",
+				x = gap.x + gap.outX * out,
+				y = map.groundY,
+				z = gap.z + gap.outZ * out,
+				faceX = gap.outX,
+				faceZ = gap.outZ,
+				scale = 1,
+				color = cycle(palette.umbrellas, umbrellaIndex),
+				color2 = cycle(palette.umbrellas, umbrellaIndex + 1),
+			})
+		end
+		if decorations.rainbowsBetweenPlots then
+			-- arching over the grass gap behind whatever else stands in it, facing the walkway, its pot of gold at the
+			-- foot on its own right (a frame facing (outX, outZ) has its right at (-outZ, outX)), a step in front
+			local back = TREE_BACK
+			for _, behind in
+				{
+					decorations.treesBetweenPlots,
+					decorations.blossomTreesBetweenPlots,
+					decorations.scarecrowsBetweenPlots,
+				}
+			do
+				if behind then
+					back += BLOSSOM_BEHIND_TREES
+				end
+			end
+			local x, z = gap.x - gap.outX * back, gap.z - gap.outZ * back
+			add({ kind = "rainbow", x = x, y = map.groundY, z = z, faceX = gap.outX, faceZ = gap.outZ, scale = 1 })
+			add({
+				kind = "potOfGold",
+				x = x - gap.outZ * RAINBOW_FOOT + gap.outX * 1.2,
+				y = map.groundY,
+				z = z + gap.outX * RAINBOW_FOOT + gap.outZ * 1.2,
+				faceX = gap.outX,
+				faceZ = gap.outZ,
+				scale = 1.15,
+			})
+		end
 	end
 
 	-- Small pumpkins, then small presents, then small roses, then small eggs, then small cornucopias, along both
@@ -533,12 +709,40 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: SeasonPalet
 	local beltRoses = count(decorations.beltRosesPerSide)
 	local beltEggs = count(decorations.beltEggsPerSide)
 	local beltCornucopias = count(decorations.beltCornucopiasPerSide)
-	local beltTotal = beltPumpkins + beltPresents + beltRoses + beltEggs + beltCornucopias
+	local beltPots = count(decorations.beltPotsOfGoldPerSide)
+	local beltBalls = count(decorations.beltBeachBallsPerSide)
+	local beforePots = beltPumpkins + beltPresents + beltRoses + beltEggs + beltCornucopias
+	local beltTotal = beforePots + beltPots + beltBalls
 	for sideIndex, side in { -1, 1 } do
 		for i = 1, beltTotal do
 			local x = (i - (beltTotal + 1) / 2) * (map.beltLength / beltTotal)
 			local z = side * (map.beltWidth / 2 + 2.2)
-			if i > beltPumpkins + beltPresents + beltRoses + beltEggs then
+			if i > beforePots + beltPots then
+				-- a beach ball resting by the rail, turned its own way
+				local n = (sideIndex - 1) * beltBalls + (i - beforePots - beltPots)
+				local turn = n * 1.1
+				add({
+					kind = "beachBall",
+					x = x,
+					y = map.groundY,
+					z = z,
+					faceX = math.sin(turn),
+					faceZ = math.cos(turn),
+					scale = 0.7,
+					color = cycle(palette.ballPanels, n + 1),
+				})
+			elseif i > beforePots then
+				-- a little pot of chocolate coins, its heap of gold towards the walkway
+				add({
+					kind = "potOfGold",
+					x = x,
+					y = map.groundY,
+					z = z,
+					faceX = 0,
+					faceZ = side,
+					scale = 0.85,
+				})
+			elseif i > beltPumpkins + beltPresents + beltRoses + beltEggs then
 				-- lying along the rail, its mouth spilling the harvest towards the walkway
 				add({
 					kind = "cornucopia",
@@ -722,10 +926,36 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: SeasonPalet
 			scale = 1.3, -- a landmark: about 11 studs tall
 		})
 	end
-	for i = 1, count(decorations.cornStalks) do
+	local cornStalks = count(decorations.cornStalks)
+	for i = 1, cornStalks do
 		local endSide, zSide, row = corner(snowmen + giantHearts + bunnies + i)
 		add({
 			kind = "cornStalk",
+			x = endSide * (map.beltLength / 2 + 8 + row * 7),
+			y = map.groundY,
+			z = zSide * (12 + row * 2),
+			faceX = -endSide,
+			faceZ = 0,
+			scale = 1.3, -- a landmark: about 11 studs tall
+		})
+	end
+	local sandcastles = count(decorations.sandcastles)
+	for i = 1, sandcastles do
+		local endSide, zSide, row = corner(snowmen + giantHearts + bunnies + cornStalks + i)
+		add({
+			kind = "sandcastle",
+			x = endSide * (map.beltLength / 2 + 8 + row * 7),
+			y = map.groundY,
+			z = zSide * (12 + row * 2),
+			faceX = -endSide,
+			faceZ = 0,
+			scale = 1.3, -- a landmark: its tallest tower about 9 studs up
+		})
+	end
+	for i = 1, count(decorations.shamrocks) do
+		local endSide, zSide, row = corner(snowmen + giantHearts + bunnies + cornStalks + sandcastles + i)
+		add({
+			kind = "shamrock",
 			x = endSide * (map.beltLength / 2 + 8 + row * 7),
 			y = map.groundY,
 			z = zSide * (12 + row * 2),

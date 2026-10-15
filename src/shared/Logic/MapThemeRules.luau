@@ -234,6 +234,8 @@ MapThemeRules.WEATHER = table.freeze({
 	popcorn = true,
 	steam = true,
 	smoke = true,
+	clovers = true, -- St Patrick's (Config/Seasons); a map may use it too
+	spray = true, -- Summer Splash's
 } :: { [string]: boolean })
 
 -- Enum.Material names a map may use for its ground, walkway and boundary wall.

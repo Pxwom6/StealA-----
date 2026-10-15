@@ -24,12 +24,15 @@ local Types = require("../Types")
 export type SeasonsConfig = Types.SeasonsConfig
 
 local Seasons: SeasonsConfig = {
+	-- Only one of these events runs at a time (DECISIONS.md #58): starting one ends the others.
 	eventThemes = {
 		Halloween2026 = "halloween",
 		Harvest2026 = "harvest",
 		Winter2026 = "winter",
 		Valentine2027 = "valentine",
+		StPatrick2027 = "clover",
 		Easter2027 = "spring",
+		Summer2027 = "summer",
 	},
 
 	themes = {
@@ -263,10 +266,99 @@ local Seasons: SeasonsConfig = {
 				bunnyBow = "#FF8FC7",
 			},
 		},
+
+		-- St Patrick's ("Lucky Clover"): a rainbow over every gap between two bases with its pot of gold at the foot,
+		-- clover patches by the entrances, little pots of chocolate coins along the belt, giant shamrocks at the belt
+		-- ends, green and gold string lights, a fresh spring afternoon and clover leaves drifting down. (398 parts: the
+		-- rainbows are 31 each, so the string lights are half the usual and the belt has two pots a side.)
+		clover = {
+			displayName = "Lucky Clover",
+			accentColor = "#2FBF5A",
+			priority = 1,
+			weather = "clovers",
+			lighting = {
+				clockTime = 14.6, -- a fresh spring afternoon
+				brightness = 2.6,
+				ambient = "#7E8C82",
+				outdoorAmbient = "#B6C8B8",
+				colorShiftTop = "#FFF2D8",
+				atmosphere = {
+					density = 0.22, -- clear spring air
+					offset = 0.1,
+					color = "#E4F2E6",
+					decay = "#A9C8B2",
+					glare = 0.25,
+					haze = 1.0,
+				},
+				colorCorrection = { tint = "#F7FFF4", brightness = 0.03, contrast = 0.06, saturation = 0.16 },
+				clouds = { cover = 0.42, density = 0.4, color = "#FFFFFF" },
+			},
+			decorations = {
+				cloverPatchesPerPlot = 2,
+				beltPotsOfGoldPerSide = 2,
+				bulbsPerPlot = 4,
+				rainbowsBetweenPlots = true,
+				shamrocks = 4,
+			},
+			palette = {
+				bulbs = { "#2EE66B", "#FFD23F", "#9CFF7A", "#1FBF55" },
+				rainbow = { "#F23A3A", "#FF8A1A", "#FFD21A", "#2FC452", "#2E8FF0", "#8A4FFF" },
+				cloud = "#FFFFFF",
+				cauldron = "#2A2A30",
+				gold = "#FFC93C",
+				clover = "#3BB54A",
+			},
+		},
+
+		-- Summer Splash: beach umbrellas between the bases, a swim ring and a beach ball by every entrance, beach balls
+		-- along the belt, sandcastles at the belt ends, bunting along the front walls, a bright midsummer noon and
+		-- sparkling spray in the air.
+		summer = {
+			displayName = "Summer Splash",
+			accentColor = "#18B8E8",
+			priority = 1,
+			weather = "spray",
+			lighting = {
+				clockTime = 12.4, -- a bright midsummer noon
+				brightness = 2.8,
+				ambient = "#8C96A4",
+				outdoorAmbient = "#C6D4E0",
+				colorShiftTop = "#FFF6E2",
+				atmosphere = {
+					density = 0.18, -- a clear sky, unlike the Heatwave's haze
+					offset = 0.06,
+					color = "#DDF1FF",
+					decay = "#9AC6E8",
+					glare = 0.45,
+					haze = 0.7,
+				},
+				colorCorrection = { tint = "#FFFDF2", brightness = 0.02, contrast = 0.1, saturation = 0.22 },
+				clouds = { cover = 0.3, density = 0.35, color = "#FFFFFF" },
+			},
+			decorations = {
+				swimRingsPerPlot = 1,
+				beachBallsPerPlot = 1,
+				beltBeachBallsPerSide = 3,
+				pennantsPerPlot = 12,
+				umbrellasBetweenPlots = true,
+				sandcastles = 4,
+			},
+			palette = {
+				bulbs = {},
+				umbrellas = { "#FF5A5A", "#2FA8FF", "#FFC23A", "#2FD07A", "#FF7AC8", "#7A6BFF" },
+				stripe = "#FFFFFF",
+				rings = { "#FF5A5A", "#FF9A2E", "#2FA8FF", "#FF5AA8" },
+				ballPanels = { "#FF3B3B", "#FFD23F", "#2F8BFF", "#2FD07A" },
+				pennants = { "#F23A3A", "#FFB21A", "#1E8BFF", "#1FBF5A", "#FF4FA8" },
+				sand = "#E8C27E",
+				flag = "#F23A3A",
+				bucket = "#2F8BFF",
+			},
+		},
 	},
 
 	maxParts = 400, -- Halloween builds 220, Winter 380 (DECISIONS.md #37), Valentine's 280 (#41), Easter 330 (#44),
-	-- Harvest Feast 386 (#50)
+	-- Harvest Feast 386 (#50), Lucky Clover 398 and Summer Splash 330 (#59)
 	transitionSeconds = 4,
 }
 

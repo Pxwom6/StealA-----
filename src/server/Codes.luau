@@ -66,6 +66,18 @@ local Codes = {
 		startsAt = 1805475600, -- 2027-03-19 17:00 UTC (Easter2027 starts)
 		expiresAt = 1806994800, -- 2027-04-06 07:00 UTC
 	},
+	-- St Patrick's 2027 ("Lucky Clover"): a Clover Pistachio Puff Frog, only while the event runs.
+	LUCKY27 = {
+		reward = { kind = "creature", creatureId = "pistachio_puff_frog", variant = "clover" },
+		startsAt = 1804870800, -- 2027-03-12 17:00 UTC (StPatrick2027 starts)
+		expiresAt = 1805353200, -- 2027-03-18 07:00 UTC
+	},
+	-- Summer Splash 2027: a Sunkissed Ice Pop Meerkat while the event runs.
+	SPLASH27 = {
+		reward = { kind = "creature", creatureId = "ice_pop_meerkat", variant = "sunkissed" },
+		startsAt = 1813942800, -- 2027-06-25 17:00 UTC (Summer2027 starts)
+		expiresAt = 1815375600, -- 2027-07-12 07:00 UTC
+	},
 }
 
 return Codes

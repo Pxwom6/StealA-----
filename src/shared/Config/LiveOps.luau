@@ -184,6 +184,59 @@ local LiveOps = {
 			title = "Easter luck",
 			durationSeconds = 1800,
 		},
+
+		-- St Patrick's 2027, "Lucky Clover": four event Snacklings (Config/Creatures), the Clover mutation
+		-- (Config/Mutations) and the "clover" seasonal theme (Config/Seasons: rainbows over the gaps between the bases,
+		-- each with its pot of gold, pots of chocolate coins and clover patches by every entrance, green string lights,
+		-- giant shamrocks at the belt ends, a fresh spring afternoon and drifting clover leaves).
+		-- Fri 12 Mar 17:00 UTC (12 PM EST / 9 AM PST) -> Thu 18 Mar 07:00 UTC (3 AM EDT / Wed midnight PDT): its lucky
+		-- weekend, then the week up to St Patrick's Day (Wed 17 Mar), ending a day and a half before Easter starts.
+		{
+			id = "StPatrick2027",
+			startsAt = 1804870800, -- 2027-03-12 17:00 UTC
+			endsAt = 1805353200, -- 2027-03-18 07:00 UTC
+			bannerText = "Lucky Clover: four-leaf Snacklings & Clover mutations!",
+			title = "Lucky Clover",
+			durationSeconds = 3600, -- `/event StPatrick2027` runs it for an hour
+		},
+		-- The lucky weekend: 2x luck from the moment the event starts (stacks with Server Luck, clamped by limits
+		-- below). Luck is only ever a free boost for everyone: nothing paid is tied to it. Fri 12 Mar 17:00 UTC (12 PM
+		-- EST / 9 AM PST) -> Sun 14 Mar 23:59 UTC (7:59 PM EDT / 4:59 PM PDT).
+		{
+			id = "StPatrickLuck2027",
+			startsAt = 1804870800, -- 2027-03-12 17:00 UTC
+			endsAt = 1805068740, -- 2027-03-14 23:59 UTC
+			luckMultiplier = 2,
+			title = "Lucky weekend",
+			durationSeconds = 1800,
+		},
+
+		-- Summer Splash 2027: four event Snacklings (Config/Creatures), the Sunkissed mutation (Config/Mutations) and
+		-- the "summer" seasonal theme (Config/Seasons: beach umbrellas between the bases, swim rings and beach balls by
+		-- every entrance and along the belt, sandcastles at the belt ends, bunting, a bright midsummer noon and
+		-- sparkling spray in the air). The Splash weekend's 2x Cash comes first in this list, so its banner shows instead
+		-- of the Summer one while it runs (the HUD shows the first active event that has a banner).
+		-- Fri 2 Jul 17:00 UTC (1 PM EDT / 10 AM PDT) -> Mon 5 Jul 23:59 UTC (7:59 PM EDT / 4:59 PM PDT): the US
+		-- Independence Day weekend (4 July is a Sunday; Monday is the holiday).
+		{
+			id = "SplashCash2027",
+			startsAt = 1814547600, -- 2027-07-02 17:00 UTC
+			endsAt = 1814831940, -- 2027-07-05 23:59 UTC
+			cashMultiplier = 2,
+			bannerText = "Splash weekend: 2x Cash!",
+			title = "2x Cash",
+			durationSeconds = 1800,
+		},
+		-- Fri 25 Jun 17:00 UTC (1 PM EDT / 10 AM PDT) -> Mon 12 Jul 07:00 UTC (3 AM EDT / Sun midnight PDT): two and a half
+		-- weeks at the start of the northern summer holidays.
+		{
+			id = "Summer2027",
+			startsAt = 1813942800, -- 2027-06-25 17:00 UTC
+			endsAt = 1815375600, -- 2027-07-12 07:00 UTC
+			bannerText = "Summer Splash: sunny Snacklings & Sunkissed mutations!",
+			title = "Summer Splash",
+			durationSeconds = 3600, -- `/event Summer2027` runs it for an hour
+		},
 	} :: { EventDef },
 
 	limits = {

@@ -5,9 +5,12 @@
 	lights, snowmen, snowflakes, snowdrifts; Valentine's: potted roses, heart balloons, giant hearts pierced by Cupid's
 	arrow, string lights, lamps; Easter: giant painted eggs, chocolate bunnies, blossom trees, butterflies, string
 	lights, lamps; Harvest Feast: plain pumpkins, hay bales, scarecrows, cornucopias, giant corn stalks, string lights,
-	lanterns) and a lighting mood; when it ends, they go away and the map's own lighting comes back. Which theme is on is
-	decided by Logic/SeasonRules.activeTheme from the active event ids, and
-	LiveOpsService tells this service whenever those change (events start and end by date while the server runs,
+	lanterns; Lucky Clover: rainbows over the gaps between bases with pots of gold at their feet, more pots by the
+	belt, clover patches, giant shamrocks, string lights; Summer Splash: beach umbrellas, swim rings, beach balls,
+	sandcastles, bunting) and a lighting mood;
+	when it ends, they go away and the map's own lighting comes back. Which theme is on is decided by
+	Logic/SeasonRules.activeTheme from the active event ids (only one seasonal event runs at a time, LiveOpsService),
+	and LiveOpsService tells this service whenever those change (events start and end by date while the server runs,
 	remote config, `/event <id>` and `/event off`).
 
 	Decorations live in workspace.SeasonDecor: every part is anchored, non-colliding, untouchable and invisible to
@@ -84,6 +87,19 @@ local FALLBACK_COLORS: { [string]: string } = {
 	produce = "#F28A1E",
 	stalks = "#7E9E3C",
 	corn = "#FFC93C",
+	rainbow = "#FF4B4B",
+	cloud = "#FFFFFF",
+	cauldron = "#26262C",
+	gold = "#FFC93C",
+	clover = "#3BB54A",
+	umbrella = "#FF5A5A",
+	stripe = "#FFFFFF",
+	sand = "#F2D49B",
+	flag = "#FF4B4B",
+	bucket = "#2FA8FF",
+	ring = "#FF5A5A",
+	ballPanel = "#FF3B3B",
+	pennant = "#FF5A5A",
 }
 
 local world: MapBuilder.World
@@ -108,6 +124,28 @@ local function part(props: { [string]: any }): Part
 	end
 	return p
 end
+
+-- A WedgePart set up like `part` (a full bottom and back face, its slope down to the front).
+local function wedge(props: { [string]: any }): WedgePart
+	local p = Instance.new("WedgePart")
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanTouch = false
+	p.CanQuery = false
+	p.CastShadow = false
+	p.Massless = true
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.Material = Enum.Material.SmoothPlastic
+	for key, value in props do
+		(p :: any)[key] = value
+	end
+	return p
+end
+
+-- Turns a wedge's triangle (its YZ plane, the right angle at the bottom back) to face the frame's front (-Z), the
+-- right angle at the top left: a pennant hanging from its top edge.
+local HANGING = CFrame.fromMatrix(Vector3.zero, Vector3.new(0, 0, -1), Vector3.new(0, -1, 0))
 
 local function light(parent: BasePart, color: Color3, range: number, brightness: number)
 	local pointLight = Instance.new("PointLight")
@@ -158,6 +196,11 @@ local TREE_TIERS = {
 	{ w = 2.4, h = 2.6, y = 11.3, turn = 0 },
 }
 local BAUBLE_CORNERS = { { { 1, 1 }, { -1, -1 } }, { { 1, -1 }, { -1, 1 } }, { { -1, 1 }, { 1, -1 } } }
+-- A rainbow's bands, and the straight segments each is built from round the arch; a swim ring's segments.
+local RAINBOW_BANDS = 6
+local RAINBOW_SEGMENTS = 5
+local SWIM_RING_SEGMENTS = 8
+local UMBRELLA_RIBS = 4
 
 -- A heart in the XY plane of `frame` (its face looks along the frame's front), `width` studs wide and `depth` thick:
 -- two lobes on the upper edges of a square turned 45 degrees. Balls make a puffy balloon; cylinders a flat sculpture.
@@ -1133,6 +1176,395 @@ local builders: { [string]: Builder } = {
 			CFrame = base * CFrame.new(0, 0.25 * s, 0),
 			Color = paletteColor(palette, "snow"),
 			Material = Enum.Material.Snow,
+			Parent = parent,
+		})
+	end,
+
+	-- A rainbow arching over the grass between two bases, facing the walkway: six bands, red outside to violet inside,
+	-- each a chain of five straight segments round the arch (an odd number, so the top is flat: from
+	-- SeasonRules.RAINBOW_RADIUS in), its left foot in a puff of cloud (its pot of gold, a prop of its own, stands at the
+	-- right foot).
+	rainbow = function(base, prop, palette, parent)
+		local s = prop.scale
+		local outer = SeasonRules.RAINBOW_RADIUS * s
+		local band = 0.85 * s
+		local step = math.pi / RAINBOW_SEGMENTS
+		for b = 0, RAINBOW_BANDS - 1 do
+			local radius = outer - (b + 0.5) * band
+			local color = listColor(palette.rainbow, b + 1, "rainbow")
+			-- each segment spans its slice of the arch with a little to spare, so neighbours close up
+			local length = 2 * radius * math.tan(step / 2) + 0.12 * s
+			for k = 0, RAINBOW_SEGMENTS - 1 do
+				local angle = (k + 0.5) * step
+				part({
+					Name = "RainbowBand",
+					Size = Vector3.new(length, band * 1.03, 0.6 * s),
+					CFrame = base
+						* CFrame.new(math.cos(angle) * radius, math.sin(angle) * radius, 0)
+						* CFrame.Angles(0, 0, angle + math.pi / 2),
+					Color = color,
+					Parent = parent,
+				})
+			end
+		end
+		local cloud = paletteColor(palette, "cloud")
+		local foot = SeasonRules.RAINBOW_FOOT * s
+		ellipsoid({
+			Name = "Cloud",
+			Size = Vector3.new(4.4, 2.6, 2.6) * s,
+			CFrame = base * CFrame.new(-foot - 0.3 * s, 0.9 * s, 0.1 * s),
+			Color = cloud,
+			Parent = parent,
+		})
+	end,
+
+	-- A giant shamrock standing on its stem: three heart-shaped leaves round the top, each pointing in to the middle.
+	shamrock = function(base, prop, palette, parent)
+		local s = prop.scale
+		local clover = paletteColor(palette, "clover")
+		local stemTop = 5.4 * s
+		part({
+			Name = "ShamrockStem",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(stemTop + 0.6 * s, 0.55 * s, 0.55 * s),
+			CFrame = base * CFrame.new(0, (stemTop + 0.6 * s) / 2, 0.15 * s) * UPRIGHT,
+			Color = clover:Lerp(Color3.new(0, 0, 0), 0.2),
+			Parent = parent,
+		})
+		local middle = base * CFrame.new(0, stemTop + 1.1 * s, 0)
+		for k, angle in { 90, 210, 330 } do
+			-- a heart's lobes are up and its point down: turn each so its point is at the middle
+			heart(
+				middle * CFrame.Angles(0, 0, math.rad(angle - 90)) * CFrame.new(0, 1.55 * s, 0),
+				3.3 * s,
+				0.45 * s,
+				false,
+				{
+					Name = "ShamrockLeaf",
+					Color = if k == 1 then clover:Lerp(Color3.new(1, 1, 1), 0.12) else clover,
+					Parent = parent,
+				}
+			)
+		end
+	end,
+
+	-- A black cauldron heaped with foil-wrapped chocolate coins, three of them standing up in the pile.
+	potOfGold = function(base, prop, palette, parent)
+		local s = prop.scale
+		local iron = paletteColor(palette, "cauldron")
+		local gold = paletteColor(palette, "gold")
+		ellipsoid({
+			Name = "Cauldron",
+			Size = Vector3.new(2.5, 2, 2.5) * s,
+			CFrame = base * CFrame.new(0, 1 * s, 0),
+			Color = iron,
+			Reflectance = 0.12,
+			Parent = parent,
+		})
+		part({
+			Name = "CauldronRim",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.3, 2.3, 2.3) * s,
+			CFrame = base * CFrame.new(0, 1.92 * s, 0) * UPRIGHT,
+			Color = iron:Lerp(Color3.new(1, 1, 1), 0.18),
+			Reflectance = 0.12,
+			Parent = parent,
+		})
+		ellipsoid({
+			Name = "GoldCoins",
+			Size = Vector3.new(2.05, 1.05, 2.05) * s,
+			CFrame = base * CFrame.new(0, 2.15 * s, 0),
+			Color = gold,
+			Material = Enum.Material.Foil,
+			Reflectance = 0.2,
+			Parent = parent,
+		})
+		for _, coin in
+			{
+				{ x = 0.4, y = 2.72, z = -0.2, yaw = 25, tilt = -18 },
+				{ x = -0.45, y = 2.6, z = 0.15, yaw = -35, tilt = 14 },
+				{ x = 0.05, y = 2.85, z = 0.45, yaw = 80, tilt = -8 },
+			}
+		do
+			part({
+				Name = "GoldCoin",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(0.14, 0.95, 0.95) * s,
+				-- a Roblox cylinder's flat faces are its X ends: turn them to the front, then lean the coin
+				CFrame = base
+					* CFrame.new(coin.x * s, coin.y * s, coin.z * s)
+					* CFrame.Angles(0, math.rad(90 + coin.yaw), math.rad(coin.tilt)),
+				Color = gold:Lerp(Color3.new(1, 1, 1), 0.12),
+				Material = Enum.Material.Foil,
+				Reflectance = 0.25,
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- A mound of clover with a big four-leaf clover on top, its leaves tipped up so it reads from the walkway.
+	cloverPatch = function(base, prop, palette, parent)
+		local s = prop.scale
+		local clover = paletteColor(palette, "clover")
+		ellipsoid({
+			Name = "CloverMound",
+			Size = Vector3.new(3.4, 1.3, 3) * s,
+			CFrame = base * CFrame.new(0, 0.3 * s, 0),
+			Color = clover:Lerp(Color3.new(0, 0, 0), 0.25),
+			Material = Enum.Material.Grass,
+			Parent = parent,
+		})
+		for i = 0, 3 do
+			local yaw = math.rad(45 + i * 90)
+			ellipsoid({
+				Name = "CloverLeaf",
+				Size = Vector3.new(1.45, 0.2, 1.75) * s,
+				CFrame = base
+					* CFrame.new(0, 1.12 * s, 0)
+					* CFrame.Angles(0, yaw, 0)
+					* CFrame.new(0, 0, -0.8 * s)
+					* CFrame.Angles(math.rad(34), 0, 0),
+				Color = if i % 2 == 0 then clover else clover:Lerp(Color3.new(1, 1, 1), 0.16),
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- A beach umbrella leaning out over the walkway: a coloured canopy with white ribs radiating from the top and a
+	-- white band round its rim, on a white pole, a towel spread under it.
+	beachUmbrella = function(base, prop, palette, parent)
+		local s = prop.scale
+		local white = paletteColor(palette, "stripe")
+		local lean = base * CFrame.Angles(math.rad(-11), 0, 0)
+		part({
+			Name = "UmbrellaPole",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(7.3, 0.28, 0.28) * s,
+			CFrame = lean * CFrame.new(0, 3.65 * s, 0) * UPRIGHT,
+			Color = white,
+			Parent = parent,
+		})
+		local top = lean * CFrame.new(0, 7.05 * s, 0)
+		local canopy = UiTheme.color(prop.color or FALLBACK_COLORS.umbrella)
+		ellipsoid({
+			Name = "Canopy",
+			Size = Vector3.new(7.8, 2.1, 7.8) * s,
+			CFrame = top,
+			Color = canopy,
+			Parent = parent,
+		})
+		-- each rib is a thin slice of the canopy's own shape standing a little proud of it, two ribs across the top
+		for i = 0, UMBRELLA_RIBS - 1 do
+			ellipsoid({
+				Name = "CanopyRib",
+				Size = Vector3.new(7.95, 2.34, 0.42) * s,
+				CFrame = top * CFrame.Angles(0, i * math.pi / UMBRELLA_RIBS, 0),
+				Color = white,
+				Parent = parent,
+			})
+		end
+		-- the rim: a thin disc just wider than the canopy at its widest, which shows as a band all the way round
+		part({
+			Name = "CanopyRim",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.34, 7.96, 7.96) * s,
+			CFrame = top * UPRIGHT,
+			Color = white,
+			Parent = parent,
+		})
+		part({
+			Name = "UmbrellaTop",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 0.7 * s,
+			CFrame = top * CFrame.new(0, 1.14 * s, 0),
+			Color = white,
+			Parent = parent,
+		})
+		part({
+			Name = "Towel",
+			Size = Vector3.new(2.6, 0.08, 5) * s,
+			CFrame = base * CFrame.new(1.3 * s, 0.04 * s, 0.6 * s) * CFrame.Angles(0, math.rad(14), 0),
+			Color = UiTheme.color(prop.color2 or prop.color or FALLBACK_COLORS.umbrella),
+			Material = Enum.Material.Fabric,
+			Parent = parent,
+		})
+	end,
+
+	-- A sandcastle on a mound of sand: a keep with a door, two towers in front and a taller one behind with a flag,
+	-- each tower capped a shade darker like the rim of the bucket it came out of; the bucket lies beside it.
+	sandcastle = function(base, prop, palette, parent)
+		local s = prop.scale
+		local sand = paletteColor(palette, "sand")
+		local rim = sand:Lerp(Color3.fromRGB(150, 110, 60), 0.18)
+		ellipsoid({
+			Name = "SandMound",
+			Size = Vector3.new(7.2, 1.6, 5.8) * s,
+			CFrame = base * CFrame.new(0, 0.25 * s, 0),
+			Color = sand:Lerp(Color3.fromRGB(150, 110, 60), 0.08),
+			Material = Enum.Material.Sand,
+			Parent = parent,
+		})
+		part({
+			Name = "Keep",
+			Size = Vector3.new(3.4, 2.6, 2.6) * s,
+			CFrame = base * CFrame.new(0, 2.05 * s, 0.1 * s),
+			Color = sand,
+			Material = Enum.Material.Sand,
+			Parent = parent,
+		})
+		part({
+			Name = "KeepTop",
+			Size = Vector3.new(3.8, 0.5, 3) * s,
+			CFrame = base * CFrame.new(0, 3.55 * s, 0.1 * s),
+			Color = rim,
+			Material = Enum.Material.Sand,
+			Parent = parent,
+		})
+		for _, tower in
+			{
+				{ x = -2.25, z = -1.25, h = 4.1, d = 1.7 },
+				{ x = 2.25, z = -1.25, h = 4.1, d = 1.7 },
+				{ x = 0, z = 1.55, h = 5.6, d = 1.95 },
+			}
+		do
+			part({
+				Name = "Tower",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(tower.h, tower.d, tower.d) * s,
+				CFrame = base * CFrame.new(tower.x * s, (0.55 + tower.h / 2) * s, tower.z * s) * UPRIGHT,
+				Color = sand,
+				Material = Enum.Material.Sand,
+				Parent = parent,
+			})
+			part({
+				Name = "TowerTop",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(0.6, tower.d + 0.4, tower.d + 0.4) * s,
+				CFrame = base * CFrame.new(tower.x * s, (0.55 + tower.h + 0.25) * s, tower.z * s) * UPRIGHT,
+				Color = rim,
+				Material = Enum.Material.Sand,
+				Parent = parent,
+			})
+		end
+		part({
+			Name = "CastleDoor",
+			Size = Vector3.new(1.1, 1.5, 0.2) * s,
+			CFrame = base * CFrame.new(0, 1.5 * s, -1.25 * s),
+			Color = sand:Lerp(Color3.new(0, 0, 0), 0.45),
+			Material = Enum.Material.Sand,
+			Parent = parent,
+		})
+		local poleTop = 0.55 + 5.6 + 0.55 + 1.5
+		part({
+			Name = "FlagPole",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(1.6, 0.12, 0.12) * s,
+			CFrame = base * CFrame.new(0, (poleTop - 0.8) * s, 1.55 * s) * UPRIGHT,
+			Color = Color3.fromRGB(245, 245, 245),
+			Parent = parent,
+		})
+		local flag = paletteColor(palette, "flag")
+		wedge({
+			Name = "Flag",
+			Size = Vector3.new(0.06, 0.7, 1.2) * s,
+			CFrame = base * CFrame.new(0.6 * s, (poleTop - 0.37) * s, 1.55 * s) * HANGING,
+			Color = flag,
+			Parent = parent,
+		})
+		-- the bucket it was made with, tipped over in front of it, and a spade stuck in the sand (in front, so neither
+		-- reaches past the mound's sides towards the factory or the chute)
+		part({
+			Name = "SandBucket",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(1.3, 1.25, 1.25) * s,
+			CFrame = base * CFrame.new(1.7 * s, 0.62 * s, -3.4 * s) * CFrame.Angles(0, math.rad(35), 0),
+			Color = paletteColor(palette, "bucket"),
+			Parent = parent,
+		})
+		local spade = base * CFrame.new(-1.9 * s, 1.15 * s, -3 * s) * CFrame.Angles(math.rad(-14), math.rad(20), 0)
+		part({
+			Name = "SpadeBlade",
+			Size = Vector3.new(0.85, 0.95, 0.1) * s,
+			CFrame = spade * CFrame.new(0, -0.45 * s, 0),
+			Color = flag,
+			Parent = parent,
+		})
+		part({
+			Name = "SpadeHandle",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(1.7, 0.18, 0.18) * s,
+			CFrame = spade * CFrame.new(0, 0.85 * s, 0) * UPRIGHT,
+			Color = flag:Lerp(Color3.new(1, 1, 1), 0.35),
+			Parent = parent,
+		})
+	end,
+
+	-- A swim ring standing on its edge by the wall, leaning back on it: eight puffy segments in two colours, overlapping
+	-- enough to read as one smooth ring.
+	swimRing = function(base, prop, palette, parent)
+		local s = prop.scale
+		local ring = UiTheme.color(prop.color or FALLBACK_COLORS.ring)
+		local white = paletteColor(palette, "stripe")
+		local radius, tube = 1.3 * s, 0.95 * s
+		local centre = base * CFrame.new(0, radius + tube / 2, 0) * CFrame.Angles(math.rad(12), 0, 0)
+		local length = 2 * math.pi * radius / SWIM_RING_SEGMENTS * 1.75
+		for i = 0, SWIM_RING_SEGMENTS - 1 do
+			local angle = (i + 0.5) * 2 * math.pi / SWIM_RING_SEGMENTS
+			ellipsoid({
+				Name = "SwimRing",
+				Size = Vector3.new(length, tube, tube),
+				CFrame = centre
+					* CFrame.new(math.cos(angle) * radius, math.sin(angle) * radius, 0)
+					* CFrame.Angles(0, 0, angle + math.pi / 2),
+				Color = if i % 2 == 0 then ring else white,
+				Reflectance = 0.08,
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- A beach ball: white, with three coloured bands running round it pole to pole (thin discs a hair wider than the
+	-- ball, so each shows its full width all the way round).
+	beachBall = function(base, prop, palette, parent)
+		local s = prop.scale
+		local d = 2 * s
+		local centre = base * CFrame.new(0, d / 2, 0) * CFrame.Angles(math.rad(14), 0, math.rad(9))
+		part({
+			Name = "BeachBall",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * d,
+			CFrame = centre,
+			Color = paletteColor(palette, "stripe"),
+			Reflectance = 0.06,
+			Parent = parent,
+		})
+		local panels = palette.ballPanels
+		local first = 1
+		if panels and prop.color then
+			first = table.find(panels, prop.color) or 1
+		end
+		for i = 0, 2 do
+			part({
+				Name = "BallPanel",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(0.62 * s, d * 1.02, d * 1.02),
+				CFrame = centre * CFrame.Angles(0, math.rad(i * 60), 0),
+				Color = listColor(panels, first + i, "ballPanel"),
+				Reflectance = 0.06,
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- One triangle of bunting hanging from its top edge, along the front wall.
+	pennant = function(base, prop, _palette, parent)
+		local s = prop.scale
+		wedge({
+			Name = "Pennant",
+			Size = Vector3.new(0.08, 1.3, 1.05) * s,
+			CFrame = base * CFrame.new(0, -0.65 * s, 0) * HANGING,
+			Color = UiTheme.color(prop.color or FALLBACK_COLORS.pennant),
+			Material = Enum.Material.Fabric,
 			Parent = parent,
 		})
 	end,

@@ -1864,6 +1864,164 @@ local CreatureLooks: { [string]: CreatureLook } = {
 			},
 		},
 	},
+
+	-- St Patrick's 2027 (recipe fallbacks: the polished models are in Config/CreatureParts). Each is sized to its tier's
+	-- reference height exactly (tools/importParts.luau), so no other Snackling changes size.
+	pistachio_puff_frog = {
+		size = 2.4,
+		plan = "blob",
+		feet = true,
+		body = { skin = "round", color = "#8CCB5E", w = 1, h = 0.72, d = 0.9 },
+		face = { eyes = "big", mouth = "smile", cheeks = "#FF9FB0", height = 0.62, spacing = 0.34 },
+		limbs = "#6FB04A",
+		features = {
+			{ kind = "belly", color = "#F2E2B8" },
+		},
+		toppings = {
+			{ kind = "swirl", on = "body", colors = { "#E2F4C8" }, n = 1 },
+			{ kind = "leaf", on = "body", colors = { "#2E9A48" } },
+		},
+	},
+	mint_meringue_hedgehog = {
+		size = 2.5,
+		plan = "blob",
+		feet = true,
+		body = { skin = "round", color = "#6B4A2E", w = 0.92, h = 0.72, d = 0.96 },
+		face = { eyes = "big", mouth = "smile", cheeks = "#FF9C8A", nose = "#2A1A10" },
+		limbs = "#4E3420",
+		features = {
+			{ kind = "spikes", color = "#E6FFF0" },
+			{ kind = "ears", style = "round", color = "#8A6440", scale = 0.6 },
+		},
+		toppings = {
+			{ kind = "chips", on = "body", colors = { "#7FE0A8" }, n = 6, spread = 0.7 },
+		},
+	},
+	lucky_loop_pony = {
+		size = 2.4,
+		plan = "quadruped",
+		legs = 0.34,
+		neck = 0.22,
+		body = { skin = "round", color = "#FFF6FA", w = 0.7, h = 0.56, d = 1 },
+		head = { skin = "round", color = "#FFF6FA", w = 0.52, h = 0.5, d = 0.64 },
+		face = { eyes = "big", mouth = "smile", cheeks = "#FFB0C8" },
+		limbs = "#F2E2EC",
+		features = {
+			{ kind = "snout", style = "dog", color = "#FFE8F0", color2 = "#C27A9A" },
+			{ kind = "horns", style = "unicorn", color = "#FFD84A" },
+			{ kind = "mane", color = "#FF7AB8" },
+			{ kind = "tail", style = "lion", color = "#FFF6FA", color2 = "#7AC8FF" },
+		},
+		toppings = {
+			{
+				kind = "balls",
+				on = "body",
+				colors = { "#FF5A5A", "#FFB23A", "#FFE04D", "#4CD964", "#3FA9F5" },
+				n = 6,
+				spread = 0.7,
+			},
+		},
+	},
+	chocolate_coin_dragon = {
+		size = 2.5,
+		plan = "biped",
+		body = { skin = "round", color = "#6B3A1E", w = 0.9, h = 0.82, d = 0.8 },
+		head = { skin = "round", color = "#2FB45A", w = 0.78, h = 0.66, d = 0.72 },
+		face = { eyes = "big", mouth = "fang", cheeks = "#FF9C8A" },
+		limbs = "#2FB45A",
+		features = {
+			{ kind = "snout", style = "bear", color = "#7CE07A", color2 = "#1E6A34" },
+			{ kind = "horns", style = "curved", color = "#FFD23F", color2 = "#FFE88A" },
+			{
+				kind = "wings",
+				style = "dragon",
+				color = "#7CE07A",
+				color2 = "#2FB45A",
+				color3 = "#1E8A44",
+				scale = 0.7,
+			},
+			{ kind = "tail", style = "long", color = "#2FB45A", color2 = "#1E8A44" },
+		},
+		toppings = {
+			{ kind = "discs", on = "body", colors = { "#FFC93C" }, n = 5, spread = 0.75 },
+		},
+	},
+
+	-- Summer Splash 2027 (recipe fallbacks, sized the same way).
+	ice_pop_meerkat = {
+		size = 2.4,
+		plan = "biped",
+		arms = true,
+		body = { skin = "can", color = "#FF8A3D", color2 = "#FFE6B8", w = 0.62, h = 0.86 },
+		head = { skin = "round", color = "#E8B87A", w = 0.5, h = 0.48 },
+		face = { eyes = "big", mouth = "smile", cheeks = "#FF9C8A", patches = "#5A3A22" },
+		limbs = "#C89058",
+		features = {
+			{ kind = "ears", style = "round", color = "#C89058", scale = 0.5 },
+			{ kind = "belly", color = "#FFF2DC" },
+			{ kind = "tail", style = "thin", color = "#D8A86A" },
+		},
+		toppings = {
+			{ kind = "sticks", on = "body", colors = { "#E2C08A" }, n = 1 },
+		},
+	},
+	shaved_ice_seal = {
+		size = 2.5,
+		plan = "swimmer",
+		body = { skin = "lumpy", color = "#F4FBFF", color2 = "#FFFFFF", n = 6, w = 0.86, h = 0.72, d = 1.1 },
+		face = { eyes = "big", mouth = "smile", cheeks = CHEEKS, nose = "#2A2A30" },
+		limbs = "#DCEAF2",
+		features = {
+			{ kind = "whiskers", color = "#B8C8D2" },
+			{ kind = "fins", style = "side", color = "#DCEAF2" },
+			{ kind = "tail", style = "fluke", color = "#DCEAF2" },
+		},
+		toppings = {
+			{ kind = "drips", on = "body", colors = { "#FF4F6A", "#2FA8FF" }, n = 4, at = 0.7 },
+		},
+	},
+	soft_serve_swan = {
+		size = 2.1,
+		plan = "biped",
+		arms = false,
+		legs = 0.3,
+		neck = 0.4,
+		body = { skin = "cone", color = "#FFFDF6", color2 = "#E8B260", w = 0.7, h = 0.66 },
+		head = { skin = "round", color = "#FFFDF6", w = 0.46, h = 0.44 },
+		face = { eyes = "big", mouth = "none", cheeks = "#FFB0C0" },
+		limbs = "#FF9A3D",
+		features = {
+			{ kind = "snout", style = "beak", color = "#FF9A3D" },
+			{ kind = "wings", style = "feather", color = "#FFFDF6", color2 = "#F2E8D8" },
+			{ kind = "tail", style = "fluffy", color = "#FFFDF6" },
+		},
+		toppings = {
+			{ kind = "sprinkles", on = "body", colors = SPRINKLES, n = 8, spread = 0.7 },
+		},
+	},
+	banana_split_whale = {
+		size = 2.85,
+		plan = "swimmer",
+		body = { skin = "round", color = "#4FA8E8", w = 0.84, h = 0.8, d = 1.2 },
+		face = { eyes = "big", mouth = "smile", cheeks = CHEEKS },
+		limbs = "#3A8ACC",
+		features = {
+			{ kind = "belly", color = "#F4F8FF" },
+			{ kind = "fins", style = "side", color = "#3A8ACC", scale = 0.8 },
+			{ kind = "tail", style = "fluke", color = "#3A8ACC" },
+		},
+		toppings = {
+			{
+				kind = "balls",
+				on = "body",
+				colors = { "#FF9AB8", "#FFF6E0", "#6A3A1E" },
+				n = 3,
+				spread = 0.4,
+				scale = 1.4,
+			},
+			{ kind = "cherry", on = "body", colors = { "#E8203F" } },
+		},
+	},
 }
 
 return CreatureLooks

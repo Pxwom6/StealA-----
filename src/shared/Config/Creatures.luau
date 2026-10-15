@@ -1076,6 +1076,102 @@ local Creatures: { CreatureDef } = {
 		flavor = "Never arrives empty-hooved.",
 		eventId = "Harvest2026",
 	},
+
+	-- Event: St Patrick's 2027 ("Lucky Clover") ---------------------------------------------------------------------
+	-- Only spawn while LiveOps event "StPatrick2027" runs, sharing their tier's odds like the other event ones
+	-- (BALANCE.md "St Patrick's"). Appended after everything else, so no earlier roll changes.
+	{
+		id = "pistachio_puff_frog",
+		displayName = "Pistachio Puff Frog",
+		rarity = "Rare",
+		price = 11000,
+		income = 145,
+		beltWeight = 30,
+		modelName = "PistachioPuffFrog",
+		flavor = "Leaps for luck. Lands in the cream.",
+		eventId = "StPatrick2027",
+	},
+	{
+		id = "mint_meringue_hedgehog",
+		displayName = "Mint Meringue Hedgehog",
+		rarity = "Epic",
+		price = 132000,
+		income = 852,
+		beltWeight = 30,
+		modelName = "MintMeringueHedgehog",
+		flavor = "Curls up crunchy. Uncurls minty.",
+		eventId = "StPatrick2027",
+	},
+	{
+		id = "lucky_loop_pony",
+		displayName = "Lucky Loop Pony",
+		rarity = "Legendary",
+		price = 3100000,
+		income = 6050,
+		beltWeight = 30,
+		modelName = "LuckyLoopPony",
+		flavor = "Gallops to the end of every rainbow.",
+		eventId = "StPatrick2027",
+	},
+	{
+		id = "chocolate_coin_dragon",
+		displayName = "Chocolate Coin Dragon",
+		rarity = "Mythic",
+		price = 76000000,
+		income = 51200,
+		beltWeight = 40,
+		modelName = "ChocolateCoinDragon",
+		flavor = "Sleeps on a hoard of chocolate gold.",
+		eventId = "StPatrick2027",
+	},
+
+	-- Event: Summer Splash 2027 ---------------------------------------------------------------------------------------
+	-- Only spawn while LiveOps event "Summer2027" runs, sharing their tier's odds like the other event ones (BALANCE.md
+	-- "Summer Splash"). Appended after everything else, so no earlier roll changes.
+	{
+		id = "ice_pop_meerkat",
+		displayName = "Ice Pop Meerkat",
+		rarity = "Rare",
+		price = 11800,
+		income = 155,
+		beltWeight = 30,
+		modelName = "IcePopMeerkat",
+		flavor = "Keeps watch. Keeps cool.",
+		eventId = "Summer2027",
+	},
+	{
+		id = "shaved_ice_seal",
+		displayName = "Shaved Ice Seal",
+		rarity = "Epic",
+		price = 145000,
+		income = 935,
+		beltWeight = 30,
+		modelName = "ShavedIceSeal",
+		flavor = "Claps for extra syrup.",
+		eventId = "Summer2027",
+	},
+	{
+		id = "soft_serve_swan",
+		displayName = "Soft Serve Swan",
+		rarity = "Legendary",
+		price = 3300000,
+		income = 6420,
+		beltWeight = 30,
+		modelName = "SoftServeSwan",
+		flavor = "Swirls as it glides.",
+		eventId = "Summer2027",
+	},
+	{
+		id = "banana_split_whale",
+		displayName = "Banana Split Whale",
+		rarity = "Mythic",
+		price = 82000000,
+		income = 55200,
+		beltWeight = 40,
+		modelName = "BananaSplitWhale",
+		flavor = "Spouts fizz. Carries dessert for everyone.",
+		eventId = "Summer2027",
+	},
 }
 
 return Creatures

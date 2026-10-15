@@ -476,6 +476,112 @@ T.describe("LiveOpsRules shipped Easter 2027 events", function()
 	end)
 end)
 
+T.describe("LiveOpsRules shipped St Patrick's 2027 events", function()
+	local patrick = findShipped("StPatrick2027")
+	local luck = findShipped("StPatrickLuck2027")
+	local all = LiveOps.events
+
+	T.it("runs Fri 12 Mar 17:00 UTC to Thu 18 Mar 07:00 UTC, opening with a 2x luck weekend", function()
+		T.expect(patrick.startsAt).toBe(utc(2027, 3, 12, 17, 0))
+		T.expect(patrick.endsAt).toBe(utc(2027, 3, 18, 7, 0))
+		T.expect(luck.startsAt).toBe(utc(2027, 3, 12, 17, 0))
+		T.expect(luck.endsAt).toBe(utc(2027, 3, 14, 23, 59))
+		T.expect(luck.luckMultiplier).toBe(2)
+		T.expect(luck.cashMultiplier or 1).toBe(1)
+		T.expect(luck.startsAt).toBeAtLeast(patrick.startsAt)
+		T.expect(luck.endsAt).toBeLessThan(patrick.endsAt)
+		T.expect(patrick.luckMultiplier or 1).toBe(1)
+		T.expect(patrick.cashMultiplier or 1).toBe(1)
+		-- St Patrick's Day itself (Wed 17 Mar) is inside it, all day round the world
+		T.expect(utc(2027, 3, 17, 0, 0)).toBeGreaterThan(patrick.startsAt)
+		T.expect(utc(2027, 3, 18, 0, 0)).toBeLessThan(patrick.endsAt)
+		-- between Valentine's and Easter, ending more than a day before Easter starts: one seasonal theme at a time,
+		-- with a gap so the two themes never swap straight over
+		T.expect(patrick.startsAt).toBeGreaterThan(findShipped("Valentine2027").endsAt)
+		T.expect(findShipped("Easter2027").startsAt - patrick.endsAt).toBeAtLeast(24 * 3600)
+	end)
+
+	T.it("switches on and off by date alone, with 2x luck on its first weekend only", function()
+		T.expect(LiveOpsRules.activeEventIds(all, patrick.startsAt - 1).StPatrick2027).toBeNil()
+		T.expect(LiveOpsRules.activeEventIds(all, patrick.startsAt))
+			.toEqual({ StPatrick2027 = true, StPatrickLuck2027 = true })
+		T.expect(LiveOpsRules.activeEventIds(all, patrick.endsAt - 1).StPatrick2027).toBe(true)
+		T.expect(LiveOpsRules.activeEventIds(all, patrick.endsAt).StPatrick2027).toBeNil()
+		local saturday = utc(2027, 3, 13, 12, 0)
+		T.expect(LiveOpsRules.luckMultiplier(all, {}, saturday, LiveOps.limits)).toBe(2)
+		T.expect(LiveOpsRules.luckChangesAt(all, {}, saturday, LiveOps.limits)).toBe(luck.endsAt)
+		T.expect(LiveOpsRules.cashMultiplier(all, saturday, LiveOps.limits)).toBe(1)
+		local stPatricksDay = utc(2027, 3, 17, 12, 0)
+		T.expect(LiveOpsRules.activeEventIds(all, stPatricksDay)).toEqual({ StPatrick2027 = true })
+		T.expect(LiveOpsRules.luckMultiplier(all, {}, stPatricksDay, LiveOps.limits)).toBe(1)
+		-- nothing seasonal in the gap before Easter
+		local gap = LiveOpsRules.activeEventIds(all, patrick.endsAt + 12 * 3600)
+		T.expect(gap.StPatrick2027).toBeNil()
+		T.expect(gap.Easter2027).toBeNil()
+	end)
+
+	T.it("shows the Lucky Clover banner with its countdown title, the luck weekend included", function()
+		for _, at in { patrick.startsAt, utc(2027, 3, 13, 12, 0), patrick.endsAt - 1 } do
+			local banner = LiveOpsRules.bannerEvent(all, at) :: LiveOpsRules.EventDef
+			T.expect(banner.id).toBe("StPatrick2027")
+			T.expect(banner.title).toBe("Lucky Clover")
+		end
+		T.expect(LiveOpsRules.bannerEvent(all, patrick.endsAt)).toBeNil()
+		T.expect(luck.bannerText).toBeNil() -- the HUD's luck pill counts the weekend down under the banner
+	end)
+end)
+
+T.describe("LiveOpsRules shipped Summer Splash 2027 events", function()
+	local summer = findShipped("Summer2027")
+	local splash = findShipped("SplashCash2027")
+	local all = LiveOps.events
+
+	T.it(
+		"runs Fri 25 Jun 17:00 UTC to Mon 12 Jul 07:00 UTC, with a 2x cash Independence Day weekend inside it",
+		function()
+			T.expect(summer.startsAt).toBe(utc(2027, 6, 25, 17, 0))
+			T.expect(summer.endsAt).toBe(utc(2027, 7, 12, 7, 0))
+			T.expect(splash.startsAt).toBe(utc(2027, 7, 2, 17, 0))
+			T.expect(splash.endsAt).toBe(utc(2027, 7, 5, 23, 59))
+			T.expect(splash.cashMultiplier).toBe(2)
+			T.expect(splash.luckMultiplier or 1).toBe(1)
+			T.expect(splash.startsAt).toBeGreaterThan(summer.startsAt)
+			T.expect(splash.endsAt).toBeLessThan(summer.endsAt)
+			T.expect(summer.luckMultiplier or 1).toBe(1)
+			T.expect(summer.cashMultiplier or 1).toBe(1)
+			-- well after Easter: one seasonal theme at a time
+			T.expect(summer.startsAt).toBeGreaterThan(findShipped("Easter2027").endsAt)
+		end
+	)
+
+	T.it("switches on and off by date alone, with 2x cash on the Splash weekend", function()
+		T.expect(LiveOpsRules.activeEventIds(all, summer.startsAt - 1).Summer2027).toBeNil()
+		T.expect(LiveOpsRules.activeEventIds(all, summer.startsAt).Summer2027).toBe(true)
+		T.expect(LiveOpsRules.activeEventIds(all, summer.endsAt - 1).Summer2027).toBe(true)
+		T.expect(LiveOpsRules.activeEventIds(all, summer.endsAt).Summer2027).toBeNil()
+		local firstMonday = utc(2027, 6, 28, 12, 0)
+		T.expect(LiveOpsRules.activeEventIds(all, firstMonday)).toEqual({ Summer2027 = true })
+		T.expect(LiveOpsRules.cashMultiplier(all, firstMonday, LiveOps.limits)).toBe(1)
+		local fourthOfJuly = utc(2027, 7, 4, 18, 0)
+		T.expect(LiveOpsRules.activeEventIds(all, fourthOfJuly)).toEqual({ Summer2027 = true, SplashCash2027 = true })
+		T.expect(LiveOpsRules.cashMultiplier(all, fourthOfJuly, LiveOps.limits)).toBe(2)
+		T.expect(LiveOpsRules.luckMultiplier(all, {}, fourthOfJuly, LiveOps.limits)).toBe(1)
+		T.expect(LiveOpsRules.cashMultiplier(all, splash.endsAt, LiveOps.limits)).toBe(1)
+	end)
+
+	T.it("shows the Summer Splash banner, and the Splash weekend's 2x Cash banner while that runs", function()
+		local banner = LiveOpsRules.bannerEvent(all, utc(2027, 6, 28, 12, 0)) :: LiveOpsRules.EventDef
+		T.expect(banner.id).toBe("Summer2027")
+		T.expect(banner.title).toBe("Summer Splash")
+		local weekend = LiveOpsRules.bannerEvent(all, utc(2027, 7, 4, 18, 0)) :: LiveOpsRules.EventDef
+		T.expect(weekend.id).toBe("SplashCash2027")
+		T.expect(weekend.title).toBe("2x Cash")
+		local after = LiveOpsRules.bannerEvent(all, splash.endsAt) :: LiveOpsRules.EventDef
+		T.expect(after.id).toBe("Summer2027")
+		T.expect(LiveOpsRules.bannerEvent(all, summer.endsAt)).toBeNil()
+	end)
+end)
+
 T.describe("LiveOpsRules boosts", function()
 	T.it("buying again extends time instead of multiplying", function()
 		local b1 = LiveOpsRules.extendBoost(nil, 0, 900, 2, "purchase", limits)

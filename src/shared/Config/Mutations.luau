@@ -15,9 +15,9 @@
 	order             display order (rarest last; event-only mutations after the permanent ones); also the order
 	                  mutations are rolled in, so append new ones with a higher order to keep existing rolls as they are
 	chance            probability per belt spawn, 0 < chance < 1; all chances together, event ones included, must stay
-	                  below 1 (CI keeps any one event's with the strongest map and modifier below 10%, every event's
-	                  together below 20%, and Golden Hour's x3 of what can roll beside it below 50%; BALANCE.md
-	                  "Harvest Feast" has today's numbers)
+	                  below 1. Only one seasonal event runs at a time (DECISIONS.md #58), so CI keeps any one event's,
+	                  with every luck or cash event's, the strongest map's and modifier's, below 10%, and Golden Hour's
+	                  x3 of what can roll beside it below 25% (BALANCE.md "Mutations" has today's numbers)
 	incomeMultiplier  × the creature's base income (>= 1)
 	priceMultiplier   × the creature's belt price, rounded to a whole number (>= 1); sell value follows it
 	announce*         server-wide banner on spawn / buy / steal (in addition to the rarity's own flags)
@@ -826,6 +826,57 @@ local Mutations: { MutationDef } = {
 			corona = true,
 		},
 		modifierId = "eclipse",
+	},
+
+	-- St Patrick's 2027 ("Lucky Clover"): a polished emerald, a soft gold glint and little clover leaves twirling up.
+	-- Rolls only while LiveOps event "StPatrick2027" runs; like the other event mutations, rarer than Golden and
+	-- stronger (order 42: rolled after every other one, so no existing roll changes). A glossy jewel green, where
+	-- Gingerbread Hollow's Gumdrop is matte sugar and Winter's Festive a knitted pine.
+	{
+		id = "clover",
+		displayName = "Clover",
+		color = "#3CCB6A",
+		order = 42,
+		chance = 0.02,
+		incomeMultiplier = 3,
+		priceMultiplier = 2,
+		announceOnSpawn = false,
+		announceOnBuy = false,
+		announceOnSteal = false,
+		look = {
+			material = "SmoothPlastic",
+			tint = "#119A4C",
+			tintStrength = 0.74,
+			reflectance = 0.3,
+			glow = "#FFD45A",
+			particles = "clovers",
+		},
+		eventId = "StPatrick2027",
+	},
+
+	-- Summer Splash 2027: warm coral as if after a day in the sun, a sunny glow and golden glints of sunlight drifting
+	-- off. Rolls only while LiveOps event "Summer2027" runs; like the other event mutations, rarer than Golden and
+	-- stronger (order 43: rolled after every other one, so no existing roll changes).
+	{
+		id = "sunkissed",
+		displayName = "Sunkissed",
+		color = "#FF9A6A",
+		order = 43,
+		chance = 0.02,
+		incomeMultiplier = 3,
+		priceMultiplier = 2,
+		announceOnSpawn = false,
+		announceOnBuy = false,
+		announceOnSteal = false,
+		look = {
+			material = "SmoothPlastic",
+			tint = "#FF8A6A",
+			tintStrength = 0.55,
+			reflectance = 0.18,
+			glow = "#FFD27A",
+			particles = "sunbeams",
+		},
+		eventId = "Summer2027",
 	},
 }
 

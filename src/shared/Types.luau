@@ -306,6 +306,19 @@ export type SeasonDecorations = {
 	beltCornucopiasPerSide: number?, -- small cornucopias along both belt rails (after any pumpkins, presents, roses
 	-- and eggs)
 	cornStalks: number?, -- giant corn stalks at the belt ends (after any snowmen, giant hearts and bunnies)
+	rainbowsBetweenPlots: boolean?, -- rainbows arching over the gaps between plots, a pot of gold at the foot of each
+	-- (behind any trees, blossom trees and scarecrows)
+	cloverPatchesPerPlot: number?, -- clover patches beside each plot entrance (after any pumpkins, presents, roses,
+	-- eggs and hay bales)
+	beltPotsOfGoldPerSide: number?, -- little pots of chocolate coins along both belt rails (after any cornucopias)
+	umbrellasBetweenPlots: boolean?, -- beach umbrellas in the gaps between plots, at the walkway (behind any lamps)
+	swimRingsPerPlot: number?, -- swim rings leaning on each plot's front wall beside the entrance (after any clover
+	-- patches)
+	beachBallsPerPlot: number?, -- beach balls beside each plot entrance (after any swim rings)
+	beltBeachBallsPerSide: number?, -- smaller ones along both belt rails (after any pots of gold)
+	pennantsPerPlot: number?, -- bunting pennants along each plot's front wall (between any string lights)
+	sandcastles: number?, -- sandcastles at the belt ends (after any snowmen, hearts, bunnies and corn stalks)
+	shamrocks: number?, -- giant shamrocks at the belt ends (after any sandcastles)
 }
 
 -- Colours of the props a theme uses ("#RRGGBB"). Only the keys of the props a theme places are needed
@@ -355,6 +368,19 @@ export type SeasonPalette = {
 	produce: { string }?, -- what spills out of them, in order: a pumpkin, an apple, grapes, an ear of corn
 	stalks: string?, -- the giant corn stalks and their leaves
 	corn: string?, -- their ears of corn
+	rainbow: { string }?, -- a rainbow's bands, outside in (six)
+	cloud: string?, -- the puffs of cloud at a rainbow's foot
+	cauldron: string?, -- the pots of gold
+	gold: string?, -- their foil-wrapped chocolate coins
+	clover: string?, -- clover patches (their mound a shade darker)
+	umbrellas: { string }?, -- beach umbrella canopies (and the towels under them)
+	stripe: string?, -- the white of umbrella stripes, swim rings and beach balls
+	sand: string?, -- sandcastles
+	flag: string?, -- the flag on each sandcastle (and the spade beside it)
+	bucket: string?, -- the bucket beside each sandcastle
+	rings: { string }?, -- swim rings
+	ballPanels: { string }?, -- the coloured panels of beach balls
+	pennants: { string }?, -- bunting
 }
 
 export type SeasonTheme = {
@@ -613,6 +639,8 @@ export type WeatherKind =
 	| "popcorn"
 	| "steam"
 	| "smoke"
+	| "clovers"
+	| "spray"
 
 export type MapThemeDef = {
 	displayName: string,

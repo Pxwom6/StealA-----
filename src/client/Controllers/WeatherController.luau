@@ -3,7 +3,7 @@
 	Weather for the current map theme (Config/MapThemes `weather`): particles drifting around this player's camera —
 	snow, embers, falling leaves, fireflies, candy sprinkles, desert dust, petals, stardust, pollen, feathers, bubbles,
 	chocolate shavings, confetti, lemonade fizz, heat shimmer, spring blossom, popping popcorn, breakfast steam, barbecue
-	smoke or rain. One invisible box follows the camera
+	smoke, clover leaves, sparkling spray or rain. One invisible box follows the camera
 	(it lives under the Camera, so only this client has it) and its emitter fills the air around you, which is far
 	cheaper than covering the whole map.
 
@@ -504,6 +504,57 @@ local RECIPES: { [Types.WeatherKind]: Recipe } = {
 			Rate = 10,
 			Rotation = NumberRange.new(0, 360),
 			RotSpeed = NumberRange.new(-15, 15),
+			EmissionDirection = Enum.NormalId.Top,
+		},
+	},
+	-- Clover leaves (St Patrick's): little leaves in three greens drifting down and turning over, now and then a fleck
+	-- of gold catching the light.
+	clovers = {
+		boxSize = Vector3.new(110, 1, 110),
+		offset = Vector3.new(0, 30, 0),
+		props = {
+			Texture = SPARKLE,
+			Color = colours({
+				Color3.fromRGB(64, 196, 92),
+				Color3.fromRGB(124, 227, 110),
+				Color3.fromRGB(34, 150, 70),
+				Color3.fromRGB(64, 196, 92),
+				Color3.fromRGB(255, 212, 90),
+			}),
+			LightEmission = 0.15,
+			Size = sequence({ { 0, 0.4 }, { 1, 0.34 } }),
+			Transparency = sequence({ { 0, 0.05 }, { 0.85, 0.1 }, { 1, 1 } }),
+			Speed = NumberRange.new(2, 3.4),
+			SpreadAngle = Vector2.new(30, 30),
+			Acceleration = Vector3.new(1.4, -0.25, 0.9),
+			Lifetime = NumberRange.new(7, 9),
+			Rate = 14,
+			Rotation = NumberRange.new(0, 360),
+			RotSpeed = NumberRange.new(-110, 110),
+			EmissionDirection = Enum.NormalId.Bottom,
+		},
+	},
+	-- Sparkling spray (Summer Splash): fine droplets glinting in the midday sun as they drift and fall, as if a
+	-- sprinkler were going just out of sight. Soft twinkles, no flashing.
+	spray = {
+		boxSize = Vector3.new(90, 8, 90),
+		offset = Vector3.new(0, 6, 0),
+		props = {
+			Texture = SPARKLE,
+			Color = colours({
+				Color3.fromRGB(255, 255, 255),
+				Color3.fromRGB(190, 236, 255),
+				Color3.fromRGB(120, 210, 255),
+			}),
+			LightEmission = 0.7,
+			Size = sequence({ { 0, 0 }, { 0.2, 0.22 }, { 0.5, 0.12 }, { 0.75, 0.2 }, { 1, 0 } }),
+			Speed = NumberRange.new(1, 2.5),
+			SpreadAngle = Vector2.new(60, 60),
+			Acceleration = Vector3.new(0.6, -3, 0.4),
+			Drag = 0.6,
+			Lifetime = NumberRange.new(1.6, 2.6),
+			Rate = 40,
+			Rotation = NumberRange.new(0, 360),
 			EmissionDirection = Enum.NormalId.Top,
 		},
 	},

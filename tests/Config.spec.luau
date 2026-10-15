@@ -134,6 +134,16 @@ local RELEASED_CREATURE_IDS = {
 	"pecan_pie_porcupine",
 	"sweet_potato_sloth",
 	"cornucopia_kirin",
+	-- St Patrick's 2027, "Lucky Clover" (event-only)
+	"pistachio_puff_frog",
+	"mint_meringue_hedgehog",
+	"lucky_loop_pony",
+	"chocolate_coin_dragon",
+	-- Summer Splash 2027 (event-only)
+	"ice_pop_meerkat",
+	"shaved_ice_seal",
+	"soft_serve_swan",
+	"banana_split_whale",
 }
 
 -- Every mutation id that has shipped (saved in players' CreatureRecord.variant). APPEND-ONLY, like creature ids: a
@@ -188,6 +198,8 @@ local RELEASED_MUTATION_IDS = {
 	"barbecue",
 	-- weather modifiers after the twenty-third map
 	"eclipse",
+	"clover", -- St Patrick's 2027 (event-only)
+	"sunkissed", -- Summer Splash 2027 (event-only)
 }
 
 T.describe("Config integrity", function()
@@ -547,6 +559,8 @@ local SEASONAL_EVENTS = {
 	{ eventId = "Valentine2027", name = "Valentine's 2027", mutation = "sweetheart" },
 	{ eventId = "Easter2027", name = "Easter 2027", mutation = "pastel" },
 	{ eventId = "Harvest2026", name = "Harvest Feast 2026", mutation = "maple" },
+	{ eventId = "StPatrick2027", name = "St Patrick's 2027", mutation = "clover" },
+	{ eventId = "Summer2027", name = "Summer Splash 2027", mutation = "sunkissed" },
 }
 
 -- One seasonal event at a time (DECISIONS.md #58): the events that switch on a theme never run together (LiveOps

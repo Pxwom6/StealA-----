@@ -706,6 +706,368 @@ T.describe("SeasonRules.layout (Harvest Feast on the real map)", function()
 	end)
 end)
 
+-- The nearest side wall of a plot beside `prop` on its side of the belt (the plots' fronts are at |z| = walkwayWidth).
+local function sideWallGap(prop: SeasonRules.Prop, rects: { Rect }): number
+	local nearest = math.huge
+	for _, rect in rects do
+		if (rect.minZ > 0) == (prop.z > 0) then
+			nearest = math.min(nearest, math.abs(prop.x - rect.minX), math.abs(prop.x - rect.maxX))
+		end
+	end
+	return nearest
+end
+
+-- Every other theme's props switched on beside `d`'s own (a theme is only data, so any mix must work).
+local function withEverything(d: Types.SeasonDecorations): Types.SeasonDecorations
+	local everything = table.clone(d)
+	for key, value in
+		{
+			pumpkinsPerPlot = 1,
+			presentsPerPlot = 1,
+			rosesPerPlot = 1,
+			eggsPerPlot = 1,
+			hayBalesPerPlot = 1,
+			cloverPatchesPerPlot = 1,
+			swimRingsPerPlot = 1,
+			beachBallsPerPlot = 1,
+			snowPilesPerPlot = 2,
+			bulbsPerPlot = 8,
+			pennantsPerPlot = 12,
+			beltPumpkinsPerSide = 1,
+			beltPresentsPerSide = 1,
+			beltRosesPerSide = 1,
+			beltEggsPerSide = 1,
+			beltCornucopiasPerSide = 1,
+			beltPotsOfGoldPerSide = 1,
+			beltBeachBallsPerSide = 1,
+			snowmen = 4,
+			giantHearts = 4,
+			chocolateBunnies = 4,
+			cornStalks = 4,
+			sandcastles = 4,
+			shamrocks = 4,
+			ghosts = 4,
+			bats = 6,
+			snowflakes = 8,
+			heartBalloons = 10,
+			butterflies = 12,
+		} :: { [string]: number }
+	do
+		if (everything :: any)[key] == nil then
+			(everything :: any)[key] = value
+		end
+	end
+	for _, key in
+		{
+			"lampsBetweenPlots",
+			"treesBetweenPlots",
+			"blossomTreesBetweenPlots",
+			"scarecrowsBetweenPlots",
+			"umbrellasBetweenPlots",
+			"rainbowsBetweenPlots",
+		}
+	do
+		(everything :: any)[key] = true
+	end
+	return everything
+end
+
+-- No two props of a layout on the same spot. Bunting hangs under a front wall's string lights, so a pennant may
+-- come closer to a bulb, as long as it hangs clearly below it.
+local function expectNoSharedSpots(props: { SeasonRules.Prop })
+	for i, a in props do
+		for j = i + 1, #props do
+			local b = props[j]
+			local apart = math.sqrt((a.x - b.x) ^ 2 + (a.y - b.y) ^ 2 + (a.z - b.z) ^ 2)
+			if (a.kind == "bulb" and b.kind == "pennant") or (a.kind == "pennant" and b.kind == "bulb") then
+				local bulb, pennant = if a.kind == "bulb" then a else b, if a.kind == "bulb" then b else a
+				if apart < 1.5 and bulb.y - pennant.y < 0.6 then
+					error(`a pennant at ({pennant.x}, {pennant.y}, {pennant.z}) hangs into a string light`)
+				end
+			elseif apart < 1.5 then
+				error(`{a.kind} and {b.kind} share the spot ({a.x}, {a.y}, {a.z})`)
+			end
+		end
+	end
+end
+
+T.describe("SeasonRules.layout (Lucky Clover on the real map)", function()
+	local map, rects = realMap()
+	local clover = theme("StPatrick2027")
+	local d = clover.decorations
+	local props = SeasonRules.layout(d, clover.palette, map)
+	local counts = countKinds(props)
+
+	T.it("is switched on by StPatrick2027 (its luck weekend too) and drifts clover leaves", function()
+		T.expect((SeasonRules.activeTheme(Seasons, { StPatrick2027 = true, StPatrickLuck2027 = true }))).toBe("clover")
+		T.expect((SeasonRules.activeTheme(Seasons, { StPatrickLuck2027 = true }))).toBeNil()
+		T.expect(clover.weather).toBe("clovers")
+	end)
+	T.it("stays within the part budget", function()
+		T.expect(SeasonRules.partCount(props)).toBeAtMost(Seasons.maxParts)
+		T.expect(SeasonRules.partCount(props)).toBe(398)
+	end)
+	T.it("places the configured number of each prop, and nothing from the other seasons", function()
+		local gapCount = 2 * (MAP.plotsPerSide - 1)
+		T.expect(counts.cloverPatch).toBe((d.cloverPatchesPerPlot :: number) * MAP.plotCount)
+		T.expect(counts.bulb).toBe((d.bulbsPerPlot :: number) * MAP.plotCount)
+		T.expect(counts.rainbow).toBe(gapCount)
+		-- one at every rainbow's foot, and the little ones along the belt
+		T.expect(counts.potOfGold).toBe(gapCount + 2 * (d.beltPotsOfGoldPerSide :: number))
+		T.expect(counts.shamrock).toBe(d.shamrocks)
+		local own = { cloverPatch = true, bulb = true, rainbow = true, potOfGold = true, shamrock = true }
+		for kind in counts do
+			if not own[kind] then
+				error(`Lucky Clover places a {kind}`)
+			end
+		end
+	end)
+	T.it("never puts anything inside a plot, on the belt or on the lobby spawn", function()
+		expectClearOfGameplay(props, rects)
+	end)
+	T.it("arches a rainbow over every grass gap between two bases, clear of both walls, facing the walkway", function()
+		for _, prop in props do
+			if prop.kind == "rainbow" then
+				T.expect(math.abs(prop.z)).toBeGreaterThan(MAP.walkwayWidth + 3)
+				T.expect(prop.faceZ * prop.z).toBeLessThan(0)
+				T.expect(prop.y).toBe(map.groundY)
+				-- its outer band reaches RAINBOW_RADIUS out either side of its middle
+				T.expect(sideWallGap(prop, rects)).toBeGreaterThan(SeasonRules.RAINBOW_RADIUS * prop.scale + 1)
+			end
+		end
+	end)
+	T.it("stands a pot of gold at the right foot of every rainbow, a step in front of it", function()
+		for _, rainbow in props do
+			if rainbow.kind == "rainbow" then
+				-- a frame facing (faceX, faceZ) has its right at (-faceZ, faceX)
+				local footX = rainbow.x - rainbow.faceZ * SeasonRules.RAINBOW_FOOT * rainbow.scale
+				local footZ = rainbow.z + rainbow.faceX * SeasonRules.RAINBOW_FOOT * rainbow.scale
+				local found = 0
+				for _, pot in props do
+					if
+						pot.kind == "potOfGold"
+						and (pot.z > 0) == (rainbow.z > 0)
+						and math.abs(pot.x - footX) < 0.01
+					then
+						found += 1
+						T.expect(math.abs(pot.z - footZ)).toBeNear(1.2, 1e-9)
+						T.expect(math.abs(pot.z)).toBeLessThan(math.abs(rainbow.z)) -- in front, towards the walkway
+						T.expect(pot.faceZ).toBe(rainbow.faceZ)
+						-- the cauldron is 2.5 studs across at scale 1
+						T.expect(sideWallGap(pot, rects)).toBeGreaterThan(1.25 * pot.scale + 0.5)
+					end
+				end
+				T.expect(found).toBe(1)
+			end
+		end
+	end)
+	T.it("sets the clover patches beside the entrances, looking out at the walkway", function()
+		for _, prop in props do
+			if prop.kind == "cloverPatch" then
+				T.expect(math.abs(prop.z)).toBeLessThan(MAP.walkwayWidth)
+				T.expect(math.abs(prop.z)).toBeGreaterThan(MAP.walkwayWidth - 3)
+				T.expect(prop.faceZ * prop.z).toBeLessThan(0)
+				T.expect(math.abs(prop.faceZ)).toBeGreaterThan(0.8) -- each clover turned its own way, never sideways
+			end
+		end
+	end)
+	T.it("lines little pots of gold along both belt rails, clear of the belt", function()
+		local onRails = 0
+		for _, prop in props do
+			if prop.kind == "potOfGold" and math.abs(prop.z) < MAP.walkwayWidth / 2 then
+				onRails += 1
+				T.expect(prop.faceZ * prop.z).toBeGreaterThan(0)
+				T.expect(prop.faceX).toBe(0)
+				T.expect(prop.scale).toBeLessThan(1)
+				T.expect(math.abs(prop.z) - 1.25 * prop.scale).toBeGreaterThan(Gameplay.belt.width / 2 + 0.5)
+			end
+		end
+		T.expect(onRails).toBe(2 * (d.beltPotsOfGoldPerSide :: number))
+	end)
+	T.it("stands the giant shamrocks past the belt ends, clear of the factory and the chute", function()
+		for _, prop in props do
+			if prop.kind == "shamrock" then
+				T.expect(math.abs(prop.x)).toBeGreaterThan(Gameplay.belt.length / 2)
+				T.expect(prop.y).toBe(map.groundY)
+				T.expect(prop.faceX * prop.x).toBeLessThan(0) -- looking back at the belt
+				-- its leaves reach 3.15 studs out at scale 1: the nearest stays clear of the factory intake and the
+				-- chute (|z| up to 7)
+				T.expect(math.abs(prop.z) - 3.15 * prop.scale).toBeGreaterThan(7)
+			end
+		end
+	end)
+	T.it("never stacks two props on the same spot", function()
+		expectNoSharedSpots(props)
+	end)
+	T.it("shares the spots with every other prop without overlapping", function()
+		local mixed = SeasonRules.layout(withEverything(d), clover.palette, map)
+		local mixedCounts = countKinds(mixed)
+		T.expect(mixedCounts.cloverPatch).toBe(counts.cloverPatch)
+		T.expect(mixedCounts.rainbow).toBe(counts.rainbow)
+		T.expect(mixedCounts.shamrock).toBe(counts.shamrock)
+		expectNoSharedSpots(mixed)
+		expectClearOfGameplay(mixed, rects)
+		-- with decorated trees, blossom trees and scarecrows there too, the rainbows arch behind all three, still
+		-- inside the plots' depth
+		for _, prop in mixed do
+			if prop.kind == "rainbow" then
+				T.expect(math.abs(prop.z)).toBeGreaterThan(MAP.walkwayWidth + 32)
+				T.expect(math.abs(prop.z)).toBeLessThan(MAP.walkwayWidth + MAP.plotDepth - SeasonRules.RAINBOW_RADIUS)
+			end
+		end
+	end)
+end)
+
+T.describe("SeasonRules.layout (Summer Splash on the real map)", function()
+	local map, rects = realMap()
+	local summer = theme("Summer2027")
+	local d = summer.decorations
+	local props = SeasonRules.layout(d, summer.palette, map)
+	local counts = countKinds(props)
+
+	T.it("is switched on by Summer2027 (its cash weekend too) and sparkles with spray", function()
+		T.expect((SeasonRules.activeTheme(Seasons, { Summer2027 = true, SplashCash2027 = true }))).toBe("summer")
+		T.expect((SeasonRules.activeTheme(Seasons, { SplashCash2027 = true }))).toBeNil()
+		T.expect(summer.weather).toBe("spray")
+	end)
+	T.it("stays within the part budget", function()
+		T.expect(SeasonRules.partCount(props)).toBeAtMost(Seasons.maxParts)
+		T.expect(SeasonRules.partCount(props)).toBe(330)
+	end)
+	T.it("places the configured number of each prop, and nothing from the other seasons", function()
+		T.expect(counts.swimRing).toBe((d.swimRingsPerPlot :: number) * MAP.plotCount)
+		T.expect(counts.beachBall)
+			.toBe((d.beachBallsPerPlot :: number) * MAP.plotCount + 2 * (d.beltBeachBallsPerSide :: number))
+		T.expect(counts.pennant).toBe((d.pennantsPerPlot :: number) * MAP.plotCount)
+		T.expect(counts.beachUmbrella).toBe(2 * (MAP.plotsPerSide - 1))
+		T.expect(counts.sandcastle).toBe(d.sandcastles)
+		local own = { swimRing = true, beachBall = true, pennant = true, beachUmbrella = true, sandcastle = true }
+		for kind in counts do
+			if not own[kind] then
+				error(`Summer Splash places a {kind}`)
+			end
+		end
+	end)
+	T.it("never puts anything inside a plot, on the belt or on the lobby spawn", function()
+		expectClearOfGameplay(props, rects)
+	end)
+	T.it("opens a beach umbrella at the walkway between every two bases, its canopy clear of both walls", function()
+		for _, prop in props do
+			if prop.kind == "beachUmbrella" then
+				T.expect(math.abs(prop.z)).toBeLessThan(MAP.walkwayWidth)
+				T.expect(math.abs(prop.z)).toBeGreaterThan(MAP.walkwayWidth - 3)
+				T.expect(prop.faceZ * prop.z).toBeLessThan(0)
+				-- the canopy (and the band round its rim) is 7.96 studs across at scale 1
+				T.expect(sideWallGap(prop, rects)).toBeGreaterThan(3.98 * prop.scale + 1)
+				T.expect(table.find(summer.palette.umbrellas :: { string }, prop.color :: string) ~= nil).toBe(true)
+				T.expect(prop.color ~= prop.color2).toBe(true) -- a towel of another colour under it
+			end
+		end
+	end)
+	T.it("leans a swim ring on the wall beside every entrance, clear of the entrance", function()
+		for _, prop in props do
+			if prop.kind == "swimRing" then
+				T.expect(math.abs(prop.z)).toBeLessThan(MAP.walkwayWidth)
+				T.expect(math.abs(prop.z)).toBeGreaterThan(MAP.walkwayWidth - 1.5)
+				T.expect(prop.faceZ * prop.z).toBeLessThan(0)
+				T.expect(table.find(summer.palette.rings :: { string }, prop.color :: string) ~= nil).toBe(true)
+				-- the ring is 3.55 studs across at scale 1: it stays beside the entrance, not in it
+				local entranceGap = math.huge
+				for _, entrance in map.entrances do
+					if (entrance.z > 0) == (prop.z > 0) then
+						entranceGap = math.min(entranceGap, math.abs(prop.x - entrance.x))
+					end
+				end
+				T.expect(entranceGap - 1.78 * prop.scale).toBeGreaterThan(MAP.entranceWidth / 2)
+			end
+		end
+	end)
+	T.it(
+		"rolls a beach ball beside every entrance and rests the rest along the belt rails, clear of the belt",
+		function()
+			local onRails = 0
+			for _, prop in props do
+				if prop.kind == "beachBall" then
+					T.expect(table.find(summer.palette.ballPanels :: { string }, prop.color :: string) ~= nil)
+						.toBe(true)
+					if math.abs(prop.z) < MAP.walkwayWidth / 2 then
+						onRails += 1
+						T.expect(prop.scale).toBeLessThan(1)
+						-- the ball is 2 studs across at scale 1
+						T.expect(math.abs(prop.z) - prop.scale).toBeGreaterThan(Gameplay.belt.width / 2 + 0.5)
+					else
+						T.expect(math.abs(prop.z)).toBeGreaterThan(MAP.walkwayWidth - 3)
+						T.expect(prop.scale).toBe(1)
+					end
+				end
+			end
+			T.expect(onRails).toBe(2 * (d.beltBeachBallsPerSide :: number))
+		end
+	)
+	T.it("hangs bunting along both halves of every front wall, below its top, in cycling colours", function()
+		local perPlot: { [number]: number } = {}
+		local colors: { [string]: boolean } = {}
+		for _, prop in props do
+			if prop.kind == "pennant" then
+				T.expect(math.abs(prop.z)).toBeNear(MAP.walkwayWidth - 0.5, 1e-9)
+				T.expect(prop.y).toBeLessThan(map.wallTopY - 1)
+				-- it hangs 1.3 studs below its top edge: the whole flag stays on the wall
+				T.expect(prop.y - 1.3).toBeGreaterThan(FLOOR_TOP + 1)
+				T.expect(prop.faceZ * prop.z).toBeLessThan(0)
+				local found = false
+				for index, entrance in map.entrances do
+					local lateral = math.abs(prop.x - entrance.x)
+					if (entrance.z > 0) == (prop.z > 0) and lateral < MAP.plotWidth / 2 then
+						T.expect(lateral).toBeGreaterThan(MAP.entranceWidth / 2 + 0.5) -- never across the entrance
+						perPlot[index] = (perPlot[index] or 0) + 1
+						found = true
+					end
+				end
+				T.expect(found).toBe(true)
+				colors[prop.color :: string] = true
+			end
+		end
+		for index = 1, MAP.plotCount do
+			T.expect(perPlot[index]).toBe(d.pennantsPerPlot)
+		end
+		for _, color in summer.palette.pennants :: { string } do
+			T.expect(colors[color]).toBe(true)
+		end
+	end)
+	T.it("builds the sandcastles past the belt ends, clear of the factory and the chute", function()
+		for _, prop in props do
+			if prop.kind == "sandcastle" then
+				T.expect(math.abs(prop.x)).toBeGreaterThan(Gameplay.belt.length / 2)
+				T.expect(prop.y).toBe(map.groundY)
+				T.expect(prop.faceX * prop.x).toBeLessThan(0) -- looking back at the belt
+				-- its mound is 7.2 studs across at scale 1 (the bucket and spade lie in front of the castle, inside
+				-- that): the near side stays clear of the factory intake and the chute (|z| up to 7)
+				T.expect(math.abs(prop.z) - 3.6 * prop.scale).toBeGreaterThan(7)
+			end
+		end
+	end)
+	T.it("never stacks two props on the same spot", function()
+		expectNoSharedSpots(props)
+	end)
+	T.it("shares the spots with every other prop without overlapping", function()
+		local mixed = SeasonRules.layout(withEverything(d), summer.palette, map)
+		local mixedCounts = countKinds(mixed)
+		T.expect(mixedCounts.swimRing).toBe(counts.swimRing)
+		T.expect(mixedCounts.pennant).toBe(counts.pennant)
+		T.expect(mixedCounts.beachUmbrella).toBe(counts.beachUmbrella)
+		T.expect(mixedCounts.sandcastle).toBe(counts.sandcastle)
+		expectNoSharedSpots(mixed)
+		expectClearOfGameplay(mixed, rects)
+		-- with lamps at the walkway too, the umbrellas stand a little back in the grass gap
+		for _, prop in mixed do
+			if prop.kind == "beachUmbrella" then
+				T.expect(math.abs(prop.z)).toBeGreaterThan(MAP.walkwayWidth)
+				T.expect(sideWallGap(prop, rects)).toBeGreaterThan(3.98 * prop.scale + 1)
+			end
+		end
+	end)
+end)
+
 T.describe("SeasonRules.validate", function()
 	local map = realMap()
 	T.it("accepts the shipped config", function()
