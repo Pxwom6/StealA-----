@@ -607,9 +607,12 @@ export type MapThemeDef = {
 
 export type MapRotation = {
 	enabled: boolean, -- false: a server keeps its first map
-	mapSeconds: number, -- how long each map stays
+	-- how long each map stays; also how long after a map comes up its signature mutation rolls (a map kept on by a
+	-- host stops rolling it then: MapThemeRules.signatureLive)
+	mapSeconds: number,
 	voteSeconds: number, -- the vote for the next map runs this long, ending as the map changes
 	candidates: number, -- maps on the ballot (never the current one)
+	creditSeconds: number, -- on a map this long, a player has played on it (its map_<id> flag: the map achievements)
 }
 
 -- Config: server modifiers (Config/Modifiers): short random twists that change how the server plays -----------------

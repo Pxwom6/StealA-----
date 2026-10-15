@@ -345,6 +345,23 @@ function MapThemeRules.voteOpensAt(switchAt: number, rotation: Types.MapRotation
 	return switchAt - math.min(rotation.voteSeconds, rotation.mapSeconds)
 end
 
+-- Seconds a map may stay past its turn before its signature mutation stops (the change itself lands a step late).
+MapThemeRules.SIGNATURE_SLACK = 5
+
+-- Whether the map's signature mutation rolls on a map that came up `age` seconds ago: for as long as the rotation
+-- keeps a map (`mapSeconds`), so in a server that stays on one map (a host turned the rotation off) it stops then,
+-- and choosing maps is never a faster farm for them than the rotation (with an owner's map cooldown as long:
+-- Config/Host).
+function MapThemeRules.signatureLive(age: number, rotation: Types.MapRotation): boolean
+	return age >= 0 and age < rotation.mapSeconds + MapThemeRules.SIGNATURE_SLACK
+end
+
+-- Whether a player who has been on the current map since `since` has played on it by `now` (its map_<id> flag, for
+-- the map achievements): `creditSeconds` on it, so a quick switch through every map counts for none of them.
+function MapThemeRules.creditDue(since: number, now: number, rotation: Types.MapRotation): boolean
+	return now - since >= rotation.creditSeconds
+end
+
 -- The flora kind that grows on a tree spot of `treeKind` ("round" or "pine") on this map.
 function MapThemeRules.floraFor(theme: MapThemeDef, treeKind: string): FloraKind
 	return if treeKind == "pine" then theme.flora.pine else theme.flora.round
@@ -435,6 +452,9 @@ function MapThemeRules.validate(
 		end
 		if not (rotation.candidates >= 2 and rotation.candidates <= 4 and rotation.candidates % 1 == 0) then
 			problem("rotation.candidates must be a whole number from 2 to 4")
+		end
+		if not (rotation.creditSeconds >= 30 and rotation.creditSeconds <= rotation.mapSeconds / 2) then
+			problem("rotation.creditSeconds must be at least 30 and at most half of mapSeconds")
 		end
 		if pickable < 2 then
 			problem("rotation needs at least two maps with a weight above 0")

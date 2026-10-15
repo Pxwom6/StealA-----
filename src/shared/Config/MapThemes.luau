@@ -1765,9 +1765,13 @@ local MapThemes: MapThemesConfig = {
 
 	rotation = {
 		enabled = true,
+		-- also how long a map's signature mutation rolls after it comes up, so a server kept on one map (a host turned
+		-- the rotation off) is no faster a farm for it than the rotation (DECISIONS.md "Review round 2 fixes")
 		mapSeconds = 20 * 60,
 		voteSeconds = 40,
 		candidates = 3,
+		-- three minutes on a map count as playing on it (Tourist, Explorer, Globetrotter): not a quick switch
+		creditSeconds = 3 * 60,
 	},
 
 	transitionSeconds = 4,

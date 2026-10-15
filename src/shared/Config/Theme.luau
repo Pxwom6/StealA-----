@@ -708,6 +708,7 @@ local Theme = {
 		hostRefusedNotAllowed = "Only hosts can do that.",
 		hostRefusedAdminOnly = "Only game admins can do that.",
 		hostRefusedNotHostable = "Private servers can't use that modifier.",
+		hostRefusedNotYours = "This modifier runs to its end: you can start yours when it's over.",
 		hostInvalid = "That didn't work. Check your choices and try again.",
 		hostWait = "Wait {time} before doing that again.",
 		hostSentAll = "🌍 Sent to every server!",

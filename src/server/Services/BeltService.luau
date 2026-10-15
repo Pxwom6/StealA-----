@@ -78,12 +78,12 @@ local function nextRandom(): number
 	return rng:NextNumber()
 end
 
--- What the mutation roll may use right now: the running LiveOps events, the current map and the running modifier
--- (MutationRules.conditions).
+-- What the mutation roll may use right now: the running LiveOps events, the current map (for as long as the rotation
+-- keeps a map: MapThemeService.signatureLive) and the running modifier (MutationRules.conditions).
 function BeltService.mutationConditions(): { [string]: boolean }
 	return MutationRules.conditions(
 		LiveOpsService.activeEventIds(),
-		MapThemeService.current(),
+		if MapThemeService.signatureLive() then MapThemeService.current() else nil,
 		ModifierService.current()
 	)
 end

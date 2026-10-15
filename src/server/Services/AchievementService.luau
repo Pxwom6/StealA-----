@@ -3,9 +3,10 @@
 	Achievements (Config/Achievements; rules: Logic/AchievementRules). Each player's counts are checked every few
 	seconds, and within a second of anything a goal counts (GameEvents: purchases, steals, new Snackdex entries...).
 	An achievement reached for the first time sets its flag ach_<id> before paying, so it pays once per account; its
-	prize goes through PrizeService, a toast says what it was, and its Roblox badge (if it has one) is awarded. The map
-	a player is on is recorded as the flag map_<id> for the map goals, and each GameEvents "milestone" as the flag
-	did_<milestone> for the milestone goals. The Trophies tab asks for the progress list (GetAchievements →
+	prize goes through PrizeService, a toast says what it was, and its Roblox badge (if it has one) is awarded. A map
+	a player has been on for Config/MapThemes.rotation.creditSeconds is recorded as the flag map_<id> for the map goals
+	(MapThemeRules.creditDue: a quick switch through the maps counts for none), and each GameEvents "milestone" as the
+	flag did_<milestone> for the milestone goals. The Trophies tab asks for the progress list (GetAchievements →
 	AchievementSync).
 ]]
 
@@ -18,6 +19,7 @@ local GameData = require(ReplicatedStorage.Shared.GameData)
 local AchievementRules = require(ReplicatedStorage.Shared.Logic.AchievementRules)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local GiftRules = require(ReplicatedStorage.Shared.Logic.GiftRules)
+local MapThemeRules = require(ReplicatedStorage.Shared.Logic.MapThemeRules)
 local Analytics = require(script.Parent.Analytics)
 local GameEvents = require(script.Parent.GameEvents)
 local MapThemeService = require(script.Parent.MapThemeService)
@@ -33,6 +35,22 @@ local FULL_CHECK_SECONDS = 10
 local catalog = GameData.catalog
 local pending: { [Session]: boolean } = setmetatable({}, { __mode = "k" }) :: any
 local checkedListeners: { (Session) -> () } = {}
+-- The map each player was last seen on, and since when (server time; the first check on it).
+local onMap: { [Session]: { id: string, since: number } } = setmetatable({}, { __mode = "k" }) :: any
+
+-- Records the current map as played on (map_<id>) once `session`'s player has been on it long enough.
+local function creditMap(session: Session)
+	local id = MapThemeService.current()
+	local t = workspace:GetServerTimeNow()
+	local seen = onMap[session]
+	if seen == nil or seen.id ~= id then
+		seen = { id = id, since = t }
+		onMap[session] = seen
+	end
+	if MapThemeRules.creditDue(seen.since, t, MapThemes.rotation) then
+		session.data.flags[AchievementRules.mapFlagKey(id)] = true
+	end
+end
 
 local function awardBadge(userId: number, badgeId: number)
 	task.spawn(function()
@@ -45,13 +63,13 @@ local function awardBadge(userId: number, badgeId: number)
 	end)
 end
 
--- Records the current map and pays every achievement `session` has newly reached.
+-- Records the current map (once played on long enough) and pays every achievement `session` has newly reached.
 function AchievementService.check(session: Session)
 	if not session.ready then
 		return
 	end
 	local data = session.data
-	data.flags[AchievementRules.mapFlagKey(MapThemeService.current())] = true
+	creditMap(session)
 	local ctx = AchievementRules.context(data, catalog.creatures, catalog.rarities)
 	for _, def in AchievementRules.newlyDone(Achievements, ctx, data.flags, catalog.rarities) do
 		data.flags[AchievementRules.flagKey(def.id)] = true
