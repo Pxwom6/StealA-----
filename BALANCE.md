@@ -674,6 +674,14 @@ spams locks, whatever the lock length.
 
 **New-player shield** (`Gameplay.grace`): the first 4 minutes of total play time; stealing ends it early.
 
+**Host panel gifts and private servers** (`Config/Host`, DECISIONS.md #49): an admin's "Gift everyone" pays each
+player N minutes of their own steady income, by the cash-pack rule (at least $150 a minute), N from 1 to 30. So the
+biggest gift is a little under a Snack Basket (35 minutes, 49 R$) for every player, and it means the same to a newcomer
+and to a big base. It happens only when Leo runs one, so the simulation leaves it out. A 30 s cooldown keeps a double
+tap from paying twice. A private server's owner can only start Sugar Rush, Quick Hands, Fortress or Snack Patrol,
+none of which changes income, prices, luck, mutations or the belt's pace, so a private server earns exactly what a
+public one does (CI checks the hostable set).
+
 **First-time tutorial** (`Config/Tutorial`): finishing it pays a one-time **$500** (the price of the cheapest
 Uncommon), usually within the first one to two minutes. Skipping it pays nothing, and players who already had progress
 when it shipped never get it. The simulation above does not include it; it can only bring the first Uncommon forward by
