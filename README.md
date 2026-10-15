@@ -168,7 +168,7 @@ Studio test purchases, etc.).
 | `lune run tools/worldsim/cosmetics.luau` | Titles, base skins and What's New through the real remotes on the offline server (CI) |
 | `lune run tools/worldsim/store.luau` | Auto Collect, the Lucky Spin packs and the Starter Pack through the real receipt path on the offline server (CI) |
 | `lune run tools/worldsim/review2.luau` | The second review's server fixes (drop modifiers started again, a private server's pace, Snack Attack's health) on the offline server, with a virtual clock (CI) |
-| `lune run tools/worldsim/review3.luau` | The third review's server fixes (the gentler "Need $X more?" offer...) on the offline server, with a virtual clock (CI) |
+| `lune run tools/worldsim/review3.luau` | The third review's server fixes (the gentler "Need $X more?" offer, toasts held during the tutorial, the shield's end, the gadget hint, Bounty Hunt and the shield, a full server) on the offline server, with a virtual clock (CI) |
 | `lune run tools/worldsim/exportSkins.luau [mapId] [out.json] [--vip]` | Dump a map with a different base skin on every base, for a 3D preview |
 | `lune run tools/worldsim/exportSeason.luau <mapId> <eventId> [out.json]` | Dump a map with a seasonal event's theme on (decorations and lighting), for a 3D preview |
 | `rojo build -o build/sync.rbxl` then `lune run tools/syncTest.luau build/sync.rbxl` | Check the Studio sync script (`studio/SyncFromGitHub.luau`) offline |
@@ -456,6 +456,11 @@ already had progress when it shipped never see it. Steps finish only when the se
   live (DECISIONS.md #21).
 * **Test it in Studio:** a fresh Studio player (API access off) starts it automatically; `/tutorial` starts it again
   any time.
+* **A quiet screen while it runs** (DECISIONS.md #58): world banners go to chat only, the Rewards button shows no red
+  dot, the HUD lock button never opens the Shop, and achievement, title and base skin toasts wait until 3 s after it
+  is completed (`Tutorial.quietSeconds`), so "You're ready! +$500" is read first; the Daily panel opens by itself only
+  once the toasts are done, and not before 6 s after it. A toast is never pushed off the screen before it has shown
+  for 1.5 s (`Logic/ToastQueue`).
 
 ### Snackling models
 
@@ -640,6 +645,9 @@ none until one is bought, and none during the first-time tutorial.
 | 🍌 Banana Peel | $15K | dropped at your feet on your own base's floor for 90 s; the first visitor to step on it slips (1.5 s), and a Snackling of yours they carry runs home, as after a tag | 45 s |
 | 🫧 Bubble Shield | $150K | nobody can tag you for 3 s (a bubble everyone sees); locks and peels still work | 40 s |
 | 🧲 Snack Magnet | $2.5M | collects the cash on all your pads from anywhere, as if you walked over them | 60 s |
+
+The first time a gadget a player doesn't own becomes affordable, one toast says so ("🥤 You can buy a Fizzy Soda with
+cash! Shop ▸ Gadgets"), once per account (the flag `tip_gadgets`), never during the tutorial (DECISIONS.md #58).
 
 The Auto Collect pass does the Snack Magnet's job every 5 s, so for its owners the magnet's button says AUTO (a tap
 explains) and the Gadgets tab doesn't sell it to them. While the Gadget Frenzy modifier runs, every gadget recharges in

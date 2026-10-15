@@ -1670,3 +1670,55 @@ physics pulls apart or a label the real text renderer clips shows first; one pas
 through every map, modifier and event by hand, and say exactly what to fix.
 **Reversal cost:** none — nothing in the game requires `SelfTest` (delete the folder and the two pastes).
 `DropService.clear`, `BossService.dismiss` and the `HudId` attributes are additive.
+
+### 58. Final pre-launch pass: deterministic CI, a kinder first session, small exploit and robustness fixes
+
+* **What:** the last fix pass before launch, from the three round-3 reviews (correctness, new-player experience,
+  performance). Each finding was checked again on main (c9fab64), fixed, and given a check that fails without the fix.
+  * **Deterministic CI.** AchievementService pays on its own one-second real-time loop, which could land inside a
+    check's window under load. `store.luau` switches achievements off (it tests none) and its fixed-odds check counts
+    only rolls made for a Spin; `server.luau`'s `buy` leaves out cash paid meanwhile (the `totalEarned` delta, as
+    `prelaunch.luau` does since a2a1bd5), and its codes and Bounty Hunt checks look at every toast since their action.
+  * **"Need $X more?" (#25):** only the three small packs (`cashOffer.packs`; CI allows none paying more than 15
+    minutes of income), never in the first 10 minutes of play, at most one every 3 minutes, and never for a gap of
+    45 s of income or less, when the toast says "Not enough cash yet: 12s more of income!" (`CashOfferRules.decide`).
+    A gap no small pack covers gets the plain toast: a Legendary tapped at $157/s no longer shows the 199 R$ Truck.
+  * **The HUD lock button** can't lock, so a tap says "Walk to the 🔒 button at your door", or while it recharges
+    "Lock ready in 1:12 · Instant Lock is in the Shop"; only a second tap within 4 s opens the Shop, and never during
+    the tutorial (`LockRules.pillTap`).
+  * **The tutorial's reward is read.** A toast is never pushed out before it has shown for 1.5 s; newer ones wait in
+    a queue of at most 6 (`Logic/ToastQueue`). Achievement, title and base skin toasts are held while the tutorial
+    runs and until 3 s after it is completed (`TutorialService.notifyWhenQuiet`, `Tutorial.quietSeconds`; the prizes
+    are still paid at once). The Daily panel opens by itself only once no toast is showing or waiting, and not before
+    6 s after the tutorial. While it runs, world banners go to chat only and the Rewards button has no red dot.
+  * **The new-player shield's end** is told once, whether its time is up or stealing ended it: "🛡️ Your shield is
+    gone. Lock your base when thieves come!" (LockService). Its length is unchanged.
+  * **Gadgets are found:** the first time one the player doesn't own becomes affordable, "🥤 You can buy a Fizzy Soda
+    with cash! Shop ▸ Gadgets", once per account (flag `tip_gadgets`), never in the tutorial
+    (`GadgetRules.affordableTip`).
+  * **Exploits:** a golden fork can't be found by anyone who teleported since it was hidden (`hiddenAt`), however long
+    they wait there; a private server starts its owner's map cooldown when the server starts, so #55's fair rule holds
+    from the first minute (closing and reopening it no longer gives a pick); Bounty Hunt never targets a newcomer who
+    is still shielded.
+  * **Robustness:** a full server (Max Players above the 8 bases: the live place is at 12) turns a player away before
+    loading their save, counting the bases taken and those promised to players still loading, and a player who never
+    gets a base keeps their save's `lastSeen` (`DataService.keepLastSeen`), so the kick no longer wipes their offline
+    earnings. The Studio sync stops before changing anything in a place without
+    `ServerScriptService.ServerPackages.ProfileStore`, and the README says how to add it. The Studio self-test runs
+    only when ProfileStore's `DataStoreState` is `NoAccess` or `NoInternet` (it refused only on `Access`).
+* **Tests:**
+  * Unit tests: 949 → 981 (CashOfferRules, `LockRules.pillTap`, ToastQueue, `TutorialRules.quiet`, `announceMode` and
+    `rewardsDot`, `GadgetRules.affordableTip`).
+  * `tools/worldsim/review3.luau` (new, in CI): the cash offer through BuyBeltItem, an achievement toast held until 3 s
+    after "You're ready!", the shield's end, the gadget hint, Bounty Hunt and the shield, a full server.
+  * `server.luau` (a teleport onto a fork, then walking into the next), `review2.luau` (a fresh private server),
+    `syncTest` (a place without ProfileStore), `selfTestOffline` (every DataStoreState that must refuse).
+* **No save change:** one new flag (`tip_gadgets`); everything else is session state.
+
+**Why:** the audience is young and mostly new. Their first session must teach the loop without a Robux prompt at the
+first small shortfall, a reward message thrown away unread, or a shield that ends in silence. Each exploit turned a
+public config or a server restart into an advantage, a full server cost returning players their offline earnings,
+and a CI that fails at random hides the failures that matter.
+**Reversal cost:** low. The numbers are data (`Monetization.cashOffer` within `CashOfferRules.LIMITS`,
+`Tutorial.quietSeconds`, `ToastQueue.SETTINGS`); the hint's flag is additive; the fork, private server and bounty
+rules are one condition each. Keep the full-server count and `keepLastSeen` while Max Players can exceed the bases.

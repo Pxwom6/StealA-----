@@ -63,7 +63,7 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | LiveOps | `LiveOpsService` (scheduled events, luck boosts, admin luck / events / announcements for HostService, active-event change listeners) | event pill (banner + countdown), luck pill | `LiveOpsRules` |
 | Host panel & cross-server | `HostService` (HostAction: roles, the whitelist, cooldowns, analytics; `/luck`, `/event`, `/announce`), `CrossServer` (MessagingService: versioned messages, dedupe, expiry, caps, pcall), `ShoutoutService` (rare pulls told to every other server) | `HostPanelController` (the dialog, from a Settings row shown only to hosts) | `HostRules`, `CrossServerRules`, `HostPanelLayout` |
 | Seasonal events | `SeasonService` (theme decorations + a lighting overlay in `WorldLighting` while a themed event runs) | event pill colour, "EVENT" tag on event Snacklings' billboards | `SeasonRules` |
-| First-time tutorial | `TutorialService` (steps finished by real purchases / collects / locks / steals, timeouts, one-time reward, existing players skipped) | `TutorialController` (banner under the cash, beam + bouncing arrow + highlight on the target, Skip) | `TutorialRules` |
+| First-time tutorial | `TutorialService` (steps finished by real purchases / collects / locks / steals, timeouts, one-time reward, existing players skipped) | `TutorialController` (banner under the cash, beam + bouncing arrow + highlight on the target, Skip) | `TutorialRules`; toasts that can wait held while it runs and just after (`quiet`), banners to chat and no Rewards dot meanwhile (`announceMode`, `rewardsDot`) |
 | Analytics | `Analytics` (onboarding funnel following the tutorial, store funnel, economy events) | sends whitelisted `store_opened` | – |
 | State sync | `Replication` (dirty-flag batching, 5 Hz) | `StateStore` | – |
 | Snackling models | podium models built by `PlotService` through `CreatureVisuals` | belt models (`BeltController`), idle bob / squash / sway (`IdleController`) | `CreatureRecipe` (recipe → parts), `IdleMotion` |
@@ -124,7 +124,7 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `RebirthMath` | rebirth cost, multiplier, lock bonus, preview (what you lose / gain) |
 | `OfflineEarnings` | capped offline earnings with clock-skew protection |
 | `ReceiptLedger` | idempotent receipt de-dup (bounded ring of PurchaseIds), purchase-history append |
-| `LockRules` | lock state machine: can lock / token lock / remaining / cooldown / mandatory vulnerable window |
+| `LockRules` | lock state machine: can lock / token lock / remaining / cooldown / mandatory vulnerable window; what a tap on the HUD lock button says (`pillTap`: the door, the time left, the Shop only on a second tap and never in the tutorial) |
 | `StealRules` | can grab / can tag (a Bubble Shield last) / can deliver / movement plausibility / carry timeout |
 | `GadgetRules` | gadget ownership as `gadget_<id>` flags, can buy / can use, cooldowns, the speed a gadget gives and the movement checks allow (capped with a modifier), shield and slip state, where a peel may go and who steps on it, the client view, `Config/Gadgets` validation |
 | `DailyStreak` | UTC-day streak maths and reward lookup |
@@ -159,6 +159,7 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `SettingsRules` | player settings as `settings_<key>` flags: keys, read, apply |
 | `ScreenLayout` | where every HUD element goes on any screen (around Roblox's top bar, player list and touch controls, out of the play zone), the gadget buttons' slots around TAG, and the check of it at nine screens in the busiest states (`tools/layoutCheck.luau`, DECISIONS.md #47, #48) |
 | `TextFit` | TextScaled's text size from FredokaOne's real metrics: proves HUD text stays readable on phones |
+| `ToastQueue` | the toast list's rules: none pushed out before it has shown 1.5 s, newer ones waiting in a queue of at most 6 (DECISIONS.md #58) |
 | `ModelPool` | bounded reuse pool keyed by look (belt Snackling models: one spare per kind, 32 in all, least recently used out first) |
 | `FxCulling` | lights and particles of far-away podium Snacklings off and back on, with a gap so they don't flicker |
 | `SnackdexRules` | discovery of Snacklings and (Snackling, mutation) pairs, tier progress over regular Snacklings (Event section apart), claim-once tier rewards, capped collection bonus, client view, config validation |
@@ -435,7 +436,7 @@ length; a Snack Attack giant's health counts the players playing (`BossRules.cou
 minute, out of the tutorial; `session.activeAt`). Studio: `/mod <id> [minutes]`, `/mod off`, `/mod list`,
 `/fork [n]`. Offline: `lune run tools/worldsim/server.luau` (CI) boots the server and plays a session that checks them
 (and `tools/worldsim/gadgets.luau` Gadget Frenzy); `lune run tools/worldsim/review2.luau` (CI) the second review's
-fixes.
+fixes, and `lune run tools/worldsim/review3.luau` (CI) the third's (DECISIONS.md #58).
 
 ## 13. Map and weather mutations
 
