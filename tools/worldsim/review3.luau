@@ -14,6 +14,8 @@
 	    paid at once, but its toast comes 3 s after the tutorial's "You're ready!"; after a skip, at once
 	  * the new-player shield ending (LockService): one toast when its time is up, or at once when it is ended early;
 	    never for a returning player who had none
+	  * finding gadgets (GadgetService): one toast when the first gadget becomes affordable, never during the
+	    tutorial, once per account (a rejoin too)
 
 	It fails on any error, any unexpected warning, or any check below.
 ]]
@@ -29,6 +31,7 @@ local OCTOBER_15_2026 = 1792023721
 
 local KIM, NIA, PIA = 9301, 9302, 9303
 local OLA, UMA, VAL = 9304, 9305, 9306
+local WES = 9307
 
 Sim.mock("ServerPackages/ProfileStore.lua", MockProfileStore)
 Sim.virtualClock = true
@@ -362,11 +365,47 @@ local function shieldEnds()
 	task.wait(0.3)
 end
 
+-- Finding gadgets -----------------------------------------------------------------------------------------------------
+
+local function gadgetTip()
+	print("Finding gadgets:")
+	local Gadgets = Sim.shared("Config/Gadgets")
+	local GadgetRules = Sim.shared("Logic/GadgetRules")
+	local UiTheme = Sim.shared("UiTheme")
+	local soda = Gadgets.gadgets.soda
+	local tip = Format.template(Theme.text.gadgetTip, { icon = soda.icon, name = UiTheme.text(soda.nameKey) })
+	local wes = join(WES, "Wes") -- brand new: in the first-time tutorial
+	local w = Sessions.get(wes)
+	w.data.cash = soda.price
+	task.wait(1.2) -- GadgetService looks once a second
+	check(toldAt(WES, 0, tip) == 0, "during the tutorial Wes hears nothing about gadgets, cash or not")
+	Sim.fireServer(wes, "SkipTutorial")
+	w.data.cash = soda.price - 1
+	task.wait(1.2)
+	check(toldAt(WES, 0, tip) == 0, "after it, $1 short of a Fizzy Soda: nothing yet")
+	w.data.cash = soda.price
+	task.wait(1.2)
+	local at = toldAt(WES, 0, tip)
+	check(at > 0 and w.data.flags[GadgetRules.TIP_FLAG] == true, `once he can buy one: "{tip}"`)
+	w.data.cash = 1e9
+	task.wait(1.2)
+	check(toldAt(WES, at, "with cash!") == 0, "never again, whatever he can afford")
+	Sim.removePlayer(wes)
+	task.wait(0.3)
+	wes = join(WES, "Wes")
+	Sessions.get(wes).data.cash = 1e9
+	task.wait(1.2)
+	check(toldAt(WES, at, "with cash!") == 0, "nor after a rejoin (the flag is in his save)")
+	Sim.removePlayer(wes)
+	task.wait(0.3)
+end
+
 local function scenario()
 	print("review 3 test:")
 	cashOffer()
 	toastsWait()
 	shieldEnds()
+	gadgetTip()
 	print(`  ({math.floor(Sim.now - OCTOBER_15_2026)} s of server time)`)
 end
 

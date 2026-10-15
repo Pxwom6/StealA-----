@@ -31,6 +31,10 @@
 	anchored, non-colliding models in workspace.Gadgets; Effect "gadget" (to the user), "slip" (to everyone) and
 	"shieldBlock" (to the tagger) cue sounds and bursts.
 
+	Finding them: the first time a gadget the player doesn't own becomes affordable with cash, one toast says so
+	("🥤 You can buy a Fizzy Soda with cash! Shop ▸ Gadgets"), once per account (the flag tip_gadgets), never during
+	the first-time tutorial or just after it (GadgetRules.affordableTip, checked once a second).
+
 	Analytics: gadget_bought (value = price, 01 = gadget id), gadget_used (01 = gadget id), gadget_effect (01 = gadget
 	id, 02 = "peelDrop" | "peelSlip" | "shieldBlock"; the shield one is logged by StealService).
 	Studio: /gadgets [all|off] grants or removes every gadget and recharges them (DevCommands).
@@ -58,6 +62,7 @@ local Remotes = require(script.Parent.Remotes)
 local Replication = require(script.Parent.Replication)
 local Sessions = require(script.Parent.Sessions)
 local StealService = require(script.Parent.StealService)
+local TutorialService = require(script.Parent.TutorialService)
 
 type Session = Sessions.Session
 type GadgetDef = Types.GadgetDef
@@ -477,6 +482,32 @@ function GadgetService.onLeaving(session: Session)
 	watching[session] = nil
 end
 
+-- The one-time hint that gadgets exist, when the first one becomes affordable (GadgetRules.affordableTip).
+local function stepTips()
+	for _, session in Sessions.all() do
+		if not session.ready then
+			continue
+		end
+		local flags = session.data.flags
+		local id = GadgetRules.affordableTip(
+			Gadgets,
+			flags,
+			session.data.cash,
+			TutorialService.quiet(session),
+			session.passes.AutoCollect
+		)
+		local def = if id then Gadgets.gadgets[id] else nil
+		if def then
+			flags[GadgetRules.TIP_FLAG] = true
+			Remotes.notify(
+				session.player,
+				Format.template(Theme.text.gadgetTip, { icon = def.icon, name = nameOf(def) }),
+				"info"
+			)
+		end
+	end
+end
+
 function GadgetService.start()
 	for _, problem in
 		GadgetRules.validate(
@@ -504,6 +535,15 @@ function GadgetService.start()
 	end)
 	Remotes.onIntent("BuyGadget", onBuy)
 	Remotes.onIntent("UseGadget", onUse)
+	task.spawn(function()
+		while true do
+			task.wait(1)
+			local ok, err = pcall(stepTips :: () -> ...any)
+			if not ok then
+				warn(`[Gadgets] tips: {err}`)
+			end
+		end
+	end)
 	task.spawn(function()
 		while true do
 			task.wait(Gadgets.peel.checkSeconds)

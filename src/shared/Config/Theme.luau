@@ -877,6 +877,8 @@ local Theme = {
 		gadgetMagnetName = "Snack Magnet",
 		gadgetMagnetInfo = "Collect the cash on all your pads at once, from anywhere.",
 		gadgetBought = "{icon} {name} is yours! Its button is by the TAG button.",
+		-- once per account, the first time a gadget becomes affordable (GadgetService; never in the first-time tutorial)
+		gadgetTip = "{icon} You can buy a {name} with cash! Shop ▸ Gadgets",
 		gadgetAlreadyOwned = "You already have that gadget!",
 		gadgetNotOwned = "Get that gadget in the Shop first!",
 		gadgetTutorial = "Gadgets unlock after the tutorial!",

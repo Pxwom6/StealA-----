@@ -81,6 +81,39 @@ function GadgetRules.owned(flags: { [string]: boolean }, config: GadgetsConfig):
 	return list
 end
 
+-- The save flag of the one-time hint that gadgets exist (review 3: new players never found the Shop's Gadgets tab).
+GadgetRules.TIP_FLAG = "tip_gadgets"
+
+-- The gadget to tell the player about now, or nil: the cheapest one they don't own and can afford with their cash (a
+-- magnet their Auto Collect pass covers left out), unless the hint has been shown on this account (TIP_FLAG) or
+-- `quiet` (the first-time tutorial runs or has just ended: TutorialService.quiet).
+function GadgetRules.affordableTip(
+	config: GadgetsConfig,
+	flags: { [string]: boolean },
+	cash: number,
+	quiet: boolean,
+	hasAutoCollect: boolean
+): string?
+	if quiet or flags[GadgetRules.TIP_FLAG] == true then
+		return nil
+	end
+	local best: string? = nil
+	local bestPrice = math.huge
+	for _, id in config.order do
+		local def = config.gadgets[id]
+		if
+			def ~= nil
+			and not GadgetRules.owns(flags, id)
+			and not GadgetRules.coveredByAutoCollect(def, hasAutoCollect)
+			and def.price <= cash
+			and def.price < bestPrice
+		then
+			best, bestPrice = id, def.price
+		end
+	end
+	return best
+end
+
 -- Gadget `id`'s place in config order: its button slot and its key (1, 2, 3...). nil for an unknown id.
 function GadgetRules.slot(config: GadgetsConfig, id: string): number?
 	return table.find(config.order, id)
