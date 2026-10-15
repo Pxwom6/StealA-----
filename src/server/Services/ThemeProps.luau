@@ -102,7 +102,7 @@ local function hexPrism(
 		local block = table.clone(props)
 		block.Size = Vector3.new(radius, height, radius * HEX_FLAT)
 		block.CFrame = frame * CFrame.Angles(0, math.rad(i * 60), 0) * CFrame.new(0, height / 2, 0)
-		local make = if i == 0 then first else kit.decor
+		local make: (props: { [string]: any }) -> Part = if i == 0 then first else kit.decor
 		make(block)
 	end
 end
@@ -1733,7 +1733,7 @@ local flora: { [string]: FloraBuilder } = {
 				* CFrame.Angles(0, i * 2.1 + random:NextNumber(-0.25, 0.25), 0)
 				* CFrame.new(0, 0, -0.6 * s)
 				* CFrame.Angles(-math.rad(random:NextNumber(5, 9)), 0, 0)
-			local make = if i == 0 then core(spot, kit) else kit.decor
+			local make: (props: { [string]: any }) -> Part = if i == 0 then core(spot, kit) else kit.decor
 			make({
 				Name = "Root",
 				Shape = Enum.PartType.Cylinder,
@@ -4147,17 +4147,17 @@ local landmarks: { [string]: LandmarkBuilder } = {
 		local radius = 6 * s
 		local step = radius * HEX_FLAT
 		local middle = frame * CFrame.new(0, step * 1.5, 0)
-		for i, cell in
-			{
-				{ angle = nil, length = 9, color = "honey" },
-				{ angle = 30, length = 12, color = "honeycomb" },
-				{ angle = 90, length = 10, color = "honeycombDark" },
-				{ angle = 150, length = 12, color = "honeycomb" },
-				{ angle = 210, length = 8, color = "honey" },
-				{ angle = 270, length = 11, color = "honeycombDark" },
-				{ angle = 330, length = 8, color = "honey" },
-			}
-		do
+		-- the middle cell (no angle), then the six round it
+		local cells: { { angle: number?, length: number, color: string } } = {
+			{ angle = nil, length = 9, color = "honey" },
+			{ angle = 30, length = 12, color = "honeycomb" },
+			{ angle = 90, length = 10, color = "honeycombDark" },
+			{ angle = 150, length = 12, color = "honeycomb" },
+			{ angle = 210, length = 8, color = "honey" },
+			{ angle = 270, length = 11, color = "honeycombDark" },
+			{ angle = 330, length = 8, color = "honey" },
+		}
+		for i, cell in cells do
 			local offset = if cell.angle
 				then Vector3.new(math.cos(math.rad(cell.angle)) * step, math.sin(math.rad(cell.angle)) * step, 0)
 				else Vector3.zero

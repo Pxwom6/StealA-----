@@ -210,6 +210,7 @@ export type MutationLook = {
 	glow: string?, -- "#RRGGBB": a soft point light in this colour (ghostly / glowing looks)
 	particles: string?, -- a particle preset around the body (Logic/Catalog.MUTATION_PARTICLES: "snow", "embers"...)
 	halo: boolean?, -- a glowing golden ring floating above the head
+	wings: boolean?, -- two glassy bee wings standing up from the back
 }
 
 export type MutationDef = {

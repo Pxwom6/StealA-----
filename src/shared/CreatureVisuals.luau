@@ -504,6 +504,9 @@ local MUTATION_PARTICLES: { [string]: { [string]: any } } = {
 -- The halo: a ring of glowing segments floating above the head (MutationLook.halo).
 local HALO_SEGMENTS = 8
 local HALO_COLOR = "#FFE066"
+-- Bee wings: two glassy wings standing up from the back, leaning out (MutationLook.wings).
+local WING_COLOR = "#EAF6FF"
+local WING_LEAN = math.rad(32)
 
 -- Whether `name` is a particle preset this module can build (MutationLook.particles).
 function CreatureVisuals.hasParticles(name: string): boolean
@@ -765,6 +768,31 @@ local function addMutationLook(model: Model, mutation: Types.MutationDef)
 			})
 			segment:SetAttribute("MutationSkip", true)
 			segment.Parent = model
+		end
+	end
+	if look.wings and root ~= nil then
+		-- On the back of the model (it faces -Z), sized to it: each wing an upright glassy ellipsoid leaning outward.
+		local cf, size = model:GetBoundingBox()
+		local height = math.clamp(size.Y * 0.5, 0.8, 3.2)
+		local length = math.clamp(size.Z * 0.55, 0.8, 3.4)
+		local top = cf.Position.Y + size.Y * 0.32
+		local back = root.Position.Z + size.Z * 0.2
+		for _, side in { -1, 1 } do
+			local wing = newPart("Part", {
+				Name = "Wing",
+				Size = Vector3.new(0.1, height, length),
+				CFrame = CFrame.new(root.Position.X + side * size.X * 0.16, top, back)
+					* CFrame.Angles(0, 0, -side * WING_LEAN)
+					* CFrame.new(0, height * 0.42, 0),
+				Color = UiTheme.color(WING_COLOR),
+				Transparency = 0.35,
+				Reflectance = 0.3,
+			})
+			local mesh = Instance.new("SpecialMesh")
+			mesh.MeshType = Enum.MeshType.Sphere
+			mesh.Parent = wing
+			wing:SetAttribute("MutationSkip", true)
+			wing.Parent = model
 		end
 	end
 	if look.glow and body ~= nil and body:IsA("BasePart") then
