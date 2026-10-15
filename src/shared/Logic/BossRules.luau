@@ -49,6 +49,23 @@ function BossRules.cash(config: BossConfig, share: number, income: number): numb
 	return EconomyMath.cashPackAmount(income, { incomeSeconds = seconds, minimum = config.cash.minimum })
 end
 
+-- Whether a hit seen at `now` starts a new flinch on a client whose last one started at `lastStart` (seconds, one
+-- clock): never with Reduce effects (`reduced`), and at most once every `flinch.gapSeconds`, so the giant can't
+-- flash faster than that however many players hit it.
+function BossRules.startsFlinch(config: BossConfig, lastStart: number, now: number, reduced: boolean): boolean
+	return not reduced and now - lastStart >= config.flinch.gapSeconds
+end
+
+-- The red fill's transparency `since` seconds after a flinch started: strongest (`flinch.peakFill`) at once, then
+-- fading back to none (1) over `flinch.seconds`: a soft pulse, not an on/off blink.
+function BossRules.flinchFill(config: BossConfig, since: number): number
+	local flinch = config.flinch
+	if not (since >= 0 and since < flinch.seconds) then
+		return 1
+	end
+	return flinch.peakFill + (1 - flinch.peakFill) * (since / flinch.seconds)
+end
+
 -- How long `players` hitting as fast as the server counts take to bring it down (seconds), for the balance notes.
 function BossRules.fastestTakedown(config: BossConfig, players: number): number
 	return BossRules.maxHp(config, players) / (config.hitsPerSecond * math.max(1, players))
@@ -91,6 +108,13 @@ function BossRules.validate(config: BossConfig, rarityIds: { [string]: boolean }
 	end
 	range(config.luck, 1, 6, "luck")
 	range(config.mutationChance, 1, 4, "mutationChance")
+	-- photosensitivity: flashing stays at two a second or fewer (well under the usual limit of three), and soft
+	range(config.flinch.seconds, 0.05, 0.4, "flinch.seconds")
+	range(config.flinch.gapSeconds, 0.5, 5, "flinch.gapSeconds (at most 2 flashes a second)")
+	if not (config.flinch.seconds < config.flinch.gapSeconds) then
+		problem("flinch.seconds must be shorter than flinch.gapSeconds")
+	end
+	range(config.flinch.peakFill, 0.5, 1, "flinch.peakFill (never more than half-opaque)")
 	-- the whole server hitting flat out must be able to bring it down in time
 	if BossRules.fastestTakedown(config, 1) > config.lifetimeSeconds * 0.6 then
 		problem("one player hitting flat out must be able to take it down in well under its lifetime")

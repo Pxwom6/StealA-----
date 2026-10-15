@@ -10,7 +10,8 @@
 	whatever the server size. Taken down within `lifetimeSeconds`, it pays everyone who landed `minHits` or more: cash
 	sized from their own steady income, more for a bigger share of the hits; the top hitter also wins a Snackling rolled
 	with extra luck (its sell value when their base is full). Announced to everyone. Not taken down in time, it flies
-	off and nothing is paid.
+	off and nothing is paid. Each hit makes it flinch on every client (`flinch`): a soft red pulse at most twice a
+	second, and none with Reduce effects.
 
 	Logic/BossRules works out the health and the rewards and validates this config (CI).
 ]]
@@ -31,6 +32,8 @@ local Boss: Types.BossConfig = {
 	cash = { baseSeconds = 20, shareSeconds = 120, minimum = 300 },
 	luck = 3,
 	mutationChance = 2,
+	-- at most two soft red pulses a second however fast it is hit, and none with Reduce effects (BossRules.validate)
+	flinch = { seconds = 0.18, gapSeconds = 0.5, peakFill = 0.6 },
 }
 
 return Boss

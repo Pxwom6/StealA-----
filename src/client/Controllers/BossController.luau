@@ -9,8 +9,9 @@
 	  * It bobs and slowly turns, so both walkways see its face (here only: the server keeps it where it put it; it
 	    holds still with Reduce effects).
 	  * Your own taps (the ClickDetector on its invisible Hitbox part, the only part of it a pointer can hit) pop a
-	    sound and a sparkle; every hit anyone lands makes it flinch, and its health bar follows the server's HP
-	    attribute.
+	    sound and a sparkle; hits anyone lands make it flinch (a soft red pulse and a squash, at most twice a second
+	    however fast it is hit, and neither with Reduce effects: BossRules.startsFlinch), and its health bar follows
+	    the server's HP attribute.
 	  * Taken down: a big sparkle burst in its rarity colour and a sting (the server's "bossDown" effect).
 ]]
 
@@ -19,11 +20,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+local Boss = require(ReplicatedStorage.Shared.Config.Boss)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local CreatureVisuals = require(ReplicatedStorage.Shared.CreatureVisuals)
 local GameData = require(ReplicatedStorage.Shared.GameData)
 local Net = require(ReplicatedStorage.Shared.Net)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
+local BossRules = require(ReplicatedStorage.Shared.Logic.BossRules)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local ClientSettings = require(script.Parent.ClientSettings)
@@ -37,8 +40,7 @@ local TAG = "SnackBoss"
 local BOB_HEIGHT = 0.9 -- studs
 local BOB_SPEED = 1.3 -- radians per second
 local TURN_SPEED = 0.35 -- radians per second
-local FLINCH_SECONDS = 0.18
-local FLINCH_SQUASH = -0.07
+local FLINCH_SQUASH = -0.07 -- for Config/Boss `flinch.seconds` after a hit
 
 type Giant = {
 	model: Model,
@@ -50,7 +52,7 @@ type Giant = {
 	timeLabel: TextLabel,
 	highlight: Highlight,
 	lastHp: number,
-	flinchUntil: number,
+	flinchAt: number, -- os.clock() when the last flinch started
 	turn: number,
 }
 
@@ -173,7 +175,7 @@ local function onGiant(instance: Instance)
 		timeLabel = timeLabel,
 		highlight = highlight,
 		lastHp = if type(maxHp) == "number" then maxHp else 0,
-		flinchUntil = 0,
+		flinchAt = -math.huge,
 		turn = 0,
 	}
 	-- your own taps: a pop and a sparkle where you hit (the server decides whether it counted)
@@ -204,8 +206,9 @@ local function step(dt: number)
 		local hp = model:GetAttribute("HP")
 		local maxHp = model:GetAttribute("MaxHP")
 		if type(hp) == "number" and type(maxHp) == "number" and maxHp > 0 then
-			if hp < giant.lastHp then
-				giant.flinchUntil = clock + FLINCH_SECONDS
+			-- hits come in 0.1 s steps from everyone: a new flinch at most twice a second, none with Reduce effects
+			if hp < giant.lastHp and BossRules.startsFlinch(Boss, giant.flinchAt, clock, reduced) then
+				giant.flinchAt = clock
 			end
 			giant.lastHp = hp
 			giant.fill.Size = UDim2.fromScale(math.clamp(hp / maxHp, 0, 1), 1)
@@ -216,8 +219,9 @@ local function step(dt: number)
 			local left = math.max(0, math.ceil(endsAt - serverNow))
 			giant.timeLabel.Text = `{hint}  ⏱ {left}s`
 		end
-		local flinching = clock < giant.flinchUntil
-		giant.highlight.FillTransparency = if flinching then 0.55 else 1
+		local since = clock - giant.flinchAt
+		local flinching = not reduced and since < Boss.flinch.seconds
+		giant.highlight.FillTransparency = if flinching then BossRules.flinchFill(Boss, since) else 1
 		if reduced then
 			continue
 		end

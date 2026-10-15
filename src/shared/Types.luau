@@ -903,6 +903,11 @@ export type BossConfig = {
 	-- share x their share of all hits), at least the minimum
 	luck: number, -- × server luck for the top hitter's Snackling
 	mutationChance: number, -- × mutation chances for it
+	-- The hit reaction each client draws: a red fill that fades from `peakFill` (its transparency at the strongest)
+	-- back to none over `seconds`, with a small squash. A new one starts at most every `gapSeconds` however fast hits
+	-- land, so it flashes at most 1 / gapSeconds times a second (CI: at most 2, for photosensitive players); none at
+	-- all with Reduce effects.
+	flinch: { seconds: number, gapSeconds: number, peakFill: number },
 }
 
 export type DropsConfig = {
