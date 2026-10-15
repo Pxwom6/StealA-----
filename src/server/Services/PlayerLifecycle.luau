@@ -139,6 +139,7 @@ local function onPlayerAdded(player: Player)
 		walk = nil,
 		flaggedAt = -math.huge,
 		teleportedAt = -math.huge,
+		activeAt = -math.huge,
 		settle = nil,
 		joinedAt = now,
 		lastSeenAtJoin = lastSeenAtJoin,

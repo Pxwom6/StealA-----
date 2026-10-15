@@ -11,7 +11,14 @@ type BossConfig = Types.BossConfig
 
 local BossRules = {}
 
--- Its health with `players` in the server when it appears.
+-- Whether a player counts towards a new giant's health (BossRules.maxHp): out of the first-time tutorial, and moved or
+-- landed a hit (`activeAt`, server time) within the last config.activeSeconds. An idle player or one still learning
+-- the game can't help bring it down, so they mustn't make it tougher for those who can.
+function BossRules.counts(config: BossConfig, inTutorial: boolean, activeAt: number, now: number): boolean
+	return not inTutorial and now - activeAt <= config.activeSeconds
+end
+
+-- Its health with `players` playing when it appears (BossRules.counts).
 function BossRules.maxHp(config: BossConfig, players: number): number
 	return math.max(config.minHp, config.hpPerPlayer * math.max(1, math.floor(players)))
 end
@@ -84,6 +91,7 @@ function BossRules.validate(config: BossConfig, rarityIds: { [string]: boolean }
 	end
 	range(config.hpPerPlayer, 10, 1000, "hpPerPlayer")
 	range(config.minHp, 10, 5000, "minHp")
+	range(config.activeSeconds, 15, 600, "activeSeconds")
 	range(config.hitsPerSecond, 1, 15, "hitsPerSecond")
 	if not (config.burst >= config.hitsPerSecond and config.burst <= 30) then
 		problem("burst must be at least hitsPerSecond and at most 30")

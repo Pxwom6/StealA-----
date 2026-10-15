@@ -891,8 +891,10 @@ export type CodesConfig = { [string]: CodeDef }
 -- Rewards are IncomeReward (below): sized from the player's steady income, like a cash pack.
 -- Config: Snack Attack (Config/Boss): a giant Snackling over the middle of the belt that everyone taps together -----
 export type BossConfig = {
-	hpPerPlayer: number, -- hits it takes for each player in the server when it appears
+	hpPerPlayer: number, -- hits it takes for each player playing when it appears (BossRules.counts)
 	minHp: number,
+	-- a player counts towards its health who moved or landed a hit this recently (seconds), out of the tutorial
+	activeSeconds: number,
 	hitsPerSecond: number, -- the most hits the server counts from one player (taps beyond it are ignored)
 	burst: number, -- hits a player can land at once before the limit kicks in
 	reach: number, -- studs from its middle a player can tap it from (the server allows a little more)

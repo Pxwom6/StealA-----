@@ -52,6 +52,30 @@ T.describe("BossRules: the real config", function()
 		end
 		T.expect(BossRules.maxHp(Boss, 1)).toBe(Boss.minHp)
 		T.expect(BossRules.maxHp(Boss, 10)).toBe(Boss.hpPerPlayer * 10)
+		T.expect(BossRules.maxHp(Boss, 0)).toBe(Boss.minHp) -- nobody playing: still a giant
+	end)
+
+	T.it("counts only the players playing towards its health (review 2)", function()
+		local now = 1000
+		-- moved or hit within activeSeconds, out of the tutorial
+		T.expect(BossRules.counts(Boss, false, now, now)).toBe(true)
+		T.expect(BossRules.counts(Boss, false, now - Boss.activeSeconds, now)).toBe(true)
+		-- idle for longer, never moved, or still in the first-time tutorial however busy
+		T.expect(BossRules.counts(Boss, false, now - Boss.activeSeconds - 1, now)).toBe(false)
+		T.expect(BossRules.counts(Boss, false, -math.huge, now)).toBe(false)
+		T.expect(BossRules.counts(Boss, true, now, now)).toBe(false)
+		-- the reviewer's server: 2 playing among 8 now face what 2 can bring down, where all 8 counted made it
+		-- 720 hits, more than 2 can land in its lifetime
+		local playing = 0
+		for index = 1, 8 do
+			local idle = index > 2
+			if BossRules.counts(Boss, index > 6, if idle then -math.huge else now - 5, now) then
+				playing += 1
+			end
+		end
+		T.expect(playing).toBe(2)
+		T.expect(BossRules.maxHp(Boss, 8) / (Boss.hitsPerSecond * 2)).toBeGreaterThan(Boss.lifetimeSeconds * 0.9)
+		T.expect(BossRules.fastestTakedown(Boss, playing)).toBeLessThan(Boss.lifetimeSeconds * 0.5)
 	end)
 end)
 
@@ -94,6 +118,9 @@ T.describe("BossRules rewards", function()
 		end)).toBe(1)
 		T.expect(broken(function(config)
 			config.luck = 50
+		end)).toBe(1)
+		T.expect(broken(function(config)
+			config.activeSeconds = 5 -- a player pausing to read a toast would stop counting
 		end)).toBe(1)
 		-- flashing faster than twice a second, a flinch as long as the gap, or a near-opaque red fill
 		T.expect(broken(function(config)

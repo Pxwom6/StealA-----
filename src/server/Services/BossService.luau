@@ -185,6 +185,7 @@ local function onHit(player: Player)
 	giant.hits[key] = (giant.hits[key] or 0) + 1
 	giant.players[key] = player
 	giant.hp -= 1
+	session.activeAt = now() -- playing, even standing still (the next giant's health counts them)
 	if giant.hp <= 0 then
 		defeat(giant)
 	end
@@ -213,8 +214,9 @@ local function addHitbox(model: Model, box: CFrame, size: Vector3): BasePart
 	return hitbox
 end
 
--- A giant appears over the middle of the belt (or at `at`), with health for the players here (or `hp`: the Studio
--- command and the server test). nil when no Snackling can play it.
+-- A giant appears over the middle of the belt (or at `at`), with health for the players playing (BossRules.counts:
+-- not idle, not in the first-time tutorial; or `hp`: the Studio command and the server test). nil when no Snackling
+-- can play it.
 local function spawnGiant(t: number, at: Vector3?, hp: number?): Giant?
 	local def = pickCreature()
 	if def == nil then
@@ -228,7 +230,13 @@ local function spawnGiant(t: number, at: Vector3?, hp: number?): Giant?
 	local feet = at or Vector3.new(0, walkwayY + Boss.hoverHeight, 0)
 	model:PivotTo(CFrame.new(feet) * CFrame.Angles(0, random:NextNumber(0, math.pi * 2), 0))
 	local boxCentre, size = model:GetBoundingBox()
-	local players = #Players:GetPlayers()
+	local players = 0
+	for _, player in Players:GetPlayers() do
+		local session = Sessions.get(player)
+		if session and BossRules.counts(Boss, session.tutorial ~= nil, session.activeAt, t) then
+			players += 1
+		end
+	end
 	local maxHp = hp or BossRules.maxHp(Boss, players)
 	local giant: Giant = {
 		model = model,

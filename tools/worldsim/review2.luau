@@ -13,12 +13,15 @@
 	    a map counted as played on after 3 minutes on it (so switching every minute for 23 minutes earns no map
 	    achievement), a map's signature mutation rolling only for its turn's 20 minutes even with the rotation off;
 	    and the random schedule's modifiers run to their end (an owner stops or replaces only their own)
+	  * a Snack Attack giant's health counts only the players playing: not idle ones, nor new players still in the
+	    first-time tutorial (who walk about but can't be expected to help)
 
 	It runs as a live server (not Studio): Ada is an admin (Config/LiveOps.adminUserIds), and the server is Owen's
 	private server. It fails on any error, any unexpected warning, or any check below.
 ]]
 
 local process = require("@lune/process")
+local roblox = require("@lune/roblox")
 local task = require("@lune/task")
 local Sim = require("./Sim")
 local MockProfileStore = require("./MockProfileStore")
@@ -26,6 +29,7 @@ local MockProfileStore = require("./MockProfileStore")
 local OCTOBER_15_2026 = 1792023721
 
 local ADA, OWEN, GUS = 8001, 8002, 8003
+local MAX, ZOE, NED, IVY = 8004, 8005, 8006, 8007
 
 Sim.mock("ServerPackages/ProfileStore.lua", MockProfileStore)
 Sim.isStudio = false -- a live server: only admins and the private server's owner may host
@@ -303,6 +307,80 @@ local function ownerPace()
 	task.wait(0.1)
 end
 
+-- Snack Attack's health counts the players playing when a giant appears. Before, every player in the server counted:
+-- with six idle or tutorial players the two playing faced 720 hits in 75 s, more than they can land.
+local function giantHealth(ada: any)
+	print("Snack Attack's health:")
+	local BossService = Sim.server("Services/BossService")
+	local Boss = Sim.shared("Config/Boss")
+	local BossRules = Sim.shared("Logic/BossRules")
+	local max, zoe, ned = join(MAX, "Max"), join(ZOE, "Zoe"), join(NED, "Ned")
+	for _, player in { max, zoe, ned } do
+		Sim.fireServer(player, "SkipTutorial")
+	end
+	local ivy = join(IVY, "Ivy") -- brand new: in the first-time tutorial
+	task.wait(0.1)
+	check(Sessions.get(ivy).tutorial ~= nil and Sessions.get(ned).tutorial == nil, "Ivy is in the tutorial, Ned isn't")
+	-- Max goes under the belt's middle to hit it (the tracker flags the jump, then trusts him again)
+	Sim.moveCharacter(max, roblox.Vector3.new(6, 3, 16))
+	jump(1.5)
+	task.wait(0.4)
+	jump(11)
+	task.wait(0.4)
+	-- walking: three quarters of a stud each second, always on, so every sample the position tracker takes (a few a
+	-- real second, many server seconds apart here) sees them move
+	local walkers: { any } = {}
+	local function walk()
+		for _, player in walkers do
+			Sim.moveCharacter(player, player.Character.HumanoidRootPart.Position + roblox.Vector3.new(0.75, 0, 0))
+		end
+	end
+	local function giantHp(): number
+		local giant = BossService.current()
+		return if giant then giant:GetAttribute("MaxHP") else -1
+	end
+
+	-- The first giant: Max, Zoe and Ivy walking, Ned standing idle (as are Ada, Owen and Gus)
+	walkers = { max, zoe, ivy }
+	walk()
+	task.wait(0.4)
+	chat(ada, "/mod snackAttack 5")
+	run(Modifiers.modifiers.snackAttack.drops.firstSeconds + 2, walk)
+	check(
+		giantHp() == BossRules.maxHp(Boss, 2),
+		`the first giant has health for the 2 playing, Max and Zoe ({giantHp()}; it was 7 players' worth, `
+			.. `{BossRules.maxHp(Boss, 7)})`
+	)
+
+	-- The second: Max stands still but hits the first one, Zoe stops (idle for over a minute when it comes), Ned
+	-- walks now and Ivy has finished the tutorial
+	walkers = { ned, ivy }
+	Sim.fireServer(ivy, "SkipTutorial")
+	run(Boss.lifetimeSeconds - 15, walk)
+	local first = BossService.current()
+	local clicker = if first then first:FindFirstChildWhichIsA("ClickDetector", true) else nil
+	for _ = 1, Boss.burst do
+		if clicker then
+			Sim.click(max, clicker)
+		end
+	end
+	check(BossService.hitsBy(max) > 0, `Max hits the first giant standing still ({BossService.hitsBy(max)} hits)`)
+	local secondAt = Modifiers.modifiers.snackAttack.drops.firstSeconds
+		+ Modifiers.modifiers.snackAttack.drops.everySeconds
+	local elapsed = Modifiers.modifiers.snackAttack.drops.firstSeconds + 2 + Boss.lifetimeSeconds - 15
+	run(secondAt - elapsed + 2, walk)
+	check(
+		BossService.current() ~= first and giantHp() == BossRules.maxHp(Boss, 3),
+		`the second counts Max (his hits), Ned and Ivy, not Zoe ({giantHp()}, {BossRules.maxHp(Boss, 3)})`
+	)
+	chat(ada, "/mod off")
+	run(Boss.lifetimeSeconds + 5)
+	for _, player in { max, zoe, ned, ivy } do
+		Sim.removePlayer(player)
+	end
+	task.wait(0.3)
+end
+
 local function scenario()
 	print("review 2 test:")
 	local ada = join(ADA, "Ada")
@@ -310,6 +388,7 @@ local function scenario()
 	task.wait(0.1)
 	dropRestart(ada)
 	ownerPace()
+	giantHealth(ada)
 	print(`  ({math.floor(Sim.now - OCTOBER_15_2026)} s of server time)`)
 end
 

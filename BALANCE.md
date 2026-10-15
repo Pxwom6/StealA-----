@@ -604,9 +604,11 @@ the player's steady income:
   two an hour, and only the first player to reach each one gets it. It runs slower than players (9 studs/s wandering,
   14.5 while someone is within 40 studs; players walk at 16), so it is always catchable: in offline chases with these
   numbers one player catches it in about 15 s (mostly running to it), four in about 4 s, well inside its 45 seconds.
-* **A Snack Attack giant** (`Config/Boss.luau`) has 90 health per player in the server (at least 120) and the server
-  counts at most 5 taps a second from each player, so everyone tapping flat out takes about 18-24 seconds whatever
-  the server size; it flies off after 75 seconds. Everyone who landed 5 taps or more gets their own income x (20 s +
+* **A Snack Attack giant** (`Config/Boss.luau`) has 90 health per player playing when it appears (at least 120) and
+  the server counts at most 5 taps a second from each player, so everyone tapping flat out takes about 18-24 seconds
+  whatever the server size; it flies off after 75 seconds. A player counts who moved or landed a hit in the last
+  minute and has finished the first-time tutorial (`activeSeconds`): counting everyone, six idle or new players gave
+  the two playing 720 taps to land, 72 seconds flat out before walking to it. Everyone who landed 5 taps or more gets their own income x (20 s +
   120 s x their share of the taps): four even helpers get about 50 seconds of income each, a solo takedown 140
   seconds. The top hitter also wins a Snackling rolled like a crate's (3x luck, 2x mutation chance). A server sees
   about one giant an hour.

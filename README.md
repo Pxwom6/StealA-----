@@ -306,7 +306,10 @@ has the numbers.
   how cleverly a runaway runs are in `src/shared/Config/Drops.luau`; how often they come is the modifier's `drops` (CI
   checks both). In Studio, `/runaway` lets one out now and `/runaway here` right beside you.
 * **Snack Attack:** the giants' health, tap rate, reach, rewards and how long they stay are in
-  `src/shared/Config/Boss.luau` (CI checks it); `/boss` sends one in Studio (`/boss 20` for a quick one).
+  `src/shared/Config/Boss.luau` (CI checks it); `/boss` sends one in Studio (`/boss 20` for a quick one). Its health
+  counts the players playing (moved or hit it in the last `activeSeconds`, out of the first-time tutorial). Players
+  tap it on a phone, click it with a mouse, or aim at it and press R2 on a gamepad; the hint under its health bar
+  says which.
 
 ### First-time tutorial
 

@@ -339,7 +339,9 @@ local function scenario()
 	local giant = BossService.current()
 	check(giant ~= nil, "Snack Attack: a giant Snackling appears")
 	local maxHp = giant:GetAttribute("MaxHP")
-	check(maxHp == math.max(Boss.minHp, Boss.hpPerPlayer * 2), `with health for the two players here ({maxHp})`)
+	-- Alice and Bob never finished the first-time tutorial, so neither counts towards its health (review2.luau mixes
+	-- idle, new and playing players): the least it has
+	check(maxHp == Boss.minHp, `with the least health: nobody here is out of the tutorial ({maxHp})`)
 	check(giant:GetPivot().Position.Y > Gameplay.belt.surfaceY + 4, "hovering over the belt")
 	local clicker = giant:FindFirstChildWhichIsA("ClickDetector", true)
 	check(clicker ~= nil and clicker.MaxActivationDistance == Boss.reach, "anyone in reach can tap it")
