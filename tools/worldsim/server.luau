@@ -593,10 +593,7 @@ local function scenario()
 			Sim.chat(alice, `/spawn pizza_pup {signature.id}`)
 			task.wait(0.1)
 			local item = lastBeltItem("pizza_pup")
-			check(
-				item ~= nil and item.variant == signature.id,
-				`a {signature.displayName} Pizza Pup rides the belt`
-			)
+			check(item ~= nil and item.variant == signature.id, `a {signature.displayName} Pizza Pup rides the belt`)
 		end
 	end
 	-- Bumblebee (the hive's): bought from the belt, its podium model wears the two bee wings, kept out of the tint

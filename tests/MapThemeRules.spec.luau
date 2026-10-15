@@ -271,7 +271,7 @@ T.describe("MapThemeRules flora and landmarks", function()
 	end)
 
 	T.it("gives the four newest maps flora and landmarks of their own", function()
-		local newest = { hive = true, gingerbread = true, ramen = true, ranch = true }
+		local newest: { [string]: boolean } = { hive = true, gingerbread = true, ramen = true, ranch = true }
 		local usedElsewhere: { [string]: boolean } = {}
 		for id, theme in MapThemes.themes do
 			if not newest[id] then
