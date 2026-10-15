@@ -151,10 +151,11 @@ change:
 
 ### Map themes
 
-The same bases and belt in twenty worlds (`src/shared/Config/MapThemes.luau`): Sunny Meadow, Candy Kingdom, Frosty
-Peaks, Nacho Dunes, Hot Sauce Volcano, Midnight Market, Coconut Cove, Apple Pie Orchard, Cherry Blossom Garden, Cookie
-Moon, Mango Rainforest, Neon Noodle City, Cloud Nine, Sushi Reef, Cocoa Canyon, Cotton Candy Carnival, Pizza Piazza,
-Rock Candy Caverns, Lemonade Lagoon and Bubblegum Bayou. A server starts on a random one and changes every 20 minutes
+The same bases and belt in twenty-three worlds (`src/shared/Config/MapThemes.luau`): Sunny Meadow, Candy Kingdom,
+Frosty Peaks, Nacho Dunes, Hot Sauce Volcano, Midnight Market, Coconut Cove, Apple Pie Orchard, Cherry Blossom Garden,
+Cookie Moon, Mango Rainforest, Neon Noodle City, Cloud Nine, Sushi Reef, Cocoa Canyon, Cotton Candy Carnival, Pizza
+Piazza, Rock Candy Caverns, Lemonade Lagoon, Bubblegum Bayou, Popcorn Drive-In, Tea Party Garden and Pancake Peaks. A
+server starts on a random one and changes every 20 minutes
 after a 40-second vote in the HUD. Each map sets scenery colours, materials, lighting,
 what grows on the tree spots, ten landmarks outside the wall and the weather; gameplay positions never change.
 
@@ -166,7 +167,7 @@ what grows on the tree spots, ten landmarks outside the wall and the weather; ga
   signature mutation too (CI checks): add one to `src/shared/Config/Mutations.luau` with `mapTheme = "<id>"`.
 * **Signature mutations:** each map has one that only rolls while it is up (Honey, Sprinkled, Frozen, Fossil,
   Molten, Moonlit, Pearl, Candy Apple, Blossom, Lunar, Mossy, Cyber, Angelic with its halo, Abyssal, Fudge, Balloon,
-  Cheesy, Amethyst, Zesty, Bubblegum), named on its vote button and title card. The Globetrotter achievement asks for every map, so its target
+  Cheesy, Amethyst, Zesty, Bubblegum, Buttered, Porcelain, Syrupy), named on its vote button and title card. The Globetrotter achievement asks for every map, so its target
   follows the number of maps.
 * **Preview offline:** `lune run tools/worldsim/export.luau <id> out.json` writes any map as JSON for a 3D preview.
 
@@ -339,7 +340,8 @@ try every 5 seconds.
   $1,000) or a Snackling (`{ kind = "creature", creatureId = "pizza_pup", variant = "golden" }`). Optional
   `expiresAt` (unix seconds, UTC). CI checks every code; changing them needs a publish.
 * **Codes ready to post:** `WELCOME` (2 minutes of income), `SNACKTIME` (a Golden Pizza Pup), `FOURTEENMAPS` (3
-  minutes of income), `STORMCHASER` (an Electric Pretzel Pal), `TWENTYMAPS` (a Bubblegum Gummy Grub), `SPOOKY26` (a
+  minutes of income), `STORMCHASER` (an Electric Pretzel Pal), `TWENTYMAPS` (a Bubblegum Gummy Grub), `MOVIENIGHT` (a Buttered Popcorn
+  Penguin), `SPOOKY26` (a
   Haunted Candy Corn Cat, until Halloween ends on 2 Nov), `JINGLE26` (a Festive Peppermint Puffin, until Winter ends on
   4 Jan), `HAPPY2027` (5 minutes of income, until 8 Jan), `LOVE27` (a Sweetheart Candy Heart Hamster, until
   Valentine's ends on 16 Feb) and `EGGHUNT27` (a Pastel Custard Chick, until Easter ends on 6 Apr).

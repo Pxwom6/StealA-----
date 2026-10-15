@@ -75,6 +75,12 @@ MapThemeRules.FLORA_PARTS = table.freeze({
 	lemonTree = 6,
 	gumTree = 4,
 	bubblePlant = 4,
+	popcornTree = 7,
+	cornStalk = 7,
+	topiary = 5,
+	coneTopiary = 5,
+	blueberryBush = 6,
+	giantFork = 7,
 } :: { [string]: number })
 
 -- How far each flora kind reaches from its spot at scale 1 (studs). A kind may only stand on spots whose tree it fits
@@ -113,6 +119,12 @@ MapThemeRules.FLORA_RADIUS = table.freeze({
 	lemonTree = 4.2,
 	gumTree = 4.3,
 	bubblePlant = 3,
+	popcornTree = 4,
+	cornStalk = 3.8,
+	topiary = 2.6,
+	coneTopiary = 2.2,
+	blueberryBush = 4,
+	giantFork = 2.7, -- leaning a little
 } :: { [string]: number })
 
 -- Parts each landmark kind is built from (server/Services/ThemeProps).
@@ -157,6 +169,16 @@ MapThemeRules.LANDMARK_PARTS = table.freeze({
 	giantLemonSlice = 7,
 	stiltHouse = 10,
 	giantBubble = 2,
+	cinemaScreen = 7,
+	popcornBucket = 12,
+	sodaCup = 5,
+	giantTeapot = 9,
+	teacup = 8,
+	cakeStand = 11,
+	sugarCubes = 5,
+	pancakeStack = 11,
+	syrupBottle = 5,
+	waffleTower = 5,
 } :: { [string]: number })
 
 MapThemeRules.WEATHER = table.freeze({
@@ -179,6 +201,8 @@ MapThemeRules.WEATHER = table.freeze({
 	fizz = true,
 	heat = true,
 	blossoms = true, -- Easter's (Config/Seasons); a map may use it too
+	popcorn = true,
+	steam = true,
 } :: { [string]: boolean })
 
 -- Enum.Material names a map may use for its ground, walkway and boundary wall.

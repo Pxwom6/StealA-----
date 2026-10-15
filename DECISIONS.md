@@ -953,3 +953,27 @@ big in the middle of the map, which is where the steals happen.
 **Why:** spring between Valentine's and the summer, with Snacklings and a mutation players can only get then.
 **Reversal cost:** none — move the dates, or drop the `Easter2027` line from Config/Seasons to keep the Snacklings
 without the decorations. Never remove the creature or mutation ids (they are in players' saves).
+
+### 45. Three more maps: Popcorn Drive-In, Tea Party Garden, Pancake Peaks
+
+* **What:** maps 21-23, built from the same pieces as the others (DECISIONS.md #32): Popcorn Drive-In (a starry
+  night lawn of popcorn trees and corn stalks; two glowing drive-in screens, giant striped popcorn buckets and soda
+  cups; popcorn popping all around), Tea Party Garden (an afternoon lawn of clipped topiaries and cone topiaries in
+  terracotta pots; a steaming giant teapot, teacups of tea, a three-tier cake stand and tumbled sugar cubes; falling
+  petals) and Pancake Peaks (a breakfast morning: pancake-brown hills round a syrup lake, blueberry bushes and giant
+  forks; towering pancake stacks with butter and syrup drips, syrup bottles and a waffle tower; steam rising).
+* **New pieces:** six flora kinds and ten landmark kinds (ThemeProps; counted in MapThemeRules and built exactly,
+  which the world smoke test checks), two weathers (popcorn: puffs jumping up and falling; steam: soft wisps rising),
+  and a particle preset (popcorn) for Buttered. The heaviest of the three builds about 1,370 scenery parts (budget
+  1,500).
+* **Signature mutations:** Buttered (golden and glossy, popcorn popping), Porcelain (glazed white, glinting) and
+  Syrupy (amber glass, dripping), 1.2% at x3 like every map's, rolled after every other mutation so no existing roll
+  changes. Code `MOVIENIGHT`: a Buttered Popcorn Penguin.
+* **Colours:** two world colours already existed (`hedge`, `strawberry`, used by other maps), so the new maps use
+  them rather than redefining them (Tea Party Garden sets its own hedge green in its palette). Pancake Peaks first
+  rendered as one orange: its ground went creamier than its pancake-brown hills and its haze bluer, and its
+  blueberry bushes grew so they read next to the forks.
+
+**Why:** "a ton of extra maps". Three themes unlike the twenty before them: a night out, a garden party and a
+breakfast.
+**Reversal cost:** none — `weight = 0` keeps a map for `/map` only; never remove the mutation ids (they are in saves).
