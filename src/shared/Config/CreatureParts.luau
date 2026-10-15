@@ -1211,7 +1211,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	ramen_raccoon = {
-		scale = 1.856, -- from batch-2.json
+		scale = 1.86, -- from batch-2.json
 		parts = {
 			{ "BowlFoot", "cylinder", { 0.6, 0.08, 0.6 }, { 0, 0.04, 0 }, { 0, 0, 0 }, "#C9342C", "SmoothPlastic", "body" },
 			{ "Body", "sphere", { 1.32, 0.76, 1.32 }, { 0, 0.42, 0 }, { 0, 0, 0 }, "#E8433A", "SmoothPlastic", "body" },
@@ -1263,7 +1263,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	omelet_owl = {
-		scale = 1.939, -- from batch-2.json
+		scale = 1.944, -- from batch-2.json
 		parts = {
 			{ "Body", "sphere", { 1.16, 1.04, 1 }, { 0, 0.62, 0.06 }, { 0, 0, 0 }, "#FFD45C", "SmoothPlastic", "body" },
 			{ "Head", "sphere", { 1.04, 0.86, 0.9 }, { 0, 1.3, -0.02 }, { 0, 0, 0 }, "#FFD45C", "SmoothPlastic", "body" },
@@ -1316,7 +1316,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	smore_skunk = {
-		scale = 1.827, -- from batch-2.json
+		scale = 1.831, -- from batch-2.json
 		parts = {
 			{ "LegFR", "cylinder", { 0.18, 0.34, 0.18 }, { 0.3, 0.17, -0.24 }, { 0, 0, 0 }, "#4A3A3A", "SmoothPlastic", "body" },
 			{ "LegFL", "cylinder", { 0.18, 0.34, 0.18 }, { -0.3, 0.17, -0.24 }, { 0, 0, 0 }, "#4A3A3A", "SmoothPlastic", "body" },
@@ -1368,7 +1368,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	tempura_tiger = {
-		scale = 2.236, -- from batch-2.json
+		scale = 2.241, -- from batch-2.json
 		parts = {
 			{ "Body", "sphere", { 0.848, 0.657, 1.23 }, { 0, 0.657, 0.127 }, { 0, 0, 0 }, "#F5C45A", "Sand", "body" },
 			{ "Stripe", "sphere", { 0.803, 0.628, 0.106 }, { 0, 0.666, -0.127 }, { 0, 0, 0 }, "#B8571E", "SmoothPlastic", "body" },
@@ -1420,7 +1420,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	popcorn_penguin = {
-		scale = 1.836, -- from batch-2.json
+		scale = 1.839, -- from batch-2.json
 		parts = {
 			{ "Body", "sphere", { 0.92, 1, 0.84 }, { 0, 0.54, 0.02 }, { 0, 0, 0 }, "#2E3A59", "SmoothPlastic", "body" },
 			{ "Belly", "sphere", { 0.7, 0.82, 0.64 }, { 0, 0.56, -0.13 }, { 0, 0, 0 }, "#FFFFFF", "SmoothPlastic", "body" },
@@ -1472,7 +1472,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	nugget_narwhal = {
-		scale = 2.535, -- from batch-2.json
+		scale = 2.54, -- from batch-2.json
 		parts = {
 			{ "Body", "sphere", { 1.08, 0.799, 1.447 }, { 0, 0.4, -0.005 }, { 0, 0, 0 }, "#E8A93B", "Sand", "body" },
 			{ "Underside", "sphere", { 0.972, 0.216, 1.274 }, { 0, 0.108, 0.016 }, { 0, 0, 0 }, "#D99530", "Sand", "body" },
@@ -1521,7 +1521,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	hamburger_hamster = {
-		scale = 2.051, -- from batch-2.json
+		scale = 2.055, -- from batch-2.json
 		parts = {
 			{ "BunBottom", "sphere", { 1.534, 0.52, 1.482 }, { 0, 0.26, 0 }, { 0, 0, 0 }, "#D48E38", "SmoothPlastic", "body" },
 			{ "Patty", "sphere", { 1.638, 0.286, 1.586 }, { 0, 0.546, 0 }, { 0, 0, 0 }, "#6B3A1E", "SmoothPlastic", "body" },
@@ -1573,7 +1573,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	spaghetti_yeti = {
-		scale = 1.846, -- from batch-2.json
+		scale = 1.849, -- from batch-2.json
 		parts = {
 			{ "FootR", "sphere", { 0.34, 0.22, 0.52 }, { 0.2, 0.11, -0.1 }, { 0, 0, 0 }, "#E8C46C", "SmoothPlastic", "body" },
 			{ "FootL", "sphere", { 0.34, 0.22, 0.52 }, { -0.2, 0.11, -0.1 }, { 0, 0, 0 }, "#E8C46C", "SmoothPlastic", "body" },
@@ -1625,7 +1625,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	bagel_badger = {
-		scale = 2.487, -- from batch-2.json
+		scale = 2.492, -- from batch-2.json
 		parts = {
 			{ "Bagel", "sphere", { 0.46, 0.4, 0.66 }, { 0.18, 0.38, -0.259 }, { 0, 67.5, 0 }, "#D9A15B", "SmoothPlastic", "body" },
 			{ "Bagel", "sphere", { 0.46, 0.4, 0.66 }, { 0.434, 0.38, -0.005 }, { 0, 22.5, 0 }, "#D9A15B", "SmoothPlastic", "body" },
@@ -1733,7 +1733,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	onigiri_orca = {
-		scale = 2.003, -- from batch-3.json
+		scale = 2.002, -- from batch-3.json
 		parts = {
 			{ "RiceTop", "sphere", { 0.8, 0.8, 0.8 }, { 0, 1.2, -0.271 }, { 0, 0, 0 }, "#FBF7EF", "Sand", "body" },
 			{ "RiceEdgeL", "cylinder", { 0.8, 0.442, 0.8 }, { -0.113, 1.01, -0.271 }, { 0, 0, -30.75 }, "#FBF7EF", "Sand", "body" },
@@ -1837,7 +1837,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	pancake_panda = {
-		scale = 2.121, -- from batch-3.json
+		scale = 2.12, -- from batch-3.json
 		parts = {
 			{ "Pancake1", "cylinder", { 0.94, 0.236, 0.94 }, { 0, 0.118, 0.079 }, { 0, 0, 0 }, "#F4C27A", "SmoothPlastic", "body" },
 			{ "Pancake2", "cylinder", { 0.92, 0.236, 0.92 }, { 0.015, 0.349, 0.049 }, { 0, 0, 0 }, "#F4C27A", "SmoothPlastic", "body" },
@@ -1993,7 +1993,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	milkshake_mammoth = {
-		scale = 1.983, -- from batch-3.json
+		scale = 1.982, -- from batch-3.json
 		parts = {
 			{ "LegFL", "cylinder", { 0.34, 0.5, 0.34 }, { -0.33, 0.25, -0.085 }, { 0, 0, 0 }, "#F2869F", "SmoothPlastic", "body" },
 			{ "NailFL", "sphere", { 0.24, 0.09, 0.1 }, { -0.33, 0.06, -0.24 }, { 0, 0, 0 }, "#FFF1D9", "SmoothPlastic", "detail" },
@@ -2050,7 +2050,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	churro_cheetah = {
-		scale = 2.67, -- from batch-3.json
+		scale = 2.669, -- from batch-3.json
 		parts = {
 			{ "Body", "cylinder", { 0.46, 1, 0.46 }, { 0, 0.84, 0.034 }, { 83, 90, 0 }, "#D98E3F", "Sand", "body" },
 			{ "Chest", "sphere", { 0.46, 0.46, 0.46 }, { 0, 0.779, -0.462 }, { 0, 0, 0 }, "#D98E3F", "Sand", "body" },
@@ -2107,7 +2107,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	lasagna_lion = {
-		scale = 2.07, -- from batch-3.json
+		scale = 2.075, -- from batch-3.json
 		parts = {
 			{ "LegFL", "sphere", { 0.25, 0.56, 0.27 }, { -0.24, 0.28, -0.288 }, { 0, 0, 0 }, "#D9952E", "SmoothPlastic", "body" },
 			{ "LegFR", "sphere", { 0.25, 0.56, 0.27 }, { 0.24, 0.28, -0.288 }, { 0, 0, 0 }, "#D9952E", "SmoothPlastic", "body" },
@@ -2166,7 +2166,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	souffle_sphinx = {
-		scale = 2.082, -- from batch-3.json
+		scale = 2.087, -- from batch-3.json
 		parts = {
 			{ "Ramekin", "cylinder", { 0.92, 0.42, 0.92 }, { 0, 0.21, 0.025 }, { 0, 0, 0 }, "#FFFFFF", "SmoothPlastic", "body" },
 			{ "Flute1", "cylinder", { 0.1, 0.396, 0.1 }, { 0.174, 0.21, -0.395 }, { 0, 0, 0 }, "#FFFFFF", "SmoothPlastic", "detail" },
@@ -2227,7 +2227,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	gingerbread_golem = {
-		scale = 2.166, -- from batch-3.json
+		scale = 2.172, -- from batch-3.json
 		parts = {
 			{ "FootL", "box", { 0.38, 0.14, 0.5 }, { -0.24, 0.07, -0.012 }, { 0, 0, 0 }, "#B9733A", "SmoothPlastic", "body" },
 			{ "LegL", "box", { 0.3, 0.46, 0.36 }, { -0.23, 0.35, 0.038 }, { 0, 0, 0 }, "#C27E42", "SmoothPlastic", "body" },
@@ -2281,7 +2281,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	parfait_pegasus = {
-		scale = 2.26, -- from batch-3.json
+		scale = 2.265, -- from batch-3.json
 		parts = {
 			{ "LegFL", "cylinder", { 0.15, 0.52, 0.15 }, { -0.17, 0.34, -0.241 }, { 0, 0, 0 }, "#FFF6E8", "SmoothPlastic", "body" },
 			{ "HoofFL", "cylinder", { 0.18, 0.12, 0.18 }, { -0.17, 0.06, -0.241 }, { 0, 0, 0 }, "#F2C9D8", "SmoothPlastic", "body" },
@@ -2342,7 +2342,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	hotpot_hydra = {
-		scale = 2.192, -- from batch-3.json
+		scale = 2.198, -- from batch-3.json
 		parts = {
 			{ "PotBottom", "sphere", { 1, 0.24, 1 }, { 0, 0.12, -0.148 }, { 0, 0, 0 }, "#97441F", "SmoothPlastic", "body" },
 			{ "Body", "cylinder", { 1.02, 0.46, 1.02 }, { 0, 0.33, -0.148 }, { 0, 0, 0 }, "#B8572E", "SmoothPlastic", "body" },
@@ -2403,7 +2403,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	flambe_phoenix = {
-		scale = 2.21, -- from batch-3.json
+		scale = 2.215, -- from batch-3.json
 		parts = {
 			{ "FootL", "sphere", { 0.17, 0.08, 0.28 }, { -0.14, 0.04, -0.228 }, { 0, 8, 0 }, "#E8862A", "SmoothPlastic", "body" },
 			{ "LegL", "cylinder", { 0.075, 0.3, 0.075 }, { -0.14, 0.2, -0.168 }, { 0, 0, 0 }, "#E8862A", "SmoothPlastic", "body" },
@@ -2461,7 +2461,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	dumpling_dino = {
-		scale = 2.153, -- from batch-3.json
+		scale = 2.158, -- from batch-3.json
 		parts = {
 			{ "FootL", "sphere", { 0.289, 0.162, 0.407 }, { -0.257, 0.081, -0.364 }, { 0, 6, 0 }, "#E6DECA", "SmoothPlastic", "body" },
 			{ "ThighL", "sphere", { 0.321, 0.407, 0.364 }, { -0.268, 0.321, -0.214 }, { 0, 0, 0 }, "#F5F0E1", "SmoothPlastic", "body" },
@@ -2915,7 +2915,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	pumpkin_pie_bat = {
-		scale = 2.111, -- from batch-2.json
+		scale = 2.115, -- from batch-2.json
 		parts = {
 			{ "PieBack", "cylinder", { 1.12, 0.24, 1.12 }, { 0, 0.69, 0.1 }, { 90, 0, 0 }, "#C48A44", "SmoothPlastic", "body" },
 			{ "Body", "cylinder", { 1.02, 0.3, 1.02 }, { 0, 0.69, 0 }, { 90, 0, 0 }, "#E07A2E", "SmoothPlastic", "body" },
@@ -3021,7 +3021,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	jack_o_lantern_latte = {
-		scale = 2.253, -- from batch-3.json
+		scale = 2.259, -- from batch-3.json
 		parts = {
 			{ "FootL", "sphere", { 0.22, 0.13, 0.28 }, { -0.292, 0.065, -0.05 }, { 0, 0, 0 }, "#C8601A", "SmoothPlastic", "body" },
 			{ "LegL", "cylinder", { 0.15, 0.2, 0.15 }, { -0.292, 0.15, 0 }, { 0, 0, 0 }, "#C8601A", "SmoothPlastic", "body" },
@@ -3117,7 +3117,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	candy_cane_chameleon = {
-		scale = 2.399, -- from batch-4.json
+		scale = 2.404, -- from batch-4.json
 		parts = {
 			{ "Body", "sphere", { 0.58, 0.64, 1.12 }, { 0, 0.5, 0.06 }, { 0, 0, 0 }, "#FFF6F2", "SmoothPlastic", "body" },
 			{ "BodyUnder", "sphere", { 0.46, 0.26, 0.92 }, { 0, 0.29, 0.06 }, { 0, 0, 0 }, "#EFDCDD", "SmoothPlastic", "body" },
@@ -3232,7 +3232,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	spun_sugar_stag = {
-		scale = 2.061, -- from batch-4.json
+		scale = 2.066, -- from batch-4.json
 		parts = {
 			{ "Leg", "cylinder", { 0.13, 0.46, 0.13 }, { 0.17, 0.27, -0.22 }, { 0, 0, 0 }, "#D9E4FA", "SmoothPlastic", "body" },
 			{ "Leg", "cylinder", { 0.13, 0.46, 0.13 }, { -0.17, 0.27, -0.22 }, { 0, 0, 0 }, "#D9E4FA", "SmoothPlastic", "body" },
@@ -3340,7 +3340,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	cherry_cordial_kitten = {
-		scale = 1.826, -- from batch-5.json
+		scale = 1.83, -- from batch-5.json
 		parts = {
 			{ "Cup", "cylinder", { 1.08, 0.28, 1.08 }, { 0, 0.14, 0.04 }, { 0, 0, 0 }, "#D9A441", "Foil", "body" },
 			{ "CupRim", "cylinder", { 1.18, 0.06, 1.18 }, { 0, 0.27, 0.04 }, { 0, 0, 0 }, "#D9A441", "Foil", "detail" },
@@ -3393,7 +3393,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	red_velvet_raccoon = {
-		scale = 2.21, -- from batch-5.json
+		scale = 2.209, -- from batch-5.json
 		parts = {
 			{ "Body", "sphere", { 0.84, 0.74, 1.06 }, { 0, 0.62, 0.1 }, { 0, 0, 0 }, "#B0173A", "Sand", "body" },
 			{ "FrostingLayer", "sphere", { 0.87, 0.13, 1.09 }, { 0, 0.6, 0.1 }, { 0, 0, 0 }, "#FFF7EE", "SmoothPlastic", "body" },
@@ -3447,7 +3447,7 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 		},
 	},
 	rose_petal_pegasus = {
-		scale = 2.291, -- from batch-5.json
+		scale = 2.297, -- from batch-5.json
 		parts = {
 			{ "Leg", "cylinder", { 0.13, 0.5, 0.13 }, { 0.16, 0.3, -0.18 }, { 0, 0, 0 }, "#FFE4EE", "SmoothPlastic", "body" },
 			{ "Leg", "cylinder", { 0.13, 0.5, 0.13 }, { -0.16, 0.3, -0.18 }, { 0, 0, 0 }, "#FFE4EE", "SmoothPlastic", "body" },
@@ -3504,6 +3504,221 @@ local CreatureParts: { [string]: Types.ImportedModel } = {
 			{ "Pendant", "cylinder", { 0.1, 0.05, 0.1 }, { -0.035, 0.977, -0.555 }, { 80, 0, 0 }, "#F2C14E", "Foil", "detail" },
 			{ "Pendant", "cylinder", { 0.1, 0.05, 0.1 }, { 0.035, 0.977, -0.555 }, { 80, 0, 0 }, "#F2C14E", "Foil", "detail" },
 			{ "Pendant", "box", { 0.1, 0.1, 0.05 }, { 0, 0.943, -0.549 }, { -10, 0, 45 }, "#F2C14E", "Foil", "detail" },
+		},
+	},
+	custard_chick = {
+		scale = 1.746, -- from batch-6.json
+		parts = {
+			{ "Body", "sphere", { 1.381, 1.189, 1.381 }, { 0, 0.595, 0.019 }, { 0, 0, 0 }, "#6E3B1F", "SmoothPlastic", "body" },
+			{ "Crack", "box", { 0.163, 0.163, 0.067 }, { 0.207, 0.959, 0.52 }, { 0, 22.5, 45 }, "#6E3B1F", "SmoothPlastic", "detail" },
+			{ "Crack", "box", { 0.163, 0.163, 0.067 }, { 0.501, 0.959, 0.226 }, { 0, 67.5, 45 }, "#6E3B1F", "SmoothPlastic", "detail" },
+			{ "Crack", "box", { 0.163, 0.163, 0.067 }, { 0.501, 0.959, -0.188 }, { 0, 112.5, 45 }, "#6E3B1F", "SmoothPlastic", "detail" },
+			{ "Crack", "box", { 0.163, 0.163, 0.067 }, { 0.207, 0.959, -0.481 }, { 0, 157.5, 45 }, "#6E3B1F", "SmoothPlastic", "detail" },
+			{ "Crack", "box", { 0.163, 0.163, 0.067 }, { -0.207, 0.959, -0.481 }, { 0, 202.5, 45 }, "#6E3B1F", "SmoothPlastic", "detail" },
+			{ "Crack", "box", { 0.163, 0.163, 0.067 }, { -0.501, 0.959, -0.188 }, { 0, 247.5, 45 }, "#6E3B1F", "SmoothPlastic", "detail" },
+			{ "Crack", "box", { 0.163, 0.163, 0.067 }, { -0.501, 0.959, 0.226 }, { 0, 292.5, 45 }, "#6E3B1F", "SmoothPlastic", "detail" },
+			{ "Crack", "box", { 0.163, 0.163, 0.067 }, { -0.207, 0.959, 0.52 }, { 0, 337.5, 45 }, "#6E3B1F", "SmoothPlastic", "detail" },
+			{ "Ribbon", "cylinder", { 1.41, 0.096, 1.41 }, { 0, 0.595, 0.019 }, { 0, 0, 0 }, "#FF9EC7", "SmoothPlastic", "detail" },
+			{ "Icing", "sphere", { 0.125, 0.125, 0.077 }, { -0.326, 0.364, -0.503 }, { 0, 32, 0 }, "#BDF0D8", "SmoothPlastic", "detail" },
+			{ "Icing", "sphere", { 0.125, 0.125, 0.077 }, { 0, 0.364, -0.597 }, { 0, 0, 0 }, "#D9C2FF", "SmoothPlastic", "detail" },
+			{ "Icing", "sphere", { 0.125, 0.125, 0.077 }, { 0.326, 0.364, -0.503 }, { 0, -32, 0 }, "#BDF0D8", "SmoothPlastic", "detail" },
+			{ "Icing", "sphere", { 0.125, 0.125, 0.077 }, { -0.405, 0.794, -0.463 }, { 0, 40, 0 }, "#FFF7A8", "SmoothPlastic", "detail" },
+			{ "Icing", "sphere", { 0.125, 0.125, 0.077 }, { 0, 0.794, -0.611 }, { 0, 0, 0 }, "#FF9EC7", "SmoothPlastic", "detail" },
+			{ "Icing", "sphere", { 0.125, 0.125, 0.077 }, { 0.405, 0.794, -0.463 }, { 0, -40, 0 }, "#FFF7A8", "SmoothPlastic", "detail" },
+			{ "Body2", "sphere", { 1.074, 0.959, 1.017 }, { 0, 1.074, 0 }, { 0, 0, 0 }, "#FFE27A", "SmoothPlastic", "body" },
+			{ "Chest", "sphere", { 0.403, 0.249, 0.153 }, { 0, 1.17, -0.46 }, { 0, 0, 0 }, "#FFEDA0", "SmoothPlastic", "body" },
+			{ "Wing", "sphere", { 0.163, 0.403, 0.326 }, { 0.508, 1.151, 0.038 }, { 0, 0, -32 }, "#F6C445", "SmoothPlastic", "body" },
+			{ "Wing", "sphere", { 0.163, 0.403, 0.326 }, { -0.508, 1.151, 0.038 }, { 0, 0, 32 }, "#F6C445", "SmoothPlastic", "body" },
+			{ "TailFeather", "sphere", { 0.096, 0.211, 0.096 }, { 0.058, 1.228, 0.499 }, { 40, 0, -15 }, "#F6C445", "SmoothPlastic", "body" },
+			{ "TailFeather", "sphere", { 0.096, 0.211, 0.096 }, { -0.058, 1.228, 0.499 }, { 40, 0, 15 }, "#F6C445", "SmoothPlastic", "body" },
+			{ "Head", "sphere", { 0.825, 0.767, 0.786 }, { 0, 1.554, -0.048 }, { 0, 0, 0 }, "#FFE27A", "SmoothPlastic", "body" },
+			{ "Caramel", "sphere", { 0.614, 0.192, 0.575 }, { 0, 1.894, -0.038 }, { 0, 0, 0 }, "#C8761E", "SmoothPlastic", "detail" },
+			{ "Drip", "sphere", { 0.096, 0.211, 0.086 }, { 0.201, 1.822, -0.24 }, { 12, 0, 8 }, "#C8761E", "SmoothPlastic", "detail" },
+			{ "Drip", "sphere", { 0.086, 0.163, 0.077 }, { -0.153, 1.841, -0.278 }, { 16, 0, -8 }, "#C8761E", "SmoothPlastic", "detail" },
+			{ "Eye", "sphere", { 0.163, 0.192, 0.077 }, { 0.163, 1.602, -0.388 }, { 6, -22, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Pupil", "sphere", { 0.101, 0.153, 0.048 }, { 0.176, 1.6, -0.404 }, { 6, -22, 0 }, "#1E1A24", "SmoothPlastic", "face" },
+			{ "Highlight", "sphere", { 0.063, 0.063, 0.043 }, { 0.192, 1.637, -0.396 }, { 6, -22, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Highlight", "sphere", { 0.038, 0.038, 0.03 }, { 0.167, 1.582, -0.431 }, { 6, -22, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Eye", "sphere", { 0.163, 0.192, 0.077 }, { -0.163, 1.602, -0.388 }, { 6, 22, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Pupil", "sphere", { 0.101, 0.153, 0.048 }, { -0.176, 1.6, -0.404 }, { 6, 22, 0 }, "#1E1A24", "SmoothPlastic", "face" },
+			{ "Highlight", "sphere", { 0.063, 0.063, 0.043 }, { -0.15, 1.639, -0.413 }, { 6, 22, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Highlight", "sphere", { 0.038, 0.038, 0.03 }, { -0.188, 1.582, -0.422 }, { 6, 22, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Beak", "sphere", { 0.192, 0.096, 0.182 }, { 0, 1.491, -0.403 }, { -8, 0, 0 }, "#FF9A2E", "SmoothPlastic", "body" },
+			{ "Mouth", "sphere", { 0.144, 0.067, 0.125 }, { 0, 1.439, -0.388 }, { -8, 0, 0 }, "#E8781C", "SmoothPlastic", "face" },
+			{ "Cheek", "sphere", { 0.125, 0.067, 0.048 }, { 0.259, 1.477, -0.336 }, { 0, -40, 0 }, "#FF9DB6", "SmoothPlastic", "face" },
+			{ "Cheek", "sphere", { 0.125, 0.067, 0.048 }, { -0.259, 1.477, -0.336 }, { 0, 40, 0 }, "#FF9DB6", "SmoothPlastic", "face" },
+		},
+	},
+	hot_cross_bunny = {
+		scale = 1.813, -- from batch-6.json
+		parts = {
+			{ "Body", "sphere", { 1.192, 0.899, 1.137 }, { 0, 0.459, 0.11 }, { 0, 0, 0 }, "#C77A35", "SmoothPlastic", "body" },
+			{ "BunBase", "sphere", { 1.119, 0.275, 1.064 }, { 0, 0.138, 0.11 }, { 0, 0, 0 }, "#A85F25", "SmoothPlastic", "body" },
+			{ "Glaze", "sphere", { 1.009, 0.459, 0.954 }, { 0, 0.702, 0.128 }, { 0, 0, 0 }, "#DC9248", "SmoothPlastic", "body" },
+			{ "Icing", "sphere", { 0.183, 0.393, 0.092 }, { -0.371, 0.807, 0.184 }, { -2.046, 1.133, -57.94 }, "#FFF8EE", "SmoothPlastic", "detail" },
+			{ "Icing", "sphere", { 0.183, 0.339, 0.092 }, { -0.122, 0.906, 0.177 }, { -0.866, 0.738, -80.906 }, "#FFF8EE", "SmoothPlastic", "detail" },
+			{ "Icing", "sphere", { 0.183, 0.339, 0.092 }, { 0.122, 0.906, 0.177 }, { 0.866, -1.015, -99.067 }, "#FFF8EE", "SmoothPlastic", "detail" },
+			{ "Icing", "sphere", { 0.183, 0.393, 0.092 }, { 0.371, 0.807, 0.184 }, { 2.05, -3.688, -121.887 }, "#FFF8EE", "SmoothPlastic", "detail" },
+			{ "Icing", "sphere", { 0.183, 0.254, 0.092 }, { 0, 0.924, 0.094 }, { 88.726, 0, 0 }, "#FFF8EE", "SmoothPlastic", "detail" },
+			{ "Icing", "sphere", { 0.183, 0.259, 0.092 }, { 0, 0.908, 0.257 }, { 101.699, 0, 0 }, "#FFF8EE", "SmoothPlastic", "detail" },
+			{ "Icing", "sphere", { 0.183, 0.252, 0.092 }, { 0, 0.857, 0.411 }, { 115.628, 0, 0 }, "#FFF8EE", "SmoothPlastic", "detail" },
+			{ "Icing", "sphere", { 0.183, 0.265, 0.092 }, { 0, 0.764, 0.547 }, { 132.324, 0, 0 }, "#FFF8EE", "SmoothPlastic", "detail" },
+			{ "Raisin", "sphere", { 0.092, 0.073, 0.069 }, { 0.487, 0.656, 0.282 }, { 0, 0, 20 }, "#3E1E14", "SmoothPlastic", "detail" },
+			{ "Raisin", "sphere", { 0.092, 0.073, 0.069 }, { -0.423, 0.692, 0.348 }, { 0, 50, 50 }, "#3E1E14", "SmoothPlastic", "detail" },
+			{ "Raisin", "sphere", { 0.092, 0.073, 0.069 }, { 0.301, 0.539, 0.574 }, { 0, 100, 80 }, "#3E1E14", "SmoothPlastic", "detail" },
+			{ "Raisin", "sphere", { 0.092, 0.073, 0.069 }, { -0.23, 0.584, 0.594 }, { 0, 150, 110 }, "#3E1E14", "SmoothPlastic", "detail" },
+			{ "Raisin", "sphere", { 0.092, 0.073, 0.069 }, { 0.561, 0.52, -0.015 }, { 0, 200, 140 }, "#3E1E14", "SmoothPlastic", "detail" },
+			{ "Raisin", "sphere", { 0.092, 0.073, 0.069 }, { -0.578, 0.489, 0.05 }, { 0, 250, 170 }, "#3E1E14", "SmoothPlastic", "detail" },
+			{ "Head", "sphere", { 0.734, 0.66, 0.66 }, { 0, 1.009, -0.385 }, { 0, 0, 0 }, "#C77A35", "SmoothPlastic", "body" },
+			{ "Muzzle", "sphere", { 0.33, 0.22, 0.202 }, { 0, 0.917, -0.66 }, { 0, 0, 0 }, "#FFE7C7", "SmoothPlastic", "body" },
+			{ "Nose", "sphere", { 0.101, 0.069, 0.046 }, { 0, 0.986, -0.757 }, { 0, 0, 0 }, "#FF8FA8", "SmoothPlastic", "face" },
+			{ "Mouth", "sphere", { 0.073, 0.03, 0.03 }, { 0.033, 0.894, -0.757 }, { 0, 0, 22 }, "#5A2A20", "SmoothPlastic", "face" },
+			{ "Mouth", "sphere", { 0.073, 0.03, 0.03 }, { -0.033, 0.894, -0.757 }, { 0, 0, -22 }, "#5A2A20", "SmoothPlastic", "face" },
+			{ "Teeth", "box", { 0.073, 0.064, 0.03 }, { 0, 0.862, -0.747 }, { 0, 0, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Eye", "sphere", { 0.147, 0.174, 0.073 }, { 0.156, 1.073, -0.633 }, { 6, -22, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Pupil", "sphere", { 0.091, 0.139, 0.046 }, { 0.168, 1.071, -0.647 }, { 6, -22, 0 }, "#2A1A14", "SmoothPlastic", "face" },
+			{ "Highlight", "sphere", { 0.057, 0.057, 0.041 }, { 0.183, 1.105, -0.641 }, { 6, -22, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Highlight", "sphere", { 0.035, 0.035, 0.03 }, { 0.16, 1.057, -0.672 }, { 6, -22, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Eye", "sphere", { 0.147, 0.174, 0.073 }, { -0.156, 1.073, -0.633 }, { 6, 22, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Pupil", "sphere", { 0.091, 0.139, 0.046 }, { -0.168, 1.071, -0.647 }, { 6, 22, 0 }, "#2A1A14", "SmoothPlastic", "face" },
+			{ "Highlight", "sphere", { 0.057, 0.057, 0.041 }, { -0.145, 1.107, -0.656 }, { 6, 22, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Highlight", "sphere", { 0.035, 0.035, 0.03 }, { -0.179, 1.056, -0.665 }, { 6, 22, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Cheek", "sphere", { 0.119, 0.064, 0.046 }, { 0.248, 0.926, -0.642 }, { 0, -38, 0 }, "#FF8FA8", "SmoothPlastic", "face" },
+			{ "Cheek", "sphere", { 0.119, 0.064, 0.046 }, { -0.248, 0.926, -0.642 }, { 0, 38, 0 }, "#FF8FA8", "SmoothPlastic", "face" },
+			{ "Ear", "sphere", { 0.202, 0.734, 0.119 }, { 0.156, 1.632, -0.349 }, { -6, 0, -12 }, "#C77A35", "SmoothPlastic", "body" },
+			{ "Ear", "sphere", { 0.202, 0.734, 0.119 }, { -0.156, 1.632, -0.349 }, { -6, 0, 12 }, "#C77A35", "SmoothPlastic", "body" },
+			{ "EarInner", "sphere", { 0.11, 0.532, 0.055 }, { 0.158, 1.614, -0.401 }, { -6, 0, -12 }, "#FFE7C7", "SmoothPlastic", "detail" },
+			{ "EarInner", "sphere", { 0.11, 0.532, 0.055 }, { -0.158, 1.614, -0.401 }, { -6, 0, 12 }, "#FFE7C7", "SmoothPlastic", "detail" },
+			{ "Butter", "box", { 0.22, 0.064, 0.22 }, { 0, 1.348, -0.349 }, { 4, 25, 0 }, "#FFE680", "SmoothPlastic", "detail" },
+			{ "ButterDrip", "sphere", { 0.083, 0.138, 0.055 }, { 0.092, 1.302, -0.486 }, { 20, 0, 0 }, "#FFE680", "SmoothPlastic", "detail" },
+			{ "Paw", "sphere", { 0.183, 0.165, 0.202 }, { 0.183, 0.569, -0.569 }, { 0, 0, 0 }, "#A85F25", "SmoothPlastic", "body" },
+			{ "Paw", "sphere", { 0.183, 0.165, 0.202 }, { -0.183, 0.569, -0.569 }, { 0, 0, 0 }, "#A85F25", "SmoothPlastic", "body" },
+			{ "Foot", "sphere", { 0.238, 0.128, 0.422 }, { 0.303, 0.064, -0.385 }, { 0, -8, 0 }, "#A85F25", "SmoothPlastic", "body" },
+			{ "Foot", "sphere", { 0.238, 0.128, 0.422 }, { -0.303, 0.064, -0.385 }, { 0, 8, 0 }, "#A85F25", "SmoothPlastic", "body" },
+			{ "Tail", "sphere", { 0.293, 0.275, 0.275 }, { 0, 0.459, 0.697 }, { 0, 0, 0 }, "#FFFFFF", "Fabric", "body" },
+		},
+	},
+	lemon_meringue_lamb = {
+		scale = 2.592, -- from batch-6.json
+		parts = {
+			{ "Leg", "cylinder", { 0.205, 0.246, 0.205 }, { 0.226, 0.144, -0.226 }, { 0, 0, 0 }, "#E3A95C", "Sand", "body" },
+			{ "Leg", "cylinder", { 0.205, 0.246, 0.205 }, { -0.226, 0.144, -0.226 }, { 0, 0, 0 }, "#E3A95C", "Sand", "body" },
+			{ "Hoof", "cylinder", { 0.226, 0.082, 0.226 }, { 0.226, 0.041, -0.226 }, { 0, 0, 0 }, "#7A4A26", "SmoothPlastic", "body" },
+			{ "Hoof", "cylinder", { 0.226, 0.082, 0.226 }, { -0.226, 0.041, -0.226 }, { 0, 0, 0 }, "#7A4A26", "SmoothPlastic", "body" },
+			{ "Leg", "cylinder", { 0.205, 0.246, 0.205 }, { 0.226, 0.144, 0.39 }, { 0, 0, 0 }, "#E3A95C", "Sand", "body" },
+			{ "Leg", "cylinder", { 0.205, 0.246, 0.205 }, { -0.226, 0.144, 0.39 }, { 0, 0, 0 }, "#E3A95C", "Sand", "body" },
+			{ "Hoof", "cylinder", { 0.226, 0.082, 0.226 }, { 0.226, 0.041, 0.39 }, { 0, 0, 0 }, "#7A4A26", "SmoothPlastic", "body" },
+			{ "Hoof", "cylinder", { 0.226, 0.082, 0.226 }, { -0.226, 0.041, 0.39 }, { 0, 0, 0 }, "#7A4A26", "SmoothPlastic", "body" },
+			{ "Crust", "sphere", { 0.882, 0.287, 1.087 }, { 0, 0.349, 0.082 }, { 0, 0, 0 }, "#E3A95C", "Sand", "body" },
+			{ "Curd", "sphere", { 0.944, 0.226, 1.149 }, { 0, 0.482, 0.082 }, { 0, 0, 0 }, "#FFD84A", "SmoothPlastic", "body" },
+			{ "Body", "sphere", { 1.046, 0.718, 1.251 }, { 0, 0.821, 0.103 }, { 0, 0, 0 }, "#FFF8EC", "SmoothPlastic", "body" },
+			{ "Meringue", "sphere", { 0.39, 0.308, 0.39 }, { -0.347, 1.019, -0.074 }, { -11.966, -3.945, 36.386 }, "#FFF8EC", "SmoothPlastic", "body" },
+			{ "Toasted", "sphere", { 0.226, 0.113, 0.226 }, { -0.413, 1.107, -0.097 }, { -11.966, -3.945, 36.386 }, "#EDB25E", "SmoothPlastic", "detail" },
+			{ "Meringue", "sphere", { 0.39, 0.308, 0.39 }, { 0, 1.125, -0.064 }, { -9.347, 0, 0 }, "#FFF8EC", "SmoothPlastic", "body" },
+			{ "Toasted", "sphere", { 0.226, 0.113, 0.226 }, { 0, 1.236, -0.082 }, { -9.347, 0, 0 }, "#EDB25E", "SmoothPlastic", "detail" },
+			{ "Meringue", "sphere", { 0.39, 0.308, 0.39 }, { 0.347, 1.019, -0.074 }, { -11.966, 3.945, -36.386 }, "#FFF8EC", "SmoothPlastic", "body" },
+			{ "Toasted", "sphere", { 0.226, 0.113, 0.226 }, { 0.413, 1.107, -0.097 }, { -11.966, 3.945, -36.386 }, "#EDB25E", "SmoothPlastic", "detail" },
+			{ "Meringue", "sphere", { 0.39, 0.308, 0.39 }, { -0.363, 1.029, 0.121 }, { 1.211, 0.408, 37.213 }, "#FFF8EC", "SmoothPlastic", "body" },
+			{ "Toasted", "sphere", { 0.226, 0.113, 0.226 }, { -0.432, 1.118, 0.123 }, { 1.211, 0.408, 37.213 }, "#EDB25E", "SmoothPlastic", "detail" },
+			{ "Meringue", "sphere", { 0.437, 0.345, 0.437 }, { 0, 1.133, 0.12 }, { 0.943, 0, 0 }, "#FFF8EC", "SmoothPlastic", "body" },
+			{ "Toasted", "sphere", { 0.252, 0.126, 0.252 }, { 0, 1.26, 0.122 }, { 0.943, 0, 0 }, "#EDB25E", "SmoothPlastic", "detail" },
+			{ "Meringue", "sphere", { 0.39, 0.308, 0.39 }, { 0.363, 1.029, 0.121 }, { 1.211, -0.408, -37.213 }, "#FFF8EC", "SmoothPlastic", "body" },
+			{ "Toasted", "sphere", { 0.226, 0.113, 0.226 }, { 0.432, 1.118, 0.123 }, { 1.211, -0.408, -37.213 }, "#EDB25E", "SmoothPlastic", "detail" },
+			{ "Meringue", "sphere", { 0.39, 0.308, 0.39 }, { -0.344, 1.017, 0.295 }, { 13.13, 4.31, 36.217 }, "#FFF8EC", "SmoothPlastic", "body" },
+			{ "Toasted", "sphere", { 0.226, 0.113, 0.226 }, { -0.409, 1.104, 0.321 }, { 13.13, 4.31, 36.217 }, "#EDB25E", "SmoothPlastic", "detail" },
+			{ "Meringue", "sphere", { 0.39, 0.308, 0.39 }, { 0, 1.122, 0.283 }, { 10.263, 0, 0 }, "#FFF8EC", "SmoothPlastic", "body" },
+			{ "Toasted", "sphere", { 0.226, 0.113, 0.226 }, { 0, 1.234, 0.304 }, { 10.263, 0, 0 }, "#EDB25E", "SmoothPlastic", "detail" },
+			{ "Meringue", "sphere", { 0.39, 0.308, 0.39 }, { 0.344, 1.017, 0.295 }, { 13.13, -4.31, -36.217 }, "#FFF8EC", "SmoothPlastic", "body" },
+			{ "Toasted", "sphere", { 0.226, 0.113, 0.226 }, { 0.409, 1.104, 0.321 }, { 13.13, -4.31, -36.217 }, "#EDB25E", "SmoothPlastic", "detail" },
+			{ "Meringue", "sphere", { 0.351, 0.277, 0.351 }, { 0, 0.997, 0.593 }, { 39.455, 0, 0 }, "#FFF8EC", "SmoothPlastic", "body" },
+			{ "Toasted", "sphere", { 0.203, 0.102, 0.203 }, { 0, 1.076, 0.656 }, { 39.455, 0, 0 }, "#EDB25E", "SmoothPlastic", "detail" },
+			{ "Head", "sphere", { 0.574, 0.554, 0.615 }, { 0, 1.046, -0.615 }, { 0, 0, 0 }, "#E3A95C", "Sand", "body" },
+			{ "Muzzle", "sphere", { 0.308, 0.205, 0.226 }, { 0, 0.964, -0.862 }, { 0, 0, 0 }, "#F4CF94", "Sand", "body" },
+			{ "Nose", "sphere", { 0.103, 0.062, 0.051 }, { 0, 1.021, -0.969 }, { 0, 0, 0 }, "#7A3E22", "SmoothPlastic", "face" },
+			{ "Mouth", "sphere", { 0.103, 0.031, 0.031 }, { 0, 0.913, -0.969 }, { 0, 0, 0 }, "#7A3E22", "SmoothPlastic", "face" },
+			{ "Eye", "sphere", { 0.144, 0.174, 0.072 }, { 0.138, 1.113, -0.851 }, { 6, -24, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Pupil", "sphere", { 0.089, 0.14, 0.044 }, { 0.151, 1.111, -0.865 }, { 6, -24, 0 }, "#2A1A12", "SmoothPlastic", "face" },
+			{ "Highlight", "sphere", { 0.056, 0.056, 0.04 }, { 0.165, 1.146, -0.859 }, { 6, -24, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Highlight", "sphere", { 0.034, 0.034, 0.031 }, { 0.144, 1.096, -0.89 }, { 6, -24, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Eye", "sphere", { 0.144, 0.174, 0.072 }, { -0.138, 1.113, -0.851 }, { 6, 24, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Pupil", "sphere", { 0.089, 0.14, 0.044 }, { -0.151, 1.111, -0.865 }, { 6, 24, 0 }, "#2A1A12", "SmoothPlastic", "face" },
+			{ "Highlight", "sphere", { 0.056, 0.056, 0.04 }, { -0.128, 1.147, -0.875 }, { 6, 24, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Highlight", "sphere", { 0.034, 0.034, 0.031 }, { -0.162, 1.096, -0.882 }, { 6, 24, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Cheek", "sphere", { 0.113, 0.062, 0.051 }, { 0.19, 0.974, -0.851 }, { 0, -38, 0 }, "#FFB0C0", "SmoothPlastic", "face" },
+			{ "Cheek", "sphere", { 0.113, 0.062, 0.051 }, { -0.19, 0.974, -0.851 }, { 0, 38, 0 }, "#FFB0C0", "SmoothPlastic", "face" },
+			{ "Ear", "sphere", { 0.349, 0.123, 0.185 }, { 0.349, 1.087, -0.574 }, { 0, -10, -28 }, "#C98A40", "Sand", "body" },
+			{ "Ear", "sphere", { 0.349, 0.123, 0.185 }, { -0.349, 1.087, -0.574 }, { 0, 10, 28 }, "#C98A40", "Sand", "body" },
+			{ "EarInner", "sphere", { 0.246, 0.051, 0.123 }, { 0.344, 1.07, -0.585 }, { 0, -10, -28 }, "#FFB0C0", "SmoothPlastic", "detail" },
+			{ "EarInner", "sphere", { 0.246, 0.051, 0.123 }, { -0.344, 1.07, -0.585 }, { 0, 10, 28 }, "#FFB0C0", "SmoothPlastic", "detail" },
+			{ "Tuft", "sphere", { 0.246, 0.205, 0.246 }, { 0.082, 1.323, -0.574 }, { 0, 0, -10 }, "#FFF8EC", "SmoothPlastic", "body" },
+			{ "Tuft", "sphere", { 0.246, 0.205, 0.246 }, { -0.082, 1.323, -0.574 }, { 0, 0, 10 }, "#FFF8EC", "SmoothPlastic", "body" },
+			{ "TuftToasted", "sphere", { 0.174, 0.092, 0.174 }, { 0.092, 1.395, -0.574 }, { 0, 0, -10 }, "#EDB25E", "SmoothPlastic", "detail" },
+			{ "TuftToasted", "sphere", { 0.174, 0.092, 0.174 }, { -0.092, 1.395, -0.574 }, { 0, 0, 10 }, "#EDB25E", "SmoothPlastic", "detail" },
+			{ "LemonRind", "cylinder", { 0.349, 0.051, 0.349 }, { 0.287, 1.313, -0.451 }, { 62, -24, 12 }, "#FFC928", "SmoothPlastic", "detail" },
+			{ "LemonSlice", "cylinder", { 0.287, 0.067, 0.287 }, { 0.287, 1.313, -0.451 }, { 62, -24, 12 }, "#FFF09A", "SmoothPlastic", "detail" },
+			{ "LemonSegment", "box", { 0.267, 0.077, 0.031 }, { 0.287, 1.313, -0.451 }, { 62, -24, 12 }, "#FFFBE0", "SmoothPlastic", "detail" },
+			{ "LemonSegment", "box", { 0.267, 0.077, 0.031 }, { 0.287, 1.313, -0.451 }, { 49.336, 34.785, 13.371 }, "#FFFBE0", "SmoothPlastic", "detail" },
+			{ "LemonSegment", "box", { 0.267, 0.077, 0.031 }, { 0.287, 1.313, -0.451 }, { -59.934, 77.751, 116.463 }, "#FFFBE0", "SmoothPlastic", "detail" },
+		},
+	},
+	jelly_bean_jackalope = {
+		scale = 2.059, -- from batch-6.json
+		parts = {
+			{ "Body", "sphere", { 0.763, 0.894, 0.838 }, { 0, 0.577, 0.112 }, { 0, 0, 0 }, "#CDB8FF", "SmoothPlastic", "body" },
+			{ "Belly", "sphere", { 0.521, 0.652, 0.372 }, { 0, 0.559, -0.158 }, { 0, 0, 0 }, "#F3ECFF", "SmoothPlastic", "body" },
+			{ "Haunch", "sphere", { 0.316, 0.484, 0.577 }, { 0.279, 0.336, 0.186 }, { 0, 0, 0 }, "#CDB8FF", "SmoothPlastic", "body" },
+			{ "Haunch", "sphere", { 0.316, 0.484, 0.577 }, { -0.279, 0.336, 0.186 }, { 0, 0, 0 }, "#CDB8FF", "SmoothPlastic", "body" },
+			{ "Foot", "sphere", { 0.223, 0.121, 0.54 }, { 0.251, 0.061, -0.112 }, { 0, -6, 0 }, "#B59CF2", "SmoothPlastic", "body" },
+			{ "Foot", "sphere", { 0.223, 0.121, 0.54 }, { -0.251, 0.061, -0.112 }, { 0, 6, 0 }, "#B59CF2", "SmoothPlastic", "body" },
+			{ "Paw", "sphere", { 0.158, 0.298, 0.158 }, { 0.14, 0.206, -0.335 }, { 0, 0, 0 }, "#CDB8FF", "SmoothPlastic", "body" },
+			{ "Paw", "sphere", { 0.158, 0.298, 0.158 }, { -0.14, 0.206, -0.335 }, { 0, 0, 0 }, "#CDB8FF", "SmoothPlastic", "body" },
+			{ "Bean", "sphere", { 0.093, 0.07, 0.168 }, { 0.306, 0.716, 0.283 }, { 0, 0, 30 }, "#FF6FAE", "SmoothPlastic", "detail" },
+			{ "Bean", "sphere", { 0.093, 0.07, 0.168 }, { -0.299, 0.792, 0.218 }, { 25, 70, 70 }, "#FFD84A", "SmoothPlastic", "detail" },
+			{ "Bean", "sphere", { 0.093, 0.07, 0.168 }, { 0.162, 0.873, 0.34 }, { 50, 140, 110 }, "#5FE0A8", "SmoothPlastic", "detail" },
+			{ "Bean", "sphere", { 0.093, 0.07, 0.168 }, { -0.229, 0.539, 0.42 }, { 75, 210, 150 }, "#FF9A4A", "SmoothPlastic", "detail" },
+			{ "Bean", "sphere", { 0.093, 0.07, 0.168 }, { 0.356, 0.502, 0.15 }, { 100, 280, 190 }, "#7CC8FF", "SmoothPlastic", "detail" },
+			{ "Bean", "sphere", { 0.093, 0.07, 0.168 }, { -0.102, 0.819, 0.422 }, { 125, 350, 230 }, "#C46BFF", "SmoothPlastic", "detail" },
+			{ "Head", "sphere", { 0.652, 0.596, 0.652 }, { 0, 1.211, -0.223 }, { 0, 0, 0 }, "#CDB8FF", "SmoothPlastic", "body" },
+			{ "Muzzle", "sphere", { 0.316, 0.223, 0.242 }, { 0, 1.109, -0.512 }, { 0, 0, 0 }, "#F3ECFF", "SmoothPlastic", "body" },
+			{ "Nose", "sphere", { 0.102, 0.07, 0.047 }, { 0, 1.178, -0.628 }, { 0, 0, 0 }, "#FF8FB8", "SmoothPlastic", "face" },
+			{ "Mouth", "sphere", { 0.074, 0.03, 0.03 }, { 0.034, 1.085, -0.628 }, { 0, 0, 22 }, "#5A2A4A", "SmoothPlastic", "face" },
+			{ "Mouth", "sphere", { 0.074, 0.03, 0.03 }, { -0.034, 1.085, -0.628 }, { 0, 0, -22 }, "#5A2A4A", "SmoothPlastic", "face" },
+			{ "Teeth", "box", { 0.074, 0.065, 0.03 }, { 0, 1.053, -0.619 }, { 0, 0, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Eye", "sphere", { 0.149, 0.186, 0.074 }, { 0.149, 1.275, -0.493 }, { 6, -24, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Pupil", "sphere", { 0.092, 0.149, 0.047 }, { 0.162, 1.273, -0.507 }, { 6, -24, 0 }, "#2A1E3A", "SmoothPlastic", "face" },
+			{ "Highlight", "sphere", { 0.058, 0.058, 0.042 }, { 0.177, 1.311, -0.501 }, { 6, -24, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Highlight", "sphere", { 0.035, 0.035, 0.03 }, { 0.155, 1.257, -0.533 }, { 6, -24, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Eye", "sphere", { 0.149, 0.186, 0.074 }, { -0.149, 1.275, -0.493 }, { 6, 24, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Pupil", "sphere", { 0.092, 0.149, 0.047 }, { -0.162, 1.273, -0.507 }, { 6, 24, 0 }, "#2A1E3A", "SmoothPlastic", "face" },
+			{ "Highlight", "sphere", { 0.058, 0.058, 0.042 }, { -0.139, 1.312, -0.518 }, { 6, 24, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Highlight", "sphere", { 0.035, 0.035, 0.03 }, { -0.174, 1.257, -0.525 }, { 6, 24, 0 }, "#FFFFFF", "SmoothPlastic", "face" },
+			{ "Cheek", "sphere", { 0.112, 0.06, 0.047 }, { 0.214, 1.118, -0.456 }, { 0, -38, 0 }, "#FF8FB8", "SmoothPlastic", "face" },
+			{ "Cheek", "sphere", { 0.112, 0.06, 0.047 }, { -0.214, 1.118, -0.456 }, { 0, 38, 0 }, "#FF8FB8", "SmoothPlastic", "face" },
+			{ "Ear", "sphere", { 0.158, 0.633, 0.093 }, { 0.149, 1.695, -0.037 }, { -16, 0, -14 }, "#CDB8FF", "SmoothPlastic", "body" },
+			{ "Ear", "sphere", { 0.158, 0.633, 0.093 }, { -0.149, 1.695, -0.037 }, { -16, 0, 14 }, "#CDB8FF", "SmoothPlastic", "body" },
+			{ "EarInner", "sphere", { 0.084, 0.465, 0.047 }, { 0.15, 1.676, -0.087 }, { -16, 0, -14 }, "#FFB3D1", "SmoothPlastic", "detail" },
+			{ "EarInner", "sphere", { 0.084, 0.465, 0.047 }, { -0.15, 1.676, -0.087 }, { -16, 0, 14 }, "#FFB3D1", "SmoothPlastic", "detail" },
+			{ "Antler", "sphere", { 0.121, 0.234, 0.121 }, { 0.14, 1.5, -0.293 }, { -9.044, 2.564, -31.597 }, "#FF6FAE", "SmoothPlastic", "body" },
+			{ "Antler", "sphere", { 0.121, 0.228, 0.121 }, { 0.247, 1.634, -0.298 }, { 6.215, -2.559, -44.721 }, "#FFD84A", "SmoothPlastic", "body" },
+			{ "Antler", "sphere", { 0.121, 0.225, 0.121 }, { 0.372, 1.746, -0.27 }, { 12.733, -6.023, -50.485 }, "#5FE0A8", "SmoothPlastic", "body" },
+			{ "Antler", "sphere", { 0.112, 0.237, 0.112 }, { 0.172, 1.652, -0.349 }, { -27.557, -2.18, 8.871 }, "#FF9A4A", "SmoothPlastic", "body" },
+			{ "Antler", "sphere", { 0.112, 0.222, 0.112 }, { 0.349, 1.676, -0.358 }, { -83.124, 32.651, -36.561 }, "#7CC8FF", "SmoothPlastic", "body" },
+			{ "AntlerGlow", "sphere", { 0.093, 0.093, 0.093 }, { 0.465, 1.821, -0.242 }, { 0, 0, 0 }, "#FFF6B0", "Neon", "detail" },
+			{ "AntlerGlow", "sphere", { 0.084, 0.084, 0.084 }, { 0.149, 1.759, -0.4 }, { 0, 0, 0 }, "#FFD6F0", "Neon", "detail" },
+			{ "Antler", "sphere", { 0.121, 0.234, 0.121 }, { -0.14, 1.5, -0.293 }, { -9.044, -2.564, 31.597 }, "#FF9A4A", "SmoothPlastic", "body" },
+			{ "Antler", "sphere", { 0.121, 0.228, 0.121 }, { -0.247, 1.634, -0.298 }, { 6.215, 2.559, 44.721 }, "#7CC8FF", "SmoothPlastic", "body" },
+			{ "Antler", "sphere", { 0.121, 0.225, 0.121 }, { -0.372, 1.746, -0.27 }, { 12.733, 6.023, 50.485 }, "#C46BFF", "SmoothPlastic", "body" },
+			{ "Antler", "sphere", { 0.112, 0.237, 0.112 }, { -0.172, 1.652, -0.349 }, { -27.557, 2.18, -8.871 }, "#FF6FAE", "SmoothPlastic", "body" },
+			{ "Antler", "sphere", { 0.112, 0.222, 0.112 }, { -0.349, 1.676, -0.358 }, { -83.124, -32.651, 36.561 }, "#FFD84A", "SmoothPlastic", "body" },
+			{ "AntlerGlow", "sphere", { 0.093, 0.093, 0.093 }, { -0.465, 1.821, -0.242 }, { 0, 0, 0 }, "#FFF6B0", "Neon", "detail" },
+			{ "AntlerGlow", "sphere", { 0.084, 0.084, 0.084 }, { -0.149, 1.759, -0.4 }, { 0, 0, 0 }, "#FFD6F0", "Neon", "detail" },
+			{ "Bow", "sphere", { 0.158, 0.112, 0.056 }, { 0.084, 0.932, -0.437 }, { 0, 0, 20 }, "#7FD8FF", "Fabric", "detail" },
+			{ "Bow", "sphere", { 0.158, 0.112, 0.056 }, { -0.084, 0.932, -0.437 }, { 0, 0, -20 }, "#7FD8FF", "Fabric", "detail" },
+			{ "BowKnot", "sphere", { 0.074, 0.074, 0.065 }, { 0, 0.932, -0.456 }, { 0, 0, 0 }, "#5CC2F2", "Fabric", "detail" },
+			{ "Tail", "sphere", { 0.242, 0.242, 0.242 }, { 0, 0.392, 0.558 }, { 0, 0, 0 }, "#FFFFFF", "Fabric", "body" },
+			{ "GoldenEgg", "sphere", { 0.316, 0.41, 0.316 }, { 0.484, 0.206, -0.465 }, { 0, 0, 8 }, "#F2C14E", "Foil", "detail" },
+			{ "EggBand", "cylinder", { 0.326, 0.056, 0.326 }, { 0.479, 0.224, -0.465 }, { 0, 0, 8 }, "#FF7AC8", "Neon", "detail" },
+			{ "EggGem", "sphere", { 0.093, 0.093, 0.056 }, { 0.465, 0.28, -0.619 }, { 0, 0, 0 }, "#7CE8FF", "Glass", "detail", 0.2 },
 		},
 	},
 }

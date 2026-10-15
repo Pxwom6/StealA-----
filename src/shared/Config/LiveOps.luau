@@ -129,6 +129,31 @@ local LiveOps = {
 			title = "Sweetheart luck",
 			durationSeconds = 1800,
 		},
+
+		-- Easter 2027: four event Snacklings (Config/Creatures), the Pastel mutation (Config/Mutations) and the
+		-- "spring" seasonal theme (Config/Seasons: giant painted eggs, chocolate bunnies, blossom trees, butterflies,
+		-- pastel string lights and lamps, a bright spring morning and falling blossom).
+		-- Fri 19 Mar 17:00 UTC (1 PM EDT / 10 AM PDT) -> Tue 6 Apr 07:00 UTC (3 AM EDT / Tue midnight PDT): two
+		-- weekends, Easter (Sun 28 Mar) and Easter Monday, and the spring holidays either side.
+		{
+			id = "Easter2027",
+			startsAt = 1805475600, -- 2027-03-19 17:00 UTC
+			endsAt = 1806994800, -- 2027-04-06 07:00 UTC
+			bannerText = "Easter: hatching Snacklings & Pastel mutations!",
+			title = "Easter",
+			durationSeconds = 3600, -- `/event Easter2027` runs it for an hour
+		},
+		-- Easter weekend inside the event, Good Friday to Easter Monday: 2x luck (stacks with Server Luck, clamped by
+		-- limits below). Fri 26 Mar 17:00 UTC (1 PM EDT / 10 AM PDT) -> Mon 29 Mar 23:59 UTC (7:59 PM EDT / 4:59 PM
+		-- PDT).
+		{
+			id = "EasterLuck2027",
+			startsAt = 1806080400, -- 2027-03-26 17:00 UTC
+			endsAt = 1806364740, -- 2027-03-29 23:59 UTC
+			luckMultiplier = 2,
+			title = "Easter luck",
+			durationSeconds = 1800,
+		},
 	} :: { EventDef },
 
 	limits = {

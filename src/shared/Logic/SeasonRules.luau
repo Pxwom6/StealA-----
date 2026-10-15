@@ -7,13 +7,16 @@
 	depend on MapBuilder and tests can check that nothing lands inside a plot, on the belt or on the lobby spawn.
 
 	Where each prop goes (every theme uses the same spots, so a new theme is only data):
-	  beside each plot entrance   pumpkins, then presents, then potted roses (alternating sides, stepping outwards)
+	  beside each plot entrance   pumpkins, then presents, then potted roses, then painted eggs (alternating sides,
+	                              stepping outwards)
 	  the plot's front wall       string-light bulbs hanging under its top; snowdrifts at its ends, on the walkway
-	  between neighbouring plots  lamp posts at the walkway; trees a little back, in the grass gap
-	  along both belt rails       small pumpkins, then small presents, then small roses
+	  between neighbouring plots  lamp posts at the walkway; trees a little back, in the grass gap; blossom trees
+	                              there too (further back when there are trees)
+	  along both belt rails       small pumpkins, then small presents, then small roses, then small eggs
 	  above the walkway           bats; snowflakes a little higher and closer to the belt; heart balloons lower and
-	                              a little closer in
-	  past both belt ends         ghosts; snowmen at the corners, a little closer in, then giant hearts
+	                              a little closer in; butterflies lower still, nearer the bases
+	  past both belt ends         ghosts; snowmen at the corners, a little closer in, then giant hearts, then
+	                              chocolate bunnies
 ]]
 
 local MapThemeRules = require("./MapThemeRules")
@@ -38,6 +41,10 @@ export type PropKind =
 	| "rosePot"
 	| "heartBalloon"
 	| "giantHeart"
+	| "easterEgg"
+	| "chocolateBunny"
+	| "blossomTree"
+	| "butterfly"
 
 -- One decoration to build. (faceX, faceZ) is the horizontal direction its front looks at.
 export type Prop = {
@@ -50,8 +57,10 @@ export type Prop = {
 	faceZ: number,
 	scale: number,
 	color: string?, -- bulbs: their colour (palette.bulbs); presents: the wrapping (palette.presents); roses and
-	-- balloons: their colour (palette.roses, palette.balloons)
-	color2: string?, -- presents: the ribbon (palette.ribbons); roses: the middle bloom
+	-- balloons: their colour (palette.roses, palette.balloons); eggs: the shell (palette.eggs); blossom trees: their
+	-- blossom (palette.blossoms); butterflies: their wings (palette.butterflies)
+	color2: string?, -- presents: the ribbon (palette.ribbons); roses: the middle bloom; eggs: the painted bands and
+	-- dots (palette.eggStripes); blossom trees: their second blossom colour
 }
 
 -- A plot entrance: the centre of its front wall's outer face, and the unit direction pointing out of the plot.
@@ -85,6 +94,10 @@ SeasonRules.PARTS_PER = {
 	rosePot = 5, -- pot, bush, three blooms
 	heartBalloon = 4, -- two lobes, the point, the string
 	giantHeart = 8, -- pedestal, two lobes and the point, the arrow's shaft, tip and two feathers
+	easterEgg = 5, -- shell, two painted bands, two dots
+	chocolateBunny = 15, -- body, head, two ears and their linings, two eyes and pupils, nose, two feet, a two-loop bow
+	blossomTree = 5, -- trunk, four clouds of blossom
+	butterfly = 3, -- body, two wings
 } :: { [PropKind]: number }
 
 -- The palette colours each prop kind is built with: a theme that places a kind must define these (lists need at
@@ -103,6 +116,10 @@ SeasonRules.PALETTE_KEYS = {
 	rosePot = { "pot", "leaves", "roses" },
 	heartBalloon = { "balloons", "balloonString" },
 	giantHeart = { "heart", "pedestal", "arrow" },
+	easterEgg = { "eggs", "eggStripes" },
+	chocolateBunny = { "chocolate", "bunnyBow" },
+	blossomTree = { "wood", "blossoms" },
+	butterfly = { "butterflies", "butterflyBody" },
 } :: { [PropKind]: { string } }
 
 -- Every palette key and whether it holds a list of colours.
@@ -135,6 +152,13 @@ local PALETTE_LISTS: { [string]: boolean } = {
 	heart = false,
 	pedestal = false,
 	arrow = false,
+	eggs = true,
+	eggStripes = true,
+	blossoms = true,
+	butterflies = true,
+	butterflyBody = false,
+	chocolate = false,
+	bunnyBow = false,
 }
 
 local COUNT_KEYS = {
@@ -152,6 +176,10 @@ local COUNT_KEYS = {
 	"beltRosesPerSide",
 	"heartBalloons",
 	"giantHearts",
+	"eggsPerPlot",
+	"beltEggsPerSide",
+	"butterflies",
+	"chocolateBunnies",
 }
 
 local HEX_PATTERN = "^#%x%x%x%x%x%x$"
@@ -159,8 +187,12 @@ local HEX_PATTERN = "^#%x%x%x%x%x%x$"
 -- Presents beside an entrance vary a little in size and angle, so a row reads as a pile of gifts.
 local PRESENT_SCALES = { 1, 0.8, 1.15, 0.9 }
 local PRESENT_TURNS = { 0, 0.32, -0.24, 0.45 } -- radians off the walkway direction
--- Trees stand this far back from the plot fronts, in the grass between two bases.
+-- Trees stand this far back from the plot fronts, in the grass between two bases; blossom trees there too, or this
+-- much further back when a theme has both.
 local TREE_BACK = 6
+local BLOSSOM_BEHIND_TREES = 10
+-- Painted eggs beside an entrance lean a little, each its own way (radians off the walkway direction).
+local EGG_TURNS = { 0.2, -0.3, 0.35, -0.15 }
 
 -- The theme to show for the active events: among active events that map to a theme, the highest-priority theme
 -- (ties: the alphabetically first event id, so every server agrees). Returns the theme id and the event that
@@ -243,8 +275,10 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: SeasonPalet
 	local pumpkinsPerPlot = count(decorations.pumpkinsPerPlot)
 	local presentsPerPlot = count(decorations.presentsPerPlot)
 	local rosesPerPlot = count(decorations.rosesPerPlot)
+	local eggsPerPlot = count(decorations.eggsPerPlot)
 	local presentIndex = 0
 	local roseIndex = 0
+	local eggIndex = 0
 	for _, entrance in map.entrances do
 		-- "Right" along the front wall (any perpendicular works: props are placed on both sides).
 		local rightX, rightZ = entrance.outZ, -entrance.outX
@@ -307,6 +341,25 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: SeasonPalet
 			})
 		end
 
+		-- Giant painted eggs in the spots after those, each turned a little, in cycling shells and stripes.
+		local firstEgg = pumpkinsPerPlot + presentsPerPlot + rosesPerPlot
+		for k = firstEgg, firstEgg + eggsPerPlot - 1 do
+			eggIndex += 1
+			local x, z = at(slot(k), 1.8)
+			local turn = EGG_TURNS[(eggIndex - 1) % #EGG_TURNS + 1]
+			add({
+				kind = "easterEgg",
+				x = x,
+				y = map.groundY,
+				z = z,
+				faceX = entrance.outX * math.cos(turn) - entrance.outZ * math.sin(turn),
+				faceZ = entrance.outX * math.sin(turn) + entrance.outZ * math.cos(turn),
+				scale = 1,
+				color = cycle(palette.eggs, eggIndex),
+				color2 = cycle(palette.eggStripes, eggIndex),
+			})
+		end
+
 		-- String-light bulbs hanging along the front wall, split between both wall segments.
 		local bulbs = count(decorations.bulbsPerPlot)
 		local segment = (map.plotWidth - map.entranceWidth) / 2
@@ -349,7 +402,9 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: SeasonPalet
 		end
 	end
 
-	-- Lamp posts at the walkway between neighbouring plots on the same side of the belt, trees further back.
+	-- Lamp posts at the walkway between neighbouring plots on the same side of the belt, trees further back, blossom
+	-- trees there too (or behind the trees).
+	local blossomIndex = 0
 	for _, gap in gaps(map) do
 		if decorations.lampsBetweenPlots then
 			add({
@@ -373,18 +428,48 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: SeasonPalet
 				scale = 1,
 			})
 		end
+		if decorations.blossomTreesBetweenPlots then
+			blossomIndex += 1
+			local back = if decorations.treesBetweenPlots then TREE_BACK + BLOSSOM_BEHIND_TREES else TREE_BACK
+			add({
+				kind = "blossomTree",
+				x = gap.x - gap.outX * back,
+				y = map.groundY,
+				z = gap.z - gap.outZ * back,
+				faceX = gap.outX,
+				faceZ = gap.outZ,
+				scale = 1,
+				color = cycle(palette.blossoms, blossomIndex),
+				color2 = cycle(palette.blossoms, blossomIndex + 1),
+			})
+		end
 	end
 
-	-- Small pumpkins, then small presents, then small roses, along both belt rails, facing away from the belt.
+	-- Small pumpkins, then small presents, then small roses, then small eggs, along both belt rails, facing away
+	-- from the belt.
 	local beltPumpkins = count(decorations.beltPumpkinsPerSide)
 	local beltPresents = count(decorations.beltPresentsPerSide)
 	local beltRoses = count(decorations.beltRosesPerSide)
-	local beltTotal = beltPumpkins + beltPresents + beltRoses
+	local beltEggs = count(decorations.beltEggsPerSide)
+	local beltTotal = beltPumpkins + beltPresents + beltRoses + beltEggs
 	for sideIndex, side in { -1, 1 } do
 		for i = 1, beltTotal do
 			local x = (i - (beltTotal + 1) / 2) * (map.beltLength / beltTotal)
 			local z = side * (map.beltWidth / 2 + 2.2)
-			if i <= beltPumpkins + beltPresents then
+			if i > beltPumpkins + beltPresents + beltRoses then
+				local n = (sideIndex - 1) * beltEggs + (i - beltPumpkins - beltPresents - beltRoses)
+				add({
+					kind = "easterEgg",
+					x = x,
+					y = map.groundY,
+					z = z,
+					faceX = 0,
+					faceZ = side,
+					scale = 0.7,
+					color = cycle(palette.eggs, n + 2),
+					color2 = cycle(palette.eggStripes, n + 1),
+				})
+			elseif i <= beltPumpkins + beltPresents then
 				local isPumpkin = i <= beltPumpkins
 				local n = (sideIndex - 1) * beltPresents + (i - beltPumpkins)
 				add({
@@ -464,6 +549,23 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: SeasonPalet
 		})
 	end
 
+	-- Butterflies hovering over the walkway, lower than the balloons and nearer the bases, each facing its own way.
+	local butterflies = count(decorations.butterflies)
+	for i = 1, butterflies do
+		local zSide = if i % 2 == 0 then 1 else -1
+		local angle = i * 2.4
+		add({
+			kind = "butterfly",
+			x = (i - 0.5 - butterflies / 2) * (map.beltLength * 0.9 / butterflies),
+			y = 8.5 + (i % 3) * 1.2,
+			z = zSide * map.walkwayWidth * 0.62,
+			faceX = math.cos(angle),
+			faceZ = math.sin(angle),
+			scale = 1,
+			color = cycle(palette.butterflies, i),
+		})
+	end
+
 	-- Ghosts floating past the belt's end arches, looking back at the belt.
 	for i = 1, count(decorations.ghosts) do
 		local endSide = if i % 2 == 1 then -1 else 1
@@ -481,7 +583,7 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: SeasonPalet
 	end
 
 	-- Snowmen at the corners of both belt ends (clear of the factory and the chute), looking along the walkway; giant
-	-- hearts in the next spots out.
+	-- hearts in the next spots out, then chocolate bunnies.
 	local snowmen = count(decorations.snowmen)
 	local function corner(i: number): (number, number, number)
 		local endSide = if i % 2 == 1 then -1 else 1
@@ -501,7 +603,8 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: SeasonPalet
 			scale = 1,
 		})
 	end
-	for i = 1, count(decorations.giantHearts) do
+	local giantHearts = count(decorations.giantHearts)
+	for i = 1, giantHearts do
 		local endSide, zSide, row = corner(snowmen + i)
 		add({
 			kind = "giantHeart",
@@ -511,6 +614,18 @@ function SeasonRules.layout(decorations: SeasonDecorations, palette: SeasonPalet
 			faceX = -endSide,
 			faceZ = 0,
 			scale = 1,
+		})
+	end
+	for i = 1, count(decorations.chocolateBunnies) do
+		local endSide, zSide, row = corner(snowmen + giantHearts + i)
+		add({
+			kind = "chocolateBunny",
+			x = endSide * (map.beltLength / 2 + 8 + row * 7),
+			y = map.groundY,
+			z = zSide * (12 + row * 2),
+			faceX = -endSide,
+			faceZ = 0,
+			scale = 1.3, -- a landmark: about 11 studs tall
 		})
 	end
 

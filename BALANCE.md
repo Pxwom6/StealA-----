@@ -396,9 +396,68 @@ ValentineLuck2027 "Valentine's luck"`.
   Sweetheart ones) keep earning forever.
 * **The Valentine's luck** is a weekend like Halloween's (about 55 hours) and works the same (2× of 6×; the store's
   odds stay exact).
-* **Three event mutations exist now**, months apart. If an admin started every event at once with `/event`, all
-  mutations together would reach 13.15% of spawns (CI keeps that below 15%); any one event with the strongest map and
-  modifier stays at 9.15%.
+* **Three event mutations existed then**, months apart. If an admin started every event at once with `/event`, all
+  mutations together would have reached 13.15% of spawns; any one event with the strongest map and modifier stays at
+  9.15% (Easter below has the bounds now).
+
+## Easter 2027 (limited-time event)
+
+`Easter2027` runs Fri 19 Mar 17:00 UTC → Tue 6 Apr 07:00 UTC (two weekends, Easter Sunday on 28 Mar and Easter
+Monday, and the spring holidays either side); `EasterLuck2027` adds **2× luck** from Good Friday to Easter Monday,
+Fri 26 Mar 17:00 UTC → Mon 29 Mar 23:59 UTC (`Config/LiveOps.luau`). While Easter runs:
+
+| Snackling | Rarity | Price | Income | Payback | Share of its tier | Per server-hour | With 2x luck |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Custard Chick | Rare | $11.5K | $152/s | 1m 15s | 23.1% | 38.2 | 65.3 |
+| Hot Cross Bunny | Epic | $135K | $870/s | 2m 35s | 23.1% | 14 | 23.9 |
+| Lemon Meringue Lamb | Legendary | $3.05M | $5.95K/s | 8m 32s | 23.1% | 3.7 | 6.2 |
+| Jelly Bean Jackalope | Mythic | $78M | $52.5K/s | 24m 45s | 28.6% | 0.7 | 1.3 |
+
+| Mutation | Chance per spawn | Per server-hour | Income | Price | Payback vs plain | Announced |
+| --- | --- | --- | --- | --- | --- | --- |
+| Pastel (event only) | 2% | 28.8 | x3 | x2 | x0.67 | no |
+
+The same shape as the other events: four Snacklings sharing their tiers' odds (priced between the Winter and the
+Valentine's ones, inside each tier's regular price and payback range) and an event mutation exactly as rare and strong
+as Haunted, Festive and Sweetheart, so any mutation is 7.15% of spawns and one spawn's expected value is income
+x1.1285, price x1.0635 while it runs.
+
+Time to reach each rarity and income for a **new free player whose whole session is inside the event** (the last
+column has the Easter luck on for the whole session too):
+
+| Rarity | No event | Easter | Easter + 2x luck |
+| --- | --- | --- | --- |
+| Common | 7s | 7s | 7s |
+| Uncommon | 1m 52s | 1m 52s | 2m 2s |
+| Rare | 4m 52s | 4m 52s | 4m 37s |
+| Epic | 11m 5s | 10m 50s | 10m 22s |
+| Legendary | 30m 52s | 30m 45s | 26m 40s |
+| Mythic | 1h 57m | 1h 50m | 1h 28m |
+| Secret | 9h 35m | 9h 22m | 5h 41m |
+| First rebirth affordable | 1h 2m | 58m 25s | 54m 12s |
+
+| Play time | No event | Easter | Easter + 2x luck |
+| --- | --- | --- | --- |
+| 10m | $1.01K/s | $1.14K/s | $1.52K/s |
+| 30m | $8.68K/s | $10.3K/s | $15K/s |
+| 1h | $31.5K/s | $34.7K/s | $53.3K/s |
+| 3h | $173K/s | $202K/s | $320K/s |
+| 8h | $568K/s | $644K/s | $1.13M/s |
+| 24h | $2.26M/s | $2.5M/s | $3.6M/s |
+
+A free player buys a median of 31 event Snacklings in 24 hours of event play (33 with the Easter luck), the first
+after about 7½ minutes (a Custard Chick). Re-run with `lune run tools/simulate.luau Easter2027 EasterLuck2027
+"Easter luck"`.
+
+* **Everything said about Halloween holds**: no regular roll changes outside the event (CI replays the rolls for every
+  event), the tier odds and the Server Luck disclosure are the same during it, and after it the Snacklings (and
+  Pastel ones) keep earning forever.
+* **The Easter luck** runs four days (about 79 hours: Good Friday to Easter Monday, a holiday weekend in much of
+  the world), longer than the other luck weekends; it works the same (2× of 6×; the store's odds stay exact).
+* **Four event mutations exist now**, months apart: CI checks that the events whose dates overlap each one (its luck
+  weekend) keep every mutation live together below 10% (5.95% for Easter), and that any one event with the strongest
+  map and modifier stays below 10% (9.15%). If an admin started every event at once with `/event`, all mutations
+  together would reach 15.15% of spawns; CI keeps that below 20%, room for two more 2% event mutations.
 
 ## Server modifiers
 
