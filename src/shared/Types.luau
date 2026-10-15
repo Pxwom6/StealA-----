@@ -1106,6 +1106,9 @@ export type ClientState = {
 	rebirthCost: number,
 	creatureCount: number,
 	capacity: number,
+	-- No free podium: a Snackling from a gift, the Lucky Spin, an achievement or a drop would be sold for its refund
+	-- (PrizeService), so the Spin and Gifts tabs can warn first.
+	baseFull: boolean,
 	packIncome: number, -- steady income cash packs are sized from (EconomyMath.packIncome)
 	podiumUpgrades: number,
 	nextPodiumCost: number,

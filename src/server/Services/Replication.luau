@@ -12,6 +12,7 @@ local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
 local Social = require(ReplicatedStorage.Shared.Config.Social)
 local DailyStreak = require(ReplicatedStorage.Shared.Logic.DailyStreak)
 local EconomyMath = require(ReplicatedStorage.Shared.Logic.EconomyMath)
+local Inventory = require(ReplicatedStorage.Shared.Logic.Inventory)
 local RebirthMath = require(ReplicatedStorage.Shared.Logic.RebirthMath)
 local SettingsRules = require(ReplicatedStorage.Shared.Logic.SettingsRules)
 local SocialRules = require(ReplicatedStorage.Shared.Logic.SocialRules)
@@ -82,6 +83,7 @@ function Replication.snapshot(session: Session): Types.ClientState
 		rebirthCost = RebirthMath.cost(data.rebirths, Economy.rebirth) or -1,
 		creatureCount = #data.creatures,
 		capacity = session.capacity,
+		baseFull = Inventory.findFreePodium(data.creatures, session.capacity) == nil,
 		packIncome = session.packIncome,
 		podiumUpgrades = data.podiumUpgrades,
 		nextPodiumCost = EconomyMath.podiumUpgradeCost(data.podiumUpgrades, Economy.podiumUpgrade) or -1,
