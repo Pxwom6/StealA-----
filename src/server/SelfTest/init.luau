@@ -1,6 +1,6 @@
 --!strict
 --[[
-	The Studio self-test (README "Studio self-test", DECISIONS.md #54): exercises the game in the real engine during a
+	The Studio self-test (README "Studio self-test", DECISIONS.md #57): exercises the game in the real engine during a
 	Play test and prints a verdict that fits on one screen. studio/SelfTest.luau starts it from the Command Bar.
 
 	Why a module the paste starts: code run in the Command Bar gets its own copies of the modules it requires, not the
