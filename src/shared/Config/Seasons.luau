@@ -26,6 +26,7 @@ export type SeasonsConfig = Types.SeasonsConfig
 local Seasons: SeasonsConfig = {
 	eventThemes = {
 		Halloween2026 = "halloween",
+		Harvest2026 = "harvest",
 		Winter2026 = "winter",
 		Valentine2027 = "valentine",
 		Easter2027 = "spring",
@@ -69,6 +70,57 @@ local Seasons: SeasonsConfig = {
 				lampLight = "#FF9F1C",
 				bat = "#1E1A2E",
 				ghost = "#EDEBFF",
+			},
+		},
+
+		harvest = {
+			displayName = "Harvest Feast",
+			accentColor = "#E8A23A",
+			priority = 1,
+			weather = "leaves", -- autumn leaves drifting down (Apple Pie Orchard's)
+			lighting = {
+				clockTime = 17.3, -- golden hour: a low warm sun, long shadows, the lanterns just lit
+				brightness = 2.3,
+				ambient = "#7A5E44",
+				outdoorAmbient = "#C9A27A",
+				colorShiftTop = "#FFB766",
+				atmosphere = {
+					density = 0.3, -- a warm golden haze: the whole map stays readable
+					offset = 0.12,
+					color = "#FFD9A8",
+					decay = "#C98A52",
+					glare = 0.5,
+					haze = 1.7,
+				},
+				colorCorrection = { tint = "#FFF1DE", brightness = 0.02, contrast = 0.07, saturation = 0.12 },
+				clouds = { cover = 0.5, density = 0.45, color = "#FFE6C8" },
+			},
+			decorations = {
+				pumpkinsPerPlot = 2, -- plain harvest pumpkins (no pumpkinFace: they aren't carved)
+				hayBalesPerPlot = 2,
+				bulbsPerPlot = 6,
+				lampsBetweenPlots = true,
+				scarecrowsBetweenPlots = true,
+				beltCornucopiasPerSide = 3,
+				cornStalks = 4,
+			},
+			palette = {
+				pumpkin = "#F07A12",
+				stem = "#5E8A2E",
+				bulbs = { "#FFB347", "#FF7A2E", "#FFD24A", "#E8452E" },
+				lampPost = "#4A3222",
+				lampLight = "#FFB347",
+				straw = "#E8C766",
+				twine = "#8A6236",
+				wood = "#7A5236",
+				shirt = "#C8452E",
+				overalls = "#3E5A8C",
+				burlap = "#D9B47A",
+				hat = "#6A4A2A",
+				wicker = "#C98A3E",
+				produce = { "#F28A1E", "#D7262E", "#7A3A9A", "#FFD23F" },
+				stalks = "#7E9E3C",
+				corn = "#FFC93C",
 			},
 		},
 
@@ -213,7 +265,8 @@ local Seasons: SeasonsConfig = {
 		},
 	},
 
-	maxParts = 400, -- Halloween builds 220, Winter 380 (DECISIONS.md #37), Valentine's 280 (#41), Easter 330 (#44)
+	maxParts = 400, -- Halloween builds 220, Winter 380 (DECISIONS.md #37), Valentine's 280 (#41), Easter 330 (#44),
+	-- Harvest Feast 386 (#50)
 	transitionSeconds = 4,
 }
 

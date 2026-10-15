@@ -1055,7 +1055,7 @@ local gameCFrame = setmetatable({
 	lookAt = lookAt,
 	new = function(...: any): any
 		local a, b = ...
-		if select("#", ...) == 2 and typeof(a) == "Vector3" and typeof(b) == "Vector3" then
+		if select("#", ...) == 2 and kindOf(a) == "Vector3" and kindOf(b) == "Vector3" then
 			return lookAt(a, b)
 		end
 		return roblox.CFrame.new(...)

@@ -4,7 +4,9 @@
 	decorations (Halloween: pumpkins, string lights, lamps, bats, ghosts; Winter: presents, decorated trees, string
 	lights, snowmen, snowflakes, snowdrifts; Valentine's: potted roses, heart balloons, giant hearts pierced by Cupid's
 	arrow, string lights, lamps; Easter: giant painted eggs, chocolate bunnies, blossom trees, butterflies, string
-	lights, lamps) and a lighting mood; when it ends, they go away and the map's own lighting comes back. Which theme is on is decided by Logic/SeasonRules.activeTheme from the active event ids, and
+	lights, lamps; Harvest Feast: plain pumpkins, hay bales, scarecrows, cornucopias, giant corn stalks, string lights,
+	lanterns) and a lighting mood; when it ends, they go away and the map's own lighting comes back. Which theme is on is
+	decided by Logic/SeasonRules.activeTheme from the active event ids, and
 	LiveOpsService tells this service whenever those change (events start and end by date while the server runs,
 	remote config, `/event <id>` and `/event off`).
 
@@ -73,6 +75,15 @@ local FALLBACK_COLORS: { [string]: string } = {
 	blossom = "#FFC0DA",
 	butterfly = "#FFD24A",
 	butterflyBody = "#3A2A40",
+	straw = "#E8C766",
+	twine = "#8A6236",
+	shirt = "#C8452E",
+	overalls = "#3E5A8C",
+	burlap = "#D9B47A",
+	wicker = "#C98A3E",
+	produce = "#F28A1E",
+	stalks = "#7E9E3C",
+	corn = "#FFC93C",
 }
 
 local world: MapBuilder.World
@@ -179,8 +190,46 @@ end
 type Builder = (base: CFrame, prop: SeasonRules.Prop, palette: Types.SeasonPalette, parent: Instance) -> ()
 
 local builders: { [string]: Builder } = {
+	-- A glowing jack-o'-lantern; a plain harvest pumpkin with a leaf when the theme has no face colour.
 	pumpkin = function(base, prop, palette, parent)
 		local s = 2.8 * prop.scale
+		if palette.pumpkinFace == nil then
+			local orange = paletteColor(palette, "pumpkin")
+			local green = paletteColor(palette, "stem")
+			ellipsoid({
+				Name = "Pumpkin",
+				Size = Vector3.new(0.92 * s, 0.8 * s, 0.92 * s),
+				CFrame = base * CFrame.new(0, 0.4 * s, 0),
+				Color = orange,
+				Parent = parent,
+			})
+			-- two crossed ribs, their ends bulging out as four lobes
+			for _, turn in { 45, -45 } do
+				ellipsoid({
+					Name = "PumpkinRib",
+					Size = Vector3.new(1.14 * s, 0.74 * s, 0.6 * s),
+					CFrame = base * CFrame.new(0, 0.38 * s, 0) * CFrame.Angles(0, math.rad(turn), 0),
+					Color = orange:Lerp(Color3.new(0, 0, 0), 0.08),
+					Parent = parent,
+				})
+			end
+			part({
+				Name = "Stem",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(0.32 * s, 0.13 * s, 0.13 * s),
+				CFrame = base * CFrame.new(0, 0.86 * s, 0) * CFrame.Angles(math.rad(10), 0, 0) * UPRIGHT,
+				Color = green:Lerp(Color3.fromRGB(120, 86, 44), 0.45),
+				Parent = parent,
+			})
+			ellipsoid({
+				Name = "PumpkinLeaf",
+				Size = Vector3.new(0.5 * s, 0.05 * s, 0.32 * s),
+				CFrame = base * CFrame.new(0.2 * s, 0.8 * s, 0.08 * s) * CFrame.Angles(0, math.rad(30), math.rad(-16)),
+				Color = green,
+				Parent = parent,
+			})
+			return
+		end
 		local face = paletteColor(palette, "pumpkinFace")
 		local body = part({
 			Name = "Pumpkin",
@@ -786,6 +835,293 @@ local builders: { [string]: Builder } = {
 				Parent = parent,
 			})
 		end
+	end,
+
+	-- A bale of hay tied with two bands of twine, a tuft of loose straw on top.
+	hayBale = function(base, prop, palette, parent)
+		local s = prop.scale
+		local straw = paletteColor(palette, "straw")
+		part({
+			Name = "HayBale",
+			Size = Vector3.new(3.4, 1.8, 2) * s,
+			CFrame = base * CFrame.new(0, 0.9 * s, 0),
+			Color = straw,
+			Material = Enum.Material.Grass,
+			Parent = parent,
+		})
+		for _, x in { -0.85, 0.85 } do
+			part({
+				Name = "Twine",
+				Size = Vector3.new(0.16, 1.86, 2.06) * s,
+				CFrame = base * CFrame.new(x * s, 0.9 * s, 0),
+				Color = paletteColor(palette, "twine"),
+				Parent = parent,
+			})
+		end
+		ellipsoid({
+			Name = "LooseStraw",
+			Size = Vector3.new(2.3, 0.4, 1.3) * s,
+			CFrame = base * CFrame.new(-0.2 * s, 1.84 * s, 0.1 * s) * CFrame.Angles(0, math.rad(8), 0),
+			Color = straw:Lerp(Color3.new(1, 1, 1), 0.15),
+			Material = Enum.Material.Grass,
+			Parent = parent,
+		})
+	end,
+
+	-- A friendly scarecrow on its post: a sack head with button eyes and a big smile under a hat, a shirt with its
+	-- arms on the crossbar and straw for hands, overalls.
+	scarecrow = function(base, prop, palette, parent)
+		local s = prop.scale
+		local straw = paletteColor(palette, "straw")
+		local shirt = paletteColor(palette, "shirt")
+		local hat = paletteColor(palette, "hat")
+		part({
+			Name = "ScarecrowPost",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(6.2, 0.42, 0.42) * s,
+			CFrame = base * CFrame.new(0, 3.1 * s, 0) * UPRIGHT,
+			Color = paletteColor(palette, "wood"),
+			Material = Enum.Material.Wood,
+			Parent = parent,
+		})
+		part({
+			Name = "Overalls",
+			Size = Vector3.new(1.5, 1.4, 0.95) * s,
+			CFrame = base * CFrame.new(0, 3.3 * s, 0),
+			Color = paletteColor(palette, "overalls"),
+			Material = Enum.Material.Fabric,
+			Parent = parent,
+		})
+		part({
+			Name = "Shirt",
+			Size = Vector3.new(1.8, 1.7, 1.05) * s,
+			CFrame = base * CFrame.new(0, 4.75 * s, 0),
+			Color = shirt,
+			Material = Enum.Material.Fabric,
+			Parent = parent,
+		})
+		part({
+			Name = "Sleeves",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(5.2, 0.62, 0.62) * s,
+			CFrame = base * CFrame.new(0, 5.15 * s, 0),
+			Color = shirt:Lerp(Color3.new(0, 0, 0), 0.08),
+			Material = Enum.Material.Fabric,
+			Parent = parent,
+		})
+		for _, side in { -1, 1 } do
+			ellipsoid({
+				Name = "StrawHand",
+				Size = Vector3.new(0.8, 0.62, 0.62) * s,
+				CFrame = base * CFrame.new(side * 2.8 * s, 5.05 * s, 0) * CFrame.Angles(0, 0, math.rad(side * -20)),
+				Color = straw,
+				Material = Enum.Material.Grass,
+				Parent = parent,
+			})
+		end
+		-- the head tilts a little, friendly
+		local head = base * CFrame.new(0, 6.5 * s, 0) * CFrame.Angles(0, 0, math.rad(4))
+		ellipsoid({
+			Name = "SackHead",
+			Size = Vector3.new(1.55, 1.6, 1.45) * s,
+			CFrame = head,
+			Color = paletteColor(palette, "burlap"),
+			Material = Enum.Material.Fabric,
+			Parent = parent,
+		})
+		ellipsoid({
+			Name = "StrawFringe",
+			Size = Vector3.new(1.95, 0.36, 1.75) * s,
+			CFrame = head * CFrame.new(0, 0.52 * s, 0),
+			Color = straw,
+			Material = Enum.Material.Grass,
+			Parent = parent,
+		})
+		part({
+			Name = "HatBrim",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.16, 2.7, 2.7) * s,
+			CFrame = head * CFrame.new(0, 0.74 * s, 0) * UPRIGHT,
+			Color = hat,
+			Parent = parent,
+		})
+		part({
+			Name = "HatTop",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.95, 1.3, 1.3) * s,
+			CFrame = head * CFrame.new(0, 1.24 * s, 0) * UPRIGHT,
+			Color = hat,
+			Parent = parent,
+		})
+		local stitch = Color3.fromRGB(42, 30, 24)
+		for _, side in { -1, 1 } do
+			part({
+				Name = "ButtonEye",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.one * 0.38 * s,
+				CFrame = head * CFrame.new(side * 0.33 * s, 0.14 * s, -0.62 * s),
+				Color = stitch,
+				Parent = parent,
+			})
+		end
+		-- a stitched smile: two short strokes meeting in a V
+		for _, side in { -1, 1 } do
+			part({
+				Name = "Smile",
+				Size = Vector3.new(0.46, 0.11, 0.12) * s,
+				CFrame = head
+					* CFrame.new(side * 0.19 * s, -0.33 * s, -0.63 * s)
+					* CFrame.Angles(0, math.rad(side * -14), math.rad(side * 28)),
+				Color = stitch,
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- A woven horn of plenty lying on its side, a pumpkin, an apple, grapes and an ear of corn spilling out of its
+	-- mouth (at its -X end; its front looks at the walkway).
+	cornucopia = function(base, prop, palette, parent)
+		local s = prop.scale
+		local wicker = paletteColor(palette, "wicker")
+		local dark = wicker:Lerp(Color3.new(0, 0, 0), 0.3)
+		local function at(x: number, y: number, z: number): CFrame
+			return base * CFrame.new(x * s, y * s, z * s)
+		end
+		for i, band in
+			{
+				{ x = -1.2, y = 1.0, d = 2, length = 1, tilt = 0 },
+				{ x = -0.25, y = 0.84, d = 1.62, length = 1, tilt = 6 },
+				{ x = 0.62, y = 0.82, d = 1.16, length = 0.9, tilt = 16 },
+			}
+		do
+			part({
+				Name = "Wicker",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(band.length, band.d, band.d) * s,
+				CFrame = at(band.x, band.y, 0) * CFrame.Angles(0, 0, math.rad(band.tilt)),
+				Color = if i % 2 == 1 then wicker else dark,
+				Material = Enum.Material.Wood,
+				Parent = parent,
+			})
+		end
+		ellipsoid({
+			Name = "WickerTip",
+			Size = Vector3.new(0.62, 1.1, 0.62) * s,
+			CFrame = at(1.22, 1.32, 0) * CFrame.Angles(0, 0, math.rad(-30)),
+			Color = wicker,
+			Material = Enum.Material.Wood,
+			Parent = parent,
+		})
+		part({
+			Name = "WickerLip",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.26, 2.22, 2.22) * s,
+			CFrame = at(-1.76, 1.0, 0),
+			Color = wicker:Lerp(Color3.new(1, 1, 1), 0.18),
+			Material = Enum.Material.Wood,
+			Parent = parent,
+		})
+		part({
+			Name = "Hollow",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.06, 1.56, 1.56) * s,
+			CFrame = at(-1.9, 1.0, 0),
+			Color = Color3.fromRGB(74, 42, 18),
+			Parent = parent,
+		})
+		local produce = palette.produce
+		part({
+			Name = "Produce",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 1.2 * s,
+			CFrame = at(-2.2, 0.6, -0.55),
+			Color = listColor(produce, 1, "produce"),
+			Parent = parent,
+		})
+		part({
+			Name = "Produce",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 0.86 * s,
+			CFrame = at(-1.3, 0.43, -1.15),
+			Color = listColor(produce, 2, "produce"),
+			Reflectance = 0.1,
+			Parent = parent,
+		})
+		ellipsoid({
+			Name = "Produce",
+			Size = Vector3.new(0.72, 0.92, 0.66) * s,
+			CFrame = at(-2.35, 1.35, 0.2) * CFrame.Angles(0, 0, math.rad(20)),
+			Color = listColor(produce, 3, "produce"),
+			Parent = parent,
+		})
+		ellipsoid({
+			Name = "Produce",
+			Size = Vector3.new(1.5, 0.48, 0.48) * s,
+			CFrame = at(-2.3, 1.05, -0.95) * CFrame.Angles(0, math.rad(40), math.rad(20)),
+			Color = listColor(produce, 4, "produce"),
+			Parent = parent,
+		})
+	end,
+
+	-- A giant corn stalk: a tall stalk with long leaves arching out (some already drying to gold), an ear of corn in
+	-- its husk leaning out at the front and a tassel on top.
+	cornStalk = function(base, prop, palette, parent)
+		local s = prop.scale
+		local green = paletteColor(palette, "stalks")
+		local gold = green:Lerp(Color3.fromRGB(214, 180, 96), 0.6)
+		part({
+			Name = "CornStalk",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(7.6, 0.8, 0.8) * s,
+			CFrame = base * CFrame.new(0, 3.8 * s, 0) * UPRIGHT,
+			Color = green,
+			Parent = parent,
+		})
+		for i, leaf in
+			{
+				{ y = 1.5, yaw = 30, tilt = 50, length = 4 },
+				{ y = 2.8, yaw = 200, tilt = 44, length = 4.4 },
+				{ y = 4.4, yaw = 110, tilt = 38, length = 4.2 },
+				{ y = 5.8, yaw = 290, tilt = 32, length = 3.6 },
+			}
+		do
+			ellipsoid({
+				Name = "CornLeaf",
+				Size = Vector3.new(0.95, leaf.length, 0.16) * s,
+				CFrame = base * CFrame.new(0, leaf.y * s, 0) * CFrame.Angles(0, math.rad(leaf.yaw), 0) * CFrame.Angles(
+					0,
+					0,
+					math.rad(leaf.tilt)
+				) * CFrame.new(0, leaf.length / 2 * s, 0),
+				Color = if i % 2 == 0 then gold else green,
+				Parent = parent,
+			})
+		end
+		local ear = base
+			* CFrame.new(0, 3.6 * s, -0.4 * s)
+			* CFrame.Angles(math.rad(-30), 0, 0)
+			* CFrame.new(0, 1.1 * s, 0)
+		ellipsoid({
+			Name = "CornHusk",
+			Size = Vector3.new(1.15, 2.3, 0.6) * s,
+			CFrame = ear * CFrame.new(0, -0.25 * s, 0.18 * s),
+			Color = green:Lerp(Color3.fromRGB(200, 220, 120), 0.35),
+			Parent = parent,
+		})
+		ellipsoid({
+			Name = "Corn",
+			Size = Vector3.new(0.95, 2.2, 0.95) * s,
+			CFrame = ear,
+			Color = paletteColor(palette, "corn"),
+			Parent = parent,
+		})
+		ellipsoid({
+			Name = "CornTassel",
+			Size = Vector3.new(0.4, 1.7, 0.4) * s,
+			CFrame = base * CFrame.new(0.12 * s, 8.3 * s, 0) * CFrame.Angles(0, 0, math.rad(-10)),
+			Color = gold,
+			Parent = parent,
+		})
 	end,
 
 	-- A low drift of snow against the front wall.
