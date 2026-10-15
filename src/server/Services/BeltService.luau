@@ -253,7 +253,11 @@ function BeltService.start(beltDef: BeltMath.Belt)
 	Remotes.onIntent("BuyBeltItem", onBuy)
 	task.spawn(function()
 		while true do
-			spawnOne()
+			-- One error must not stop the belt for good.
+			local ok, err = pcall(spawnOne :: () -> ...any)
+			if not ok then
+				warn(`[BeltService] spawn: {err}`)
+			end
 			task.wait(Gameplay.belt.spawnInterval * ModifierService.effects().spawnInterval) -- Rush Hour: faster
 		end
 	end)

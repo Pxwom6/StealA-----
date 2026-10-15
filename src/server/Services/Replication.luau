@@ -162,15 +162,23 @@ function Replication.flush(session: Session)
 	end
 end
 
+local function flushDirty()
+	for _, session in Sessions.all() do
+		if session.dirty then
+			Replication.flush(session)
+		end
+	end
+end
+
 function Replication.start()
 	task.spawn(function()
 		local interval = 1 / Gameplay.replicationHz
 		while true do
 			task.wait(interval)
-			for _, session in Sessions.all() do
-				if session.dirty then
-					Replication.flush(session)
-				end
+			-- One error must not stop state updates for good.
+			local ok, err = pcall(flushDirty :: () -> ...any)
+			if not ok then
+				warn(`[Replication] {err}`)
 			end
 		end
 	end)

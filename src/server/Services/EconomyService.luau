@@ -310,12 +310,16 @@ function EconomyService.start()
 	LiveOpsService.onCashMultiplierChanged(refreshAll)
 	ModifierService.onChanged(refreshAll)
 
+	-- One error must not stop income or collecting for good: each loop's body runs protected.
 	task.spawn(function()
 		local last = os.clock()
 		while true do
 			task.wait(Gameplay.incomeTickSeconds)
 			local now = os.clock()
-			incomeTick(now - last)
+			local ok, err = pcall(incomeTick :: (number) -> ...any, now - last)
+			if not ok then
+				warn(`[EconomyService] income tick: {err}`)
+			end
 			last = now
 		end
 	end)
@@ -323,7 +327,10 @@ function EconomyService.start()
 	task.spawn(function()
 		while true do
 			task.wait(PAD_CHECK_INTERVAL)
-			padCheck()
+			local ok, err = pcall(padCheck :: () -> ...any)
+			if not ok then
+				warn(`[EconomyService] pad check: {err}`)
+			end
 		end
 	end)
 end

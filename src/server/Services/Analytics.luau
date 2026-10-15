@@ -100,11 +100,16 @@ function Analytics.start()
 	task.spawn(function()
 		while true do
 			task.wait(60)
-			for player, amount in pendingCollect do
-				local session = Sessions.get(player)
-				if session and amount > 0 then
-					Analytics.economySource(session, amount, "Gameplay", "Collect")
+			local ok, err = pcall(function()
+				for player, amount in pendingCollect do
+					local session = Sessions.get(player)
+					if session and amount > 0 then
+						Analytics.economySource(session, amount, "Gameplay", "Collect")
+					end
 				end
+			end)
+			if not ok then
+				warn(`[Analytics] {err}`)
 			end
 			table.clear(pendingCollect)
 		end

@@ -409,16 +409,23 @@ end
 
 function LiveOpsService.start()
 	LiveOpsService.publishAttributes()
+	-- One error must not stop events starting and ending (or remote config) for good: each body runs protected.
 	task.spawn(function()
 		while true do
 			task.wait(1)
-			LiveOpsService.publishAttributes()
+			local ok, err = pcall(LiveOpsService.publishAttributes :: () -> ...any)
+			if not ok then
+				warn(`[LiveOps] {err}`)
+			end
 		end
 	end)
 	if LiveOps.remoteConfig.enabled then
 		task.spawn(function()
 			while true do
-				loadRemoteConfig()
+				local ok, err = pcall(loadRemoteConfig :: () -> ...any)
+				if not ok then
+					warn(`[LiveOps] remote config: {err}`)
+				end
 				task.wait(LiveOps.remoteConfig.refreshSeconds)
 			end
 		end)
