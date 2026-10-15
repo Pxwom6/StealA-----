@@ -12,6 +12,7 @@ local Analytics = require(Services.Analytics)
 local AutoCollectService = require(Services.AutoCollectService)
 local BeltService = require(Services.BeltService)
 local BossService = require(Services.BossService)
+local BountyService = require(Services.BountyService)
 local CodeService = require(Services.CodeService)
 local CrossServer = require(Services.CrossServer)
 local DataService = require(Services.DataService)
@@ -65,7 +66,7 @@ Replication.start()
 PositionTracker.start()
 EconomyService.start()
 BeltService.start(world.belt)
-DropService.start(world.walkwayY) -- crates, coins and runaways on the walkways while a drop modifier runs
+DropService.start(world.walkwayY) -- crates, coins, runaways and golden forks while a drop modifier runs
 BossService.start(world.walkwayY) -- Snack Attack: giant Snacklings over the belt for everyone to tap together
 LockService.start()
 StealService.start()
@@ -80,6 +81,7 @@ SocialService.start()
 TutorialService.start(EconomyService.addCash) -- pays the one-time completion reward; first GameEvents listener
 SnackdexService.start() -- after the tutorial: discoveries (and the quest event they emit) follow its steps
 QuestService.start()
+BountyService.start() -- Bounty Hunt: a bounty on the top earner, claimed by tags and steals (a GameEvents listener)
 LeaderboardService.start(world)
 SettingsService.start() -- music / sound effects / reduce effects, saved in flags
 CodeService.start() -- redeem codes (server/Codes.luau), once per account, saved in flags
@@ -114,6 +116,7 @@ table.insert(hooks.onLeaving, function(session)
 end)
 table.insert(hooks.onLeaving, LockService.onLeaving)
 table.insert(hooks.onLeaving, GadgetService.onLeaving)
+table.insert(hooks.onLeaving, BountyService.onLeaving) -- the target leaving: the next top earner gets it
 table.insert(hooks.onLeaving, SocialService.onLeaving)
 table.insert(hooks.onLeaving, TutorialService.onLeaving)
 table.insert(hooks.onLeaving, function(session)

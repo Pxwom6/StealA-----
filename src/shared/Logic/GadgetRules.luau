@@ -1,9 +1,10 @@
 --!strict
 --[[
 	Gadget rules (Config/Gadgets): who owns which gadget (the save's `gadget_<id>` flags), whether one can be bought or
-	used right now, what using one does to the player's gadget state (cooldowns, effects), the walking speed a speed
-	gadget gives and the movement checks allow (capped together with a speed modifier), where a banana peel may go and
-	who steps on it, what the client is told, and validation. Pure: no Roblox APIs; times come in as server time.
+	used right now, what using one does to the player's gadget state (cooldowns, effects), how long a recharge takes
+	while a modifier changes recharge times (Gadget Frenzy), the walking speed a speed gadget gives and the movement
+	checks allow (capped together with a speed modifier), where a banana peel may go and who steps on it, what the
+	client is told, and validation. Pure: no Roblox APIs; times come in as server time.
 ]]
 
 local StealRules = require("./StealRules")
@@ -15,6 +16,7 @@ type GadgetDef = Types.GadgetDef
 -- A player's gadgets this session (Sessions.Session.gadgets). Never saved: cooldowns start over in a new server.
 export type State = {
 	readyAt: { [string]: number }, -- gadget id -> when it can be used again
+	usedAt: { [string]: number }, -- gadget id -> when it was last used (its recharge runs from then to readyAt)
 	activeUntil: { [string]: number }, -- gadget id -> when its effect ends (a peel: when the peel goes)
 	speedUntil: number, -- a speed gadget runs until then (0: never)
 	speedMultiplier: number, -- at this multiplier
@@ -87,6 +89,7 @@ end
 function GadgetRules.newState(): State
 	return {
 		readyAt = {},
+		usedAt = {},
 		activeUntil = {},
 		speedUntil = 0,
 		speedMultiplier = 1,
@@ -180,10 +183,75 @@ function GadgetRules.freeze(state: State, t: number, seconds: number)
 	state.frozenUntil = math.max(state.frozenUntil, t + math.max(0, seconds))
 end
 
--- Uses gadget `id` (its `def`) at `t`: the cooldown starts, and a speed or shield effect runs (a peel's life is
--- recorded too; GadgetService puts the peel down). Call only after canUse and the kind's own checks said yes.
-function GadgetRules.use(state: State, id: string, def: GadgetDef, t: number, config: GadgetsConfig)
-	state.readyAt[id] = t + def.cooldownSeconds
+-- The shortest recharge gadget `def` may ever have, whatever a modifier does to recharge times: a speed gadget runs at
+-- most a third of the time and a shield a fifth (as validate asks of the config), and nothing recharges in under
+-- MIN_COOLDOWN seconds.
+GadgetRules.MIN_COOLDOWN = 5
+
+function GadgetRules.cooldownFloor(def: GadgetDef): number
+	local duration = def.durationSeconds or 0
+	if def.kind == "speed" then
+		return math.max(GadgetRules.MIN_COOLDOWN, 3 * duration)
+	elseif def.kind == "shield" then
+		return math.max(GadgetRules.MIN_COOLDOWN, 5 * duration)
+	end
+	return GadgetRules.MIN_COOLDOWN
+end
+
+-- How long gadget `def` takes to recharge while a modifier multiplies recharge times by `multiplier` (Gadget Frenzy:
+-- 0.5; 1 = none): its own cooldown times that, never under its floor. NaN or a non-positive multiplier counts as 1.
+function GadgetRules.cooldownSeconds(def: GadgetDef, multiplier: number?): number
+	local m = multiplier or 1
+	if not (m > 0 and m < math.huge) then
+		m = 1
+	end
+	return math.max(GadgetRules.cooldownFloor(def), def.cooldownSeconds * m)
+end
+
+-- The recharge-time multiplier changed from `before` to `after` at `t` (Gadget Frenzy starting or ending). A gadget
+-- still recharging finishes the rest of its recharge at the new pace when that is quicker, never sooner than its floor
+-- after it was used, and never later than it would have been: a recharge never gets slower once it has started (Frenzy
+-- ending leaves them as they are). Returns true when any recharge changed (the client needs telling).
+function GadgetRules.rechargeChanged(
+	state: State,
+	config: GadgetsConfig,
+	t: number,
+	before: number,
+	after: number
+): boolean
+	if not (after > 0 and before > 0 and after < before) then
+		return false
+	end
+	local changed = false
+	for id, readyAt in state.readyAt do
+		local def = config.gadgets[id]
+		if def == nil or not (readyAt > t) then
+			continue
+		end
+		local usedAt = state.usedAt[id] or (readyAt - GadgetRules.cooldownSeconds(def, before))
+		local quicker = t + (readyAt - t) * (after / before)
+		local new = math.min(readyAt, math.max(quicker, usedAt + GadgetRules.cooldownFloor(def)))
+		if new < readyAt then
+			state.readyAt[id] = new
+			changed = true
+		end
+	end
+	return changed
+end
+
+-- Uses gadget `id` (its `def`) at `t`: the cooldown starts (`cooldownMultiplier`: a running modifier's recharge-time
+-- multiplier, GadgetRules.cooldownSeconds), and a speed or shield effect runs (a peel's life is recorded too;
+-- GadgetService puts the peel down). Call only after canUse and the kind's own checks said yes.
+function GadgetRules.use(
+	state: State,
+	id: string,
+	def: GadgetDef,
+	t: number,
+	config: GadgetsConfig,
+	cooldownMultiplier: number?
+)
+	state.usedAt[id] = t
+	state.readyAt[id] = t + GadgetRules.cooldownSeconds(def, cooldownMultiplier)
 	local duration = def.durationSeconds or 0
 	if def.kind == "speed" then
 		-- A speed that still counts (running, or in its grace) stays allowed as long as it would have been.
@@ -283,11 +351,13 @@ function GadgetRules.view(flags: { [string]: boolean }, state: State, config: Ga
 	local owned = GadgetRules.owned(flags, config)
 	local readyAt: { [string]: number } = {}
 	local activeUntil: { [string]: number } = {}
+	local usedAt: { [string]: number } = {}
 	for _, id in owned do
 		readyAt[id] = state.readyAt[id]
 		activeUntil[id] = state.activeUntil[id]
+		usedAt[id] = state.usedAt[id]
 	end
-	return { owned = owned, readyAt = readyAt, activeUntil = activeUntil }
+	return { owned = owned, readyAt = readyAt, activeUntil = activeUntil, usedAt = usedAt }
 end
 
 -- The fastest anyone can walk with `maxModifierSpeed` (the strongest speed modifier) and every speed gadget.

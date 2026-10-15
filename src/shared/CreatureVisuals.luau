@@ -485,6 +485,17 @@ local MUTATION_PARTICLES: { [string]: { [string]: any } } = {
 		Lifetime = NumberRange.new(1.6, 2.4),
 		Rate = 5,
 	},
+	corona = { -- embers of an eclipse's ring of fire drifting off, gold to rose
+		Texture = SPARKLE_TEXTURE,
+		Color = colours({ "#FFD27A", "#FF7AA8" }),
+		LightEmission = 1,
+		Size = sequence({ { 0, 0.26 }, { 1, 0 } }),
+		Speed = NumberRange.new(0.6, 1.4),
+		SpreadAngle = Vector2.new(180, 180),
+		Drag = 1,
+		Lifetime = NumberRange.new(0.8, 1.4),
+		Rate = 8,
+	},
 	smoke = { -- grey barbecue smoke curling up
 		Texture = SMOKE_TEXTURE,
 		Color = colours({ "#9A8E86", "#6A605A" }),
@@ -507,6 +518,12 @@ local HALO_COLOR = "#FFE066"
 -- Bee wings: two glassy wings standing up from the back, leaning out (MutationLook.wings).
 local WING_COLOR = "#EAF6FF"
 local WING_LEAN = math.rad(32)
+-- The eclipse's corona: a ring of glowing segments standing upright behind the body, so that from the front the
+-- Snackling is the dark moon in a ring of fire, with one bright bead on the ring like the sun peeking out
+-- (MutationLook.corona).
+local CORONA_SEGMENTS = 14
+local CORONA_COLOR = "#FF9A3C" -- Neon glows: this reads as a ring of fire
+local CORONA_BEAD = "#FFF4D6"
 
 -- Whether `name` is a particle preset this module can build (MutationLook.particles).
 function CreatureVisuals.hasParticles(name: string): boolean
@@ -794,6 +811,37 @@ local function addMutationLook(model: Model, mutation: Types.MutationDef)
 			wing:SetAttribute("MutationSkip", true)
 			wing.Parent = model
 		end
+	end
+	if look.corona and root ~= nil then
+		-- Behind the model (it faces -Z), upright, a little wider than it: the body covers the middle, the ring shows
+		-- round its edge.
+		local cf, size = model:GetBoundingBox()
+		local radius = math.clamp(math.max(size.X, size.Y) * 0.58, 0.9, 3.6)
+		local centre = CFrame.new(root.Position.X, cf.Position.Y, root.Position.Z + size.Z * 0.5 + 0.15)
+		local length = 2 * math.pi * radius / CORONA_SEGMENTS * 1.1
+		local thickness = radius * 0.14 + 0.06
+		for index = 1, CORONA_SEGMENTS do
+			local angle = (index - 1) / CORONA_SEGMENTS * math.pi * 2
+			local segment = newPart("Part", {
+				Name = "Corona",
+				Size = Vector3.new(length, thickness, 0.12),
+				CFrame = centre * CFrame.Angles(0, 0, angle) * CFrame.new(0, radius, 0),
+				Color = UiTheme.color(CORONA_COLOR),
+				Material = Enum.Material.Neon,
+			})
+			segment:SetAttribute("MutationSkip", true)
+			segment.Parent = model
+		end
+		local bead = newPart("Part", {
+			Name = "Corona",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * (thickness * 2.2),
+			CFrame = centre * CFrame.Angles(0, 0, math.rad(-40)) * CFrame.new(0, radius, -0.05),
+			Color = UiTheme.color(CORONA_BEAD),
+			Material = Enum.Material.Neon,
+		})
+		bead:SetAttribute("MutationSkip", true)
+		bead.Parent = model
 	end
 	if look.glow and body ~= nil and body:IsA("BasePart") then
 		local light = Instance.new("PointLight")

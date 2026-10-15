@@ -2,7 +2,8 @@
 --[[
 	Drop rules (Config/Drops, and Config/Modifiers `drops` for when): where a crate or a coin lands, the times a
 	modifier drops something, what a pickup pays, whether a crate was held open long enough, where a runaway Snackling
-	appears and runs, and validation. Pure: no Roblox APIs; random numbers come in as a function returning [0, 1).
+	appears and runs, where a golden fork hides and what it pays, and validation. Pure: no Roblox APIs; random numbers
+	come in as a function returning [0, 1).
 
 	A runaway moves in legs: it waits at `from` until `startsAt`, then runs in a straight line to `to`, arriving at
 	`endsAt`. The server plans the next leg when one ends (away from the players near it, sprinting when someone is
@@ -19,7 +20,8 @@ type ModifierDrops = Types.ModifierDrops
 
 local DropRules = {}
 
-DropRules.KINDS = table.freeze({ crate = true, coins = true, runaway = true, boss = true } :: { [string]: boolean })
+DropRules.KINDS =
+	table.freeze({ crate = true, coins = true, runaway = true, treasure = true, boss = true } :: { [string]: boolean })
 
 -- A horizontal position (world X, Z).
 export type Point = { x: number, z: number }
@@ -238,11 +240,90 @@ function DropRules.catches(config: DropsConfig, horizontal: number, vertical: nu
 	return horizontal <= config.runaway.catchRange + slack and math.abs(vertical) <= 8
 end
 
+-- Treasure Hunt ------------------------------------------------------------------------------------------------------
+
+-- Horizontal distance from spot `index` of the treasure config to the nearest of `players` (math.huge with none).
+function DropRules.treasureDistance(config: DropsConfig, index: number, players: { Point }): number
+	local spot = config.treasure.spots[index]
+	return if spot then nearest(players, spot.x, spot.z) else 0
+end
+
+-- Which hiding place the next golden fork goes to: one at random of those at least minPlayerDistance from every player
+-- (so nobody standing there finds it at once), never `last` (the previous fork's) while another will do; when none
+-- is that far, the farthest from everyone. nil only with no spots. Draws exactly one number.
+function DropRules.treasureSpot(config: DropsConfig, players: { Point }, last: number?, random: () -> number): number?
+	local spots = config.treasure.spots
+	local roll = random()
+	local far: { number } = {}
+	local best, bestDistance = nil :: number?, -math.huge
+	for index in spots do
+		if index == last and #spots > 1 then
+			continue
+		end
+		local distance = DropRules.treasureDistance(config, index, players)
+		if distance >= config.treasure.minPlayerDistance then
+			table.insert(far, index)
+		end
+		if distance > bestDistance then
+			best, bestDistance = index, distance
+		end
+	end
+	if #far > 0 then
+		return far[math.clamp(math.floor(roll * #far) + 1, 1, #far)]
+	end
+	return best
+end
+
+-- Whether a player whose root is `horizontal` studs from a fork (and `vertical` above its foot) walks into it.
+function DropRules.findsTreasure(config: DropsConfig, horizontal: number, vertical: number): boolean
+	return horizontal <= config.treasure.pickupRange and vertical >= -2 and vertical <= 8
+end
+
+-- The prize a found fork pays: one of `prizes` by weight (roll in [0, 1)). nil only with no prize of weight above 0.
+function DropRules.treasurePrize(prizes: { Types.TreasurePrize }, roll: number): Types.PrizeReward?
+	local total = 0
+	for _, prize in prizes do
+		if prize.weight > 0 then
+			total += prize.weight
+		end
+	end
+	if not (total > 0) then
+		return nil
+	end
+	local left = math.clamp(roll, 0, 1) * total
+	local chosen: Types.PrizeReward? = nil
+	for _, prize in prizes do
+		if prize.weight > 0 then
+			chosen = prize.reward
+			if left < prize.weight then
+				return chosen
+			end
+			left -= prize.weight
+		end
+	end
+	return chosen
+end
+
+-- The chance of each prize (weight / total), in config order: what the docs and BALANCE.md quote.
+function DropRules.treasureChances(prizes: { Types.TreasurePrize }): { number }
+	local total = 0
+	for _, prize in prizes do
+		total += math.max(0, prize.weight)
+	end
+	local list: { number } = {}
+	for _, prize in prizes do
+		table.insert(list, if total > 0 then math.max(0, prize.weight) / total else 0)
+	end
+	return list
+end
+
 -- Problems with Config/Drops (an empty list means valid). `walkway` is the band the walkways cover: |z| up to
 -- `maxZ` (Gameplay.map.walkwayWidth) and |x| up to `maxX`, with the belt's half width `beltHalfWidth` in the middle.
+-- `text` (Config/Theme.text, optional): every hiding place's `where` must be there.
 function DropRules.validate(
 	config: DropsConfig,
-	walkway: { maxX: number, maxZ: number, beltHalfWidth: number }
+	walkway: { maxX: number, maxZ: number, beltHalfWidth: number },
+	text: { [string]: string }?
 ): { string }
 	local problems: { string } = {}
 	local function problem(message: string)
@@ -333,6 +414,56 @@ function DropRules.validate(
 	if not (runaway.mutationChance >= 1 and runaway.mutationChance <= 4) then
 		problem("runaway.mutationChance must be between 1 and 4")
 	end
+
+	local treasure = config.treasure
+	if not (treasure.lifetimeSeconds >= 10 and treasure.lifetimeSeconds <= 120) then
+		problem("treasure.lifetimeSeconds must be between 10 and 120")
+	end
+	if not (treasure.revealSeconds >= 0 and treasure.revealSeconds < treasure.lifetimeSeconds) then
+		problem("treasure.revealSeconds must be 0 or more, and before it goes")
+	end
+	if not (treasure.pickupRange >= 1 and treasure.pickupRange <= 8) then
+		problem("treasure.pickupRange must be between 1 and 8")
+	end
+	if not (treasure.minPlayerDistance >= 0 and treasure.minPlayerDistance <= 200) then
+		problem("treasure.minPlayerDistance must be between 0 and 200")
+	end
+	local weighted = 0
+	for index, prize in treasure.prizes do
+		local name = `treasure.prizes[{index}]`
+		if not (prize.weight >= 0 and prize.weight < math.huge) then
+			problem(`{name}.weight must be 0 or more`)
+		elseif prize.weight > 0 then
+			weighted += 1
+		end
+		local prizeReward = prize.reward
+		if prizeReward.kind == "cash" then
+			reward({ incomeSeconds = prizeReward.incomeSeconds, minimum = prizeReward.minimum }, `{name}.reward`)
+		elseif prizeReward.kind == "spin" then
+			if not (prizeReward.count >= 1 and prizeReward.count <= 3 and prizeReward.count % 1 == 0) then
+				problem(`{name}.reward.count must be a whole number from 1 to 3`)
+			end
+		else
+			problem(`{name}.reward must be cash or a spin`)
+		end
+	end
+	if weighted == 0 then
+		problem("treasure.prizes needs a prize with a weight above 0")
+	end
+	if #treasure.spots < 4 then
+		problem("treasure.spots needs at least 4 hiding places")
+	end
+	for index, spot in treasure.spots do
+		local name = `treasure.spots[{index}]`
+		if not (math.abs(spot.x) < 1000 and math.abs(spot.z) < 1000) then
+			problem(`{name} must be a finite position on the map`)
+		elseif math.abs(spot.z) <= walkway.beltHalfWidth + 2 and math.abs(spot.x) <= walkway.maxX + 6 then
+			problem(`{name} is on the belt`)
+		end
+		if text and (type(text[spot.where]) ~= "string" or text[spot.where] == "") then
+			problem(`{name}.where must be a Theme.text key ({spot.where} is not)`)
+		end
+	end
 	return problems
 end
 
@@ -340,7 +471,7 @@ end
 function DropRules.dropsProblems(drops: ModifierDrops, duration: number, name: string): { string }
 	local problems: { string } = {}
 	if not DropRules.KINDS[drops.kind] then
-		table.insert(problems, `{name} drops.kind {drops.kind} is not crate, coins, runaway or boss`)
+		table.insert(problems, `{name} drops.kind {drops.kind} is not crate, coins, runaway, treasure or boss`)
 	end
 	if not (drops.firstSeconds >= 0 and drops.firstSeconds < duration) then
 		table.insert(problems, `{name} drops.firstSeconds must be at least 0 and before the modifier ends`)

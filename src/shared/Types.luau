@@ -211,6 +211,7 @@ export type MutationLook = {
 	particles: string?, -- a particle preset around the body (Logic/Catalog.MUTATION_PARTICLES: "snow", "embers"...)
 	halo: boolean?, -- a glowing golden ring floating above the head
 	wings: boolean?, -- two glassy bee wings standing up from the back
+	corona: boolean?, -- an eclipse's ring of fire standing behind the body, so the Snackling is the dark moon in it
 }
 
 export type MutationDef = {
@@ -272,6 +273,9 @@ export type SeasonLighting = {
 	atmosphere: SeasonAtmosphere,
 	colorCorrection: SeasonColorCorrection,
 	clouds: { cover: number, density: number, color: string }?, -- nil: the map's clouds
+	-- true: the sky's sun disc is hidden while this overlay is on top (Eclipse: each client draws the eclipsed sun in
+	-- its place, WeatherController); nil: the map's sun
+	hideSun: boolean?,
 }
 
 -- How many of each code-built prop the server places (0 / nil = none). Positions come from the map layout.
@@ -653,16 +657,21 @@ export type ModifierEffects = {
 	stealHold: number?, -- × the hold-to-steal time
 	lockDuration: number?, -- × base lock time (locks started while it runs)
 	tagRange: number?, -- × how far a tag reaches
+	-- × every gadget's recharge time, never below its fairness floor (Logic/GadgetRules.cooldownSeconds): gadgets
+	-- used while it runs recharge sooner, and ones already recharging finish their rest at the new pace
+	gadgetCooldown: number?,
 }
 
--- An effect in the sky while a weather modifier runs (client only; off with Reduce effects).
-export type SkyEffect = "lightning" | "meteors" | "aurora"
+-- An effect in the sky while a weather modifier runs (client only): lightning flashes, shooting stars and the aurora
+-- are off with Reduce effects; the eclipsed sun stays, standing still.
+export type SkyEffect = "lightning" | "meteors" | "aurora" | "eclipse"
 
 -- Things a modifier drops on the walkways while it runs (DropService, Config/Drops): supply crates (hold to open,
--- first player wins), a shower of coins (walk over them) or a runaway Snackling (catch it); or a giant Snackling over
--- the belt that everyone taps together (BossService, Config/Boss).
+-- first player wins), a shower of coins (walk over them), a runaway Snackling (catch it) or a golden fork hidden
+-- somewhere on the walkways and the plaza (find it); or a giant Snackling over the belt that everyone taps together
+-- (BossService, Config/Boss).
 export type ModifierDrops = {
-	kind: "crate" | "coins" | "runaway" | "boss",
+	kind: "crate" | "coins" | "runaway" | "treasure" | "boss",
 	firstSeconds: number, -- the first drop this long after the modifier starts
 	everySeconds: number, -- then one every this long until it ends
 }
@@ -679,9 +688,13 @@ export type ModifierDef = {
 	weather: WeatherKind?,
 	lighting: SeasonLighting?,
 	skyEffect: SkyEffect?,
-	drops: ModifierDrops?, -- crates, coins or runaways on the walkways (Config/Drops)
+	drops: ModifierDrops?, -- crates, coins, runaways or golden forks on the walkways (Config/Drops)
+	-- Bounty Hunt: the server's top earner wears a bounty for as long as it runs; tagging them while they carry, or
+	-- stealing from their base, pays a bounty (BountyService, Config/Bounty)
+	bounty: boolean?,
 	-- A private server's owner may start it from the host panel (Config/Host). Only modifiers that leave the economy
-	-- alone: no luck, mutations, income, sale prices, faster belt, drops or mutation-unlocking weather (CI checks).
+	-- alone: no luck, mutations, income, sale prices, faster belt, drops, bounties or mutation-unlocking weather (CI
+	-- checks).
 	hostable: boolean?,
 }
 
@@ -977,6 +990,30 @@ export type DropsConfig = {
 		luck: number, -- × server luck for which Snackling escapes
 		mutationChance: number, -- × mutation chances for it
 	},
+	-- Treasure Hunt: a golden fork hidden at one of `spots`, one at a time; walk into it to find it.
+	treasure: {
+		lifetimeSeconds: number, -- unfound, it goes this long after it appeared (before the next one comes)
+		revealSeconds: number, -- unfound this long, a marker shows where it is, so none is wasted
+		pickupRange: number, -- horizontal studs from the fork to a player's root
+		minPlayerDistance: number, -- it hides at least this far from every player (when some spot is that far)
+		prizes: { TreasurePrize }, -- what a fork pays, one picked by weight when it is found (cash or a spin)
+		spots: { TreasureSpot },
+	},
+}
+
+-- A hiding place for a golden fork: world X / Z on the walkways, in a gap between two bases or on the spawn plaza.
+-- `where` is the Config/Theme.text key that says where in the announcement ("by the fountain").
+export type TreasureSpot = { x: number, z: number, where: string }
+
+export type TreasurePrize = { weight: number, reward: PrizeReward }
+
+-- Config: Bounty Hunt (Config/Bounty): a bounty on the server's top earner while the modifier runs --------------------
+export type BountyConfig = {
+	tag: IncomeReward, -- tagging the target while they carry a Snackling: sized from the tagger's steady income
+	steal: IncomeReward, -- getting a Snackling stolen from the target's base home: sized from the thief's
+	claimsPerHunter: number, -- each player claims the bounty at most this many times in one Bounty Hunt
+	restSeconds: number, -- after a claim, nobody can claim it again for this long
+	checkSeconds: number, -- how often the server checks that the target is still here (else the next top earner)
 }
 
 -- Config: gadgets (Config/Gadgets): gear bought once with in-game cash, used whenever the player chooses -----------
@@ -1294,6 +1331,8 @@ export type GadgetsView = {
 	owned: { string }, -- gadget ids owned, in Config/Gadgets order
 	readyAt: { [string]: number }, -- when each owned gadget can be used again (missing or past: ready)
 	activeUntil: { [string]: number }, -- when a running effect ends (speed, shield) or a peel goes (missing: none)
+	-- when each recharging gadget was used: its button's disc shrinks over readyAt - usedAt (Gadget Frenzy shortens it)
+	usedAt: { [string]: number },
 }
 
 export type QuestsView = {

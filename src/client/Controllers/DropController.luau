@@ -13,6 +13,9 @@
 	    checks catches against), easing into each new leg, hopping as it runs (IdleMotion.run; it glides with Reduce
 	    effects) and jumping high when it crosses the belt. A "Catch me!" marker with its name in its rarity colour
 	    shows from far away, and a burst of sparkles marks the catch.
+	  * Golden forks (Treasure Hunt): a warm glow and a slow glint on each fork (the glint is off with Reduce effects),
+	    no marker at first (it is hidden: the banner says roughly where), then a 🍴 marker from its RevealAt time on,
+	    so none goes to waste. The server finds it for whoever walks into it; a burst of sparkles and a sting mark it.
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -38,6 +41,7 @@ local DropController = {}
 local CRATE_TAG = "SupplyCrate"
 local COIN_TAG = "DropCoin"
 local RUNAWAY_TAG = "Runaway"
+local TREASURE_TAG = "GoldenFork"
 local SPIN_SPEED = 3 -- radians per second
 local BOB_HEIGHT = 0.3
 local THUD_DISTANCE = 120
@@ -137,6 +141,71 @@ local function onCrate(instance: Instance)
 			end)
 		end
 	end)
+end
+
+-- A golden fork: its glow and glint now, its marker once it is revealed.
+local function onFork(instance: Instance)
+	if not instance:IsA("Model") then
+		return
+	end
+	local model = instance
+	local head = model:FindFirstChild("Head")
+	if head == nil or not head:IsA("BasePart") or head:FindFirstChild("ForkGlow") then
+		return
+	end
+	local shine = UiTheme.world("goldenForkShine")
+	local light = Instance.new("PointLight")
+	light.Name = "ForkGlow"
+	light.Color = shine
+	light.Range = 9
+	light.Brightness = 1.3
+	light.Shadows = false
+	light.Parent = head
+	if not ClientSettings.reduceEffects() then
+		local glint = Instance.new("ParticleEmitter")
+		glint.Name = "ForkGlint"
+		glint.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		glint.Color = ColorSequence.new(shine)
+		glint.LightEmission = 1
+		glint.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0),
+			NumberSequenceKeypoint.new(0.4, 0.7),
+			NumberSequenceKeypoint.new(1, 0),
+		})
+		glint.Speed = NumberRange.new(0)
+		glint.Lifetime = NumberRange.new(0.6, 0.9)
+		glint.Rate = 2
+		glint.LockedToPart = true
+		glint.Parent = head
+	end
+	local function reveal()
+		if model.Parent == nil or head:FindFirstChild("ForkMarker") then
+			return
+		end
+		local board = UiKit.new("BillboardGui", {
+			Name = "ForkMarker",
+			Size = UDim2.fromOffset(46, 46),
+			StudsOffsetWorldSpace = Vector3.new(0, 3, 0),
+			AlwaysOnTop = true,
+			MaxDistance = 400,
+			LightInfluence = 0,
+			Parent = head,
+		}) :: BillboardGui
+		UiKit.label({
+			Name = "Icon",
+			Text = Theme.text.treasureMarker,
+			Size = UDim2.fromScale(1, 1),
+			TextScaled = true,
+			Parent = board,
+		})
+	end
+	local revealAt = model:GetAttribute("RevealAt")
+	local hiddenFor = if type(revealAt) == "number" then revealAt - workspace:GetServerTimeNow() else 0
+	if hiddenFor > 0 then
+		task.delay(hiddenFor, reveal)
+	else
+		reveal()
+	end
 end
 
 local function onCoin(instance: Instance)
@@ -317,11 +386,18 @@ function DropController.start()
 	for _, instance in CollectionService:GetTagged(RUNAWAY_TAG) do
 		onRunaway(instance)
 	end
+	CollectionService:GetInstanceAddedSignal(TREASURE_TAG):Connect(onFork)
+	for _, instance in CollectionService:GetTagged(TREASURE_TAG) do
+		onFork(instance)
+	end
 	RunService.RenderStepped:Connect(spin)
 	RunService.RenderStepped:Connect(run)
 	Net.get("Effect").OnClientEvent:Connect(function(payload: { kind: string, position: Vector3?, rarity: string? })
 		local position = payload.position
-		if (payload.kind ~= "crate" and payload.kind ~= "runaway") or position == nil then
+		if
+			(payload.kind ~= "crate" and payload.kind ~= "runaway" and payload.kind ~= "treasure")
+			or position == nil
+		then
 			return
 		end
 		local color = if type(payload.rarity) == "string"
@@ -329,7 +405,11 @@ function DropController.start()
 			else UiTheme.palette("gold")
 		NotificationController.sparkle(position + Vector3.new(0, 2, 0), color)
 		local camera = workspace.CurrentCamera
-		if payload.kind == "crate" or (camera and (camera.Focus.Position - position).Magnitude < THUD_DISTANCE) then
+		if
+			payload.kind == "crate"
+			or payload.kind == "treasure"
+			or (camera and (camera.Focus.Position - position).Magnitude < THUD_DISTANCE)
+		then
 			SoundPlayer.world("crateOpen")
 		end
 	end)

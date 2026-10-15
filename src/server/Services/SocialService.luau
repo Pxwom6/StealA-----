@@ -335,6 +335,13 @@ function SocialService.onLeaving(session: Session)
 	end
 end
 
+-- Whether Roblox said `a` and `b` are friends (cached since they joined; a pair still being asked about, or whose
+-- check failed, is not friends for now). Never yields.
+function SocialService.areFriends(a: Session, b: Session): boolean
+	local friendship = friendships[SocialRules.pairKey(a.userId, b.userId)]
+	return friendship ~= nil and friendship.friends == true
+end
+
 -- Studio only (DevCommands /friends): pretend `count` friends are here, or nil to go back to real friends.
 function SocialService.devSetFriends(session: Session, count: number?)
 	if not RunService:IsStudio() then

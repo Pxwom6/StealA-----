@@ -6,7 +6,8 @@
 	fewer (three on a 320 px tall phone) shows the first gadgets owned; a button with no slot stays hidden.
 
 	  * slot 1 is the first gadget owned in Config/Gadgets order, slot 2 the next...; each shows its icon in its colour
-	  * recharging: a dark disc shrinks away as the gadget recharges, with the seconds left on it
+	  * recharging: a dark disc shrinks away as the gadget recharges, with the seconds left on it (over the recharge
+	    the server started: Gadget Frenzy makes it shorter)
 	  * running (the soda's speed, the shield, a peel lying in your base): a bright pulsing ring
 	  * keys 1-4 on a keyboard use the gadgets in Config/Gadgets order (each button shows its key)
 	  * with the Auto Collect pass, the Snack Magnet shows "AUTO": the pass already does its job every few seconds, so
@@ -68,7 +69,7 @@ type Slot = {
 }
 
 local slots: { Slot } = {}
-local view: Types.GadgetsView = { owned = {}, readyAt = {}, activeUntil = {} }
+local view: Types.GadgetsView = { owned = {}, readyAt = {}, activeUntil = {}, usedAt = {} }
 local inTutorial = true -- until the first state says otherwise (no flash of buttons for a new player)
 local autoCollect = false -- the player owns the Auto Collect pass
 local room = SLOTS -- buttons this screen has a slot for (ScreenLayout.gadgetSlots)
@@ -261,7 +262,10 @@ local function tick()
 		local remaining = if readyAt then math.max(0, readyAt - t) else 0
 		local cooling = remaining > 0
 		if cooling then
-			local share = math.clamp(remaining / def.cooldownSeconds, 0, 1)
+			-- over the recharge the server started (shorter during Gadget Frenzy), else the gadget's own
+			local usedAt = view.usedAt[id]
+			local total = if usedAt and readyAt and readyAt > usedAt then readyAt - usedAt else def.cooldownSeconds
+			local share = math.clamp(remaining / total, 0, 1)
 			slot.disc.Size = UDim2.fromScale(share, share)
 			slot.time.Text = tostring(math.ceil(remaining))
 		end

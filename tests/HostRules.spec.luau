@@ -360,28 +360,42 @@ T.describe("Config/Host", function()
 		end
 		T.expect(#problems).toBe(0)
 	end)
-	T.it("ships the four chase twists as the hostable set", function()
+	T.it("ships the five chase twists as the hostable set", function()
 		local hostable: { string } = {}
 		for _, id in Modifiers.order do
 			if Modifiers.modifiers[id].hostable then
 				table.insert(hostable, id)
 			end
 		end
-		T.expect(hostable).toEqual({ "sugarRush", "quickHands", "fortress", "snackPatrol" })
+		T.expect(hostable).toEqual({ "sugarRush", "quickHands", "fortress", "snackPatrol", "gadgetFrenzy" })
 	end)
-	T.it("refuses a hostable modifier that touches luck, mutations, income, prices, the belt or drops", function()
-		local unlocks = weatherUnlocks()
-		for _, id in
-			{ "luckyBreeze", "goldenHour", "cashSplash", "clearanceSale", "rushHour", "supplyDrop", "thunderstorm" }
-		do
-			local config = table.clone(Modifiers) :: Types.ModifiersConfig
-			config.modifiers = table.clone(Modifiers.modifiers)
-			local def = table.clone(config.modifiers[id])
-			def.hostable = true
-			config.modifiers[id] = def
-			T.expect(#HostRules.hostableProblems(config, unlocks)).toBe(1)
+	T.it(
+		"refuses a hostable modifier that touches luck, mutations, income, prices, the belt, drops or bounties",
+		function()
+			local unlocks = weatherUnlocks()
+			for _, id in
+				{
+					"luckyBreeze",
+					"goldenHour",
+					"cashSplash",
+					"clearanceSale",
+					"rushHour",
+					"supplyDrop",
+					"thunderstorm",
+					"eclipse",
+					"treasureHunt",
+					"bountyHunt",
+				}
+			do
+				local config = table.clone(Modifiers) :: Types.ModifiersConfig
+				config.modifiers = table.clone(Modifiers.modifiers)
+				local def = table.clone(config.modifiers[id])
+				def.hostable = true
+				config.modifiers[id] = def
+				T.expect(#HostRules.hostableProblems(config, unlocks)).toBe(1)
+			end
 		end
-	end)
+	)
 	T.it("needs at least one hostable modifier", function()
 		local config = table.clone(Modifiers) :: Types.ModifiersConfig
 		config.modifiers = {}

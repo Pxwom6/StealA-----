@@ -339,13 +339,21 @@ local function giantHealth(ada: any)
 		local giant = BossService.current()
 		return if giant then giant:GetAttribute("MaxHP") else -1
 	end
+	-- BossService looks at the clock every 0.1 real seconds, and `run` moves a server second every 0.03: on its own it
+	-- would plan the giants a few server seconds after the modifier started, or not have put up one due just before a
+	-- check. A real-time pause (the server clock stands still) lets it catch up.
+	local function catchUp()
+		task.wait(0.3)
+	end
 
 	-- The first giant: Max, Zoe and Ivy walking, Ned standing idle (as are Ada, Owen and Gus)
 	walkers = { max, zoe, ivy }
 	walk()
 	task.wait(0.4)
 	chat(ada, "/mod snackAttack 5")
+	catchUp()
 	run(Modifiers.modifiers.snackAttack.drops.firstSeconds + 2, walk)
+	catchUp()
 	check(
 		giantHp() == BossRules.maxHp(Boss, 2),
 		`the first giant has health for the 2 playing, Max and Zoe ({giantHp()}; it was 7 players' worth, `
@@ -369,6 +377,7 @@ local function giantHealth(ada: any)
 		+ Modifiers.modifiers.snackAttack.drops.everySeconds
 	local elapsed = Modifiers.modifiers.snackAttack.drops.firstSeconds + 2 + Boss.lifetimeSeconds - 15
 	run(secondAt - elapsed + 2, walk)
+	catchUp()
 	check(
 		BossService.current() ~= first and giantHp() == BossRules.maxHp(Boss, 3),
 		`the second counts Max (his hits), Ned and Ivy, not Zoe ({giantHp()}, {BossRules.maxHp(Boss, 3)})`

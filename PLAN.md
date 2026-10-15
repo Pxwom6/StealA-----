@@ -58,7 +58,7 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | Retention | `RetentionService` (daily streak, offline earnings), `LeaderboardService` | `RewardsController` (Rewards panel: Daily + Quests tabs) | `DailyStreak`, `OfflineEarnings` |
 | Snackdex | `SnackdexService` (discovery on every Snackling landing in a base, tier rewards claimed automatically, sync) | `SnackdexController` (rarity / Event tabs, 3D preview cards, silhouettes, NEW! toasts) | `SnackdexRules` |
 | Daily quests | `QuestService` (daily roll per UserId + UTC day, progress from gameplay events, ClaimQuest, day reset) | `RewardsController` (Quests tab) | `QuestRules` |
-| Gameplay events | `GameEvents` (buy / acquired / collect / sell / lock / steal / discover, emitted by the services that applied them) | – | – |
+| Gameplay events | `GameEvents` (buy / acquired / collect / sell / lock / steal / tag / discover, emitted by the services that applied them) | – | – |
 | Social | `Announcer` (server-wide banners), `SocialService` (friends in server, group membership, welcome gift) | `NotificationController`, `ChatTagController`, `SocialController` (👥 Friends button, invite / join group panel) | `SocialRules` |
 | LiveOps | `LiveOpsService` (scheduled events, luck boosts, admin luck / events / announcements for HostService, active-event change listeners) | event pill (banner + countdown), luck pill | `LiveOpsRules` |
 | Host panel & cross-server | `HostService` (HostAction: roles, the whitelist, cooldowns, analytics; `/luck`, `/event`, `/announce`), `CrossServer` (MessagingService: versioned messages, dedupe, expiry, caps, pcall), `ShoutoutService` (rare pulls told to every other server) | `HostPanelController` (the dialog, from a Settings row shown only to hosts) | `HostRules`, `CrossServerRules`, `HostPanelLayout` |
@@ -69,7 +69,7 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | Snackling models | podium models built by `PlotService` through `CreatureVisuals` | belt models (`BeltController`), idle bob / squash / sway (`IdleController`) | `CreatureRecipe` (recipe → parts), `IdleMotion` |
 | World & scenery | `MapBuilder` (plot decor, belt chevrons, boards, lobby spawn; `restyle` for a new map theme), `SceneryBuilder` (spawn plaza, Snack Factory, chute, flora, landmarks, boundary wall, terrain), `ThemeProps` (each theme's flora and landmarks), `WorldLighting` (map lighting + seasonal overlay) | `WorldFxController` (belt chevrons, factory cog, blinking lights; Reduce effects) | `SceneryLayout` |
 | Map themes | `MapThemeService` (first map, 20-minute rotation, the vote, `/map`) | `MapThemeController` (vote strip at the bottom of the screen, new-map title card), `WeatherController` (snow / embers / leaves... around the camera) | `MapThemeRules` |
-| Server modifiers | `ModifierService` (schedule, `/mod`; belt, economy, lock, steal, movement read its effects) | `ModifierController` (HUD button among the status pills; effects for belt prices, steal hold, tag reach) | `ModifierRules` |
+| Server modifiers | `ModifierService` (schedule, `/mod`; belt, economy, lock, steal, movement, gadgets read its effects), `DropService` (crates, coins, runaways, golden forks), `BossService` (Snack Attack), `BountyService` (Bounty Hunt: the target, claims from StealService's events) | `ModifierController` (HUD button among the status pills; effects for belt prices, steal hold, tag reach), `DropController`, `BossController`, `WeatherController` (weather skies, the eclipsed sun) | `ModifierRules`, `DropRules`, `BossRules`, `BountyRules` |
 | Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends <n\|off>`, `/tutorial`, `/gallery [mutationId\|off]` via `DevGallery`, `/sky <clockTime>`, `/quests reset`, `/dex fill <rarity\|event>`); `/map <id\|vote\|list>` (MapThemeService); `/mod <id> [minutes]`, `/mod off`, `/mod list` (ModifierService); LiveOps `/event <id> [minutes]`, `/event off`, `/luck`, `/announce` (HostService; anyone in Studio, local only); `/hostas <owner\|none\|admin>` (try the host panel as another role); `/style [off]` (every title and skin unlocked, this session), `/news` (the What's New card again) | – | – |
 | Settings & audio | `SettingsService` (SetSetting → `settings_<key>` flags) | `ClientSettings`, `SettingsController` (the gear, top right), `SoundPlayer`, `MusicController` (looping, crossfade) | `SettingsRules`, `ScreenLayout` |
 | Titles & base skins | `StyleService` (unlocks read from the save, toasts after each achievement check, GetStyle / EquipStyle → `title_<id>` / `skin_<id>` flags), `Nametags` (the title's BillboardGui on each character), `PlotService.setSkin` + `MapBuilder.paintPlot` (a base's floor, rug and trims) | `StyleController` (the Style dialog, from a Settings row), `ChatTagController` (the title's chat tag), `MutationFxController` (Rainbow Swirl's trims) | `StyleRules`, `StyleLayout` |
@@ -85,7 +85,7 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | `Creatures` | the Snackling catalogue (80 permanent + 4 Halloween + 4 Harvest Feast + 4 Winter + 4 Valentine's + 4 Easter): id, name, rarity, price, income, belt weight, model name, flavour text, optional `eventId` |
 | `CreatureLooks` | one 3D model recipe per Snackling, keyed by id: body plan, food skins, face, animal features, toppings, size (the fallback) |
 | `CreatureParts` | GENERATED by `tools/importParts.luau`: the polished models (Claude Design batches 1-3, the hand-built Winter batch 4, Valentine's batch 5, Easter batch 6, the 20 permanent Snacklings of batch 7 and the Harvest Feast batch 8), as primitive part lists |
-| `Mutations` | rare variants of any creature (Golden, Diamond, Rainbow; event-only Haunted, Maple, Festive, Sweetheart and Pastel; one signature per map, one per weather modifier): id, name, colour, chance per spawn, income / price multipliers, announce flags, look (material, tint, sparkles, rainbow, glow light, particles, halo, bee wings), optional `eventId`, `mapTheme` or `modifierId` |
+| `Mutations` | rare variants of any creature (Golden, Diamond, Rainbow; event-only Haunted, Maple, Festive, Sweetheart and Pastel; one signature per map, one per weather modifier): id, name, colour, chance per spawn, income / price multipliers, announce flags, look (material, tint, sparkles, rainbow, glow light, particles, halo, bee wings, eclipse corona), optional `eventId`, `mapTheme` or `modifierId` |
 | `Economy` | start cash, podium upgrade curve, sell refund, offline earnings, rebirth curve, cash packs, daily rewards |
 | `Gameplay` | belt timing, plot geometry, steal/tag ranges, carry speed, lock/grace timers, rate limits |
 | `Monetization` | game-pass and developer-product IDs (0 = not created on the Creator Hub yet: hidden in live servers), perk values (Auto Collect's interval), store layout, the Starter Pack's contents and offer timing, the items whose views are logged |
@@ -94,7 +94,9 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | `Sounds` | sound effects `{ id, volume, pitch }` (built-in `rbxasset://sounds/` files), music tracks (**empty, TODO**) and the crossfade time |
 | `Scenery` | the world's layout: default lighting, boundary wall, terrain (hills, rocks, lake), spawn plaza layout, tree spots, landmark spots, belt chevron spacing, part budget |
 | `MapThemes` | the twenty-seven map themes (palette over `Theme.world`, lighting, materials, flora, landmarks, weather), the first map, the rotation and vote timings |
-| `Modifiers` | the ten server modifiers (name, icon, description, colour, weight, effect multipliers), their schedule and each effect's limits |
+| `Modifiers` | the twenty-four server modifiers (name, icon, description, colour, weight, effect multipliers, weather, drops, bounty), their schedule and each effect's limits |
+| `Drops` | what the drop modifiers put out: supply crates, coin showers, runaway Snacklings and Treasure Hunt's golden forks (hiding places, prizes by weight, marker and lifetime) |
+| `Bounty` | Bounty Hunt: what a tag or a steal on the target pays (sized from the claimer's own income), claims per hunter, the rest after a claim |
 | `Social` | friend bonus (+10% per friend in the server, max 3), group id (**placeholder 0 = off**), group bonus, one-time welcome gift |
 | `Tutorial` | first-time tutorial: on/off, steps in order (buy, collect, lock, steal) with their automatic endings, one-time reward, belt-target tuning |
 | `Snackdex` | collection book rewards: one-time cash per completed rarity tier (steady income, minimum), permanent income bonus per tier and its cap |
@@ -152,6 +154,8 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `SceneryLayout` | where the scenery goes (plaza props, trees, tree line, landmark spots), factory / chute footprints, terrain heights, validation against plots, belt, walkway, lobby spawn and Halloween props, part estimate |
 | `MapThemeRules` | first map, vote candidates, vote counting and the winner, flora / landmark part counts and footprints, which colours maps may change, how long a map's own mutation rolls (`signatureLive`) and when a player has played on it (`creditDue`), `Config/MapThemes` validation |
 | `ModifierRules` | a modifier's effects (all 1 when none), belt price and capacity under them, the next pick and gap, the fastest walking speed allowed, `Config/Modifiers` validation |
+| `DropRules` | where drops land, their times, what a pickup pays, crate holds, runaway legs, where a golden fork hides (away from everyone, never twice running) and what it pays, `Config/Drops` validation |
+| `BountyRules` | Bounty Hunt's target (the top steady income outside the tutorial), whether a tag or a steal claims it (not the target, not a friend, once per hunter, not while it rests), payouts, `Config/Bounty` validation |
 | `SettingsRules` | player settings as `settings_<key>` flags: keys, read, apply |
 | `ScreenLayout` | where every HUD element goes on any screen (around Roblox's top bar, player list and touch controls, out of the play zone), the gadget buttons' slots around TAG, and the check of it at nine screens in the busiest states (`tools/layoutCheck.luau`, DECISIONS.md #47, #48) |
 | `TextFit` | TextScaled's text size from FredokaOne's real metrics: proves HUD text stays readable on phones |
@@ -410,30 +414,34 @@ and `lune run tools/worldsim/server.luau` (CI) switches to the newest four on th
 
 ## 12. Server modifiers
 
-Every 4-8 minutes a server runs one of twenty modifiers for 5 minutes (DECISIONS.md #30, `Config/Modifiers`): Rush
-Hour, Clearance Sale, Golden Hour, Lucky Breeze, Cash Splash, Sugar Rush, Quick Hands, Fortress, Snack Patrol, the rare
-Snack Party and Jackpot, five weathers (Thunderstorm, Meteor Shower, Toxic Fog, Northern Lights, Heatwave) that change
-the sky and unlock a mutation (DECISIONS.md #31, #40), three drops (Supply Drop, Coin Rain, Great Escape;
-DropService, `Config/Drops`, DECISIONS.md #33, #40) and Snack Attack (giant Snacklings over the belt that everyone taps
-together; BossService, `Config/Boss`, DECISIONS.md #42). A banner announces it, a button among the HUD's status pills counts it down (tap it for the description), and
-each system applies the effect where it decides (belt, economy, locks, steals, movement), the client showing the same
-prices, hold time and tag reach. A modifier started again while it runs (`ModifierService.run`) has the drop services
-plan its drops again for the new length; a Snack Attack giant's health counts the players playing (`BossRules.counts`:
-moved or hit it in the last minute, out of the tutorial; `session.activeAt`). Studio: `/mod <id> [minutes]`,
-`/mod off`, `/mod list`. Offline: `lune run tools/worldsim/server.luau` (CI) boots the server and plays a session that
-checks them; `lune run tools/worldsim/review2.luau` (CI) the second review's fixes.
+Every 4-8 minutes a server runs one of twenty-four modifiers for 5 minutes (DECISIONS.md #30, `Config/Modifiers`):
+Rush Hour, Clearance Sale, Golden Hour, Lucky Breeze, Cash Splash, Sugar Rush, Quick Hands, Fortress, Snack Patrol, the
+rare Snack Party and Jackpot, Gadget Frenzy (gadget recharges halved, never under their fairness floors), six weathers
+(Thunderstorm, Meteor Shower, Toxic Fog, Northern Lights, Heatwave, Eclipse) that change the sky and unlock a mutation
+(DECISIONS.md #31, #40, #56), four drops (Supply Drop, Coin Rain, Great Escape, Treasure Hunt's hidden golden forks;
+DropService, `Config/Drops`, DECISIONS.md #33, #40, #56), Snack Attack (giant Snacklings over the belt that everyone
+taps together; BossService, `Config/Boss`, DECISIONS.md #42) and Bounty Hunt (a bounty on the top earner, claimed by a
+tag or a steal; BountyService, `Config/Bounty`, `BountyRules`, DECISIONS.md #56). A banner announces it, a button
+among the HUD's status pills counts it down (tap it for the description), and each system applies the effect where it
+decides (belt, economy, locks, steals, movement, gadgets), the client showing the same prices, hold time and tag reach.
+A modifier started again while it runs (`ModifierService.run`) has the drop services plan its drops again for the new
+length; a Snack Attack giant's health counts the players playing (`BossRules.counts`: moved or hit it in the last
+minute, out of the tutorial; `session.activeAt`). Studio: `/mod <id> [minutes]`, `/mod off`, `/mod list`,
+`/fork [n]`. Offline: `lune run tools/worldsim/server.luau` (CI) boots the server and plays a session that checks them
+(and `tools/worldsim/gadgets.luau` Gadget Frenzy); `lune run tools/worldsim/review2.luau` (CI) the second review's
+fixes.
 
 ## 13. Map and weather mutations
 
-Thirty-two gated mutations (DECISIONS.md #31, `Config/Mutations`): one signature per map that only rolls on that
+Thirty-three gated mutations (DECISIONS.md #31, `Config/Mutations`): one signature per map that only rolls on that
 map (Honey, Sprinkled, Frozen, Fossil, Molten, Moonlit, Pearl, Candy Apple, Blossom, Lunar, Mossy, Cyber, Angelic,
 Abyssal, Fudge, Balloon, Cheesy, Amethyst, Zesty, Bubblegum, Buttered, Porcelain, Syrupy, Bumblebee, Gumdrop, Lantern,
 Barbecue; 1.2%, x3) and one per weather modifier that
-only rolls while it runs (Electric, Galaxy, Toxic, Aurora, Toasted; 2%, x4, announced). `BeltService.mutationConditions()` passes the
+only rolls while it runs (Electric, Galaxy, Toxic, Aurora, Toasted, Eclipse; 2%, x4, announced). `BeltService.mutationConditions()` passes the
 running events, the map and the modifier into `MutationRules.roll`; permanent rolls never change. The vote buttons
 and the map title card name each map's mutation; the Snackdex shows a pip for each one owned. Mutation looks gained
-particle presets (`MutationLook.particles`, built by `CreatureVisuals`), Angelic's halo and Bumblebee's glassy bee
-wings (`halo`, `wings`).
+particle presets (`MutationLook.particles`, built by `CreatureVisuals`), Angelic's halo, Bumblebee's glassy bee
+wings and Eclipse's ring of fire standing behind the body (`halo`, `wings`, `corona`).
 
 ## 14. Gadgets
 
@@ -443,7 +451,8 @@ to step on it slips, and a Snackling of yours they carry runs home), **Bubble Sh
 Magnet** (every pad's cash, from anywhere). Each owned gadget gets a round button beside TAG (keys 1-4;
 `ScreenLayout.gadgetSlots`, covered by the layout check), hidden during the tutorial. `GadgetService` checks everything
 (`GadgetRules`); `Movement` keeps every walking speed and the movement checks' allowance together (capped at 1.5x with
-a speed modifier). Ownership is the save's `gadget_<id>` flags (no schema bump); cooldowns are session-only server time.
+a speed modifier). Ownership is the save's `gadget_<id>` flags (no schema bump); cooldowns are session-only server time,
+halved while Gadget Frenzy runs (`GadgetRules.cooldownSeconds`, never under each kind's fairness floor).
 Studio: `/gadgets` (own all, recharged), `/gadgets off`. Offline: `lune run tools/worldsim/gadgets.luau` (CI).
 
 ## 15. Host panel, cross-server LiveOps and shout-outs
@@ -452,7 +461,7 @@ Admins and a private server's owner get a 🛠️ Host panel row in Settings (DE
 switch the map, start a vote, turn rotation off or on, run or stop any modifier, drop a chosen Snackling and mutation
 on the belt, start luck or a configured event, gift everyone minutes of their own income and send a filtered message,
 in this server or in every server (one versioned MessagingService message each, run once everywhere, `CrossServer`).
-An owner gets the map (every 20 minutes, the rotation's turn), rotation and the four hostable modifiers (every 10
+An owner gets the map (every 20 minutes, the rotation's turn), rotation and the five hostable modifiers (every 10
 minutes, when no other modifier runs, and stopping only their own: `ModifierService.startedBy`) in their own server
 only; in every server a map counts as played on after 3 minutes and its own mutation rolls for its first 20 minutes up
 (DECISIONS.md #55). Everything goes through one rate-limited intent, `HostAction`, checked by `HostRules`, and the

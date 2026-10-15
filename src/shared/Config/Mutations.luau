@@ -24,13 +24,14 @@
 	look              material (Enum.Material name), optional tint (+ tintStrength 0..1), transparency,
 	                  reflectance, sparkles, rainbow (hue-cycling colours + rainbow particles), glow (a point light
 	                  in that #RRGGBB colour), particles (a preset around the body: Logic/Catalog.MUTATION_PARTICLES),
-	                  halo (a glowing ring above the head), wings (two glassy bee wings on the back)
+	                  halo (a glowing ring above the head), wings (two glassy bee wings on the back), corona (an
+	                  eclipse's ring of fire standing behind the body)
 	at most one gate (none: it can roll on any spawn):
 	eventId           only rolls while that LiveOps event is active (event-only mutations)
 	mapTheme          only rolls on that map (Config/MapThemes): every map has exactly one such signature mutation,
 	                  shown on its vote button and title card, so voting for a map means something
 	modifierId        only rolls while that server modifier runs (Config/Modifiers: Thunderstorm, Meteor Shower,
-	                  Toxic Fog); the modifier's banner says so
+	                  Toxic Fog, Northern Lights, Heatwave, Eclipse); the modifier's banner says so
 
 	Gated mutations roll after the permanent ones (higher `order`), so a permanent roll never changes with the map,
 	the weather or an event. Only one map and one modifier are ever live, so CI checks the worst case that can roll
@@ -737,7 +738,7 @@ local Mutations: { MutationDef } = {
 		eventId = "Harvest2026",
 	},
 
-	-- Map signatures of the four maps after Pancake Peaks (order 37-40: rolled after every other one, so no existing
+	-- Map signatures of the four maps after Pancake Peaks (order 37-40: rolled after every earlier one, so no existing
 	-- roll changes; each only rolls on its own map).
 	{
 		id = "bumblebee",
@@ -800,6 +801,31 @@ local Mutations: { MutationDef } = {
 			particles = "smoke",
 		},
 		mapTheme = "ranch",
+	},
+
+	-- Eclipse (order 41, after everything else): only while the Eclipse modifier runs, like the other weathers (2%, x4,
+	-- announced on spawn). A Snackling gone dark as the moon, standing in a ring of fire, with embers drifting off it.
+	{
+		id = "eclipse",
+		displayName = "Eclipse",
+		color = "#FFA64D",
+		order = 41,
+		chance = 0.02,
+		incomeMultiplier = 4,
+		priceMultiplier = 2.5,
+		announceOnSpawn = true,
+		announceOnBuy = false,
+		announceOnSteal = false,
+		look = {
+			material = "SmoothPlastic",
+			tint = "#120E1A",
+			tintStrength = 0.86,
+			reflectance = 0.2,
+			glow = "#FFB04A",
+			particles = "corona",
+			corona = true,
+		},
+		modifierId = "eclipse",
 	},
 }
 

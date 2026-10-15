@@ -7,17 +7,19 @@
 	(it lives under the Camera, so only this client has it) and its emitter fills the air around you, which is far
 	cheaper than covering the whole map.
 
-	A weather modifier (Config/Modifiers: Thunderstorm, Meteor Shower, Toxic Fog, Northern Lights, Heatwave) replaces
-	the map's particles with its own (rain, glowing spores, heat shimmer) while it runs, and adds its sky effect:
-	lightning (a far-off bolt, a soft flash of this client's screen and a rumble of thunder every 6-14 seconds),
-	shooting stars streaking across the sky, or an aurora (ribbons of light all around the sky, swaying and
-	shimmering). The server changes the lighting itself (ModifierService).
+	A weather modifier (Config/Modifiers: Thunderstorm, Meteor Shower, Toxic Fog, Northern Lights, Heatwave, Eclipse)
+	replaces the map's particles with its own (rain, glowing spores, heat shimmer) while it runs, and adds its sky
+	effect: lightning (a far-off bolt, a soft flash of this client's screen and a rumble of thunder every 6-14
+	seconds), shooting stars streaking across the sky, an aurora (ribbons of light all around the sky, swaying and
+	shimmering), or the eclipsed sun (a black disc in a ring of fire where the sun was: as it starts, the disc slides
+	across the bright sun, then its streamers turn slowly). The server changes the lighting itself (ModifierService),
+	and an eclipse's takes the sky's own sun away.
 
 	A seasonal theme with weather of its own (Config/Seasons, e.g. Winter's snow) replaces the map's particles while
 	it is on; a weather modifier still wins over it.
 
-	Off with Settings > Reduce effects (only the thunder stays), and while there is no weather. The kinds come from the
-	server through the workspace attributes MapTheme, SeasonTheme and Modifier.
+	Off with Settings > Reduce effects (only the thunder stays, and the eclipsed sun, standing still), and while there
+	is no weather. The kinds come from the server through the workspace attributes MapTheme, SeasonTheme and Modifier.
 ]]
 
 local Lighting = game:GetService("Lighting")
@@ -59,6 +61,44 @@ local AURORA_LENGTH = 380
 local AURORA_WIDTH = 60
 local AURORA_SWAY = 70 -- studs the ribbons bend
 local AURORA_STEP = 1 / 20
+-- Eclipse: a billboard far out in the sun's direction (so it keeps its size and place as the camera moves), its side a
+-- share of that distance. Every size below is a share of the billboard: a soft glow from gold through rose to violet,
+-- long pale streamers, a rim going from gold to white-hot, the dark disc, and one bright bead on the rim. It slides in
+-- over ECLIPSE_IN_SECONDS (the time the lighting takes to darken, ModifierService) and the streamers turn ECLIPSE_TURN
+-- degrees a second; with Reduce effects it stands still, already eclipsed.
+local ECLIPSE_DISTANCE = 1200
+local ECLIPSE_SPAN = 0.32
+local ECLIPSE_MOON = 0.27
+local ECLIPSE_MOON_COLOR = "#0B0814"
+local ECLIPSE_SUN_COLOR = "#FFF6DC"
+local ECLIPSE_GLOW = {
+	{ size = 1, color = "#7A3CE0", transparency = 0.9 },
+	{ size = 0.78, color = "#C84DFF", transparency = 0.84 },
+	{ size = 0.6, color = "#FF5FA0", transparency = 0.74 },
+	{ size = 0.47, color = "#FF8F57", transparency = 0.6 },
+	{ size = 0.37, color = "#FFC870", transparency = 0.4 },
+	{ size = 0.31, color = "#FFE9B0", transparency = 0.15 },
+}
+local ECLIPSE_RIM = { { size = 0.292, color = "#FFB347" }, { size = 0.281, color = "#FFF8E8" } }
+local ECLIPSE_STREAMERS = {
+	{ angle = 12, length = 0.95, width = 0.02 },
+	{ angle = 58, length = 0.72, width = 0.015 },
+	{ angle = 103, length = 0.88, width = 0.018 },
+	{ angle = 141, length = 0.66, width = 0.013 },
+	{ angle = 172, length = 0.8, width = 0.016 },
+}
+local ECLIPSE_STREAMER_COLOR = "#FFE9B8"
+local ECLIPSE_STREAMER_FADE =
+	{ { 0, 1 }, { 0.22, 0.75 }, { 0.38, 0.25 }, { 0.5, 0.15 }, { 0.62, 0.25 }, { 0.78, 0.75 }, { 1, 1 } }
+local ECLIPSE_BEAD = { angle = 140, size = 0.034, glow = 0.1 } -- upper left: the last of the sun as the disc arrives
+local ECLIPSE_IN_SECONDS = 4
+local ECLIPSE_TURN = 1.5
+local ECLIPSE_STEP = 1 / 20
+-- When it starts, the light changes first (the sun moving to where the eclipse will be): the eclipse waits until the
+-- time of day has stood still this long (at most ECLIPSE_SETTLE_MAX), then starts there; the server hides the sky's own
+-- sun a moment later (WorldLighting).
+local ECLIPSE_SETTLE = 0.5
+local ECLIPSE_SETTLE_MAX = 8
 
 local random = Random.new()
 
@@ -748,8 +788,144 @@ local function auroraLoop(token: number)
 	end
 end
 
--- Starts (or stops, with nil) the running sky effect's loop.
-local function setSkyEffect(effect: Types.SkyEffect?)
+-- One round frame of the eclipse billboard, `size` a share of it, centred unless moved.
+local function disc(parent: Instance, size: number, color: string, transparency: number, z: number): Frame
+	local frame = Instance.new("Frame")
+	frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	frame.Position = UDim2.fromScale(0.5, 0.5)
+	frame.Size = UDim2.fromScale(size, size)
+	frame.BackgroundColor3 = Color3.fromHex(color)
+	frame.BackgroundTransparency = transparency
+	frame.BorderSizePixel = 0
+	frame.ZIndex = z
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0.5, 0)
+	corner.Parent = frame
+	frame.Parent = parent
+	return frame
+end
+
+type EclipseLayer = { frame: Frame, transparency: number }
+
+-- The eclipsed sun on an invisible anchor. Returns the anchor and a function that draws it at `progress` (0: the dark
+-- disc beside the bright sun, 1: eclipsed) with its streamers turned for time `t` (nil: as built).
+local function buildEclipse(): (Part, (progress: number, t: number?) -> ())
+	local anchor = Instance.new("Part")
+	anchor.Name = "Eclipse"
+	anchor.Anchored = true
+	anchor.CanCollide = false
+	anchor.CanQuery = false
+	anchor.CanTouch = false
+	anchor.CastShadow = false
+	anchor.Transparency = 1
+	anchor.Size = Vector3.one
+	local gui = Instance.new("BillboardGui")
+	gui.Name = "EclipseSun"
+	gui.Size = UDim2.fromScale(ECLIPSE_DISTANCE * ECLIPSE_SPAN, ECLIPSE_DISTANCE * ECLIPSE_SPAN)
+	gui.LightInfluence = 0
+	gui.AlwaysOnTop = false -- hills and buildings in front of it still hide it
+	gui.Parent = anchor
+	-- the corona: fades in as the disc covers the sun
+	local corona: { EclipseLayer } = {}
+	for index, ring in ECLIPSE_GLOW do
+		table.insert(
+			corona,
+			{ frame = disc(gui, ring.size, ring.color, ring.transparency, index), transparency = ring.transparency }
+		)
+	end
+	local streamers: { { frame: Frame, angle: number } } = {}
+	for _, streamer in ECLIPSE_STREAMERS do
+		local frame = Instance.new("Frame")
+		frame.AnchorPoint = Vector2.new(0.5, 0.5)
+		frame.Position = UDim2.fromScale(0.5, 0.5)
+		frame.Size = UDim2.fromScale(streamer.length, streamer.width)
+		frame.Rotation = streamer.angle
+		frame.BackgroundColor3 = Color3.fromHex(ECLIPSE_STREAMER_COLOR)
+		frame.BorderSizePixel = 0
+		frame.ZIndex = #ECLIPSE_GLOW + 1
+		local fade = Instance.new("UIGradient")
+		fade.Transparency = sequence(ECLIPSE_STREAMER_FADE)
+		fade.Parent = frame
+		frame.Parent = gui
+		table.insert(corona, { frame = frame, transparency = 0 })
+		table.insert(streamers, { frame = frame, angle = streamer.angle })
+	end
+	local z = #ECLIPSE_GLOW + 2
+	local sun = disc(gui, ECLIPSE_MOON, ECLIPSE_SUN_COLOR, 0, z)
+	for index, rim in ECLIPSE_RIM do
+		table.insert(corona, { frame = disc(gui, rim.size, rim.color, 0, z + index), transparency = 0 })
+	end
+	local moon = disc(gui, ECLIPSE_MOON, ECLIPSE_MOON_COLOR, 0, z + #ECLIPSE_RIM + 1)
+	local beadAngle = math.rad(ECLIPSE_BEAD.angle)
+	local radius = ECLIPSE_RIM[1].size / 2
+	local beadAt = UDim2.fromScale(0.5 + math.cos(beadAngle) * radius, 0.5 - math.sin(beadAngle) * radius)
+	local beadGlow = disc(gui, ECLIPSE_BEAD.glow, ECLIPSE_GLOW[#ECLIPSE_GLOW].color, 0.55, z + #ECLIPSE_RIM + 2)
+	beadGlow.Position = beadAt
+	local bead = disc(gui, ECLIPSE_BEAD.size, ECLIPSE_SUN_COLOR, 0, z + #ECLIPSE_RIM + 3)
+	bead.Position = beadAt
+	table.insert(corona, { frame = beadGlow, transparency = 0.55 })
+	table.insert(corona, { frame = bead, transparency = 0 })
+
+	local function draw(progress: number, t: number?)
+		-- the disc slides in from the lower right and slows as it covers the sun; the corona lights up at the end
+		local slide = 1 - (1 - math.clamp(progress, 0, 1)) ^ 2
+		moon.Position = UDim2.fromScale(0.5 + 0.2 * (1 - slide), 0.5 + 0.09 * (1 - slide))
+		local lit = math.clamp((progress - 0.75) / 0.25, 0, 1)
+		sun.BackgroundTransparency = lit
+		for _, layer in corona do
+			layer.frame.BackgroundTransparency = 1 - (1 - layer.transparency) * lit
+		end
+		if t then
+			for _, streamer in streamers do
+				streamer.frame.Rotation = streamer.angle + t * ECLIPSE_TURN
+			end
+		end
+	end
+	draw(1, nil)
+	return anchor, draw
+end
+
+-- Runs the eclipsed sun until the sky effect changes (token), always where the sun is (Lighting:GetSunDirection).
+-- `animate`: it starts now, so once the light has settled the disc slides over the sun (not with Reduce effects, nor
+-- for a player who joins while it is already on).
+local function eclipseLoop(token: number, animate: boolean)
+	if animate then
+		local last, still, waited = Lighting.ClockTime, 0, 0
+		while token == skyToken and still < ECLIPSE_SETTLE and waited < ECLIPSE_SETTLE_MAX do
+			task.wait(ECLIPSE_STEP)
+			waited += ECLIPSE_STEP
+			local clock = Lighting.ClockTime
+			still = if clock == last then still + ECLIPSE_STEP else 0
+			last = clock
+		end
+		if token ~= skyToken then
+			return
+		end
+	end
+	local anchor, draw = buildEclipse()
+	local gui = anchor:FindFirstChildOfClass("BillboardGui")
+	anchor.Parent = folder()
+	local started = os.clock()
+	while token == skyToken do
+		local camera = workspace.CurrentCamera
+		local direction = Lighting:GetSunDirection()
+		anchor.CFrame = CFrame.new(camera.CFrame.Position + direction * ECLIPSE_DISTANCE)
+		if gui then
+			gui.Enabled = direction.Y > -0.03
+		end
+		local reduced = ClientSettings.reduceEffects()
+		local progress = if animate and not reduced
+			then math.clamp((os.clock() - started) / ECLIPSE_IN_SECONDS, 0, 1)
+			else 1
+		draw(progress, if reduced then nil else os.clock())
+		task.wait(ECLIPSE_STEP)
+	end
+	anchor:Destroy()
+end
+
+-- Starts (or stops, with nil) the running sky effect's loop. `animate`: the effect starts now (not when this client
+-- joins with it already running).
+local function setSkyEffect(effect: Types.SkyEffect?, animate: boolean)
 	if effect == skyEffect then
 		return
 	end
@@ -761,6 +937,9 @@ local function setSkyEffect(effect: Types.SkyEffect?)
 	end
 	if effect == "aurora" then
 		task.spawn(auroraLoop, token)
+		return
+	elseif effect == "eclipse" then
+		task.spawn(eclipseLoop, token, animate)
 		return
 	end
 	task.spawn(function()
@@ -780,10 +959,12 @@ local function setSkyEffect(effect: Types.SkyEffect?)
 	end)
 end
 
+local refreshedOnce = false -- the first refresh (this client joining) shows a running sky effect as it already is
+
 local function refresh()
 	clear()
 	local modifier = runningModifier()
-	setSkyEffect(if modifier then modifier.skyEffect else nil)
+	setSkyEffect(if modifier then modifier.skyEffect else nil, refreshedOnce)
 	if ClientSettings.reduceEffects() then
 		return
 	end
@@ -825,6 +1006,7 @@ function WeatherController.start()
 		end
 	end)
 	refresh()
+	refreshedOnce = true
 	RunService.RenderStepped:Connect(function()
 		local part, chosen = box, recipe
 		if part == nil or chosen == nil then

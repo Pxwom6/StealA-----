@@ -1,9 +1,15 @@
 --!strict
 local T = require("./TestKit")
 local DropRules = require("../src/shared/Logic/DropRules")
+local MapThemeRules = require("../src/shared/Logic/MapThemeRules")
+local SceneryLayout = require("../src/shared/Logic/SceneryLayout")
+local SeasonRules = require("../src/shared/Logic/SeasonRules")
 local Drops = require("../src/shared/Config/Drops")
 local Gameplay = require("../src/shared/Config/Gameplay")
 local Modifiers = require("../src/shared/Config/Modifiers")
+local Scenery = require("../src/shared/Config/Scenery")
+local Seasons = require("../src/shared/Config/Seasons")
+local Theme = require("../src/shared/Config/Theme")
 local Types = require("../src/shared/Types")
 
 local WALKWAY = {
@@ -33,7 +39,7 @@ end
 
 T.describe("DropRules: the real config", function()
 	T.it("is valid", function()
-		local problems = DropRules.validate(Drops, WALKWAY)
+		local problems = DropRules.validate(Drops, WALKWAY, (Theme.text :: any) :: { [string]: string })
 		if #problems > 0 then
 			print(table.concat(problems, "\n"))
 		end
@@ -45,6 +51,16 @@ T.describe("DropRules: the real config", function()
 		T.expect(#DropRules.times(Modifiers.modifiers.supplyDrop.drops :: Types.ModifierDrops, duration)).toBe(4)
 		T.expect(#DropRules.times(Modifiers.modifiers.coinRain.drops :: Types.ModifierDrops, duration)).toBe(8)
 		T.expect(#DropRules.times(Modifiers.modifiers.greatEscape.drops :: Types.ModifierDrops, duration)).toBe(6)
+		T.expect(#DropRules.times(Modifiers.modifiers.treasureHunt.drops :: Types.ModifierDrops, duration)).toBe(7)
+	end)
+
+	T.it("hides one golden fork at a time", function()
+		local drops = Modifiers.modifiers.treasureHunt.drops :: Types.ModifierDrops
+		T.expect(Drops.treasure.lifetimeSeconds).toBeLessThan(drops.everySeconds)
+		-- and the last one still has its whole life before the next modifier can start
+		local times = DropRules.times(drops, Modifiers.schedule.durationSeconds)
+		T.expect(times[#times] + Drops.treasure.lifetimeSeconds)
+			.toBeAtMost(Modifiers.schedule.durationSeconds + Modifiers.schedule.gapMinSeconds)
 	end)
 
 	T.it("lets a runaway run slower than players walk, and only one at a time mostly", function()
@@ -284,6 +300,208 @@ T.describe("DropRules runaways", function()
 	end)
 end)
 
+-- The real map, laid out as MapBuilder and SeasonService place things (as tests/SeasonRules.spec builds it).
+local MAP = Gameplay.map
+local function seasonMap(): SeasonRules.MapShape
+	local entrances: { SeasonRules.Entrance } = {}
+	local spanX = MAP.plotsPerSide * MAP.plotWidth + (MAP.plotsPerSide - 1) * MAP.plotGap
+	for index = 1, MAP.plotCount do
+		local north = index <= MAP.plotsPerSide
+		local column = (index - 1) % MAP.plotsPerSide
+		local x = -spanX / 2 + MAP.plotWidth / 2 + column * (MAP.plotWidth + MAP.plotGap)
+		local sign = if north then 1 else -1
+		local z = sign * (MAP.walkwayWidth + MAP.plotDepth / 2)
+		table.insert(entrances, { x = x, z = z - sign * MAP.plotDepth / 2, outX = 0, outZ = -sign })
+	end
+	return {
+		entrances = entrances,
+		entranceWidth = MAP.entranceWidth,
+		plotWidth = MAP.plotWidth,
+		groundY = 0.2,
+		wallTopY = 0.4 + MAP.wallHeight,
+		beltLength = Gameplay.belt.length,
+		beltWidth = Gameplay.belt.width,
+		walkwayWidth = MAP.walkwayWidth,
+	}
+end
+
+-- Horizontal distance from (x, z) to the segment of half length `half` through (cx, cz) along (dx, dz) (a unit vector).
+local function segmentDistance(
+	x: number,
+	z: number,
+	cx: number,
+	cz: number,
+	dx: number,
+	dz: number,
+	half: number
+): number
+	local along = math.clamp((x - cx) * dx + (z - cz) * dz, -half, half)
+	local px, pz = cx + dx * along, cz + dz * along
+	return math.sqrt((x - px) ^ 2 + (z - pz) ^ 2)
+end
+
+T.describe("DropRules Treasure Hunt", function()
+	local function far(): { DropRules.Point }
+		return { { x = 0, z = 0 } } -- one player on the belt's middle
+	end
+
+	T.it("hides a fork far from every player, never twice running in the same place", function()
+		local spots = Drops.treasure.spots
+		local random = T.seededRandom(11)
+		local last: number? = nil
+		local used: { [number]: boolean } = {}
+		for _ = 1, 400 do
+			local index = DropRules.treasureSpot(Drops, far(), last, random) :: number
+			T.expect(index ~= last).toBe(true)
+			T.expect(DropRules.treasureDistance(Drops, index, far())).toBeAtLeast(Drops.treasure.minPlayerDistance)
+			used[index] = true
+			last = index
+		end
+		-- every hiding place far enough from the middle of the belt gets used
+		for index in spots do
+			if DropRules.treasureDistance(Drops, index, far()) >= Drops.treasure.minPlayerDistance then
+				T.expect(used[index] == true).toBe(true)
+			end
+		end
+	end)
+
+	T.it("goes to the farthest place when every one is near someone", function()
+		local config = copy(Drops)
+		config.treasure.minPlayerDistance = 10000
+		local index = DropRules.treasureSpot(config, far(), nil, function(): number
+			return 0.5
+		end) :: number
+		local best = 0
+		for other in Drops.treasure.spots do
+			best = math.max(best, DropRules.treasureDistance(Drops, other, far()))
+		end
+		T.expect(DropRules.treasureDistance(Drops, index, far())).toBe(best)
+	end)
+
+	T.it("draws exactly one number, and needs a hiding place", function()
+		local draws = 0
+		DropRules.treasureSpot(Drops, far(), nil, function(): number
+			draws += 1
+			return 0.3
+		end)
+		T.expect(draws).toBe(1)
+		local empty = copy(Drops)
+		empty.treasure.spots = {}
+		T.expect(DropRules.treasureSpot(empty, far(), nil, function(): number
+			return 0
+		end)).toBeNil()
+	end)
+
+	T.it("is found by walking into it, not from a jump over it or under the map", function()
+		local range = Drops.treasure.pickupRange
+		T.expect(DropRules.findsTreasure(Drops, range, 3)).toBe(true)
+		T.expect(DropRules.findsTreasure(Drops, range + 0.1, 3)).toBe(false)
+		T.expect(DropRules.findsTreasure(Drops, 0, 12)).toBe(false)
+		T.expect(DropRules.findsTreasure(Drops, 0, -5)).toBe(false)
+		T.expect(DropRules.findsTreasure(Drops, 0 / 0, 3)).toBe(false)
+	end)
+
+	T.it("pays a few seconds of income three times in four, else a Lucky Spin", function()
+		local chances = DropRules.treasureChances(Drops.treasure.prizes)
+		T.expect(chances[1]).toBeNear(0.75, 1e-9)
+		T.expect(chances[2]).toBeNear(0.25, 1e-9)
+		local first = DropRules.treasurePrize(Drops.treasure.prizes, 0) :: Types.PrizeReward
+		local last = DropRules.treasurePrize(Drops.treasure.prizes, 0.99) :: Types.PrizeReward
+		T.expect(first.kind).toBe("cash")
+		T.expect(last.kind).toBe("spin")
+		T.expect((DropRules.treasurePrize(Drops.treasure.prizes, 0.749) :: Types.PrizeReward).kind).toBe("cash")
+		T.expect((DropRules.treasurePrize(Drops.treasure.prizes, 0.75) :: Types.PrizeReward).kind).toBe("spin")
+		T.expect(DropRules.treasurePrize({ { weight = 0, reward = first } }, 0.5)).toBeNil()
+	end)
+
+	T.it("hides every fork on open ground: clear of the belt, the bases and everything on the map", function()
+		local shape = SceneryLayout.mapShape(MAP :: any, Gameplay.belt :: any)
+		local layout = SceneryLayout.layout(Scenery)
+		local plaza = Scenery.plaza
+		local boundary = Scenery.boundary
+		local widest = 0
+		for _, radius in MapThemeRules.FLORA_RADIUS do
+			widest = math.max(widest, radius)
+		end
+		local seasonal: { SeasonRules.Prop } = {}
+		for _, theme in Seasons.themes do
+			for _, prop in SeasonRules.layout(theme.decorations, theme.palette, seasonMap()) do
+				table.insert(seasonal, prop)
+			end
+		end
+		local problems: { string } = {}
+		local function needs(ok: boolean, index: number, what: string)
+			if not ok then
+				table.insert(problems, `spot {index} {what}`)
+			end
+		end
+		for index, spot in Drops.treasure.spots do
+			local x, z = spot.x, spot.z
+			needs(
+				x > boundary.minX + boundary.wallThickness + 3 and x < boundary.maxX - boundary.wallThickness - 3,
+				index,
+				"inside the boundary (X)"
+			)
+			needs(math.abs(z) < boundary.maxZ - boundary.wallThickness - 3, index, "inside the boundary (Z)")
+			for _, rect in shape.plots do
+				needs(SceneryLayout.rectDistance(rect, x, z) >= 3, index, "clear of the bases")
+			end
+			needs(SceneryLayout.rectDistance(shape.belt, x, z) >= 3, index, "clear of the belt")
+			for _, rect in shape.structures do
+				needs(SceneryLayout.rectDistance(rect, x, z) >= 3, index, "clear of the factory and the chute")
+			end
+			local function clear(px: number, pz: number, radius: number, what: string)
+				needs(math.sqrt((x - px) ^ 2 + (z - pz) ^ 2) >= radius, index, `clear of {what}`)
+			end
+			clear(plaza.x, plaza.z, plaza.fountainRadius + 1.5, "the fountain")
+			for _, bench in layout.benches do
+				clear(bench.x, bench.z, SceneryLayout.RADIUS.bench + 1, "a bench")
+			end
+			for _, lamp in layout.lamps do
+				clear(lamp.x, lamp.z, SceneryLayout.RADIUS.lamp + 1.5, "a lamp")
+			end
+			for _, bed in layout.flowerBeds do
+				clear(bed.x, bed.z, SceneryLayout.RADIUS.flowerBed + 1, "a flower bed")
+			end
+			for _, side in { -1, 1 } do
+				clear(plaza.archX, side * plaza.archSpan / 2, SceneryLayout.RADIUS.pillar + 1.5, "an arch pillar")
+				-- each leaderboard faces the map's middle: 18 wide, its plinth 3.4 deep behind it
+				local bx, bz = plaza.boardX, side * plaza.boardZ
+				local length = math.sqrt(bx * bx + bz * bz)
+				local nx, nz = -bx / length, -bz / length
+				needs(segmentDistance(x, z, bx, bz, -nz, nx, 10) >= 3.5, index, "clear of a leaderboard")
+			end
+			local news = layout.newsBoard
+			needs(
+				segmentDistance(x, z, news.x, news.z, -math.sin(math.rad(news.yaw)), math.cos(math.rad(news.yaw)), 7)
+					>= 2.5,
+				index,
+				"clear of the What's New board"
+			)
+			clear(MAP.lobby.x, MAP.lobby.z, 5, "the lobby spawn")
+			for _, tree in layout.trees do
+				if not tree.outside then
+					-- any map's flora on that spot, at its scale
+					clear(tree.x, tree.z, widest * tree.scale + 1.5, "a tree spot's flora")
+				end
+			end
+			for _, prop in seasonal do
+				clear(prop.x, prop.z, 6 * prop.scale, `a seasonal {prop.kind}`)
+			end
+		end
+		T.expect(table.concat(problems, ", ")).toBe("")
+	end)
+
+	T.it("says where every hiding place is", function()
+		local text = (Theme.text :: any) :: { [string]: string }
+		for _, spot in Drops.treasure.spots do
+			T.expect(type(text[spot.where])).toBe("string")
+			local line = string.gsub(text.treasureHidden, "{where}", text[spot.where])
+			T.expect(#line).toBeAtMost(80)
+		end
+	end)
+end)
+
 T.describe("DropRules.validate", function()
 	local function broken(edit: (config: any) -> ()): number
 		local config = copy(Drops)
@@ -339,9 +557,36 @@ T.describe("DropRules.validate", function()
 		end)).toBe(1)
 	end)
 
+	T.it("refuses broken golden forks", function()
+		T.expect(broken(function(config)
+			config.treasure.revealSeconds = config.treasure.lifetimeSeconds
+		end)).toBe(1)
+		T.expect(broken(function(config)
+			config.treasure.prizes[1].reward = { kind = "creature", luck = 3 }
+		end)).toBe(1)
+		T.expect(broken(function(config)
+			config.treasure.prizes[2].reward.count = 50
+		end)).toBe(1)
+		T.expect(broken(function(config)
+			for _, prize in config.treasure.prizes do
+				prize.weight = 0
+			end
+		end)).toBe(1)
+		T.expect(broken(function(config)
+			config.treasure.spots[1] = { x = 10, z = 0, where = "treasureWhereBench" } -- on the belt
+		end)).toBe(1)
+		T.expect(broken(function(config)
+			config.treasure.spots = { config.treasure.spots[1] }
+		end)).toBe(1)
+		local config = copy(Drops)
+		config.treasure.spots[1].where = "treasureWhereNowhere"
+		T.expect(#DropRules.validate(config, WALKWAY, (Theme.text :: any) :: { [string]: string })).toBe(1)
+	end)
+
 	T.it("checks a modifier's drops", function()
 		T.expect(#DropRules.dropsProblems({ kind = "crate", firstSeconds = 10, everySeconds = 75 }, 300, "x")).toBe(0)
 		T.expect(#DropRules.dropsProblems({ kind = "runaway", firstSeconds = 6, everySeconds = 50 }, 300, "x")).toBe(0)
+		T.expect(#DropRules.dropsProblems({ kind = "treasure", firstSeconds = 6, everySeconds = 42 }, 300, "x")).toBe(0)
 		T.expect(#DropRules.dropsProblems({ kind = "pinata" :: any, firstSeconds = 10, everySeconds = 75 }, 300, "x"))
 			.toBe(1)
 		T.expect(#DropRules.dropsProblems({ kind = "coins", firstSeconds = 400, everySeconds = 75 }, 300, "x")).toBe(1)

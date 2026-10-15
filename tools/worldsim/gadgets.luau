@@ -10,8 +10,8 @@
 	strict; a cheater at the same speed without a soda is caught) and its cooldown, the soda under Sugar Rush (the cap),
 	Banana Peels (refused outside your base, the owner never slips, a thief carrying your Snackling drops it and it
 	goes home, a shield doesn't help, a new one replaces it and keeps its button's ring, it expires), the Bubble Shield
-	against tags, the Snack Magnet from across the map and its cooldown, and gadgets kept through a rebirth. It fails
-	on any error, any unexpected warning, or any check.
+	against tags, the Snack Magnet from across the map and its cooldown, Gadget Frenzy's shorter recharges (and their
+	floors), and gadgets kept through a rebirth. It fails on any error, any unexpected warning, or any check.
 
 	Alice (plot 1) is the owner. Bob joins fifth and gets plot 5, straight across the belt from hers.
 ]]
@@ -495,6 +495,48 @@ local function scenario()
 	use(dan, "magnet")
 	check(d.gadgets.readyAt.magnet == nil, "with nothing to collect it isn't used up")
 	check(lastToast(DAN) == Theme.text.magnetEmpty, "and says so")
+
+	-- Gadget Frenzy: recharges halved, never under the fairness floors; one already recharging catches up -------------
+	use(bob, "shield")
+	local shieldUsed = Sim.now
+	check(near(b.gadgets.readyAt.shield, shieldUsed + SHIELD.cooldownSeconds), "a shield recharges in its own time")
+	wait(10)
+	chat(alice, "/mod gadgetFrenzy")
+	task.wait(0.2)
+	local left = SHIELD.cooldownSeconds - 10
+	check(
+		near(b.gadgets.readyAt.shield, shieldUsed + 10 + left / 2),
+		`Gadget Frenzy: a recharge already running finishes twice as fast ({b.gadgets.readyAt.shield - Sim.now} s left)`
+	)
+	task.wait(0.3) -- the next state update
+	local frenzyStates = Sim.received(BOB, "StateUpdate")
+	local frenzyView = frenzyStates[#frenzyStates][1].gadgets
+	check(
+		near(frenzyView.readyAt.shield, b.gadgets.readyAt.shield) and near(frenzyView.usedAt.shield, shieldUsed),
+		"and his button is told (its disc runs from when he used it)"
+	)
+	use(bob, "soda")
+	check(
+		near(b.gadgets.readyAt.soda - Sim.now, 3 * SODA.durationSeconds),
+		`a soda used now recharges in {3 * SODA.durationSeconds} s, not {SODA.cooldownSeconds / 2}: on a third of the time at most`
+	)
+	check(
+		near(humanoid(bob).WalkSpeed, Gameplay.walkSpeed * SODA.speedMultiplier),
+		"and runs exactly as fast as ever (the speed caps are untouched)"
+	)
+	use(dan, "shield")
+	local danUsed = Sim.now
+	check(
+		near(d.gadgets.readyAt.shield - danUsed, SHIELD.cooldownSeconds / 2),
+		"a shield used now recharges in half the time"
+	)
+	check(near(d.gadgets.shieldUntil - danUsed, SHIELD.durationSeconds), "and lasts just as long as ever")
+	chat(alice, "/mod off")
+	task.wait(0.2)
+	check(
+		near(d.gadgets.readyAt.shield - danUsed, SHIELD.cooldownSeconds / 2),
+		"when it ends, recharges keep whatever they had left"
+	)
 
 	-- Kept through a rebirth -----------------------------------------------------------------------------------------
 	chat(alice, "/cash 30000000")

@@ -39,6 +39,9 @@ Sim.isStudio = true
 Sim.virtualClock = false
 -- Game passes each fake player owns: Sim.ownedPasses[userId][passId] = true (nobody owns any by default).
 Sim.ownedPasses = {} :: { [number]: { [number]: boolean } }
+-- Roblox friendships between fake players, by "<lower UserId>:<higher UserId>" (nobody is friends by default):
+-- Player:IsFriendsWithAsync answers from it.
+Sim.friendships = {} :: { [string]: boolean }
 -- PolicyService answers per fake player: Sim.policies[userId] = the policy table, or "error" for a failed lookup.
 -- Default: nothing restricted.
 Sim.policies = {} :: { [number]: any }
@@ -485,6 +488,10 @@ function Players.GetPlayerByUserId(_self: any, userId: number): any
 	end
 	return nil
 end
+roblox.implementMethod("Player", "IsFriendsWithAsync", function(self: any, userId: number): boolean
+	local a, b = self.UserId, userId
+	return Sim.friendships[`{math.min(a, b)}:{math.max(a, b)}`] == true
+end)
 function Players.GetFriendsAsync(_self: any, _userId: number): any
 	error("Players.GetFriendsAsync is not available offline")
 end
