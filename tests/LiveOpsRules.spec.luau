@@ -176,6 +176,54 @@ T.describe("LiveOpsRules shipped Halloween 2026 events", function()
 	end)
 end)
 
+T.describe("LiveOpsRules shipped Harvest Feast 2026 events", function()
+	local harvest = findShipped("Harvest2026")
+	local luck = findShipped("HarvestLuck2026")
+	local all = LiveOps.events
+
+	T.it("runs Fri 20 Nov 17:00 UTC to Mon 30 Nov 08:00 UTC, with a 2x luck feast weekend inside it", function()
+		T.expect(harvest.startsAt).toBe(utc(2026, 11, 20, 17, 0))
+		T.expect(harvest.endsAt).toBe(utc(2026, 11, 30, 8, 0))
+		T.expect(luck.startsAt).toBe(utc(2026, 11, 27, 17, 0))
+		T.expect(luck.endsAt).toBe(utc(2026, 11, 29, 23, 59))
+		T.expect(luck.luckMultiplier).toBe(2)
+		T.expect(luck.startsAt).toBeGreaterThan(harvest.startsAt)
+		T.expect(luck.endsAt).toBeLessThan(harvest.endsAt)
+		T.expect(harvest.luckMultiplier or 1).toBe(1)
+		T.expect(harvest.cashMultiplier or 1).toBe(1)
+		-- in the empty weeks between Halloween and Winter: one seasonal theme at a time
+		T.expect(harvest.startsAt).toBeGreaterThan(findShipped("Halloween2026").endsAt)
+		T.expect(harvest.endsAt).toBeLessThan(findShipped("Winter2026").startsAt)
+	end)
+
+	T.it("switches on and off by date alone, with 2x luck on the feast weekend", function()
+		T.expect(LiveOpsRules.activeEventIds(all, harvest.startsAt - 1).Harvest2026).toBeNil()
+		T.expect(LiveOpsRules.activeEventIds(all, harvest.startsAt).Harvest2026).toBe(true)
+		T.expect(LiveOpsRules.activeEventIds(all, harvest.endsAt - 1).Harvest2026).toBe(true)
+		T.expect(LiveOpsRules.activeEventIds(all, harvest.endsAt).Harvest2026).toBeNil()
+		-- the event alone in its first week (US Thanksgiving is Thu 26 Nov): no luck yet
+		local thanksgiving = utc(2026, 11, 26, 18, 0)
+		T.expect(LiveOpsRules.activeEventIds(all, thanksgiving)).toEqual({ Harvest2026 = true })
+		T.expect(LiveOpsRules.luckMultiplier(all, {}, thanksgiving, LiveOps.limits)).toBe(1)
+		local saturday = utc(2026, 11, 28, 12, 0)
+		T.expect(LiveOpsRules.activeEventIds(all, saturday)).toEqual({ Harvest2026 = true, HarvestLuck2026 = true })
+		T.expect(LiveOpsRules.luckMultiplier(all, {}, saturday, LiveOps.limits)).toBe(2)
+		T.expect(LiveOpsRules.luckChangesAt(all, {}, saturday, LiveOps.limits)).toBe(luck.endsAt)
+		T.expect(LiveOpsRules.luckMultiplier(all, {}, luck.endsAt, LiveOps.limits)).toBe(1)
+		T.expect(LiveOpsRules.cashMultiplier(all, saturday, LiveOps.limits)).toBe(1)
+	end)
+
+	T.it("shows the Harvest Feast banner with its countdown title, the luck weekend included", function()
+		for _, at in { harvest.startsAt, utc(2026, 11, 28, 12, 0), harvest.endsAt - 1 } do
+			local banner = LiveOpsRules.bannerEvent(all, at) :: LiveOpsRules.EventDef
+			T.expect(banner.id).toBe("Harvest2026")
+			T.expect(banner.title).toBe("Harvest Feast")
+		end
+		T.expect(LiveOpsRules.bannerEvent(all, harvest.endsAt)).toBeNil()
+		T.expect(luck.bannerText).toBeNil() -- the HUD's luck pill counts the weekend down under the banner
+	end)
+end)
+
 T.describe("LiveOpsRules shipped Winter 2026 events", function()
 	local winter = findShipped("Winter2026")
 	local christmasLuck = findShipped("WinterLuck2026")

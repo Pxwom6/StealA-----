@@ -540,6 +540,172 @@ T.describe("SeasonRules.layout (Easter on the real map)", function()
 	end)
 end)
 
+T.describe("SeasonRules.layout (Harvest Feast on the real map)", function()
+	local map, rects = realMap()
+	local harvest = theme("Harvest2026")
+	local d = harvest.decorations
+	local props = SeasonRules.layout(d, harvest.palette, map)
+	local counts = countKinds(props)
+	local function apart(a: SeasonRules.Prop, b: SeasonRules.Prop): number
+		return math.sqrt((a.x - b.x) ^ 2 + (a.y - b.y) ^ 2 + (a.z - b.z) ^ 2)
+	end
+
+	T.it("is switched on by Harvest2026 and drops autumn leaves", function()
+		T.expect((SeasonRules.activeTheme(Seasons, { Harvest2026 = true, HarvestLuck2026 = true }))).toBe("harvest")
+		T.expect(harvest.weather).toBe("leaves")
+	end)
+	T.it("stays within the part budget", function()
+		T.expect(SeasonRules.partCount(props)).toBeAtMost(Seasons.maxParts)
+		T.expect(SeasonRules.partCount(props)).toBe(386)
+	end)
+	T.it("places the configured number of each prop, and nothing from the other seasons", function()
+		T.expect(counts.pumpkin).toBe((d.pumpkinsPerPlot :: number) * MAP.plotCount)
+		T.expect(counts.hayBale).toBe((d.hayBalesPerPlot :: number) * MAP.plotCount)
+		T.expect(counts.bulb).toBe((d.bulbsPerPlot :: number) * MAP.plotCount)
+		T.expect(counts.lamp).toBe(2 * (MAP.plotsPerSide - 1))
+		T.expect(counts.scarecrow).toBe(2 * (MAP.plotsPerSide - 1))
+		T.expect(counts.cornucopia).toBe(2 * (d.beltCornucopiasPerSide :: number))
+		T.expect(counts.cornStalk).toBe(d.cornStalks)
+		for _, kind in
+			{
+				"present",
+				"tree",
+				"snowman",
+				"snowflake",
+				"snowPile",
+				"bat",
+				"ghost",
+				"rosePot",
+				"heartBalloon",
+				"giantHeart",
+				"easterEgg",
+				"chocolateBunny",
+				"blossomTree",
+				"butterfly",
+			}
+		do
+			T.expect(counts[kind]).toBeNil()
+		end
+	end)
+	T.it("never puts anything inside a plot, on the belt or on the lobby spawn", function()
+		expectClearOfGameplay(props, rects)
+	end)
+	T.it("carves no faces into its pumpkins: without a face colour they are plain harvest ones", function()
+		T.expect(harvest.palette.pumpkinFace).toBeNil()
+		local paletteKeys = SeasonRules.PALETTE_KEYS :: { [any]: { string } }
+		T.expect(table.find(paletteKeys.pumpkin, "pumpkinFace")).toBeNil()
+		-- Halloween's keep their glowing faces
+		T.expect(theme().palette.pumpkinFace ~= nil).toBe(true)
+	end)
+	T.it("sets pumpkins beside the entrances and hay bales beyond them, looking out at the walkway", function()
+		for _, prop in props do
+			if prop.kind == "pumpkin" or prop.kind == "hayBale" then
+				T.expect(math.abs(prop.z)).toBeLessThan(MAP.walkwayWidth)
+				T.expect(math.abs(prop.z)).toBeGreaterThan(MAP.walkwayWidth - 3)
+				T.expect(prop.faceZ * prop.z).toBeLessThan(0)
+				T.expect(math.abs(prop.faceZ)).toBeGreaterThan(0.98) -- bales a little crooked, never sideways
+			end
+		end
+		-- a bale (3.4 studs long) never touches a pumpkin (2.8 across)
+		for _, bale in props do
+			if bale.kind == "hayBale" then
+				for _, pumpkin in props do
+					if pumpkin.kind == "pumpkin" then
+						T.expect(apart(bale, pumpkin)).toBeGreaterThan(1.7 + 1.4 + 0.5)
+					end
+				end
+			end
+		end
+	end)
+	T.it("stands the scarecrows in the grass between bases, their arms clear of the walls", function()
+		for _, prop in props do
+			if prop.kind == "scarecrow" then
+				T.expect(math.abs(prop.z)).toBeGreaterThan(MAP.walkwayWidth + 3)
+				T.expect(prop.faceZ * prop.z).toBeLessThan(0) -- looking out at the walkway
+				for _, rect in rects do
+					if prop.z > rect.minZ and prop.z < rect.maxZ then
+						-- its straw hands reach 3.2 studs out at scale 1
+						local gap = math.min(math.abs(prop.x - rect.minX), math.abs(prop.x - rect.maxX))
+						T.expect(gap).toBeGreaterThan(3.2 * prop.scale + 1)
+					end
+				end
+			end
+		end
+	end)
+	T.it("lays cornucopias along both belt rails, spilling the harvest towards the walkway", function()
+		for _, prop in props do
+			if prop.kind == "cornucopia" then
+				T.expect(math.abs(prop.z)).toBeLessThan(MAP.walkwayWidth / 2)
+				T.expect(prop.faceZ * prop.z).toBeGreaterThan(0)
+				T.expect(prop.faceX).toBe(0)
+				-- its woven lip is 2.2 studs across at scale 1: the belt side stays clear of the belt
+				T.expect(math.abs(prop.z) - 1.11 * prop.scale).toBeGreaterThan(Gameplay.belt.width / 2 + 0.5)
+			end
+		end
+	end)
+	T.it("stands the giant corn stalks past the belt ends, clear of the factory and the chute", function()
+		for _, prop in props do
+			if prop.kind == "cornStalk" then
+				T.expect(math.abs(prop.x)).toBeGreaterThan(Gameplay.belt.length / 2)
+				T.expect(prop.y).toBe(map.groundY)
+				T.expect(prop.faceX * prop.x).toBeLessThan(0) -- looking back at the belt
+				-- its leaves reach 3.55 studs out at scale 1: the nearest stays clear of the factory intake and the
+				-- chute (|z| up to 7)
+				T.expect(math.abs(prop.z) - 3.55 * prop.scale).toBeGreaterThan(7)
+			end
+		end
+	end)
+	T.it("never stacks two props on the same spot", function()
+		for i, a in props do
+			for j = i + 1, #props do
+				local b = props[j]
+				if apart(a, b) < 1.5 then
+					error(`{a.kind} and {b.kind} share the spot ({a.x}, {a.y}, {a.z})`)
+				end
+			end
+		end
+	end)
+	T.it("shares the spots with every other prop without overlapping", function()
+		local everything = table.clone(d)
+		everything.presentsPerPlot = 1
+		everything.rosesPerPlot = 1
+		everything.eggsPerPlot = 1
+		everything.snowPilesPerPlot = 2
+		everything.beltPumpkinsPerSide = 1
+		everything.beltPresentsPerSide = 1
+		everything.beltRosesPerSide = 1
+		everything.beltEggsPerSide = 1
+		everything.treesBetweenPlots = true
+		everything.blossomTreesBetweenPlots = true
+		everything.snowmen = 4
+		everything.giantHearts = 4
+		everything.chocolateBunnies = 4
+		everything.ghosts = 4
+		everything.bats = 6
+		everything.snowflakes = 8
+		everything.heartBalloons = 10
+		everything.butterflies = 12
+		local mixed = SeasonRules.layout(everything, harvest.palette, map)
+		local mixedCounts = countKinds(mixed)
+		for _, kind in { "pumpkin", "hayBale", "scarecrow", "cornucopia", "cornStalk" } do
+			T.expect(mixedCounts[kind] >= counts[kind]).toBe(true)
+		end
+		T.expect(mixedCounts.hayBale).toBe(counts.hayBale)
+		T.expect(mixedCounts.cornStalk).toBe(counts.cornStalk)
+		for i, a in mixed do
+			for j = i + 1, #mixed do
+				T.expect(apart(a, mixed[j])).toBeGreaterThan(1.5)
+			end
+		end
+		-- with decorated trees and blossom trees there too, the scarecrows stand behind both
+		for _, prop in mixed do
+			if prop.kind == "scarecrow" then
+				T.expect(math.abs(prop.z)).toBeGreaterThan(MAP.walkwayWidth + 22)
+			end
+		end
+	end)
+end)
+
 T.describe("SeasonRules.validate", function()
 	local map = realMap()
 	T.it("accepts the shipped config", function()
@@ -610,8 +776,9 @@ T.describe("SeasonRules.validate", function()
 			t.palette.ornaments = {} -- an empty list counts as missing
 		end)).toBe(1)
 		T.expect(#problemsWith(function(t)
-			t.decorations.beltPumpkinsPerSide = 1 -- pumpkins now, without pumpkin, pumpkinFace and stem colours
-		end)).toBe(3)
+			-- pumpkins now, without pumpkin and stem colours (a face colour is optional: without one they are plain)
+			t.decorations.beltPumpkinsPerSide = 1
+		end)).toBe(2)
 		T.expect(#problemsWith(function(t)
 			(t.palette :: any).presnts = { "#FF0000" } -- a typo is not a palette colour
 		end)).toBe(1)

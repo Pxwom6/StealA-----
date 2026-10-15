@@ -1784,6 +1784,86 @@ local CreatureLooks: { [string]: CreatureLook } = {
 			{ kind = "swirl", on = "body", colors = { "#F3E8FF" }, n = 2 },
 		},
 	},
+
+	-- Harvest Feast 2026 (recipe fallbacks: the polished models are in Config/CreatureParts)
+	cranberry_crane = {
+		size = 2.4,
+		plan = "biped",
+		arms = false,
+		legs = 0.5,
+		neck = 0.3,
+		body = { skin = "can", color = "#B5123A", color2 = "#D9325A", w = 0.68, h = 0.6 },
+		head = { skin = "round", color = "#C41E46", w = 0.5, h = 0.48 },
+		face = { eyes = "big", mouth = "none", cheeks = "#FF8FA8" },
+		limbs = "#F2C14E",
+		features = {
+			{ kind = "snout", style = "beak", color = "#F2C14E" },
+			{ kind = "wings", style = "feather", color = "#FFF4F0", color2 = "#8E0A24" },
+			{ kind = "crest", color = "#FF3B5C" },
+			{ kind = "tail", style = "fluffy", color = "#FFF4F0" },
+		},
+		toppings = {
+			{ kind = "balls", on = "head", colors = { "#E8203F", "#8E0A24" }, n = 3, spread = 0.5 },
+		},
+	},
+	pecan_pie_porcupine = {
+		size = 2.5,
+		plan = "blob",
+		feet = true,
+		body = { skin = "cup", color = "#6B3416", color2 = "#E3A55A", w = 0.9, h = 0.72, d = 0.9 },
+		face = { eyes = "big", mouth = "smile", cheeks = "#FF9C8A", nose = "#3A1E10" },
+		limbs = "#A8692E",
+		features = {
+			{ kind = "spikes", color = "#8A4A1E" },
+			{ kind = "ears", style = "round", color = "#C98A4A", scale = 0.6 },
+		},
+		toppings = {
+			{ kind = "seeds", on = "body", colors = { "#9A5424", "#B8682E" }, n = 8, spread = 0.7 },
+		},
+	},
+	sweet_potato_sloth = {
+		size = 2.6,
+		plan = "biped",
+		arms = true,
+		body = { skin = "round", color = "#E07A35", w = 0.82, h = 0.8 },
+		head = { skin = "round", color = "#F0A050", w = 0.7, h = 0.6 },
+		face = { eyes = "sleepy", mouth = "smile", cheeks = "#FF9C8A", patches = "#6A3A22" },
+		limbs = "#8A4A5A",
+		features = {
+			{ kind = "claws", color = "#F5E6C8" },
+			{ kind = "belly", color = "#F6B26B" },
+		},
+		toppings = {
+			{ kind = "balls", on = "head", colors = { "#FFF6E8", "#F2C27A" }, n = 4, spread = 0.6 },
+			{ kind = "pat", on = "body", colors = { "#FFE680" } },
+		},
+	},
+	cornucopia_kirin = {
+		size = 2.6,
+		plan = "quadruped",
+		legs = 0.32,
+		neck = 0.22,
+		body = { skin = "round", color = "#C8893A", w = 0.72, h = 0.58, d = 1, material = "Sand" },
+		head = { skin = "round", color = "#E8B860", w = 0.54, h = 0.5, d = 0.66 },
+		face = { eyes = "big", mouth = "smile", cheeks = "#FF9C8A" },
+		limbs = "#A86A2A",
+		features = {
+			{ kind = "snout", style = "dog", color = "#F5D48A", color2 = "#6A3A1A" },
+			{ kind = "horns", style = "unicorn", color = "#FFD84A" },
+			{ kind = "mane", color = "#E8642A" },
+			{ kind = "tail", style = "lion", color = "#C8893A", color2 = "#E8642A" },
+		},
+		toppings = {
+			{ kind = "band", on = "body", colors = { "#9A6224" } },
+			{
+				kind = "balls",
+				on = "body",
+				colors = { "#D7262E", "#7A3A9A", "#F28C28", "#9ACD32" },
+				n = 5,
+				spread = 0.7,
+			},
+		},
+	},
 }
 
 return CreatureLooks

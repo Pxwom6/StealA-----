@@ -7,8 +7,8 @@
 	in-memory store, then plays a short session with two fake players through the real remotes and chat commands:
 	join, buy from the belt, every server modifier's effect where it applies (belt prices, speed, locks, steals),
 	weather (the sky and the mutation it unlocks), drops, codes, gifts and the Lucky Spin, achievements, a base lock, a
-	map change and a map vote, a seasonal event switched on and off (Winter's decorations, lighting and mutation), and
-	leaving with the save written. It fails on any error, any
+	map change and a map vote, the seasonal events switched on and off (each one's decorations, lighting and mutation),
+	and leaving with the save written. It fails on any error, any
 	unexpected warning, or any check below. Server time only moves when the test moves it (Sim.advance).
 ]]
 
@@ -651,6 +651,41 @@ local function scenario()
 	task.wait(1.2)
 	check(workspace:FindFirstChild("SeasonDecor") == nil, "/event off takes the eggs and bunnies away")
 	check(BeltService.mutationConditions().Easter2027 == nil, "and the Pastel mutation with them")
+
+	Sim.chat(alice, "/event Harvest2026 5")
+	task.wait(1.2)
+	check(workspace:GetAttribute("SeasonTheme") == "harvest", "/event Harvest2026 switches the harvest theme on")
+	decorParts, inTheWay, byName = decorCounts()
+	-- 16 plain pumpkins and 16 hay bales by the bases, 6 cornucopias at the belt, 48 bulbs, 6 lanterns, 6 scarecrows,
+	-- 4 giant corn stalks: 386 parts (tests/SeasonRules.spec.luau pins the same layout)
+	check(decorParts == 386, `the harvest decorations are built ({decorParts} parts)`)
+	check(
+		byName.Pumpkin == 16
+			and byName.PumpkinLeaf == 16
+			and byName.HayBale == 16
+			and byName.Twine == 32
+			and byName.SackHead == 6
+			and byName.Smile == 12
+			and byName.Wicker == 18
+			and byName.Produce == 24
+			and byName.CornStalk == 4
+			and byName.CornLeaf == 16,
+		"pumpkins, hay bales, scarecrows, cornucopias and corn stalks, each built from the parts the budget counts"
+	)
+	check(byName.Eye == nil and byName.Mouth == nil, "the harvest pumpkins are plain, not carved")
+	check(inTheWay == 0, "and none of them gets in anyone's way")
+	local harvestLighting = Seasons.themes.harvest.lighting
+	check(math.abs(Lighting.ClockTime - harvestLighting.clockTime) < 1e-3, "a golden late afternoon lights the map")
+	Sim.chat(alice, "/spawn cornucopia_kirin maple")
+	task.wait(0.1)
+	local maple = lastBeltItem("cornucopia_kirin")
+	check(maple ~= nil and maple.variant == "maple", "a Maple Cornucopia Kirin rides the belt")
+	check(BeltService.mutationConditions().Harvest2026 == true, "Maple Snacklings can roll while it runs")
+	Sim.chat(alice, "/event off")
+	task.wait(1.2)
+	check(workspace:FindFirstChild("SeasonDecor") == nil, "/event off takes the pumpkins and scarecrows away")
+	check(BeltService.mutationConditions().Harvest2026 == nil, "and the Maple mutation with them")
+	check(math.abs(Lighting.ClockTime - mapSky.clockTime) < 1e-3, "and the map's own sky comes back")
 
 	-- Leaving -------------------------------------------------------------------------------------------------------------
 	local owned = #aliceSession.data.creatures

@@ -76,6 +76,7 @@ Studio test purchases, etc.).
 | `lune run tools/worldsim/cosmetics.luau` | Titles, base skins and What's New through the real remotes on the offline server (CI) |
 | `lune run tools/worldsim/store.luau` | Auto Collect, the Lucky Spin packs and the Starter Pack through the real receipt path on the offline server (CI) |
 | `lune run tools/worldsim/exportSkins.luau [mapId] [out.json] [--vip]` | Dump a map with a different base skin on every base, for a 3D preview |
+| `lune run tools/worldsim/exportSeason.luau <mapId> <eventId> [out.json]` | Dump a map with a seasonal event's theme on (decorations and lighting), for a 3D preview |
 | `rojo build -o build/sync.rbxl` then `lune run tools/syncTest.luau build/sync.rbxl` | Check the Studio sync script (`studio/SyncFromGitHub.luau`) offline |
 | `stylua src tests tools studio` | Format |
 | `selene src tests tools studio` | Lint |
@@ -225,19 +226,19 @@ publishes or listens in Studio). `/hostas owner` shows the owner's panel, `/host
 `/hostas admin` goes back (reopen Settings after each). Offline, `lune run tools/worldsim/host.luau` (in CI) plays every
 role and the cross-server messages with a MessagingService stand-in.
 
-### Seasonal events (Halloween 2026, Winter 2026, Valentine's 2027, Easter 2027 and future ones)
+### Seasonal events (Halloween 2026, Harvest Feast 2026, Winter 2026, Valentine's 2027, Easter 2027 and future ones)
 
 A seasonal event is one LiveOps event id that everything keys off, so it switches on and off by date with no code
 change:
 
-| Piece | Where | Halloween 2026 | Winter 2026 | Valentine's 2027 | Easter 2027 |
-| --- | --- | --- | --- | --- | --- |
-| Dates, HUD banner + countdown title, luck / cash | `events` in `src/shared/Config/LiveOps.luau` | `Halloween2026` (23 Oct–2 Nov), `HalloweenLuck2026` (2× luck, 30 Oct–1 Nov) | `Winter2026` (18 Dec–4 Jan), `WinterLuck2026` (2× luck, 24–26 Dec), `NewYearCash2026` (2× cash, 31 Dec–1 Jan) | `Valentine2027` (5–16 Feb), `ValentineLuck2027` (2× luck, 12–14 Feb) | `Easter2027` (19 Mar–6 Apr), `EasterLuck2027` (2× luck, Good Friday 26 Mar–Easter Monday 29 Mar) |
-| Event Snacklings | `eventId` in `src/shared/Config/Creatures.luau` | Candy Corn Cat, Pumpkin Pie Bat, Caramel Apple Ghoul, Jack-o'-Lantern Latte | Peppermint Puffin, Candy Cane Chameleon, Yule Log Yak, Spun Sugar Stag | Candy Heart Hamster, Cherry Cordial Kitten, Red Velvet Raccoon, Rose Petal Pegasus | Custard Chick, Hot Cross Bunny, Lemon Meringue Lamb, Jelly Bean Jackalope |
-| Event mutation | `eventId` in `src/shared/Config/Mutations.luau` | Haunted (2%, x3 income) | Festive (2%, x3 income: green knit + twinkling lights) | Sweetheart (2%, x3 income: candy red, glowing, floating hearts) | Pastel (2%, x3 income: washed soft pastel, a pale pink glow, pastel sparkles) |
-| Map decorations, lighting, weather | `eventThemes` / `themes` in `src/shared/Config/Seasons.luau` | `halloween`: pumpkins, string lights, lamps, bats, ghosts, dusk + light fog | `winter`: presents, decorated trees, string lights, snowmen, snowflakes, snowdrifts, a wintry late afternoon, snowfall | `valentine`: potted roses, heart balloons, giant hearts pierced by Cupid's arrows, string lights, rose-pink lamps, a rosy late afternoon, falling petals | `spring`: giant painted eggs, chocolate bunnies, blossom trees, butterflies, pastel string lights, lamps, a bright spring morning, falling blossom |
-| Music | `music.<theme id>` in `src/shared/Config/Sounds.luau` | "Hear, The Wind Blows" | "Festive Medley" | none yet (the lobby track) | none yet (the lobby track) |
-| Codes | `src/server/Codes.luau` | `SPOOKY26` | `JINGLE26`, `HAPPY2027` | `LOVE27` | `EGGHUNT27` |
+| Piece | Where | Halloween 2026 | Harvest Feast 2026 | Winter 2026 | Valentine's 2027 | Easter 2027 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Dates, HUD banner + countdown title, luck / cash | `events` in `src/shared/Config/LiveOps.luau` | `Halloween2026` (23 Oct–2 Nov), `HalloweenLuck2026` (2× luck, 30 Oct–1 Nov) | `Harvest2026` (20–30 Nov), `HarvestLuck2026` (2× luck, 27–29 Nov) | `Winter2026` (18 Dec–4 Jan), `WinterLuck2026` (2× luck, 24–26 Dec), `NewYearCash2026` (2× cash, 31 Dec–1 Jan) | `Valentine2027` (5–16 Feb), `ValentineLuck2027` (2× luck, 12–14 Feb) | `Easter2027` (19 Mar–6 Apr), `EasterLuck2027` (2× luck, Good Friday 26 Mar–Easter Monday 29 Mar) |
+| Event Snacklings | `eventId` in `src/shared/Config/Creatures.luau` | Candy Corn Cat, Pumpkin Pie Bat, Caramel Apple Ghoul, Jack-o'-Lantern Latte | Cranberry Crane, Pecan Pie Porcupine, Sweet Potato Sloth, Cornucopia Kirin | Peppermint Puffin, Candy Cane Chameleon, Yule Log Yak, Spun Sugar Stag | Candy Heart Hamster, Cherry Cordial Kitten, Red Velvet Raccoon, Rose Petal Pegasus | Custard Chick, Hot Cross Bunny, Lemon Meringue Lamb, Jelly Bean Jackalope |
+| Event mutation | `eventId` in `src/shared/Config/Mutations.luau` | Haunted (2%, x3 income) | Maple (2%, x3 income: a glossy amber maple-syrup glaze, falling maple leaves) | Festive (2%, x3 income: green knit + twinkling lights) | Sweetheart (2%, x3 income: candy red, glowing, floating hearts) | Pastel (2%, x3 income: washed soft pastel, a pale pink glow, pastel sparkles) |
+| Map decorations, lighting, weather | `eventThemes` / `themes` in `src/shared/Config/Seasons.luau` | `halloween`: pumpkins, string lights, lamps, bats, ghosts, dusk + light fog | `harvest`: plain pumpkins, hay bales, scarecrows, cornucopias on the belt rails, giant corn stalks, warm string lights, lanterns, a golden late afternoon, falling leaves | `winter`: presents, decorated trees, string lights, snowmen, snowflakes, snowdrifts, a wintry late afternoon, snowfall | `valentine`: potted roses, heart balloons, giant hearts pierced by Cupid's arrows, string lights, rose-pink lamps, a rosy late afternoon, falling petals | `spring`: giant painted eggs, chocolate bunnies, blossom trees, butterflies, pastel string lights, lamps, a bright spring morning, falling blossom |
+| Music | `music.<theme id>` in `src/shared/Config/Sounds.luau` | "Hear, The Wind Blows" | none yet (the lobby track) | "Festive Medley" | none yet (the lobby track) | none yet (the lobby track) |
+| Codes | `src/server/Codes.luau` | `SPOOKY26` | `FEAST26` | `JINGLE26`, `HAPPY2027` | `LOVE27` | `EGGHUNT27` |
 
 * **Change the dates:** edit `startsAt` / `endsAt` (Unix seconds, UTC; e.g. `date -u -d "2026-10-23 17:00" +%s`)
   in `LiveOps.luau` and publish. Running servers pick up the start and end on their own (checked every second): the
@@ -247,15 +248,19 @@ change:
   `Seasons.luau` (`Halloween2027 = "halloween"`), and give new event Snacklings that `eventId`. Owned 2026 Snacklings
   keep working; to bring a 2026 Snackling back, change its `eventId` to the new event (never its `id`).
 * **A new season:** add a theme to `Seasons.luau`: colours, lighting, optional weather, and how many of each prop
-  (any mix of pumpkins, presents, potted roses, painted eggs, string lights, lamps, trees, blossom trees, bats,
-  snowflakes, heart balloons, butterflies, ghosts, snowmen, giant hearts, chocolate bunnies and snowdrifts; CI checks
-  it stays under the part budget, away from plots and the belt, and that it has the colours its props need).
+  (any mix of pumpkins, carved with a `pumpkinFace` colour or plain without one, presents, potted roses, painted
+  eggs, hay bales, string lights, lamps, trees, blossom trees, scarecrows, bats, snowflakes, heart balloons,
+  butterflies, ghosts, cornucopias on the belt rails, snowmen, giant hearts, chocolate bunnies, giant corn stalks and
+  snowdrifts; CI checks it stays under the part budget, away from plots and the belt, and that it has the colours its
+  props need). `lune run tools/worldsim/exportSeason.luau meadow <eventId> out.json` writes a map with it on, for an
+  offline render.
   A new prop kind is laid out in `src/shared/Logic/SeasonRules.luau` and built in
   `src/server/Services/SeasonService.luau`.
 * New creature / mutation ids must be appended to the released lists in `tests/Config.spec.luau`; new event
   Snacklings also need a model (a recipe in `CreatureLooks.luau`, and optionally a polished model in
   `art/snackling-parts`). `lune run tools/simulate.luau Winter2026 WinterLuck2026 "Christmas luck"` shows an event's
-  balance effect (no arguments: Halloween; see BALANCE.md "Halloween", "Winter", "Valentine's" and "Easter").
+  balance effect (no arguments: Halloween; see BALANCE.md "Halloween", "Harvest Feast", "Winter", "Valentine's" and
+  "Easter").
 
 ### Map themes
 
@@ -323,14 +328,14 @@ already had progress when it shipped never see it. Steps finish only when the se
 Every Snackling is a 3D "living snack" built in code from plain Roblox parts (no meshes or asset ids).
 
 * **The roster:** 80 permanent Snacklings (13 Common, 13 Uncommon, 13 Rare, 12 Epic, 11 Legendary, 10 Mythic and 8
-  Secret) plus 16 event ones (four each for Halloween, Winter, Valentine's and Easter, Rare to Mythic). Prices, odds
-  and the share of each tier are in BALANCE.md ("The roster").
-* **Polished models:** all 96 have one. The first 64 were designed in Claude Design from the prompts in
+  Secret) plus 20 event ones (four each for Halloween, the Harvest Feast, Winter, Valentine's and Easter, Rare to
+  Mythic). Prices, odds and the share of each tier are in BALANCE.md ("The roster").
+* **Polished models:** all 100 have one. The first 64 were designed in Claude Design from the prompts in
   `art/snackling-parts/`; the four Winter 2026 Snacklings (`batch-4.json`), the four Valentine's 2027 ones
-  (`batch-5.json`), the four Easter 2027 ones (`batch-6.json`) and the 20 permanent ones added in batch 7
-  (`batch-7.json`, DECISIONS.md #50) were built by hand in the same format and checked from every side in an offline
-  3D preview, next to their tier's other models (`prompt-batch-4.md` to `prompt-batch-7.md` can redo them in Claude
-  Design). Imported with `lune run tools/importParts.luau`, which checks them, sizes them and writes
+  (`batch-5.json`), the four Easter 2027 ones (`batch-6.json`), the 20 permanent ones added in batch 7
+  (`batch-7.json`, DECISIONS.md #50) and the four Harvest Feast 2026 ones (`batch-8.json`, #53) were built by hand in
+  the same format and checked from every side in an offline 3D preview, next to their tier's other models
+  (`prompt-batch-4.md` to `prompt-batch-8.md` can redo them in Claude Design). Imported with `lune run tools/importParts.luau`, which checks them, sizes them and writes
   `src/shared/Config/CreatureParts.luau` (generated: edit a `batch-*.json` and re-run the tool). See DECISIONS.md #28.
 * **Recipes (the fallback):** a Snackling without a polished model builds from its recipe in
   `src/shared/Config/CreatureLooks.luau`, which picks a body plan (blob, biped, quadruped, swimmer, tentacled), the food its
@@ -400,8 +405,9 @@ load in Studio (October 2026):
 **Music** (APM Music, loops, crossfades on change, follows the player's Music setting):
 `music.lobby` = `1842203609` "Laugh To Learn" (59 s) everywhere; `music.halloween` = `1848232312` "Hear, The Wind
 Blows" while the Halloween theme is on; `music.winter` = `1836394584` "Festive Medley" (APM Christmas Classics
-Ensemble, 3:39) during Winter. Valentine's and Easter have no track of their own yet and keep the lobby track: paste
-a sweet one from the library into `music.valentine` or `music.spring` to give them one. Another seasonal theme gets music by adding a slot named after
+Ensemble, 3:39) during Winter. Valentine's, Easter and the Harvest Feast have no track of their own yet and keep the
+lobby track: paste a sweet (or cosy) one from the library into `music.valentine`, `music.spring` or `music.harvest`
+to give them one. Another seasonal theme gets music by adding a slot named after
 its theme id. A track that fails to load (removed or private) is skipped for the session, so a seasonal theme falls
 back to the lobby track.
 
@@ -476,9 +482,9 @@ to one try every 5 seconds.
 * **Codes ready to post:** `WELCOME` (2 minutes of income), `SNACKTIME` (a Golden Pizza Pup), `FOURTEENMAPS` (3
   minutes of income), `STORMCHASER` (an Electric Pretzel Pal), `TWENTYMAPS` (a Bubblegum Gummy Grub), `MOVIENIGHT`
   (a Buttered Popcorn Penguin), and the event codes, which only work while their event runs: `SPOOKY26` (a Haunted
-  Candy Corn Cat, 23 Oct-2 Nov), `JINGLE26` (a Festive Peppermint Puffin, 18 Dec-4 Jan), `HAPPY2027` (5 minutes of
-  income, 31 Dec-8 Jan), `LOVE27` (a Sweetheart Candy Heart Hamster, 5-16 Feb) and `EGGHUNT27` (a Pastel Custard
-  Chick, 19 Mar-6 Apr).
+  Candy Corn Cat, 23 Oct-2 Nov), `FEAST26` (a Maple Cranberry Crane, 20-30 Nov), `JINGLE26` (a Festive Peppermint
+  Puffin, 18 Dec-4 Jan), `HAPPY2027` (5 minutes of income, 31 Dec-8 Jan), `LOVE27` (a Sweetheart Candy Heart Hamster,
+  5-16 Feb) and `EGGHUNT27` (a Pastel Custard Chick, 19 Mar-6 Apr).
 
 ### Gadgets
 
@@ -642,4 +648,6 @@ snowmen, snowfall, Festive on the belt; `/spawn spun_sugar_stag festive`), `/eve
 `/event NewYearCash2026`, Valentine's: `/event Valentine2027 5` (roses, heart balloons, giant hearts, petals,
 Sweetheart on the belt; `/spawn rose_petal_pegasus sweetheart`), `/event ValentineLuck2027`, and Easter:
 `/event Easter2027 5` (painted eggs, chocolate bunnies, blossom trees, butterflies, blossom falling, Pastel on the belt;
-`/spawn jelly_bean_jackalope pastel`), `/event EasterLuck2027`.
+`/spawn jelly_bean_jackalope pastel`), `/event EasterLuck2027`, and the Harvest Feast: `/event Harvest2026 5` (plain
+pumpkins, hay bales, scarecrows, cornucopias, corn stalks, golden hour, falling leaves, Maple on the belt;
+`/spawn cornucopia_kirin maple`), `/event HarvestLuck2026`.

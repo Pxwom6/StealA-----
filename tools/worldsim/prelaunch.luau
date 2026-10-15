@@ -591,6 +591,29 @@ local function scenario()
 	task.wait(0.1)
 	check(#c.data.creatures == creatures + 1, "SPOOKY26 works once Halloween has started")
 
+	-- 6 (and the Harvest Feast). It comes on by date alone, with its decorations, and FEAST26 works from then -----------
+	Sim.advance(Codes.FEAST26.startsAt - 1 - Sim.now)
+	task.wait(1.2)
+	check(workspace:GetAttribute("SeasonTheme") == "", "Halloween's decorations came down when it ended")
+	Sim.fireServer(carol, "RedeemCode", "FEAST26")
+	task.wait(0.1)
+	check(c.data.flags.code_FEAST26 == nil, "FEAST26 gives nothing the second before the Harvest Feast")
+	Sim.advance(1)
+	task.wait(1.2)
+	check(
+		workspace:GetAttribute("SeasonTheme") == "harvest",
+		"the Harvest Feast decorations go up on 20 November by themselves"
+	)
+	check(workspace:GetAttribute("EventBannerId") == "Harvest2026", "and its banner shows")
+	creatures = #c.data.creatures
+	Sim.fireServer(carol, "RedeemCode", "FEAST26")
+	task.wait(0.1)
+	local gift = c.data.creatures[#c.data.creatures]
+	check(
+		#c.data.creatures == creatures + 1 and gift.id == "cranberry_crane" and gift.variant == "maple",
+		"FEAST26 gives a Maple Cranberry Crane once the Harvest Feast has started"
+	)
+
 	print(`  ({math.floor(Sim.now - OCTOBER_15_2026)} s of server time)`)
 end
 

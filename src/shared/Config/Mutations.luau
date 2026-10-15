@@ -16,7 +16,8 @@
 	                  mutations are rolled in, so append new ones with a higher order to keep existing rolls as they are
 	chance            probability per belt spawn, 0 < chance < 1; all chances together, event ones included, must stay
 	                  below 1 (CI keeps any one event's with the strongest map and modifier below 10%, every event's
-	                  together below 12%)
+	                  together below 20%, and Golden Hour's x3 of what can roll beside it below 50%; BALANCE.md
+	                  "Harvest Feast" has today's numbers)
 	incomeMultiplier  × the creature's base income (>= 1)
 	priceMultiplier   × the creature's belt price, rounded to a whole number (>= 1); sell value follows it
 	announce*         server-wide banner on spawn / buy / steal (in addition to the rarity's own flags)
@@ -708,6 +709,32 @@ local Mutations: { MutationDef } = {
 			particles = "drips",
 		},
 		mapTheme = "pancakes",
+	},
+
+	-- Harvest Feast 2026: a glossy amber maple-syrup glaze with a warm glow, and little maple leaves in red, orange and
+	-- gold tumbling off. Rolls only while LiveOps event "Harvest2026" runs; like the other event mutations, rarer than
+	-- Golden and stronger (order 36: rolled after every other one, so no existing roll changes). Opaque and leafy where
+	-- Pancake Peaks' Syrupy is see-through glass dripping syrup.
+	{
+		id = "maple",
+		displayName = "Maple",
+		color = "#E07B24",
+		order = 36,
+		chance = 0.02,
+		incomeMultiplier = 3,
+		priceMultiplier = 2,
+		announceOnSpawn = false,
+		announceOnBuy = false,
+		announceOnSteal = false,
+		look = {
+			material = "SmoothPlastic",
+			tint = "#D9741C",
+			tintStrength = 0.76,
+			reflectance = 0.34,
+			glow = "#FFB347",
+			particles = "maple",
+		},
+		eventId = "Harvest2026",
 	},
 }
 

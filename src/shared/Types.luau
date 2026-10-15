@@ -296,6 +296,11 @@ export type SeasonDecorations = {
 	blossomTreesBetweenPlots: boolean?, -- blossom trees in the gaps between plots (behind any decorated trees)
 	butterflies: number?, -- hovering over the walkway, lower than the balloons
 	chocolateBunnies: number?, -- big chocolate bunnies at the belt ends (after any snowmen and giant hearts)
+	hayBalesPerPlot: number?, -- hay bales beside each plot entrance (after any pumpkins, presents, roses and eggs)
+	scarecrowsBetweenPlots: boolean?, -- scarecrows in the gaps between plots (behind any trees and blossom trees)
+	beltCornucopiasPerSide: number?, -- small cornucopias along both belt rails (after any pumpkins, presents, roses
+	-- and eggs)
+	cornStalks: number?, -- giant corn stalks at the belt ends (after any snowmen, giant hearts and bunnies)
 }
 
 -- Colours of the props a theme uses ("#RRGGBB"). Only the keys of the props a theme places are needed
@@ -303,7 +308,7 @@ export type SeasonDecorations = {
 export type SeasonPalette = {
 	bulbs: { string }, -- string lights (may be empty when the theme has none)
 	pumpkin: string?,
-	pumpkinFace: string?, -- glowing eyes / mouth (and their light)
+	pumpkinFace: string?, -- carved, glowing eyes / mouth (and their light); none: plain harvest pumpkins with a leaf
 	stem: string?,
 	lampPost: string?,
 	lampLight: string?,
@@ -336,6 +341,15 @@ export type SeasonPalette = {
 	butterflyBody: string?,
 	chocolate: string?, -- the chocolate bunnies
 	bunnyBow: string?, -- their ribbon bows
+	straw: string?, -- hay bales and the scarecrows' straw
+	twine: string?, -- the twine round hay bales
+	shirt: string?, -- the scarecrows' shirts
+	overalls: string?, -- their overalls
+	burlap: string?, -- their sack heads
+	wicker: string?, -- the cornucopias' woven horns
+	produce: { string }?, -- what spills out of them, in order: a pumpkin, an apple, grapes, an ear of corn
+	stalks: string?, -- the giant corn stalks and their leaves
+	corn: string?, -- their ears of corn
 }
 
 export type SeasonTheme = {

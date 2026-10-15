@@ -34,10 +34,10 @@ Spawn every 2.5 s → 1,440 rolls per server-hour.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Common | 13 | 56% | 806 | 47.9% | $25 - $200 | $1 - $6/s | 25s - 33s |
 | Uncommon | 13 | 27% | 389 | 23.1% | $500 - $1.5K | $12 - $30/s | 41s - 50s |
-| Rare | 13 (+4 event) | 11.5% | 166 | 19.7% | $4.5K - $12.5K | $65 - $160/s | 1m 9s - 1m 18s |
-| Epic | 12 (+4 event) | 4.2% | 60.5 | 7.18% | $60K - $150K | $400 - $950/s | 2m 30s - 2m 37s |
-| Legendary | 11 (+4 event) | 1.1% | 15.8 | 1.88% | $1.4M - $3.4M | $2.8K - $6.5K/s | 8m 20s - 8m 43s |
-| Mythic | 10 (+4 event) | 0.18% | 2.6 | 0.308% | $50M - $85M | $35K - $56K/s | 23m 48s - 25m 17s |
+| Rare | 13 (+5 event) | 11.5% | 166 | 19.7% | $4.5K - $12.5K | $65 - $160/s | 1m 9s - 1m 18s |
+| Epic | 12 (+5 event) | 4.2% | 60.5 | 7.18% | $60K - $150K | $400 - $950/s | 2m 30s - 2m 37s |
+| Legendary | 11 (+5 event) | 1.1% | 15.8 | 1.88% | $1.4M - $3.4M | $2.8K - $6.5K/s | 8m 20s - 8m 43s |
+| Mythic | 10 (+5 event) | 0.18% | 2.6 | 0.308% | $50M - $85M | $35K - $56K/s | 23m 48s - 25m 17s |
 | Secret | 8 | 0.02% | 0.3 | 0.034% | $1.8B - $3.2B | $360K - $620K/s | 1h 23m - 1h 26m |
 
 "With 2× luck" is the Server Luck product (or a `/luck 2` admin boost): Rare-and-up weights double, so Commons
@@ -77,8 +77,8 @@ Secret over a few days — and can shortcut any of it by stealing. A 2× Cash ow
 
 ## The roster (80 Snacklings)
 
-Each tier has 8-13 regular Snacklings, plus four limited-time event Snacklings (Halloween, Winter, Valentine's and
-Easter) in each tier from Rare to Mythic (see the event sections below). Rules that keep a bigger roster from changing
+Each tier has 8-13 regular Snacklings, plus five limited-time event Snacklings (Halloween, the Harvest Feast, Winter,
+Valentine's and Easter) in each tier from Rare to Mythic (see the event sections below). Rules that keep a bigger roster from changing
 the chase:
 
 * **Tier odds never change.** A new Snackling shares its tier's spawns. Each tier's regular `beltWeight`s add up to
@@ -241,8 +241,10 @@ no modifier): 5.15% of spawns (74.2 per server-hour). Expected value of one spaw
 * **Event-only mutations** (with an `eventId`) roll only while that LiveOps event runs.
 * **The worst case stays small.** Only one map and one modifier are ever live, so CI checks any one seasonal event
   plus the strongest map and modifier together (9.15% today) against 10%, every event at once (only possible if an
-  admin starts them together with `/event`; `MutationRules.worstCaseTotal`, today 13.15%) against 15%, and the total
-  with Golden Hour on any map against 30%.
+  admin starts them together with `/event`; `MutationRules.worstCaseTotal`, today 17.15%) against 20%, and the total
+  with Golden Hour on any map against 30%. Golden Hour is itself the running modifier, so no weather mutation can
+  roll beside it: with every event on at once and the strongest map it multiplies 15.15% to 45.45%, which CI keeps
+  under 50% (`MutationRules.worstCaseTotal(mutations, "goldenHour")`).
 * Want mutations rarer or stronger? Change `chance` (how often) or `incomeMultiplier` (how much) and re-run the
   simulation; keep `incomeMultiplier >= priceMultiplier`.
 
@@ -482,10 +484,75 @@ after about 7½ minutes (a Custard Chick). Re-run with `lune run tools/simulate.
   Pastel ones) keep earning forever.
 * **The Easter luck** runs four days (about 79 hours: Good Friday to Easter Monday, a holiday weekend in much of
   the world), longer than the other luck weekends; it works the same (2× of 6×; the store's odds stay exact).
-* **Four event mutations exist now**, months apart: CI checks that the events whose dates overlap each one (its luck
-  weekend) keep every mutation live together below 10% (5.95% for Easter), and that any one event with the strongest
-  map and modifier stays below 10% (9.15%). If an admin started every event at once with `/event`, all mutations
-  together would reach 15.15% of spawns; CI keeps that below 20%, room for two more 2% event mutations.
+* **Four event mutations existed then**, months apart: the events whose dates overlap each one (its luck weekend)
+  kept every mutation live together below 10% (5.95% for Easter), and any one event with the strongest map and
+  modifier stayed below 10% (9.15%). Every event at once with `/event` reached 15.15% of spawns, against 20% (the
+  Harvest Feast below has the bounds now).
+
+## Harvest Feast 2026 (limited-time event)
+
+`Harvest2026` runs Fri 20 Nov 17:00 UTC → Mon 30 Nov 08:00 UTC, in the six weeks between Halloween and Winter that had
+no event (late November is busy on Roblox: US Thanksgiving on the 26th and school holidays in places; the event is a
+global harvest feast, not one country's holiday); `HarvestLuck2026` adds **2× luck** over its last weekend, Fri 27 Nov
+17:00 UTC → Sun 29 Nov 23:59 UTC (`Config/LiveOps.luau`). It overlaps no other seasonal event (CI checks). While the
+Harvest Feast runs:
+
+| Snackling | Rarity | Price | Income | Payback | Share of its tier | Per server-hour | With 2x luck |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Cranberry Crane | Rare | $10.5K | $140/s | 1m 15s | 23.1% | 38.2 | 65.3 |
+| Pecan Pie Porcupine | Epic | $125K | $810/s | 2m 34s | 23.1% | 14 | 23.9 |
+| Sweet Potato Sloth | Legendary | $2.9M | $5.65K/s | 8m 33s | 23.1% | 3.7 | 6.2 |
+| Cornucopia Kirin | Mythic | $72M | $48.5K/s | 24m 44s | 28.6% | 0.7 | 1.3 |
+
+| Mutation | Chance per spawn | Per server-hour | Income | Price | Payback vs plain | Announced |
+| --- | --- | --- | --- | --- | --- | --- |
+| Maple (event only) | 2% | 28.8 | x3 | x2 | x0.67 | no |
+
+The same shape as the other events: four Snacklings sharing their tiers' odds (priced between the Halloween and the
+Winter ones, as the event sits between them on the calendar, inside each tier's regular price and payback range) and
+an event mutation exactly as rare and strong as Haunted, Festive, Sweetheart and Pastel, so any mutation is 7.15% of
+spawns and one spawn's expected value is income x1.1285, price x1.0635 while it runs.
+
+Time to reach each rarity and income for a **new free player whose whole session is inside the event** (the last
+column has the Harvest luck on for the whole session too):
+
+| Rarity | No event | Harvest Feast | Harvest Feast + 2x luck |
+| --- | --- | --- | --- |
+| Common | 5s | 5s | 7s |
+| Uncommon | 1m 52s | 1m 52s | 2m 2s |
+| Rare | 4m 52s | 4m 50s | 4m 35s |
+| Epic | 10m 50s | 11m 10s | 10m 35s |
+| Legendary | 31m 0s | 30m 45s | 26m 40s |
+| Mythic | 1h 54m | 1h 50m | 1h 27m |
+| Secret | 9h 35m | 9h 22m | 5h 41m |
+| First rebirth affordable | 1h 2m | 58m 47s | 55m 2s |
+
+| Play time | No event | Harvest Feast | Harvest Feast + 2x luck |
+| --- | --- | --- | --- |
+| 10m | $995/s | $1.1K/s | $1.43K/s |
+| 30m | $8.58K/s | $10.1K/s | $14.6K/s |
+| 1h | $30.7K/s | $33.8K/s | $52.4K/s |
+| 3h | $169K/s | $196K/s | $306K/s |
+| 8h | $559K/s | $626K/s | $1.1M/s |
+| 24h | $2.22M/s | $2.46M/s | $3.65M/s |
+
+A free player buys a median of 30 event Snacklings in 24 hours of event play (32 with the Harvest luck), the first
+after about 7½ minutes (a Cranberry Crane). Re-run with `lune run tools/simulate.luau Harvest2026 HarvestLuck2026
+"Harvest luck"`.
+
+* **Everything said about Halloween holds**: no regular roll changes outside the event (CI replays the rolls for every
+  event), the tier odds and the Server Luck disclosure are the same during it, and after it the Snacklings (and Maple
+  ones) keep earning forever.
+* **The Harvest luck** is a weekend like Halloween's (about 55 hours, Friday evening to Sunday night UTC, when US
+  schools are off after Thanksgiving) and works the same (2× of 6×; the store's odds stay exact).
+* **Five event mutations exist now**, months apart: the events whose dates overlap the Harvest Feast (its luck
+  weekend) keep every mutation live together at 5.95% (CI: below 10%), and any one event with the strongest map and
+  modifier stays at 9.15% (below 10%). If an admin started every event at once with `/event`, all mutations together
+  would reach 17.15% of spawns (below 20%; 13.95% on a spawn with no map signature or modifier, below 15%), and
+  Golden Hour on top 45.45% (below 50%).
+* **No room for a sixth 2% event mutation** under those bounds: it would take the ordinary all-events case to 15.95%
+  and Golden Hour's to 51.45%. A sixth event can have a 1% mutation (14.95% and 48.45%), or the all-events bounds can
+  be revisited then, since the events never overlap by date.
 
 ## Server modifiers
 

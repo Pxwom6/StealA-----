@@ -73,6 +73,30 @@ local LiveOps = {
 			durationSeconds = 1800,
 		},
 
+		-- Harvest Feast 2026: four event Snacklings (Config/Creatures), the Maple mutation (Config/Mutations) and the
+		-- "harvest" seasonal theme (Config/Seasons: pumpkins, hay bales, scarecrows, cornucopias, corn shocks, warm
+		-- string lights and lanterns, falling leaves and a golden-hour glow). A cosy feast for everyone, in the empty
+		-- weeks between Halloween and Winter (US Thanksgiving and school holidays in places fall inside it).
+		-- Fri 20 Nov 17:00 UTC (12 PM EST / 9 AM PST) -> Mon 30 Nov 08:00 UTC (3 AM EST / Sun midnight PST).
+		{
+			id = "Harvest2026",
+			startsAt = 1795194000, -- 2026-11-20 17:00 UTC
+			endsAt = 1796025600, -- 2026-11-30 08:00 UTC
+			bannerText = "Harvest Feast: hearty Snacklings & Maple mutations!",
+			title = "Harvest Feast",
+			durationSeconds = 3600, -- `/event Harvest2026` runs it for an hour
+		},
+		-- The feast weekend inside the event: 2x luck (stacks with Server Luck, clamped by limits below).
+		-- Fri 27 Nov 17:00 UTC (12 PM EST / 9 AM PST) -> Sun 29 Nov 23:59 UTC (6:59 PM EST / 3:59 PM PST).
+		{
+			id = "HarvestLuck2026",
+			startsAt = 1795798800, -- 2026-11-27 17:00 UTC
+			endsAt = 1795996740, -- 2026-11-29 23:59 UTC
+			luckMultiplier = 2,
+			title = "Feast luck",
+			durationSeconds = 1800,
+		},
+
 		-- Winter 2026: four event Snacklings (Config/Creatures), the Festive mutation (Config/Mutations) and the
 		-- "winter" seasonal theme (Config/Seasons: presents, trees, snowmen, string lights, snowfall, a wintry dusk).
 		-- New Year's Eve 2x Cash comes first in this list so its banner shows instead of the Winter one while it runs

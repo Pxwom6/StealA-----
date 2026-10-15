@@ -1035,6 +1035,33 @@ local gameOs = setmetatable({
 	end,
 }, { __index = os })
 
+-- Roblox's CFrame.lookAt(at, target, up?) (and the old CFrame.new(at, target)): the front (-Z) looks at the target,
+-- right = look x up. Lune's own drops any tilt and turns a frame looking along Z the other way round, so everything
+-- the game builds facing a plot entrance or the belt rails came out backwards offline (lune 0.10.5).
+local function lookAt(at: any, target: any, up: any?): any
+	local look = target - at
+	if look.Magnitude < 1e-9 then
+		return roblox.CFrame.new(at)
+	end
+	look = look.Unit
+	local right = look:Cross(up or roblox.Vector3.new(0, 1, 0))
+	if right.Magnitude < 1e-6 then
+		right = look:Cross(roblox.Vector3.new(0, 0, 1)) -- looking straight up or down
+	end
+	right = right.Unit
+	return roblox.CFrame.fromMatrix(at, right, right:Cross(look), -look)
+end
+local gameCFrame = setmetatable({
+	lookAt = lookAt,
+	new = function(...: any): any
+		local a, b = ...
+		if select("#", ...) == 2 and kindOf(a) == "Vector3" and kindOf(b) == "Vector3" then
+			return lookAt(a, b)
+		end
+		return roblox.CFrame.new(...)
+	end,
+}, { __index = roblox.CFrame })
+
 local globals: { [string]: any } = {
 	game = gameProxy,
 	os = gameOs,
@@ -1042,7 +1069,7 @@ local globals: { [string]: any } = {
 	Instance = Instance,
 	Vector3 = roblox.Vector3,
 	Vector2 = roblox.Vector2,
-	CFrame = roblox.CFrame,
+	CFrame = gameCFrame,
 	Color3 = roblox.Color3,
 	BrickColor = roblox.BrickColor,
 	UDim = roblox.UDim,

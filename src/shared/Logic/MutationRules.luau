@@ -87,8 +87,10 @@ end
 
 -- The highest total mutation chance per spawn that can ever be live at once: every permanent and event mutation
 -- (events may overlap), plus the strongest single map's signature mutations (one map at a time) and the strongest
--- single modifier's (one modifier at a time). Validation keeps this well below 1.
-function MutationRules.worstCaseTotal(mutations: { MutationDef }): number
+-- single modifier's (one modifier at a time). Validation keeps this well below 1. With `modifierId`, the most that can
+-- be live while that modifier runs: its own mutations take the strongest modifier's place, since no other modifier
+-- runs then (Golden Hour unlocks none, so no weather mutation rolls during it).
+function MutationRules.worstCaseTotal(mutations: { MutationDef }, modifierId: string?): number
 	local total = 0
 	local byMap: { [string]: number } = {}
 	local byModifier: { [string]: number } = {}
@@ -108,6 +110,9 @@ function MutationRules.worstCaseTotal(mutations: { MutationDef }): number
 	end
 	for _, chance in byModifier do
 		bestModifier = math.max(bestModifier, chance)
+	end
+	if modifierId ~= nil then
+		bestModifier = byModifier[modifierId] or 0
 	end
 	return total + bestMap + bestModifier
 end

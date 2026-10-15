@@ -1355,3 +1355,67 @@ player is told "no" before Roblox asks for Robux, not after.
 **Reversal cost:** low. Leave an id at 0 and the item disappears from live servers; `perks.autoCollectSeconds`,
 `Spin.paidBankFull` and `starterPack` are data. Never rename the flags `starter_pack` and `starter_offer` (they are in
 saves), and keep the policy check while any paid random item is sold.
+
+### 53. Harvest Feast 2026: a late-November event between Halloween and Winter, four new kinds of decoration
+
+* **What:** `Harvest2026` (Fri 20 Nov 17:00 UTC → Mon 30 Nov 08:00 UTC) with `HarvestLuck2026` (2× luck from Fri 27
+  Nov 17:00 to Sun 29 Nov 23:59 UTC, the weekend after US Thanksgiving): Cranberry Crane (Rare), Pecan Pie Porcupine
+  (Epic), Sweet Potato Sloth (Legendary) and Cornucopia Kirin (Mythic), hand-built polished models
+  (`art/snackling-parts/batch-8.json`, with `prompt-batch-8.md` for a Claude Design redo) and recipe fallbacks; the
+  Maple mutation (2%, x3: a glossy amber maple-syrup glaze, a warm glow and maple leaves drifting down, the `maple`
+  particle preset); code `FEAST26` (a Maple Cranberry Crane, only while the event runs). It is a harvest feast for
+  everyone, not one country's holiday, in the six weeks between Halloween (ends 2 Nov) and Winter (starts 18 Dec) that
+  had no event, and it overlaps neither.
+* **The `harvest` theme:** four new prop kinds, laid out in the same spots as the others so any theme can mix them:
+  hay bales (a bale, two twine bands, a tuft of loose straw; turned a little, never sideways) beside each entrance,
+  after the other entrance props; scarecrows (post, shirt with sleeves and straw hands, overalls, a sack head with
+  button eyes and a stitched smile, a hat) between the bases, behind the trees and blossom trees when a theme has them;
+  cornucopias (a wicker horn with a curled tip, spilling a pumpkin, an apple, grapes and an ear of corn) on the belt
+  rails, facing away from the belt; giant corn stalks (about 11 studs: landmarks by the factory) in the corner spots
+  after the snowmen, giant hearts and bunnies. Pumpkins without a `pumpkinFace` colour are plain harvest pumpkins
+  (ribs and a leaf, no light); Halloween's keep their carved, glowing faces. Warm string lights, lanterns (the lamps), a
+  golden late afternoon (clock 17.3 under a warm haze) and Apple Pie Orchard's falling `leaves` complete it: 386
+  parts, under the 400 budget. No music of its own: no verified track fits yet, so the lobby track plays, as for
+  Valentine's and Easter (`music.harvest` is the slot).
+* **Golden Hour and the worst case:** a fifth 2% event mutation took the old Golden Hour check (×3 of every mutation
+  that could be live) to 51.45%, over its 50%. That check added the strongest weather mutation, but Golden Hour is
+  then the one running modifier, so no weather mutation can roll beside it. `MutationRules.worstCaseTotal(mutations,
+  modifierId)` now counts only the running modifier's own mutations, and `ModifierRules.validate` asks it for each
+  modifier: 15.15% × 3 = 45.45% for Golden Hour with every event on at once. The other bounds: the Harvest window
+  5.95% (below 10%), any one event with the strongest map and modifier 9.15% (below 10%), every event at once 17.15%
+  (below 20%), 13.95% without a map signature or modifier (below 15%). A sixth event mutation fits these only at 1%
+  (BALANCE.md "Harvest Feast").
+* **Renders before shipping:** every model was looked at from five sides at podium size, in its tier's lineup and with
+  Maple and other mutations. The crane first read as a red barrel (its head became frosted sugar with a cranberry
+  crown, and it got chunkier like the other Rares), the porcupine's pecans as spikes (plumper and swept back, on a
+  lower crust), the sloth as a brown egg (a coppery skin split open down the front, curling skin, a tuber-tip tail, a
+  scarf) and the kirin's horn of plenty as a flat disc from the front (a lighter lip around a dark hollow). Maple was
+  brightened after it read like Toasted. The decorations were rendered on Sunny Meadow, Apple Pie Orchard and Midnight
+  Market: a shock of corn read as planks and became one giant corn stalk, and the scarecrow's smile was redrawn until
+  it read as one.
+* **Offline preview fix:** Lune 0.10.5's `CFrame.lookAt` turns a frame looking along Z the other way round and drops
+  any tilt, so whatever the game builds with it facing along Z (props looking at a plot entrance or across the belt)
+  came out backwards offline. The worldsim (`tools/worldsim/Sim`) now gives game code Roblox's `CFrame.lookAt` and
+  two-vector `CFrame.new`; every offline scenario passes with it. `tools/worldsim/exportSeason.luau <mapId> <eventId>`
+  exports a map with an event's theme on for `tools/preview`.
+* **Two sloths:** batch 7 (#50) added Shortcake Sloth (Rare) while this was built. The Sweet Potato Sloth is another
+  tier, colour and silhouette (rendered side by side), like the two pegasi; its flavour line changed so it doesn't
+  echo Shortcake's, and the porcupine's moved off Lemon Meringue Lamb's pattern.
+* **No existing model changed size:** the sloth's and the kirin's recipe fallbacks are sized so the Legendary and
+  Mythic quartiles stay where they were; the regenerated `Config/CreatureParts` only adds lines.
+* **Tests:** the dates, the luck weekend, no overlap with Halloween or Winter, the banner through the event and none
+  after; the layout on the real map (386 parts, the configured counts, nothing on plots, the belt or the lobby,
+  pumpkins and bales facing the walkway without touching, scarecrows clear of the plot walls, cornucopias on the rails,
+  corn stalks clear of the factory and the chute, no shared spots, every kind mixing with the others); palette
+  validation (plain pumpkins need no face colour); the Snacklings and Maple through the event checks; the server test
+  turns the Harvest Feast on (386 parts by name, uncarved pumpkins, none touchable, collidable or hit by a raycast, the
+  lighting, a Maple Kirin on the belt) and off; the pre-launch test runs the calendar into it (decorations up on 20 Nov
+  by themselves, its banner, `FEAST26` refused a second before and working after).
+* **No save change.**
+
+**Why:** the calendar went from Halloween straight to Winter, leaving six empty weeks in one of Roblox's busiest times
+of year (US Thanksgiving, school holidays in places). A cosy harvest event fills them with Snacklings and a mutation
+players can only get then, and a luck weekend when many are off school.
+**Reversal cost:** none: move the dates, or drop the `Harvest2026` line from Config/Seasons to keep the Snacklings
+without the decorations. Never remove the creature or mutation ids (they are in players' saves). Going back to the old
+Golden Hour check would need its bound raised or a rarer event mutation.
