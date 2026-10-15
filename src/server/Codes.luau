@@ -40,6 +40,11 @@ local Codes = {
 		reward = { kind = "creature", creatureId = "candy_heart_hamster", variant = "sweetheart" },
 		expiresAt = 1802764800, -- 2027-02-16 08:00 UTC
 	},
+	-- Easter 2027: a Pastel Custard Chick until the event ends.
+	EGGHUNT27 = {
+		reward = { kind = "creature", creatureId = "custard_chick", variant = "pastel" },
+		expiresAt = 1806994800, -- 2027-04-06 07:00 UTC
+	},
 }
 
 return Codes

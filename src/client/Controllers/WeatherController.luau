@@ -2,7 +2,7 @@
 --[[
 	Weather for the current map theme (Config/MapThemes `weather`): particles drifting around this player's camera —
 	snow, embers, falling leaves, fireflies, candy sprinkles, desert dust, petals, stardust, pollen, feathers, bubbles,
-	chocolate shavings, confetti, lemonade fizz, heat shimmer or rain. One invisible box follows the camera
+	chocolate shavings, confetti, lemonade fizz, heat shimmer, spring blossom or rain. One invisible box follows the camera
 	(it lives under the Camera, so only this client has it) and its emitter fills the air around you, which is far
 	cheaper than covering the whole map.
 
@@ -383,6 +383,30 @@ local RECIPES: { [Types.WeatherKind]: Recipe } = {
 			Rotation = NumberRange.new(0, 360),
 			RotSpeed = NumberRange.new(-30, 30),
 			EmissionDirection = Enum.NormalId.Top,
+		},
+	},
+	-- Spring blossom (Easter): soft petals in pale pink, white, lilac and lemon, drifting down slowly and swirling.
+	blossoms = {
+		boxSize = Vector3.new(110, 1, 110),
+		offset = Vector3.new(0, 30, 0),
+		props = {
+			Texture = SMOKE,
+			Color = colours({
+				Color3.fromRGB(255, 196, 222),
+				Color3.fromRGB(255, 255, 255),
+				Color3.fromRGB(226, 208, 255),
+				Color3.fromRGB(255, 244, 176),
+			}),
+			Size = sequence({ { 0, 0.34 }, { 1, 0.28 } }),
+			Transparency = sequence({ { 0, 0.05 }, { 0.85, 0.1 }, { 1, 1 } }),
+			Speed = NumberRange.new(2, 3.2),
+			SpreadAngle = Vector2.new(35, 35),
+			Acceleration = Vector3.new(1.6, -0.2, 1),
+			Lifetime = NumberRange.new(8, 10),
+			Rate = 22,
+			Rotation = NumberRange.new(0, 360),
+			RotSpeed = NumberRange.new(-120, 120),
+			EmissionDirection = Enum.NormalId.Bottom,
 		},
 	},
 	-- Glowing green spores floating up through the fog.

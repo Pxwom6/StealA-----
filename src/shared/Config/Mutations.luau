@@ -620,6 +620,31 @@ local Mutations: { MutationDef } = {
 		},
 		eventId = "Valentine2027",
 	},
+
+	-- Easter 2027: everything washed soft and pastel (towards a lilac white), a pale pink glow and pastel sugar
+	-- sparkles drifting up. Rolls only while LiveOps event "Easter2027" runs; like the other event mutations, rarer
+	-- than Golden and stronger (order 32: rolled after every other one, so no existing roll changes).
+	{
+		id = "pastel",
+		displayName = "Pastel",
+		color = "#C9A8FF",
+		order = 32,
+		chance = 0.02,
+		incomeMultiplier = 3,
+		priceMultiplier = 2,
+		announceOnSpawn = false,
+		announceOnBuy = false,
+		announceOnSteal = false,
+		look = {
+			material = "SmoothPlastic",
+			tint = "#F4E8FF",
+			tintStrength = 0.5,
+			reflectance = 0.08,
+			glow = "#FFD6F0",
+			particles = "pastel",
+		},
+		eventId = "Easter2027",
+	},
 }
 
 return Mutations
