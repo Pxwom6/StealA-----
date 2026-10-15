@@ -244,17 +244,6 @@ local function equal(a: { string }, b: { string }): boolean
 	return table.concat(a, "|") == table.concat(b, "|")
 end
 
--- Lets server time pass in steps (the server's loops run in between).
-local function wait(seconds: number)
-	local left = seconds
-	while left > 0 do
-		local step = math.min(left, 2)
-		Sim.advance(step)
-		task.wait(0.15)
-		left -= step
-	end
-end
-
 -- Moves a player somewhere, then lets enough server time pass for every movement check to trust them again.
 local function teleport(player: any, position: any)
 	Sim.moveCharacter(player, position)
@@ -361,7 +350,9 @@ local function scenario()
 	check(alice:GetAttribute("Title") == "", "she wears none")
 	local sync = lastSync(ALICE)
 	check(sync ~= nil and sync.title == "", "the dialog is told the truth (StyleSync)")
-	for _, args in { { 123, "x" }, { "title", 5 }, { "hat", "masterThief" }, { "title", string.rep("a", 200) } } do
+	local garbage: { { any } } =
+		{ { 123, "x" }, { "title", 5 }, { "hat", "masterThief" }, { "title", string.rep("a", 200) } }
+	for _, args in garbage do
 		send(alice, "EquipStyle", args[1], args[2])
 	end
 	check(#flagsWith(a.data.flags, "title_") == 0, "garbage arguments change nothing")
