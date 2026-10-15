@@ -17,6 +17,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Gadgets = require(ReplicatedStorage.Shared.Config.Gadgets)
+local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local Net = require(ReplicatedStorage.Shared.Net)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
@@ -87,7 +88,7 @@ local function makeDizzy(head: BasePart): BillboardGui
 		LightInfluence = 0,
 		Parent = head,
 	}) :: BillboardGui
-	UiKit.label({ Text = "💫💫", Size = UDim2.fromScale(1, 1), Parent = gui })
+	UiKit.label({ Text = Theme.text.gadgetDizzy, Size = UDim2.fromScale(1, 1), Parent = gui })
 	return gui
 end
 

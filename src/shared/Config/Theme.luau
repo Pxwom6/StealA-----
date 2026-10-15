@@ -655,6 +655,7 @@ local Theme = {
 		shieldBlocked = "Shielded! 🫧 Wait for the bubble to pop.",
 		magnetEmpty = "Nothing to collect yet!",
 		magnetCollected = "🧲 +{amount} from your pads!",
+		gadgetDizzy = "💫💫", -- over the head of whoever slipped on a banana peel
 
 		-- Map themes (Config/MapThemes): the vote for the next map and the change itself
 		mapVoteTitle = "Vote for the next map! {time}",

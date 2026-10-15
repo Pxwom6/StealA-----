@@ -71,6 +71,7 @@ Studio test purchases, etc.).
 | `node tools/preview/render.mjs <export.json> <outPrefix>` | Render an export to PNGs offline with three.js (see [`tools/preview`](tools/preview/README.md)) |
 | `lune run tools/worldsim/server.luau` | Boot the whole server offline and play a short two-player session (CI runs this too) |
 | `lune run tools/worldsim/prelaunch.luau` | The pre-launch server fixes on the offline server, with a virtual clock (CI runs this too) |
+| `lune run tools/worldsim/gadgets.luau` | Every gadget through the real remotes on the offline server, with a virtual clock (CI runs this too) |
 | `rojo build -o build/sync.rbxl` then `lune run tools/syncTest.luau build/sync.rbxl` | Check the Studio sync script (`studio/SyncFromGitHub.luau`) offline |
 | `stylua src tests tools studio` | Format |
 | `selene src tests tools studio` | Lint |
@@ -285,13 +286,13 @@ load in Studio (October 2026):
 | --- | --- | --- |
 | `15675032796` Roblox_UI_Small_Click | Roblox | every button click |
 | `15675059323` Roblox_UI_Bright_Click | Roblox | settings switches, Rare spawn |
-| `15675037413` Roblox_UI_Paper_Swipe | Roblox | a dialog opens, selling |
-| `127645268874265` CoinTransfer_01 | Roblox | success toasts, collecting cash |
+| `15675037413` Roblox_UI_Paper_Swipe | Roblox | a dialog opens, selling; pitched up, a Banana Peel slapped down |
+| `127645268874265` CoinTransfer_01 | Roblox | success toasts, collecting cash; pitched down, the Snack Magnet |
 | `15675075163` Roblox_UI_Delete | Roblox | error toasts |
-| `15675055424` Roblox_UI_Cute_Pop | Roblox | buying from the belt, Common / Uncommon spawn |
-| `15675085146` Roblox_UI_Indicator | Roblox | locking your base |
-| `15675046931` Roblox_UI_Sweep | Roblox | unlocking |
-| `15675024286` Roblox_UI_Whoosh_01 | Roblox | starting a steal; slowed right down, thunder (Thunderstorm) |
+| `15675055424` Roblox_UI_Cute_Pop | Roblox | buying from the belt, Common / Uncommon spawn; pitched up, a Fizzy Soda |
+| `15675085146` Roblox_UI_Indicator | Roblox | locking your base; pitched up, a tag bouncing off a Bubble Shield |
+| `15675046931` Roblox_UI_Sweep | Roblox | unlocking; pitched up, a Bubble Shield popping up |
+| `15675024286` Roblox_UI_Whoosh_01 | Roblox | starting a steal; slowed right down, thunder (Thunderstorm); sped up, slipping on a peel |
 | `15675012262` Roblox_UI_Whoosh_04 | Roblox | announcement banners |
 | `15675043410` Roblox_UI_Tonal_Stinger | Roblox | steal success, Epic spawn |
 | `15675062723` Roblox_UI_Whistle_Low | Roblox | tagging a thief |
@@ -327,8 +328,8 @@ camera are switched off to save phones the work (`podiumFx` in `src/shared/Confi
 The HUD is laid out for a landscape phone (667×375 is the reference) by `src/shared/Logic/ScreenLayout.luau`, and
 the game places every HUD element with it (DECISIONS.md #47): the cash pill in Roblox's top bar strip with one band
 under it (the tutorial banner, a "Need $X more?" offer, or the event / modifier / luck pills), the lock, Friends and
-gear buttons top right, the four feature buttons in a 2×2 grid top left, TAG on the right, the map vote at the
-bottom. Nothing tappable goes in the middle of the screen, where the character and the Buy / Steal prompts are.
+gear buttons top right, the four feature buttons in a 2×2 grid top left, TAG on the right with the gadget buttons
+around it, the map vote at the bottom. Nothing tappable goes in the middle of the screen, where the character and the Buy / Steal prompts are.
 
 * **Moving or adding a HUD element:** give it a size in `ScreenLayout.SIZE` and a place in `ScreenLayout.layout`,
   hand its frame to `HudController.place`, and keep `lune run tools/layoutCheck.luau` green: it checks 640×360,
@@ -382,6 +383,36 @@ to one try every 5 seconds.
   income, 31 Dec-8 Jan), `LOVE27` (a Sweetheart Candy Heart Hamster, 5-16 Feb) and `EGGHUNT27` (a Pastel Custard
   Chick, 19 Mar-6 Apr).
 
+### Gadgets
+
+Gear bought once with in-game cash (never Robux) in the Shop's **Gadgets** tab and kept forever, rebirths too
+(DECISIONS.md #48). Each owned gadget gets a round button beside the TAG button (keys 1-4 on a keyboard); there are
+none until one is bought, and none during the first-time tutorial.
+
+| Gadget | Price | Does | Recharges |
+| --- | --- | --- | --- |
+| 🥤 Fizzy Soda | $1.5K | 30% faster for 6 s, carrying too (on top of the carry slowdown) | 35 s |
+| 🍌 Banana Peel | $15K | dropped at your feet on your own base's floor for 90 s; the first visitor to step on it slips (1.5 s), and a Snackling of yours they carry runs home, as after a tag | 45 s |
+| 🫧 Bubble Shield | $150K | nobody can tag you for 3 s (a bubble everyone sees); locks and peels still work | 40 s |
+| 🧲 Snack Magnet | $2.5M | collects the cash on all your pads from anywhere, as if you walked over them | 60 s |
+
+* **Tune one:** `src/shared/Config/Gadgets.luau` (price, cooldown, duration, speed, slip, peel radius). CI keeps
+  every number inside `GadgetRules.validate`: the Bubble Shield at most 5 s and recharging at least 5x as long, any
+  speed at most 1.5x and the speed cap (`maxSpeedMultiplier`, a speed modifier and a gadget together) at most 1.5x,
+  prices rising in shop order. Names and descriptions are `gadget*` keys in `src/shared/Config/Theme.luau`; a
+  description's `{percent}`, `{seconds}`, `{slip}` and `{cooldown}` are filled from the config. BALANCE.md "Gadgets"
+  has the prices against the income curve; `lune run tools/simulate.luau` prints when a free player affords each one.
+* **Add one:** an entry in `Gadgets.gadgets` with one of the kinds (`speed`, `peel`, `shield`, `magnet`), its id in
+  `order` (its shop place, button slot and key), and its name and description in `Theme.text`. A new kind needs its
+  effect in `src/server/Services/GadgetService.luau` (and its rules in `src/shared/Logic/GadgetRules.luau`). The HUD
+  makes room for `ScreenLayout.SIZE.gadget.slots` (4) buttons beside TAG on every screen; a fifth means checking
+  `lune run tools/layoutCheck.luau` still finds room on all five screens. Ids are saved in the `gadget_<id>` flags:
+  never rename one that has shipped.
+* **Analytics:** `gadget_bought` (value = price, field = gadget id), `gadget_used` (gadget id) and `gadget_effect`
+  (gadget id, and `peelDrop`, `peelSlip` or `shieldBlock`).
+* **Studio:** `/gadgets` owns every gadget and recharges them; offline, `lune run tools/worldsim/gadgets.luau` (CI)
+  plays every gadget through the real remotes.
+
 ### Studio test commands
 
 These work in Studio only (`src/server/Services/DevCommands.luau`):
@@ -400,6 +431,7 @@ These work in Studio only (`src/server/Services/DevCommands.luau`):
   `/mod supplyDrop` (first crate after 10 s); admins too, that server only)
 * `/runaway` (a Snackling escapes now, as in Great Escape), `/runaway here` (right beside you, to try catching it)
 * `/boss [hp]` (a Snack Attack giant over the belt now; tap it, e.g. `/boss 20` for a quick one)
+* `/gadgets` (own every gadget and recharge them all now), `/gadgets off` (none again)
 
 To test a seasonal event in Studio: `/event Halloween2026 5` turns Halloween on for 5 minutes (decorations, dusk
 lighting, banner with countdown, event Snacklings and Haunted on the belt), and `/event off` ends it early.
