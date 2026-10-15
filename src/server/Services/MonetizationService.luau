@@ -3,7 +3,8 @@
 	Game passes and developer products.
 
 	Passes: ownership is checked on join (UserOwnsGamePassAsync, with retries) and when bought in-game
-	(PromptGamePassPurchaseFinished). Ownership lives in the session, not the save: Roblox is the source of truth.
+	(PromptGamePassPurchaseFinished, then UserOwnsGamePassAsync: the event alone is not trusted). Ownership lives in
+	the session, not the save: Roblox is the source of truth.
 
 	Products: MarketplaceService.ProcessReceipt → Logic/ReceiptLedger.process:
 	  * the grant and the PurchaseId record happen together without yielding (no double grants on retry)
@@ -438,6 +439,8 @@ local function onDevGrant(player: Player, keyArg: unknown)
 	print(`[Monetization] Studio grant {key}: {decision.Name}`)
 end
 
+-- Store analytics from the client. Only known keys reach a breakdown field (CustomField01): any other string from a
+-- client would add a value to the analytics breakdowns, so the event is dropped instead.
 local function onClientEvent(player: Player, nameArg: unknown, keyArg: unknown)
 	local name = Guard.oneOf(nameArg, { "store_opened", "store_product_clicked", "cash_offer_clicked" })
 	local session = Sessions.get(player)
@@ -447,11 +450,35 @@ local function onClientEvent(player: Player, nameArg: unknown, keyArg: unknown)
 	if name == "store_opened" then
 		Analytics.storeStep(session, "StoreOpened")
 	elseif name == "cash_offer_clicked" then
-		local key = Guard.shortString(keyArg, 40)
-		Analytics.custom(session, "cash_offer_clicked", nil, { key or "" })
+		local key = Guard.keyOf(keyArg, Monetization.products)
+		if key and Monetization.products[key].kind == "Cash" then
+			Analytics.custom(session, "cash_offer_clicked", nil, { key })
+		end
 	else
-		local key = Guard.shortString(keyArg, 40)
-		Analytics.storeStep(session, "ProductPrompted", { key or "" })
+		local key = Guard.keyOf(keyArg, Monetization.products) or Guard.keyOf(keyArg, Monetization.passes)
+		if key then
+			Analytics.storeStep(session, "ProductPrompted", { key })
+		end
+	end
+end
+
+-- A game pass bought in-game. The event's `purchased` flag is not proof of a purchase, so Roblox is asked first
+-- (UserOwnsGamePassAsync, retried): granted only when it says owned; when it can't answer, the pass joins the
+-- background re-check (recheckPasses) like a failed lookup at join.
+local function onPassPurchaseFinished(player: Player, passId: number, purchased: boolean)
+	if not purchased then
+		return
+	end
+	local key = passKeyForId(passId)
+	if key == nil then
+		return
+	end
+	local owns = ownsPass(player.UserId, passId)
+	local session = Sessions.get(player)
+	if owns == true and session then
+		grantPass(session, key)
+	elseif owns == nil or (owns == true and session == nil) then
+		task.spawn(recheckPasses, player, { key }) -- unknown, or owned but the session is not ready yet
 	end
 end
 
@@ -459,14 +486,7 @@ function MonetizationService.start()
 	MarketplaceService.ProcessReceipt = processReceipt
 	MarketplaceService.PromptGamePassPurchaseFinished:Connect(
 		function(player: Player, passId: number, purchased: boolean)
-			if not purchased then
-				return
-			end
-			local key = passKeyForId(passId)
-			local session = Sessions.get(player)
-			if key and session then
-				grantPass(session, key)
-			end
+			task.spawn(onPassPurchaseFinished, player, passId, purchased)
 		end
 	)
 	Remotes.onIntent("ClientEvent", onClientEvent)
