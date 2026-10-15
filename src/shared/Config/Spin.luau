@@ -16,11 +16,12 @@ local Types = require("../Types")
 
 local Spin: Types.SpinConfig = {
 	freeEverySeconds = 12 * 3600,
-	maxBanked = 20,
+	-- The spin bank's size, one for every spin: gifts' and achievements' spins bank up to it and the rest are paid as
+	-- `bankedOverflow` cash; Lucky Spin packs (Config/Monetization) can't be bought with this many banked ("spin some
+	-- first!"), and a pack's receipt banks every spin it paid for, past it if need be. One number, so a bought spin
+	-- never turns a later earned one into cash below it.
+	maxBanked = 40,
 	bankedOverflow = { incomeSeconds = 60, minimum = 400 },
-	-- Lucky Spin packs (Config/Monetization) can't be bought with this many spins banked ("spin some first!"); a
-	-- receipt that arrives anyway banks every spin it paid for, past any cap.
-	paidBankFull = 40,
 
 	segments = {
 		{

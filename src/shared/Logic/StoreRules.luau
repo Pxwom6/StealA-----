@@ -11,8 +11,8 @@
 	server first (the RequestPurchase intent, StoreService) and the client checks the same rule before asking, for an
 	instant answer. The receipt path checks again (MonetizationService): a client can always prompt by itself.
 	  Spins         paid random items: only where the player's Roblox policy allows them (PlayerPolicy), and not while
-	                the spin bank already holds Config/Spin.paidBankFull spins or more (a receipt still banks every
-	                spin it paid for, past any cap)
+	                the spin bank is already full (Config/Spin.maxBanked spins or more; a receipt still banks every
+	                spin it paid for, past it)
 	  StarterPack   once per account, and only with a free podium for its Snackling
 
 	Pure: no Roblox APIs (the caller passes RunService:IsStudio() and the player's state).
@@ -34,7 +34,7 @@ export type PurchaseContext = {
 	visible: boolean, -- StoreRules.visible for the product's id
 	paidRandomAllowed: boolean, -- PlayerPolicy (the client: the player attribute in Logic/PaidRandomItems)
 	spins: number, -- spins banked now
-	spinBankFull: number, -- Config/Spin.paidBankFull
+	spinBankFull: number, -- Config/Spin.maxBanked
 	starterOwned: boolean, -- the Starter Pack was bought (Logic/StarterPackRules)
 	podiumFree: boolean, -- the Starter Pack's Snackling may take a podium now
 }

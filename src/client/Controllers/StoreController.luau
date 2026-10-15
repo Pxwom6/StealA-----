@@ -17,7 +17,7 @@
 	    (UI/OddsDetails, Logic/SpinOdds: a spin's odds never change). They are paid random items too, so they show
 	    only to players whose policy allows them (hidden otherwise, and while it is being looked up). Their buy button
 	    asks first (PurchaseController: the client's check, then the server's, before Roblox's prompt opens) and says
-	    "Bank full" while the spin bank holds Config/Spin.paidBankFull.
+	    "Bank full" while the spin bank holds Config/Spin.maxBanked.
 	  * Items whose id is still 0 (not created on the Creator Hub yet) are hidden outside Studio, headers too when a
 	    section has nothing to show (Logic/StoreRules.visible). In Studio they show a "(Studio) Grant" button that runs
 	    the real server receipt path, so purchases are testable before the IDs exist.
@@ -300,7 +300,7 @@ end
 local function shows(state: Types.ClientState): string
 	local parts = {
 		tostring(PurchaseController.paidRandomAllowed()),
-		tostring(state.spin.spins >= Spin.paidBankFull),
+		tostring(state.spin.spins >= Spin.maxBanked),
 		tostring(state.store.starterOwned),
 		tostring(#state.gadgets.owned), -- the Starter Pack's card prices the gadgets it no longer unlocks
 	}

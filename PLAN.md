@@ -211,7 +211,7 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `Rebirth` | – | `RebirthMath.canRebirth` |
 | `ClaimDaily` | – | `DailyStreak.canClaim` |
 | `ClientEvent` | `name: string, key: string?` | whitelist (`store_opened`, `store_product_clicked`, `cash_offer_clicked`, `store_viewed`); `key` only when it is a known product or pass key, `store_viewed`'s only `spin` or `offer` (the Starter Pack's offer then never shows again: `starter_offer`) → analytics (StoreService) |
-| `RequestPurchase` | `key: string, surface: string` | a Lucky Spin pack or the Starter Pack (`StoreRules.CHECKED_KINDS`), `surface` one of `StoreRules.SURFACES`; the policy looked up first (it may yield), then `StoreRules.purchaseRefusal` on server state (on the Creator Hub or Studio, paid random items allowed, fewer than `Spin.paidBankFull` spins banked, not owned, a free podium) → `PurchaseApproved` (Studio with no id: the fake receipt), or a toast saying why |
+| `RequestPurchase` | `key: string, surface: string` | a Lucky Spin pack or the Starter Pack (`StoreRules.CHECKED_KINDS`), `surface` one of `StoreRules.SURFACES`; the policy looked up first (it may yield), then `StoreRules.purchaseRefusal` on server state (on the Creator Hub or Studio, paid random items allowed, fewer than `Spin.maxBanked` spins banked, not owned, a free podium) → `PurchaseApproved` (Studio with no id: the fake receipt), or a toast saying why |
 | `CheckGroup` | – | group feature on, at most once per 10 s, not already checking → re-check membership (`IsInGroupAsync`, then `GetGroupsAsync`) |
 | `InvitePrompted` | – | analytics only (`invite_prompt_opened`); nothing is rewarded for inviting |
 | `SkipTutorial` | – | a tutorial is running → it ends with no reward (steps themselves only finish from gameplay the server saw) |
@@ -476,9 +476,9 @@ receipt in Studio, for every store item (`StoreRules.visible`). **Auto Collect**
 `AutoCollectService` collects a holder's pads through `EconomyService.collectPad`, quietly; their Snack Magnet shows
 AUTO and is neither used nor sold to them. **3 / 10 Lucky Spins**: paid random items, so the odds are on their Shop
 card and in the Spin tab's Odds beside their buttons (`UI/OddsGrid`), they show only where PolicyService allows paid
-random items, buying is refused at `Spin.paidBankFull` banked spins and a receipt always banks every spin
-(`SpinRules.bankPaid`). **Starter Pack**: fixed contents once per account (`starter_pack`), a cash-only second receipt,
-and a one-time offer (`starter_offer`) after the first rebirth or 30 minutes of play. The spin packs and the Starter
-Pack are checked on the server before the prompt (`RequestPurchase` → `PurchaseApproved`, `StoreService`) and again at
-the receipt. Studio: "(Studio) Grant", `/spins <n>`, `/starter [reset|offer]`. Offline:
-`lune run tools/worldsim/store.luau` (CI).
+random items, buying is refused at `Spin.maxBanked` banked spins (the bank's one size: gifts' spins stop there too)
+and a receipt always banks every spin (`SpinRules.bankPaid`). **Starter Pack**: fixed contents once per account
+(`starter_pack`), a cash-only second receipt, and a one-time offer (`starter_offer`) after the first rebirth or 30
+minutes of play. The spin packs and the Starter Pack are checked on the server before the prompt (`RequestPurchase`
+→ `PurchaseApproved`, `StoreService`) and again at the receipt. Studio: "(Studio) Grant", `/spins <n>`,
+`/starter [reset|offer]`. Offline: `lune run tools/worldsim/store.luau` (CI).

@@ -14,7 +14,7 @@
 	price. They are paid random items, so they show only to a player whose Roblox policy allows those (the player
 	attribute in Logic/PaidRandomItems, so not while it is being looked up) and only once the packs exist on the Creator
 	Hub (Studio: always); the Odds view sits right beside them. A tap goes through PurchaseController (checked here, then
-	on the server, before Roblox's prompt opens); while the spin bank holds Config/Spin.paidBankFull spins they say
+	on the server, before Roblox's prompt opens); while the spin bank holds Config/Spin.maxBanked spins they say
 	"Bank full". Where everything goes: Logic/StoreLayout.spinTab (checked on every checked screen by tools/layoutCheck.luau).
 ]]
 

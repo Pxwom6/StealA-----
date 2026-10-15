@@ -440,8 +440,8 @@ local function prepareProduct(
 		data.cash += cash
 		data.stats.totalEarned += cash
 		data.lockTokens += tokens
-		-- Every spin paid for, past the bank's caps: a purchase is never clipped (buying is refused at
-		-- Config/Spin.paidBankFull, before the prompt; see StoreService).
+		-- Every spin paid for, past the bank's size: a purchase is never clipped (buying is refused at
+		-- Config/Spin.maxBanked, before the prompt; see StoreService).
 		SpinRules.bankPaid(data.spin, spins)
 		if starter then
 			data.flags[StarterPackRules.OWNED_FLAG] = true -- once per account, saved with the purchase

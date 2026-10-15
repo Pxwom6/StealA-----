@@ -627,7 +627,8 @@ at 4x luck. An hour of play collects all six: 90 seconds of income, three spins 
 gifts that were unlocked are paid at midnight, so nobody loses one by logging off.
 
 **The Lucky Spin** (`Config/Spin.luau`): a free spin every 12 hours (a new player's first is ready at once) plus the
-banked ones from gifts (up to 20; more are paid as a minute of income each).
+banked ones from gifts and achievements (the bank holds 40, bought spins included; more are paid as a minute of
+income each).
 
 | Prize | Chance | What it pays |
 | --- | --- | --- |
@@ -867,7 +868,8 @@ are about 5 minutes for 25 R$ (a third of the Snack Pack) and 10 spins about 15 
 the time (Epic 7.2%, Legendary 1.9%), a big step early on and pocket change at high income. To move them closer to
 the cash ladder, give more spins per pack (`Monetization.products`, the `spins` field) or lower the price; don't change
 the prize table, which the free spin shares and whose odds the store publishes. Buying is refused from 40 banked spins
-on (`Spin.paidBankFull`), so nobody stockpiles packs they haven't spun.
+on (`Spin.maxBanked`), so nobody stockpiles packs they haven't spun; it is the bank's one size, so bought spins never
+push gifts' and achievements' spins into cash below it (they once stopped at 20 while packs went on to 40).
 
 **The Starter Pack** (49 R$, once) beats the same-price Snack Basket at every income: 40 minutes of income instead of
 35, a floor of $60K (the price of the cheapest Epic) instead of $6K, plus the Snackling and the gadgets. For a new

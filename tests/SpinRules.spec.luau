@@ -8,6 +8,7 @@ local Spin = require("../src/shared/Config/Spin")
 local SpinRules = require("../src/shared/Logic/SpinRules")
 local DataSchema = require("../src/shared/Logic/DataSchema")
 local Monetization = require("../src/shared/Config/Monetization")
+local StoreRules = require("../src/shared/Logic/StoreRules")
 local Types = require("../src/shared/Types")
 
 local catalog = Catalog.build(Creatures, Rarities, Mutations)
@@ -115,10 +116,10 @@ T.describe("SpinRules.validate", function()
 			config.freeEverySeconds = 60
 		end)).toBe(1)
 		T.expect(broken(function(config)
-			config.paidBankFull = config.maxBanked - 1 -- below the free bank: packs refused before gifts are
+			config.maxBanked = SpinRules.MAX_BANKED + 1
 		end)).toBe(1)
 		T.expect(broken(function(config)
-			config.paidBankFull = SpinRules.MAX_PAID_BANK_FULL + 1
+			config.maxBanked = 2.5
 		end)).toBe(1)
 	end)
 end)
@@ -135,22 +136,44 @@ local function packCounts(): { number }
 end
 
 T.describe("SpinRules: Lucky Spin packs and the bank", function()
-	T.it("bank every spin a pack paid for, past the free cap and past the buying limit", function()
+	T.it("bank every spin a pack paid for, past the bank's size", function()
 		local state: Types.SpinState = { nextFreeAt = 0, spins = Spin.maxBanked, total = 0 }
 		SpinRules.bankPaid(state, 3)
 		T.expect(state.spins).toBe(Spin.maxBanked + 3) -- gifts would have been paid as cash here
-		state.spins = Spin.paidBankFull - 1
+		state.spins = Spin.maxBanked - 1
 		SpinRules.bankPaid(state, 10)
-		T.expect(state.spins).toBe(Spin.paidBankFull + 9) -- a receipt that lands anyway is never clipped
+		T.expect(state.spins).toBe(Spin.maxBanked + 9) -- a receipt that lands anyway is never clipped
 		SpinRules.bankPaid(state, 0 / 0)
 		SpinRules.bankPaid(state, -5)
-		T.expect(state.spins).toBe(Spin.paidBankFull + 9) -- garbage adds nothing
-		-- a gift's spins still respect the free cap, and pay the rest as cash
+		T.expect(state.spins).toBe(Spin.maxBanked + 9) -- garbage adds nothing
+		-- a gift's spins still stop at the bank's size, and pay the rest as cash
 		T.expect(SpinRules.bank(state, 2, Spin)).toBe(2)
 	end)
 
-	T.it("leave the buying limit above the free bank and far under the save's limit", function()
-		T.expect(Spin.paidBankFull).toBeAtLeast(Spin.maxBanked)
+	T.it("leave earned spins room up to the size the packs stop at, bought spins in the bank or not", function()
+		-- review 2: 15 banked and a 10-pack bought, then Secret Keeper's 5 spins: all banked (with gifts stopping at
+		-- 20 while packs stopped at 40, all 5 were paid as cash)
+		local state: Types.SpinState = { nextFreeAt = 0, spins = 15, total = 0 }
+		SpinRules.bankPaid(state, Monetization.products.LuckySpins10.spins or 0)
+		T.expect(SpinRules.bank(state, 5, Spin)).toBe(0)
+		T.expect(state.spins).toBe(30)
+		-- one size for both: a pack can be bought exactly while an earned spin still fits
+		for spins = 0, Spin.maxBanked + 5 do
+			local probe: Types.SpinState = { nextFreeAt = 0, spins = spins, total = 0 }
+			local fits = SpinRules.bank(probe, 1, Spin) == 0
+			local buyable = StoreRules.purchaseRefusal("Spins", {
+				visible = true,
+				paidRandomAllowed = true,
+				spins = spins,
+				spinBankFull = Spin.maxBanked, -- as StoreService and PurchaseController pass it
+				starterOwned = false,
+				podiumFree = true,
+			}) == nil
+			T.expect(buyable).toBe(fits)
+		end
+	end)
+
+	T.it("keep a full bank far under the save's limit", function()
 		T.expect(#SpinRules.validate(Spin, catalog.mutations)).toBe(0)
 		local problems = SpinRules.validatePacks(packCounts(), Spin, DataSchema.MAX_BANKED_SPINS)
 		T.expect(table.concat(problems, "; ")).toBe("")
@@ -159,7 +182,7 @@ T.describe("SpinRules: Lucky Spin packs and the bank", function()
 		for _, count in packCounts() do
 			biggest = math.max(biggest, count)
 		end
-		T.expect(Spin.paidBankFull - 1 + SpinRules.RECEIPT_BACKLOG * biggest).toBeAtMost(DataSchema.MAX_BANKED_SPINS)
+		T.expect(Spin.maxBanked - 1 + SpinRules.RECEIPT_BACKLOG * biggest).toBeAtMost(DataSchema.MAX_BANKED_SPINS)
 	end)
 
 	T.it("refuse packs that could be clipped by the save, and odd pack sizes", function()

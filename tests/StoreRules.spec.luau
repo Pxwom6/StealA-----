@@ -86,7 +86,7 @@ local function context(changes: { [string]: any }?): StoreRules.PurchaseContext
 		visible = true,
 		paidRandomAllowed = true,
 		spins = 0,
-		spinBankFull = Spin.paidBankFull,
+		spinBankFull = Spin.maxBanked,
 		starterOwned = false,
 		podiumFree = true,
 	}
@@ -118,7 +118,7 @@ T.describe("StoreRules: Lucky Spin packs before the prompt", function()
 
 	T.it("can be bought when the policy allows it and the bank has room", function()
 		T.expect(StoreRules.purchaseRefusal("Spins", context())).toBeNil()
-		T.expect(StoreRules.purchaseRefusal("Spins", context({ spins = Spin.paidBankFull - 1 }))).toBeNil()
+		T.expect(StoreRules.purchaseRefusal("Spins", context({ spins = Spin.maxBanked - 1 }))).toBeNil()
 	end)
 
 	T.it("are refused where Roblox's policy restricts paid random items, or while that is being looked up", function()
@@ -126,7 +126,7 @@ T.describe("StoreRules: Lucky Spin packs before the prompt", function()
 	end)
 
 	T.it("are refused once the bank is very full, with a clear message", function()
-		T.expect(StoreRules.purchaseRefusal("Spins", context({ spins = Spin.paidBankFull }))).toBe("bankFull")
+		T.expect(StoreRules.purchaseRefusal("Spins", context({ spins = Spin.maxBanked }))).toBe("bankFull")
 		T.expect(StoreRules.purchaseRefusal("Spins", context({ spins = 999 }))).toBe("bankFull")
 		T.expect(StoreRules.purchaseRefusal("Spins", context({ spins = 0 / 0 }))).toBe("bankFull") -- never through
 		T.expect(StoreRules.messageKey("bankFull")).toBe("spinPackBankFull")

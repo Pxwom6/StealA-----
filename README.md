@@ -604,10 +604,10 @@ Three Robux items beside the original passes and cash packs (DECISIONS.md #52), 
 
 * **Fair by design:** the spin packs only show where the player's Roblox policy allows paid random items (and the
   server refuses them otherwise); buying is refused while 40 spins are banked, but a pack that lands anyway banks
-  every spin. The Starter Pack can't be bought twice, and a second purchase that slips through pays its whole value in
+  every spin. The bank is 40 for every spin, so a bought spin never turns an earned one into cash below that. The Starter Pack can't be bought twice, and a second purchase that slips through pays its whole value in
   cash. Each purchase is checked on the server before Roblox's prompt opens, and again when the receipt arrives.
 * **Tune it:** `perks.autoCollectSeconds` and `starterPack` (its cash, Snackling, mutation, gadgets and when its offer
-  shows) in `src/shared/Config/Monetization.luau`, `paidBankFull` in `src/shared/Config/Spin.luau`; the texts are the
+  shows) in `src/shared/Config/Monetization.luau`, `maxBanked` (the spin bank's size) in `src/shared/Config/Spin.luau`; the texts are the
   `store` entries and the `spinPack*` and `starter*` keys in `src/shared/Config/Theme.luau`. CI checks them.
   `lune run tools/simulate.luau store` prints what each pays (BALANCE.md "Store additions").
 * **Analytics:** `product_viewed` (the item, and where: `store`, `spin` or `offer`), the store funnel's

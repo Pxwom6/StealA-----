@@ -376,8 +376,19 @@ local function spinPacks()
 	end
 	check(history == 1, "and one entry in his purchase history")
 
+	-- Bought spins leave earned ones their room (review 2): 15 banked, a 10-pack, then an achievement's 5 spins. With
+	-- gifts stopping at 20 while packs stopped at 40, all 5 were paid as cash.
+	d.data.spin.spins = 15
+	check(receipt(DAN, SPINS_10, "spin-receipt-room", 69) == "PurchaseGranted", "with 15 banked a 10-pack lands")
+	local cashBefore = d.data.cash
+	local paid = Sim.server("Services/PrizeService").pay(d, { kind = "spin", count = 5 }, "Achievement")
+	check(
+		paid.spins == 5 and d.data.spin.spins == 30 and d.data.cash == cashBefore,
+		`and an achievement's 5 spins all bank after it, none paid as cash ({d.data.spin.spins} banked: {paid.text})`
+	)
+
 	-- A very full bank: refused before the prompt, and a receipt that lands anyway is never clipped.
-	local full = Sim.shared("Config/Spin").paidBankFull
+	local full = Sim.shared("Config/Spin").maxBanked
 	d.data.spin.spins = full
 	local approvedBefore = #approvals(DAN)
 	Sim.advance(3)
@@ -396,7 +407,7 @@ local function spinPacks()
 		"logged as refused, with the reason"
 	)
 	check(receipt(DAN, SPINS_10, "spin-receipt-2", 69) == "PurchaseGranted", "a 10-pack receipt lands anyway")
-	check(d.data.spin.spins == full + 10, `every spin is banked, past both caps ({d.data.spin.spins})`)
+	check(d.data.spin.spins == full + 10, `every spin is banked, past the bank's size ({d.data.spin.spins})`)
 
 	-- Views: the Spin tab's pack buttons, once per session.
 	Sim.fireServer(dan, "ClientEvent", "store_viewed", "spin")

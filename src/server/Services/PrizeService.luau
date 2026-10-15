@@ -3,7 +3,8 @@
 	Prizes from gifts, the Lucky Spin and supply crates (Types.PrizeReward), paid the same way everywhere:
 
 	  cash      sized from the player's steady income like a cash pack (EconomyMath.cashPackAmount)
-	  spin      banked for the Lucky Spin (SpinRules.bank); spins beyond Config/Spin.maxBanked are paid as cash
+	  spin      banked for the Lucky Spin (SpinRules.bank); spins beyond the bank's size (Config/Spin.maxBanked, bought
+	            spins in it or not) are paid as cash
 	  creature  a Snackling rolled at `luck` x the server's luck, a bought Server Luck boost left out (its store card
 	            only shows belt odds); mutation rolled as usual, or always `mutation`; on the lowest free podium. With a
 	            full base it is sold for its usual refund instead, and so it is when the player is carrying a stolen

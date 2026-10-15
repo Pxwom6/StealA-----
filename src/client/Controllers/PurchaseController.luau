@@ -50,7 +50,7 @@ function PurchaseController.context(key: string, state: Types.ClientState): Stor
 		visible = product ~= nil and StoreRules.visible(product.id, RunService:IsStudio()),
 		paidRandomAllowed = PurchaseController.paidRandomAllowed(),
 		spins = state.spin.spins,
-		spinBankFull = Spin.paidBankFull,
+		spinBankFull = Spin.maxBanked,
 		starterOwned = state.store.starterOwned,
 		-- the server also keeps a carrying thief's last podium for the delivery (Inventory.prizeMayTakePodium)
 		podiumFree = not state.baseFull,
