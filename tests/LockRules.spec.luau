@@ -165,7 +165,8 @@ T.describe("LockRules.pillTap (the HUD's lock button)", function()
 			lastHintAt = nil,
 			repeatSeconds = 4,
 		}
-		for key, value in changes or {} do
+		local extra: { [string]: any } = changes or {}
+		for key, value in extra do
 			input[key] = value
 		end
 		return LockRules.pillTap(input :: any)
