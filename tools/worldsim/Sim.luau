@@ -20,6 +20,10 @@
 	Online services: MessagingService is a loopback for one server of a game (Sim.messaging, Sim.deliver), TextService
 	filters with Sim.filter, and game.PrivateServerId / PrivateServerOwnerId / JobId can be set (Sim.gameProperties).
 	The rest throw, as during an outage.
+
+	LogService.MessageOut fires for everything the game prints or warns (and for Sim.log, e.g. an engine error), as in
+	Roblox; Sim.setService swaps in a stand-in for any other service (e.g. ContentProvider), and Sim.runScript runs a
+	Script made at run time, as Roblox runs one parented into ServerScriptService (the Studio self-test starts so).
 ]]
 
 local fs = require("@lune/fs")
@@ -928,7 +932,19 @@ function TextService.FilterStringAsync(_self: any, text: string, _fromUserId: nu
 	return result
 end
 
+-- LogService: MessageOut(message, messageType) for everything the game prints or warns (see `globals` below), and for
+-- whatever a test logs with Sim.log (e.g. an error the engine would print).
+Sim.logOut = Sim.signal()
+function Sim.log(text: string, messageType: any)
+	Sim.logOut:Fire(text, messageType)
+end
+local LogService: any = { MessageOut = Sim.logOut }
+function LogService.GetLogHistory(_self: any): { any }
+	return {}
+end
+
 local serviceStubs: { [string]: any } = {
+	LogService = LogService,
 	TweenService = TweenService,
 	RunService = RunService,
 	Players = Players,
@@ -946,6 +962,11 @@ local serviceStubs: { [string]: any } = {
 }
 
 local services: { [string]: any } = {}
+
+-- Makes game:GetService(name) return `service` from now on (a stand-in a test provides, e.g. ContentProvider).
+function Sim.setService(name: string, service: any)
+	services[name] = service
+end
 
 local function getService(_self: any, name: string): any
 	if services[name] then
@@ -1062,6 +1083,16 @@ local gameCFrame = setmetatable({
 	end,
 }, { __index = roblox.CFrame })
 
+local realPrint = print
+
+local function joinArgs(...: any): string
+	local parts = {}
+	for i = 1, select("#", ...) do
+		table.insert(parts, tostring((select(i, ...))))
+	end
+	return table.concat(parts, " ")
+end
+
 local globals: { [string]: any } = {
 	game = gameProxy,
 	os = gameOs,
@@ -1091,14 +1122,15 @@ local globals: { [string]: any } = {
 	typeof = function(value: any): string
 		return if reals[value] ~= nil then "Instance" else kindOf(value)
 	end,
+	print = function(...: any)
+		realPrint(...)
+		Sim.logOut:Fire(joinArgs(...), roblox.Enum.MessageType.MessageOutput)
+	end,
 	warn = function(...: any)
-		local parts = {}
-		for i = 1, select("#", ...) do
-			table.insert(parts, tostring((select(i, ...))))
-		end
-		local text = table.concat(parts, " ")
+		local text = joinArgs(...)
 		table.insert(Sim.warnings, text)
-		print(`[warn] {text}`)
+		realPrint(`[warn] {text}`)
+		Sim.logOut:Fire(text, roblox.Enum.MessageType.MessageWarning)
 	end,
 }
 
@@ -1194,6 +1226,21 @@ end
 -- Replaces a module before anything requires it, e.g. ProfileStore with tools/worldsim/MockProfileStore.
 function Sim.mock(fsPath: string, value: any)
 	cache[fsPath] = value
+end
+
+-- Runs a Script made at run time (its Source, with `script` set to it), as Roblox runs a Script parented into
+-- ServerScriptService during a Play test: in the game's environment, so its `require` of a project module (an
+-- instance path such as game:GetService("ServerScriptService").Server.X) returns the module the game already loaded.
+function Sim.runScript(instance: any): ...any
+	local real = unwrap(instance)
+	local env = table.clone(globals)
+	env.script = wrap(real)
+	env.require = function(target: any): any
+		assert(type(target) ~= "string", "a Script made at run time can only require instances offline")
+		return load(target)
+	end
+	local chunk = luau.load(real.Source, { debugName = real:GetFullName(), environment = env })
+	return chunk()
 end
 
 -- Runs what game:BindToClose registered (a server shutting down).
