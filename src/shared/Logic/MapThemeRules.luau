@@ -81,6 +81,14 @@ MapThemeRules.FLORA_PARTS = table.freeze({
 	coneTopiary = 5,
 	blueberryBush = 6,
 	giantFork = 7,
+	giantDaisy = 6,
+	honeycombColumn = 8,
+	cookieTree = 6,
+	candyCaneLamp = 6,
+	mapleTree = 4,
+	springOnion = 6,
+	chiliPlant = 6,
+	kebab = 6,
 } :: { [string]: number })
 
 -- How far each flora kind reaches from its spot at scale 1 (studs). A kind may only stand on spots whose tree it fits
@@ -125,6 +133,14 @@ MapThemeRules.FLORA_RADIUS = table.freeze({
 	coneTopiary = 2.2,
 	blueberryBush = 4,
 	giantFork = 2.7, -- leaning a little
+	giantDaisy = 4.1, -- its head tipped a little
+	honeycombColumn = 4.7, -- a tall cell beside a short one
+	cookieTree = 4.1,
+	candyCaneLamp = 2.6, -- the hook and its lantern
+	mapleTree = 4.45, -- a lopsided canopy
+	springOnion = 3, -- three stalks leaning apart
+	chiliPlant = 3.8,
+	kebab = 1.6,
 } :: { [string]: number })
 
 -- Parts each landmark kind is built from (server/Services/ThemeProps).
@@ -179,6 +195,20 @@ MapThemeRules.LANDMARK_PARTS = table.freeze({
 	pancakeStack = 11,
 	syrupBottle = 5,
 	waffleTower = 5,
+	honeycombSlab = 23,
+	giantBee = 13,
+	beeSkep = 8,
+	honeyPot = 8,
+	gingerbreadHouse = 14,
+	gingerbreadMan = 14,
+	gumdropCottage = 10,
+	gumdrops = 5,
+	ramenBowl = 17,
+	hotSpring = 11,
+	ramenCart = 12,
+	sauceTower = 12,
+	smoker = 8,
+	campfire = 14,
 } :: { [string]: number })
 
 MapThemeRules.WEATHER = table.freeze({
@@ -203,6 +233,7 @@ MapThemeRules.WEATHER = table.freeze({
 	blossoms = true, -- Easter's (Config/Seasons); a map may use it too
 	popcorn = true,
 	steam = true,
+	smoke = true,
 } :: { [string]: boolean })
 
 -- Enum.Material names a map may use for its ground, walkway and boundary wall.

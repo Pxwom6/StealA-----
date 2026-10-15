@@ -447,11 +447,66 @@ local MUTATION_PARTICLES: { [string]: { [string]: any } } = {
 		Lifetime = NumberRange.new(1.2, 2),
 		Rate = 9,
 	},
+	nectar = { -- glowing drops of nectar and pollen floating up, golden and peach
+		Texture = SPARKLE_TEXTURE,
+		Color = colours({ "#FFD27A", "#FF9A6A" }),
+		LightEmission = 0.6,
+		Size = sequence({ { 0, 0.22 }, { 1, 0.1 } }),
+		Speed = NumberRange.new(0.4, 1),
+		SpreadAngle = Vector2.new(180, 180),
+		Acceleration = Vector3.new(0, 1.5, 0),
+		Drag = 0.5,
+		Lifetime = NumberRange.new(1, 1.6),
+		Rate = 7,
+	},
+	sugar = { -- sugar crystals glinting and dropping off a sugared gumdrop
+		Texture = SPARKLE_TEXTURE,
+		Color = colours({ "#FFFFFF", "#D8FFE6" }),
+		LightEmission = 0.4,
+		Size = sequence({ { 0, 0.2 }, { 1, 0.1 } }),
+		Speed = NumberRange.new(0.5, 1.2),
+		SpreadAngle = Vector2.new(180, 180),
+		Acceleration = Vector3.new(0, -2.5, 0),
+		Lifetime = NumberRange.new(0.8, 1.4),
+		Rate = 7,
+		Rotation = NumberRange.new(0, 360),
+		RotSpeed = NumberRange.new(-90, 90),
+	},
+	lanterns = { -- tiny warm lights rising slowly, like paper lanterns let go into the sky
+		Texture = SMOKE_TEXTURE,
+		Color = colours({ "#FFD27A", "#FF8A4A" }),
+		LightEmission = 1,
+		Size = sequence({ { 0, 0.22 }, { 1, 0.14 } }),
+		Transparency = sequence({ { 0, 0 }, { 0.8, 0.2 }, { 1, 1 } }),
+		Speed = NumberRange.new(0.6, 1.2),
+		SpreadAngle = Vector2.new(30, 30),
+		EmissionDirection = Enum.NormalId.Top,
+		Acceleration = Vector3.new(0, 0.8, 0),
+		Lifetime = NumberRange.new(1.6, 2.4),
+		Rate = 5,
+	},
+	smoke = { -- grey barbecue smoke curling up
+		Texture = SMOKE_TEXTURE,
+		Color = colours({ "#9A8E86", "#6A605A" }),
+		Size = sequence({ { 0, 0.4 }, { 1, 1.2 } }),
+		Transparency = sequence({ { 0, 0.5 }, { 1, 1 } }),
+		Speed = NumberRange.new(0.8, 1.6),
+		SpreadAngle = Vector2.new(20, 20),
+		EmissionDirection = Enum.NormalId.Top,
+		Acceleration = Vector3.new(0.3, 0.6, 0),
+		Lifetime = NumberRange.new(1.4, 2.2),
+		Rate = 6,
+		Rotation = NumberRange.new(0, 360),
+		RotSpeed = NumberRange.new(-30, 30),
+	},
 }
 
 -- The halo: a ring of glowing segments floating above the head (MutationLook.halo).
 local HALO_SEGMENTS = 8
 local HALO_COLOR = "#FFE066"
+-- Bee wings: two glassy wings standing up from the back, leaning out (MutationLook.wings).
+local WING_COLOR = "#EAF6FF"
+local WING_LEAN = math.rad(32)
 
 -- Whether `name` is a particle preset this module can build (MutationLook.particles).
 function CreatureVisuals.hasParticles(name: string): boolean
@@ -713,6 +768,31 @@ local function addMutationLook(model: Model, mutation: Types.MutationDef)
 			})
 			segment:SetAttribute("MutationSkip", true)
 			segment.Parent = model
+		end
+	end
+	if look.wings and root ~= nil then
+		-- On the back of the model (it faces -Z), sized to it: each wing an upright glassy ellipsoid leaning outward.
+		local cf, size = model:GetBoundingBox()
+		local height = math.clamp(size.Y * 0.5, 0.8, 3.2)
+		local length = math.clamp(size.Z * 0.55, 0.8, 3.4)
+		local top = cf.Position.Y + size.Y * 0.32
+		local back = root.Position.Z + size.Z * 0.2
+		for _, side in { -1, 1 } do
+			local wing = newPart("Part", {
+				Name = "Wing",
+				Size = Vector3.new(0.1, height, length),
+				CFrame = CFrame.new(root.Position.X + side * size.X * 0.16, top, back)
+					* CFrame.Angles(0, 0, -side * WING_LEAN)
+					* CFrame.new(0, height * 0.42, 0),
+				Color = UiTheme.color(WING_COLOR),
+				Transparency = 0.35,
+				Reflectance = 0.3,
+			})
+			local mesh = Instance.new("SpecialMesh")
+			mesh.MeshType = Enum.MeshType.Sphere
+			mesh.Parent = wing
+			wing:SetAttribute("MutationSkip", true)
+			wing.Parent = model
 		end
 	end
 	if look.glow and body ~= nil and body:IsA("BasePart") then

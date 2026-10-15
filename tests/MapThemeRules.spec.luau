@@ -71,13 +71,13 @@ T.describe("MapThemeRules: the real config", function()
 		end
 	end)
 
-	T.it("has twenty-three maps, every one in the order once", function()
+	T.it("has twenty-seven maps, every one in the order once", function()
 		local count = 0
 		for _ in MapThemes.themes do
 			count += 1
 		end
-		T.expect(count).toBe(23)
-		T.expect(#MapThemes.order).toBe(23)
+		T.expect(count).toBe(27)
+		T.expect(#MapThemes.order).toBe(27)
 	end)
 
 	T.it("keeps every map's scenery under the part budget", function()
@@ -103,6 +103,18 @@ T.describe("MapThemeRules: the real config", function()
 				`{theme.palette.ground or Theme.world.ground}|{theme.lighting.clockTime}|{theme.flora.round}`
 			T.expect(seen[signature]).toBeNil()
 			seen[signature] = id
+		end
+	end)
+
+	T.it("puts the four newest maps at times of day no other map has (at least 20 minutes apart)", function()
+		for _, id in { "hive", "gingerbread", "ramen", "ranch" } do
+			local mine = MapThemes.themes[id].lighting.clockTime
+			for other, theme in MapThemes.themes do
+				if other ~= id then
+					local gap = math.abs(theme.lighting.clockTime - mine)
+					T.expect(math.min(gap, 24 - gap)).toBeAtLeast(1 / 3)
+				end
+			end
 		end
 	end)
 end)
@@ -233,6 +245,55 @@ T.describe("MapThemeRules flora and landmarks", function()
 		for kind, parts in MapThemeRules.FLORA_PARTS do
 			T.expect(MapThemeRules.FLORA_RADIUS[kind] ~= nil).toBeTruthy()
 			T.expect(parts).toBeGreaterThan(0)
+		end
+	end)
+
+	T.it("uses every flora and landmark kind on some map (no prop builders left unused)", function()
+		local flora: { [string]: boolean } = {}
+		local landmarks: { [string]: boolean } = {}
+		for _, theme in MapThemes.themes do
+			flora[theme.flora.round] = true
+			flora[theme.flora.pine] = true
+			for _, kind in theme.landmarks do
+				landmarks[kind] = true
+			end
+		end
+		for kind in MapThemeRules.FLORA_PARTS do
+			if not flora[kind] then
+				error(`flora kind {kind} grows on no map`)
+			end
+		end
+		for kind in MapThemeRules.LANDMARK_PARTS do
+			if not landmarks[kind] then
+				error(`landmark kind {kind} stands on no map`)
+			end
+		end
+	end)
+
+	T.it("gives the four newest maps flora and landmarks of their own", function()
+		local newest: { [string]: boolean } = { hive = true, gingerbread = true, ramen = true, ranch = true }
+		local usedElsewhere: { [string]: boolean } = {}
+		for id, theme in MapThemes.themes do
+			if not newest[id] then
+				usedElsewhere[theme.flora.round] = true
+				usedElsewhere[theme.flora.pine] = true
+				for _, kind in theme.landmarks do
+					usedElsewhere[kind] = true
+				end
+			end
+		end
+		for id in newest do
+			local theme = MapThemes.themes[id]
+			T.expect(usedElsewhere[theme.flora.round]).toBeNil()
+			T.expect(usedElsewhere[theme.flora.pine]).toBeNil()
+			local own = 0
+			for _, kind in theme.landmarks do
+				if not usedElsewhere[kind] then
+					own += 1
+				end
+			end
+			-- the hive keeps one of Mango Rainforest's giant flowers (recoloured as daisies) among its own
+			T.expect(own).toBeAtLeast(#theme.landmarks - 1)
 		end
 	end)
 end)

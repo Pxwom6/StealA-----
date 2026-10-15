@@ -540,6 +540,94 @@ local function scenario()
 	check(workspace:GetAttribute("MapTheme") == candidates[2], `the most voted map wins ({candidates[2]})`)
 	check(workspace:GetAttribute("MapVoteEndsAt") == 0, "the vote is over")
 
+	-- The four newest maps: each one's scenery and sky, only its own signature mutation, and props that never get in
+	-- anyone's way (only the solid middle of each tree spot's prop inside the wall, like a trunk) --------------------
+	local Mutations = Sim.shared("Config/Mutations")
+	local Scenery = Sim.shared("Config/Scenery")
+	local SceneryLayout = Sim.shared("Logic/SceneryLayout")
+	local insideSpots = 0
+	for _, tree in SceneryLayout.layout(Scenery).trees do
+		if not tree.outside then
+			insideSpots += 1
+		end
+	end
+	local function solidParts(folder: any): number
+		local count = 0
+		for _, descendant in folder:GetDescendants() do
+			if descendant:IsA("BasePart") and (descendant.CanCollide or descendant.CanQuery or descendant.CanTouch) then
+				count += 1
+			end
+		end
+		return count
+	end
+	for _, id in { "hive", "gingerbread", "ramen", "ranch" } do
+		local theme = MapThemes.themes[id]
+		Sim.chat(alice, `/map {id}`)
+		task.wait(0.2)
+		check(workspace:GetAttribute("MapTheme") == id, `/map switches to {theme.displayName}`)
+		local scenery = workspace.Map.Scenery :: any
+		check(scenery:GetAttribute("MapTheme") == theme.displayName, `{id}: its scenery is built`)
+		check(
+			math.abs(Lighting.ClockTime - theme.lighting.clockTime) < 1e-3,
+			`{id}: its own sky ({Lighting.ClockTime})`
+		)
+		check(solidParts(scenery.Landmarks) == 0, `{id}: its landmarks are decoration only`)
+		check(
+			solidParts(scenery.Trees) == insideSpots,
+			`{id}: one solid core per tree spot inside the wall ({solidParts(scenery.Trees)} of {insideSpots})`
+		)
+		local signature = MutationRules.forMap(Mutations, id)
+		local conditions = BeltService.mutationConditions()
+		check(
+			signature ~= nil and conditions[MutationRules.mapKey(id)] == true,
+			`{id}: {if signature then signature.displayName else "?"} Snacklings can roll`
+		)
+		local others = 0
+		for _, other in MapThemes.order do
+			if other ~= id and conditions[MutationRules.mapKey(other)] then
+				others += 1
+			end
+		end
+		check(others == 0, `{id}: no other map's signature mutation can roll`)
+		if signature then
+			Sim.chat(alice, `/spawn pizza_pup {signature.id}`)
+			task.wait(0.1)
+			local item = lastBeltItem("pizza_pup")
+			check(item ~= nil and item.variant == signature.id, `a {signature.displayName} Pizza Pup rides the belt`)
+		end
+	end
+	-- Bumblebee (the hive's): bought from the belt, its podium model wears the two bee wings, kept out of the tint
+	Sim.chat(alice, "/map hive")
+	task.wait(0.2)
+	Sim.chat(alice, "/spawn pizza_pup bumblebee")
+	task.wait(0.1)
+	local bee = lastBeltItem("pizza_pup")
+	local beltNow = Sim.server("Services/BeltService").belt()
+	Sim.moveCharacter(alice, roblox.Vector3.new(beltNow.startX + 2, 3, Gameplay.belt.width / 2 + 3))
+	local ownedBefore = #aliceSession.data.creatures
+	Sim.fireServer(alice, "BuyBeltItem", bee.id)
+	task.wait(0.2)
+	local bought = aliceSession.data.creatures[#aliceSession.data.creatures]
+	check(
+		#aliceSession.data.creatures == ownedBefore + 1 and bought.variant == "bumblebee",
+		"a Bumblebee Pizza Pup lands in the base"
+	)
+	local wings, wingsKept = 0, 0
+	local beePodium = PlotService.podium(aliceSession.plot, bought.podium)
+	for _, child in (beePodium :: any).model:GetChildren() do
+		if child:IsA("Model") and child:GetAttribute("Variant") == "bumblebee" then
+			for _, part in child:GetDescendants() do
+				if part:IsA("BasePart") and part.Name == "Wing" then
+					wings += 1
+					if part:GetAttribute("MutationSkip") == true and part.Transparency > 0 then
+						wingsKept += 1
+					end
+				end
+			end
+		end
+	end
+	check(wings == 2 and wingsKept == 2, `its podium model has two glassy bee wings ({wings})`)
+
 	-- Seasonal events: `/event` switches a theme on (decorations, lighting, its weather), its Snacklings and mutation
 	-- can spawn, and `/event off` takes it all away again ------------------------------------------------------------
 	local Seasons = Sim.shared("Config/Seasons")
