@@ -259,7 +259,10 @@ function ModifierService.start()
 			unlocks[mutation.modifierId] = true
 		end
 	end
-	for _, problem in ModifierRules.validate(Modifiers, MutationRules.worstCaseTotal(Mutations), unlocks) do
+	local function liveMutationChance(modifierId: string): number
+		return MutationRules.worstCaseTotal(Mutations, modifierId)
+	end
+	for _, problem in ModifierRules.validate(Modifiers, liveMutationChance, unlocks) do
 		warn(`[Modifiers] config problem: {problem}`)
 	end
 	nextAt = now() + Modifiers.schedule.firstDelaySeconds

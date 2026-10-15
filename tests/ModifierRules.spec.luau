@@ -6,8 +6,9 @@ local Modifiers = require("../src/shared/Config/Modifiers")
 local Mutations = require("../src/shared/Config/Mutations")
 local Types = require("../src/shared/Types")
 
-local function mutationTotal(): number
-	return MutationRules.worstCaseTotal(Mutations)
+-- The most mutation chance that can be live while a modifier runs (only one modifier runs at a time).
+local function mutationTotal(modifierId: string): number
+	return MutationRules.worstCaseTotal(Mutations, modifierId)
 end
 
 -- The modifiers a mutation waits for (Config/Mutations modifierId).
@@ -49,7 +50,7 @@ end
 
 T.describe("ModifierRules: the real config", function()
 	T.it("is valid", function()
-		local problems = ModifierRules.validate(Modifiers, mutationTotal(), unlocks())
+		local problems = ModifierRules.validate(Modifiers, mutationTotal, unlocks())
 		T.expect(#problems).toBe(0)
 		if #problems > 0 then
 			print(table.concat(problems, "\n"))
@@ -194,7 +195,7 @@ T.describe("ModifierRules.validate", function()
 	local function broken(edit: (config: any) -> ()): { string }
 		local config = copy(Modifiers)
 		edit(config)
-		return ModifierRules.validate(config :: Types.ModifiersConfig, mutationTotal(), unlocks())
+		return ModifierRules.validate(config :: Types.ModifiersConfig, mutationTotal, unlocks())
 	end
 
 	T.it("refuses effects outside their limits", function()
@@ -228,14 +229,14 @@ T.describe("ModifierRules.validate", function()
 	end)
 
 	T.it("lets a weather modifier change only the sky when it unlocks a mutation", function()
-		T.expect(#ModifierRules.validate(Modifiers, mutationTotal(), unlocks())).toBe(0)
+		T.expect(#ModifierRules.validate(Modifiers, mutationTotal, unlocks())).toBe(0)
 		-- without its mutation, a storm changes nothing
-		T.expect(mentions(ModifierRules.validate(Modifiers, mutationTotal(), {}), "thunderstorm changes nothing"))
+		T.expect(mentions(ModifierRules.validate(Modifiers, mutationTotal, {}), "thunderstorm changes nothing"))
 			.toBeTruthy()
 	end)
 
 	T.it("lets a drop modifier change nothing but what it drops", function()
-		T.expect(mentions(ModifierRules.validate(Modifiers, mutationTotal(), unlocks()), "supplyDrop")).toBe(false)
+		T.expect(mentions(ModifierRules.validate(Modifiers, mutationTotal, unlocks()), "supplyDrop")).toBe(false)
 		T.expect(mentions(
 			broken(function(config)
 				config.modifiers.coinRain.drops = nil
@@ -278,8 +279,18 @@ T.describe("ModifierRules.validate", function()
 	end)
 
 	T.it("refuses making mutations too common", function()
-		local problems = ModifierRules.validate(Modifiers, 0.2) -- 0.2 x Golden Hour's 3 = 0.6
+		local problems = ModifierRules.validate(Modifiers, constant(0.2)) -- 0.2 x Golden Hour's 3 = 0.6
 		T.expect(mentions(problems, "too common")).toBeTruthy()
+	end)
+
+	T.it("counts only the mutations that can roll while the multiplying modifier itself runs", function()
+		-- one modifier at a time: during Golden Hour no weather mutation can roll, so it multiplies everything
+		-- permanent, every event's (only an admin's /event could run them all at once) and the strongest map's
+		local goldenHour = MutationRules.worstCaseTotal(Mutations, "goldenHour")
+		T.expect(goldenHour).toBeLessThan(MutationRules.worstCaseTotal(Mutations))
+		T.expect(goldenHour * ModifierRules.effects(Modifiers, "goldenHour").mutationChance).toBeLessThan(0.5)
+		T.expect(MutationRules.worstCaseTotal(Mutations, "thunderstorm"))
+			.toBeNear(MutationRules.worstCaseTotal(Mutations))
 	end)
 
 	T.it("checks the order, the text and the schedule", function()

@@ -406,6 +406,17 @@ T.describe("MutationRules gates: map themes and server modifiers", function()
 		end
 		T.expect(worst).toBeNear(MutationRules.worstCaseTotal(all))
 	end)
+
+	T.it("puts the running modifier's own mutations in the place of the strongest modifier's", function()
+		-- only one modifier runs at a time: while Fortress runs no weather mutation can roll
+		T.expect(MutationRules.worstCaseTotal(all, "fortress")).toBeNear(0.265 - 0.05)
+		T.expect(MutationRules.worstCaseTotal(all, "thunderstorm")).toBeNear(0.265)
+		local total = 0
+		for _, entry in MutationRules.odds(all, MutationRules.conditions({ Halloween = true }, "volcano", "fortress")) do
+			total += entry.chance
+		end
+		T.expect(total).toBeNear(MutationRules.worstCaseTotal(all, "fortress"))
+	end)
 end)
 
 return nil

@@ -154,13 +154,13 @@ function ModifierRules.maxWalkSpeed(config: ModifiersConfig): number
 	return best
 end
 
--- Problems with Config/Modifiers (an empty list means valid). `mutationChanceTotal` is the most mutation chance per
--- spawn that can be live at once (MutationRules.worstCaseTotal): even multiplied by the strongest mutation modifier it
--- must stay well below 1. `unlocks`: the modifiers a mutation is gated on (Config/Mutations modifierId); such a
--- modifier may have no other effect.
+-- Problems with Config/Modifiers (an empty list means valid). `liveMutationChance(id)` is the most mutation chance per
+-- spawn that can be live at once while modifier `id` runs (MutationRules.worstCaseTotal(mutations, id)): multiplied by
+-- that modifier's own mutation multiplier it must stay well below 1. `unlocks`: the modifiers a mutation is gated on
+-- (Config/Mutations modifierId); such a modifier may have no other effect.
 function ModifierRules.validate(
 	config: ModifiersConfig,
-	mutationChanceTotal: number,
+	liveMutationChance: (modifierId: string) -> number,
 	unlocks: { [string]: boolean }?
 ): { string }
 	local problems: { string } = {}
@@ -231,9 +231,9 @@ function ModifierRules.validate(
 				problem(message)
 			end
 		end
-		local chance = ModifierRules.effects(config, id).mutationChance
-		if mutationChanceTotal * chance >= 0.5 then
-			problem(`{name} would make mutations too common ({mutationChanceTotal * chance})`)
+		local live = liveMutationChance(id) * ModifierRules.effects(config, id).mutationChance
+		if live >= 0.5 then
+			problem(`{name} would make mutations too common ({live})`)
 		end
 	end
 	if pickable == 0 then
