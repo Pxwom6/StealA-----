@@ -334,6 +334,12 @@ T.describe("ScreenLayout text", function()
 		T.expect(table.concat(small, ", ")).toBe("")
 	end)
 
+	T.it("fits the base-full warning in the Spin and Gifts tabs", function()
+		local box = TEXT.prizesBaseFull
+		T.expect(fit(Theme.text.prizesBaseFull, box.spin.w, box.spin.h, true)).toBeAtLeast(MIN)
+		T.expect(fit(Theme.text.prizesBaseFull, box.gifts.w, box.gifts.h, false)).toBeAtLeast(MIN)
+	end)
+
 	T.it("fits every modifier's announcement in the narrowest banner", function()
 		local narrowest = math.huge
 		for _, device in ScreenLayout.DEVICES do

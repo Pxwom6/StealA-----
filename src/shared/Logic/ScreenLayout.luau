@@ -104,6 +104,8 @@ ScreenLayout.TEXT = table.freeze({
 	toast = { padX = 8, padY = 4, oneLine = 16 }, -- a toast whose one line would be smaller wraps (the tall toast)
 	cashOffer = { top = 4, title = 24, body = 30 }, -- left of the Robux button, from `cashOffer.text`
 	banner = { padX = 12, padY = 6 }, -- announcement banners wrap onto two lines
+	-- "Base full: Snackling prizes will be sold" in the Rewards panel: left of SPIN! (wrapped), beside the Gifts title
+	prizesBaseFull = { spin = { w = 164, h = 56 }, gifts = { w = 294, h = 24 } },
 })
 
 export type DeviceSpec = {

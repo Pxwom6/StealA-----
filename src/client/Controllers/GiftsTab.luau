@@ -3,7 +3,8 @@
 	The Rewards panel's Gifts tab (playtime gifts; server: GiftService, config: Config/Gifts): six gift boxes that
 	unlock with time played today. Each shows when it unlocks ("12 min"), what it holds and a countdown, then a Claim
 	button, then a tick. The time counts on here from the last StateUpdate (GiftsTab.played), so the countdowns tick
-	without any traffic; the server re-checks every claim.
+	without any traffic; the server re-checks every claim. Claim buttons are 52 tall (44 px on phones). While the base
+	is full a warning beside the title says Snackling prizes will be sold.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,6 +16,7 @@ local Types = require(ReplicatedStorage.Shared.Types)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local GiftRules = require(ReplicatedStorage.Shared.Logic.GiftRules)
+local ScreenLayout = require(ReplicatedStorage.Shared.Logic.ScreenLayout)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local SoundPlayer = require(script.Parent.SoundPlayer)
 local StateStore = require(script.Parent.StateStore)
@@ -23,6 +25,9 @@ local GiftsTab = {}
 
 local CELL_GAP = 8
 local CELL_HEIGHT = 150
+local CLAIM_HEIGHT = 52
+-- The title row; while the base is full, its right half is the warning (tests/ScreenLayout.spec keeps it readable).
+local TITLE_HEIGHT = ScreenLayout.TEXT.prizesBaseFull.gifts.h
 
 -- Seconds played today as of now: what the server last sent plus the time since.
 function GiftsTab.played(view: Types.GiftsView): number
@@ -57,16 +62,27 @@ end
 
 -- Builds the tab into `content`; returns its refresh.
 function GiftsTab.build(content: Frame): (state: Types.ClientState) -> ()
-	UiKit.label({
+	local title = UiKit.label({
 		Name = "Title",
 		Text = Theme.text.giftsTitle,
-		Size = UDim2.new(1, 0, 0, 24),
+		Size = UDim2.new(1, 0, 0, TITLE_HEIGHT),
 		TextColor3 = UiTheme.palette("gold"),
+		Parent = content,
+	})
+	local warning = UiKit.label({
+		Name = "BaseFull",
+		Text = Theme.text.prizesBaseFull,
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.fromScale(1, 0),
+		Size = UDim2.new(0.5, 0, 0, TITLE_HEIGHT),
+		TextXAlignment = Enum.TextXAlignment.Right,
+		TextColor3 = UiTheme.palette("danger"),
+		Visible = false,
 		Parent = content,
 	})
 	local row = UiKit.new("Frame", {
 		Name = "Gifts",
-		Position = UDim2.fromOffset(0, 30),
+		Position = UDim2.fromOffset(0, TITLE_HEIGHT + 6),
 		Size = UDim2.new(1, 0, 0, CELL_HEIGHT),
 		BackgroundTransparency = 1,
 		Parent = content,
@@ -89,11 +105,12 @@ function GiftsTab.build(content: Frame): (state: Types.ClientState) -> ()
 			BackgroundColor3 = UiTheme.palette("panelLight"),
 			Parent = row,
 		})
+		-- When it unlocks, its icon, what it holds, and the Claim button (the bottom 52 + 6).
 		UiKit.label({
 			Name = "When",
 			Text = Format.template(Theme.text.minutesShort, { minutes = def.minutes }),
 			FontFace = UiTheme.bodyFont,
-			Size = UDim2.new(1, -8, 0, 20),
+			Size = UDim2.new(1, -8, 0, 18),
 			Position = UDim2.fromOffset(4, 4),
 			TextColor3 = UiTheme.palette("textDim"),
 			Parent = frame,
@@ -101,8 +118,8 @@ function GiftsTab.build(content: Frame): (state: Types.ClientState) -> ()
 		UiKit.label({
 			Name = "Icon",
 			Text = def.icon,
-			Size = UDim2.new(1, 0, 0, 40),
-			Position = UDim2.fromOffset(0, 26),
+			Size = UDim2.new(1, 0, 0, 34),
+			Position = UDim2.fromOffset(0, 22),
 			Parent = frame,
 		})
 		local reward = UiKit.label({
@@ -110,14 +127,14 @@ function GiftsTab.build(content: Frame): (state: Types.ClientState) -> ()
 			Text = "",
 			TextWrapped = true,
 			Size = UDim2.new(1, -8, 0, 32),
-			Position = UDim2.fromOffset(4, 68),
+			Position = UDim2.fromOffset(4, 57),
 			Parent = frame,
 		})
 		local button = UiKit.button({
 			Name = "Claim",
 			AnchorPoint = Vector2.new(0.5, 1),
 			Position = UDim2.new(0.5, 0, 1, -6),
-			Size = UDim2.new(1, -10, 0, 38),
+			Size = UDim2.new(1, -10, 0, CLAIM_HEIGHT),
 			BackgroundColor3 = UiTheme.palette("panel"),
 			Text = "",
 			Parent = frame,
@@ -139,7 +156,7 @@ function GiftsTab.build(content: Frame): (state: Types.ClientState) -> ()
 		Text = "",
 		FontFace = UiTheme.bodyFont,
 		Size = UDim2.new(1, 0, 0, 22),
-		Position = UDim2.fromOffset(0, 30 + CELL_HEIGHT + 8),
+		Position = UDim2.fromOffset(0, TITLE_HEIGHT + 6 + CELL_HEIGHT + 8),
 		TextColor3 = UiTheme.palette("textDim"),
 		Parent = content,
 	})
@@ -147,6 +164,10 @@ function GiftsTab.build(content: Frame): (state: Types.ClientState) -> ()
 	return function(state: Types.ClientState)
 		local view = state.gifts
 		local played = GiftsTab.played(view)
+		-- The title moves left to make room for the warning while the base is full.
+		warning.Visible = state.baseFull
+		title.Size = if state.baseFull then UDim2.new(0.5, 0, 0, TITLE_HEIGHT) else UDim2.new(1, 0, 0, TITLE_HEIGHT)
+		title.TextXAlignment = if state.baseFull then Enum.TextXAlignment.Left else Enum.TextXAlignment.Center
 		for index, cell in cells do
 			local def = Gifts.ladder[index]
 			cell.reward.Text = rewardText(def.reward, view.rewards[index] or 0)

@@ -567,6 +567,9 @@ local Theme = {
 		spinNotReady = "No spins yet: one is free every 12 hours, and gifts give more.",
 		spinAnnounce = "🎰 {player} won {prize} on the Lucky Spin!",
 		spinOdds = "Odds",
+		spinOddsBack = "Back",
+		-- Shown in the Spin and Gifts tabs while the base is full (Snackling prizes are sold for their refund then)
+		prizesBaseFull = "⚠️ Base full: Snackling prizes will be sold",
 
 		-- Achievements (Config/Achievements): the Trophies tab and the toast
 		rewardsTabTrophies = "Trophies",
