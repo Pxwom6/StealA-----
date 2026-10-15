@@ -15,6 +15,7 @@ type CodeDef = Types.CodeDef
 local CodeRules = {}
 
 CodeRules.MAX_LENGTH = 24
+CodeRules.FLAG_PREFIX = "code_" -- the achievements count these flags (AchievementRules)
 
 -- Why a code can't be redeemed (a Theme.text key each: code<Reason>).
 export type Refusal = "invalid" | "unknown" | "expired" | "used"
@@ -34,7 +35,7 @@ end
 
 -- The save flag that marks `code` (normalized) as redeemed.
 function CodeRules.flagKey(code: string): string
-	return `code_{code}`
+	return CodeRules.FLAG_PREFIX .. code
 end
 
 -- The code's definition if this player may redeem it now, or nil and why not. `code` is what the player typed.

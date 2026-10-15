@@ -899,3 +899,25 @@ Snacklings without the decorations. Never remove the creature or mutation ids (t
 **Why:** the modifiers so far are races between players; this one has the whole server work together on something
 big in the middle of the map, which is where the steals happen.
 **Reversal cost:** none — `weight = 0` keeps it for `/mod` only.
+
+### 43. 28 more achievements, and milestones for the one-off things
+
+* **What:** 53 achievements (from 25). Longer goals on the old counts (1,000 belt buys, 500 steals, 50 discoveries,
+  24 mutations, $1T earned, 7 rebirths, 12 maps, 50 spins) and new goals read from what the save already kept: being
+  stolen from (a consolation for the first time), the best income per second ($1K/s, $100K/s, $1M/s), hours played,
+  the daily streak (7 and 30 days), Snackdex tiers completed, limited (event) Snacklings discovered, and redeem codes
+  used (the `code_` flags).
+* **Milestones:** opening a Supply Crate, catching a runaway, sharing in a Snack Attack takedown and being its top
+  hitter are not counted anywhere, so the service where each happens emits a GameEvents "milestone" and
+  AchievementService sets the flag `did_<id>`: still no save-format change, but these only count from this release.
+  Only ids in `AchievementRules.MILESTONES` are recorded or accepted by the config check.
+* **Reachable:** the tests check that the mutation, limited-Snackling and tier goals ask for no more than exist;
+  the 7th rebirth costs $1.17T, so it and "Trillionaire" are the long-haul pair. The time goals count hours to a tenth so
+  the bar moves from the first minutes.
+* **Tests:** each new count from a save, milestones from their flags (unknown ones ignored), and the config check;
+  the server test opens a crate, catches a runaway and taps a giant down, then checks Bob was paid the four
+  achievements and Alice, who never hit the giant, got neither milestone.
+
+**Why:** a longer ladder for players who have finished the first 25, and trophies that point at the newer systems
+(the modifiers, the daily reward, codes) and soften the first steal against you.
+**Reversal cost:** none — an achievement removed stops showing; its ids stay in the shipped list.

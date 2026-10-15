@@ -3,6 +3,7 @@ local T = require("./TestKit")
 local Achievements = require("../src/shared/Config/Achievements")
 local AchievementRules = require("../src/shared/Logic/AchievementRules")
 local Catalog = require("../src/shared/Logic/Catalog")
+local CodeRules = require("../src/shared/Logic/CodeRules")
 local Creatures = require("../src/shared/Config/Creatures")
 local DataSchema = require("../src/shared/Logic/DataSchema")
 local GiftRules = require("../src/shared/Logic/GiftRules")
@@ -40,6 +41,35 @@ local RELEASED_ACHIEVEMENT_IDS = {
 	"tourist",
 	"globetrotter",
 	"luckySpinner",
+	-- more achievements (28)
+	"conveyorKing",
+	"phantomThief",
+	"robbed",
+	"thickSkin",
+	"archivist",
+	"fullSet",
+	"snackdexScholar",
+	"limitedEdition",
+	"seasonCollector",
+	"mutationManiac",
+	"trillionaire",
+	"moneyMachine",
+	"cashCannon",
+	"snackEmpire",
+	"sevenLives",
+	"explorer",
+	"highRoller",
+	"snackBreak",
+	"regular",
+	"veteran",
+	"weekStreak",
+	"devoted",
+	"insider",
+	"codeCracker",
+	"crateCracker",
+	"gotcha",
+	"giantSlayer",
+	"mvp",
 }
 
 local function rewardProblems(reward: Types.PrizeReward, name: string): { string }
@@ -85,6 +115,33 @@ T.describe("AchievementRules: the real config", function()
 
 	T.it("asks for every map in 'Globetrotter'", function()
 		T.expect(byId("globetrotter").target).toBe(#MapThemes.order)
+	end)
+
+	T.it("only asks for what exists: mutations, limited Snacklings, tiers", function()
+		local regularMutations, limited = 0, 0
+		for _, mutation in catalog.mutationList do
+			if mutation.eventId == nil then
+				regularMutations += 1
+			end
+		end
+		for _, def in catalog.creatures do
+			if def.eventId ~= nil then
+				limited += 1
+			end
+		end
+		local tiers = 0
+		for _ in catalog.rarities do
+			tiers += 1
+		end
+		for _, def in Achievements.list do
+			if def.goal == "mutations" then
+				T.expect(def.target <= regularMutations).toBe(true)
+			elseif def.goal == "limited" then
+				T.expect(def.target <= limited).toBe(true)
+			elseif def.goal == "tiers" then
+				T.expect(def.target <= tiers).toBe(true)
+			end
+		end
 	end)
 end)
 
@@ -150,6 +207,79 @@ T.describe("AchievementRules progress", function()
 		T.expect(AchievementRules.isDone(byId("globetrotter"), ctx, catalog.rarities)).toBe(false)
 	end)
 
+	T.it("counts being robbed, the best income, time played, the daily streak and codes", function()
+		local data = save()
+		data.stats.timesStolenFrom = 3
+		data.stats.bestCashPerSecond = 150000
+		data.stats.playTime = 5400 -- 1.5 hours
+		data.daily.streak = 8
+		data.flags[CodeRules.flagKey("WELCOME")] = true
+		data.flags[CodeRules.flagKey("SNACKTIME")] = true
+		data.flags[AchievementRules.mapFlagKey("meadow")] = true -- other flags don't count as codes
+		local ctx = AchievementRules.context(data, catalog.creatures, catalog.rarities)
+		T.expect(ctx.stolenFrom).toBe(3)
+		T.expect(ctx.income).toBe(150000)
+		T.expect(ctx.playHours).toBe(1.5)
+		T.expect(ctx.streak).toBe(8)
+		T.expect(ctx.codes).toBe(2)
+		local function done(id: string): boolean
+			return AchievementRules.isDone(byId(id), ctx, catalog.rarities)
+		end
+		T.expect(done("robbed")).toBe(true)
+		T.expect(done("thickSkin")).toBe(false)
+		T.expect(done("moneyMachine")).toBe(true)
+		T.expect(done("cashCannon")).toBe(true)
+		T.expect(done("snackEmpire")).toBe(false)
+		T.expect(done("snackBreak")).toBe(true)
+		T.expect(done("regular")).toBe(false)
+		T.expect(done("weekStreak")).toBe(true)
+		T.expect(done("devoted")).toBe(false)
+		T.expect(done("insider")).toBe(true)
+		T.expect(done("codeCracker")).toBe(false)
+		local progress, target = AchievementRules.progress(byId("regular"), ctx, catalog.rarities)
+		T.expect(progress).toBe(1.5) -- the bar moves before the first whole hour
+		T.expect(target).toBe(10)
+	end)
+
+	T.it("counts limited Snacklings and completed Snackdex tiers", function()
+		local data = save()
+		local found = 0
+		for id, def in catalog.creatures do
+			if def.eventId ~= nil and found < 2 then
+				data.snackdex.creatures[id] = true
+				found += 1
+			end
+		end
+		data.snackdex.tiers.Common = true
+		data.snackdex.tiers.Uncommon = true
+		local ctx = AchievementRules.context(data, catalog.creatures, catalog.rarities)
+		T.expect(ctx.limited).toBe(2)
+		T.expect(ctx.discovered).toBe(2)
+		T.expect(ctx.tiers).toBe(2)
+		T.expect(AchievementRules.isDone(byId("limitedEdition"), ctx, catalog.rarities)).toBe(true)
+		T.expect(AchievementRules.isDone(byId("seasonCollector"), ctx, catalog.rarities)).toBe(false)
+		T.expect(AchievementRules.isDone(byId("fullSet"), ctx, catalog.rarities)).toBe(true)
+		T.expect(AchievementRules.isDone(byId("snackdexScholar"), ctx, catalog.rarities)).toBe(false)
+	end)
+
+	T.it("counts milestones from their flags, and only known ones", function()
+		local data = save()
+		data.flags[AchievementRules.milestoneFlagKey("crate")] = true
+		data.flags[AchievementRules.milestoneFlagKey("snackAttack")] = true
+		local ctx = AchievementRules.context(data, catalog.creatures, catalog.rarities)
+		local done: { [string]: boolean } = {}
+		for _, def in AchievementRules.newlyDone(Achievements, ctx, data.flags, catalog.rarities) do
+			done[def.id] = true
+		end
+		T.expect(done.crateCracker).toBe(true)
+		T.expect(done.giantSlayer).toBe(true)
+		T.expect(done.gotcha).toBeNil()
+		T.expect(done.mvp).toBeNil()
+		local progress, target = AchievementRules.progress(byId("mvp"), ctx, catalog.rarities)
+		T.expect(progress).toBe(0)
+		T.expect(target).toBe(1)
+	end)
+
 	T.it("never pays one twice: a flag marks it done", function()
 		local data = save()
 		data.stats.beltPurchases = 1
@@ -183,6 +313,12 @@ T.describe("AchievementRules.validate", function()
 		local badReward = table.clone(good) :: any
 		badReward.reward = { kind = "gems" }
 		T.expect(problems({ badReward })).toBe(1)
+		local unknownMilestone = table.clone(byId("gotcha")) :: any
+		unknownMilestone.milestone = "jumpedTwice"
+		T.expect(problems({ unknownMilestone })).toBe(1)
+		local noMilestone = table.clone(byId("gotcha")) :: any
+		noMilestone.milestone = nil
+		T.expect(problems({ noMilestone })).toBe(1)
 	end)
 end)
 
