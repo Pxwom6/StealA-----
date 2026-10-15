@@ -73,6 +73,31 @@ T.describe("Format.percent", function()
 	end)
 end)
 
+T.describe("Format.percentPrecise (odds disclosures)", function()
+	T.it("rounds four decimal places below the first non-zero digit, as Roblox's policy allows", function()
+		T.expect(Format.percentPrecise(0.18)).toBe("18%")
+		T.expect(Format.percentPrecise(0.035)).toBe("3.5%")
+		T.expect(Format.percentPrecise(1)).toBe("100%")
+		T.expect(Format.percentPrecise(0.0172846)).toBe("1.7285%")
+		T.expect(Format.percentPrecise(0.0003409)).toBe("0.03409%")
+		T.expect(Format.percentPrecise(0.000001234567)).toBe("0.00012346%")
+		T.expect(Format.percentPrecise(0)).toBe("0%")
+		T.expect(Format.percentPrecise(0 / 0)).toBe("0%")
+		T.expect(Format.percentPrecise(-0.2)).toBe("0%")
+	end)
+
+	T.it("always keeps five significant digits", function()
+		local rng = T.seededRandom(5)
+		for _ = 1, 2000 do
+			local p = 10 ^ (-8 * rng()) -- 1e-8 to 1
+			local text = Format.percentPrecise(p)
+			local shown = tonumber((string.gsub(text, "%%$", ""))) :: number
+			local step = 10 ^ (math.floor(math.log10(p * 100)) - 4)
+			T.expect(math.abs(shown - p * 100)).toBeAtMost(step / 2 + 1e-12)
+		end
+	end)
+end)
+
 T.describe("Format.template", function()
 	T.it("fills placeholders and leaves unknown ones visible", function()
 		T.expect(Format.template("{a} stole {b}!", { a = "Ana", b = 3 })).toBe("Ana stole 3!")

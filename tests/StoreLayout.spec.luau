@@ -3,12 +3,17 @@
 -- dialogs fit every checked screen below Roblox's top bar, every button is a full touch target, nothing overlaps, and
 -- every label reads at 12 UI or more (Logic/TextFit).
 local T = require("./TestKit")
+local Catalog = require("../src/shared/Logic/Catalog")
 local Format = require("../src/shared/Logic/Format")
 local ScreenLayout = require("../src/shared/Logic/ScreenLayout")
+local SpinOdds = require("../src/shared/Logic/SpinOdds")
 local SpinRules = require("../src/shared/Logic/SpinRules")
 local StoreLayout = require("../src/shared/Logic/StoreLayout")
 local TextFit = require("../src/shared/Logic/TextFit")
+local Creatures = require("../src/shared/Config/Creatures")
 local Monetization = require("../src/shared/Config/Monetization")
+local Mutations = require("../src/shared/Config/Mutations")
+local Rarities = require("../src/shared/Config/Rarities")
 local Spin = require("../src/shared/Config/Spin")
 local Theme = require("../src/shared/Config/Theme")
 
@@ -168,6 +173,144 @@ T.describe("StoreLayout Shop cards", function()
 	T.it("is as wide as the Shop's content less its scroll bar", function()
 		T.expect(C.w).toBe(L.content(L.STORE).w - 8)
 		T.expect(C.textX + C.textW).toBeAtMost(C.w - C.buy.right - C.buy.w)
+	end)
+end)
+
+T.describe("StoreLayout: the Lucky Spin's Details list", function()
+	local D = L.DETAILS
+	local catalog = Catalog.build(Creatures, Rarities, Mutations)
+	local odds = SpinOdds.table(Spin, catalog.rarityList, catalog.creatureList)
+	local areas: { [string]: { w: number, h: number } } = { Rewards = L.content(L.REWARDS), Shop = L.content(L.STORE) }
+
+	-- Every text a prize row can show (UI/OddsDetails.prizeText): a Snackling prize, or a cash prize with the largest
+	-- amounts Format writes, or its rule.
+	local function prizeTexts(): { string }
+		local list: { string } = {}
+		for _, segment in Spin.segments do
+			local reward = segment.reward :: any
+			if reward.kind == "creature" then
+				local mutation = if reward.mutation then catalog.mutations[reward.mutation] else nil
+				table.insert(
+					list,
+					if mutation
+						then Format.template(
+							Theme.text.spinDetailsSnacklingMutation,
+							{ icon = segment.icon, label = segment.label, mutation = mutation.displayName }
+						)
+						else Format.template(
+							Theme.text.spinDetailsSnackling,
+							{ icon = segment.icon, label = segment.label }
+						)
+				)
+			else
+				local time = (string.gsub(Format.duration(reward.incomeSeconds), " 0s$", ""))
+				for _, amount in
+					{
+						"$999Qa",
+						"$9.99Sx",
+						"$999.9K",
+						Format.template(Theme.text.spinDetailsCashTime, { time = time }),
+					}
+				do
+					table.insert(
+						list,
+						Format.template(
+							Theme.text.spinDetailsCash,
+							{ icon = segment.icon, label = segment.label, amount = amount }
+						)
+					)
+				end
+			end
+		end
+		return list
+	end
+
+	for name, area in areas do
+		T.it(`fits the {name} dialog's content: a title, a full-size Back and the list`, function()
+			local boxes = L.oddsDetails(area.w, area.h)
+			T.expect(table.concat(L.problems(boxes, area.w, area.h), "; ")).toBe("")
+			T.expect(TextFit.fit(Theme.text.spinDetailsTitle, boxes.title.rect.w, boxes.title.rect.h, false))
+				.toBeAtLeast(MIN)
+			T.expect(TextFit.fit(Theme.text.spinOddsBack, D.back.w - 16, D.back.h - 12, false)).toBeAtLeast(MIN)
+			T.expect(boxes.list.rect.h).toBeAtLeast(4 * D.row) -- a few rows show at once
+		end)
+
+		T.it(`reads every row at {D.text} UI in the {name} dialog: prizes, every Snackling and every chance`, function()
+			local w = L.oddsDetails(area.w, area.h).list.rect.w
+			local columns = #odds.columns
+			local small: { string } = {}
+			local function check(text: string, r: StoreLayout.Rect)
+				if not TextFit.fits(text, D.text, r.w, r.h, false) then
+					table.insert(small, text)
+				end
+			end
+			local prize, chance = L.detailsPrize(w)
+			for _, text in prizeTexts() do
+				check(text, prize)
+			end
+			for _, row in odds.segments do
+				check(Format.percentPrecise(row.chance), chance)
+			end
+			local tierName, tierCells = L.detailsColumns(w, columns, false)
+			local creatureName, creatureCells = L.detailsColumns(w, columns, true)
+			for index, segment in odds.columns do
+				check(`{segment.icon} {segment.label}`, tierCells[index])
+			end
+			for _, tier in odds.tiers do
+				check(catalog.rarities[tier.rarity].displayName, tierName)
+				for index, value in tier.chances do
+					check(Format.percentPrecise(value), tierCells[index])
+				end
+				for _, creature in tier.creatures do
+					check(catalog.creatures[creature.id].displayName, creatureName)
+					for index, value in creature.chances do
+						check(Format.percentPrecise(value), creatureCells[index])
+					end
+				end
+			end
+			-- the widest a chance can be written, and the headings and notes (two rows, wrapped)
+			check("0.00012346%", creatureCells[1])
+			for _, text in { Theme.text.spinDetailsReel, Theme.text.spinDetailsSnacklings } do
+				check(text, L.detailsLine(w, 1))
+			end
+			for _, text in { Theme.text.spinDetailsFixed, Theme.text.spinDetailsRounded, Theme.text.spinDetailsSold } do
+				local r = L.detailsLine(w, D.noteRows)
+				if not TextFit.fits(text, D.text, r.w, r.h, true) then
+					table.insert(small, text)
+				end
+			end
+			T.expect(table.concat(small, " | ")).toBe("")
+			T.expect(D.text).toBeAtLeast(MIN)
+			T.expect(D.text * TextFit.LINE_HEIGHT).toBeAtMost(D.row)
+		end)
+	end
+
+	T.it("keeps every column apart and inside the row", function()
+		for _, area in areas do
+			local w = L.oddsDetails(area.w, area.h).list.rect.w
+			for _, indent in { false, true } do
+				local name, cells = L.detailsColumns(w, #odds.columns, indent)
+				local rightEdge = name.x + name.w
+				for _, cell in cells do
+					T.expect(cell.x).toBeAtLeast(rightEdge)
+					rightEdge = cell.x + cell.w
+				end
+				T.expect(rightEdge).toBeAtMost(w - D.scrollBar)
+			end
+		end
+	end)
+
+	T.it("puts Details on the pack card beside the odds grid, and in SPIN!'s place in the Spin tab", function()
+		local card = L.packCard()
+		T.expect(card.details.kind).toBe("button")
+		T.expect(card.details.rect.x).toBeAtLeast(card.odds.rect.x + card.odds.rect.w)
+		T.expect(card.details.rect.y).toBeAtLeast(card.buy.rect.y + card.buy.rect.h)
+		T.expect(TextFit.fit(Theme.text.spinDetails, card.details.rect.w - 16, card.details.rect.h - 12, false))
+			.toBeAtLeast(MIN)
+		for _, packs in { false, true } do
+			local boxes = L.spinTab(packs)
+			T.expect(boxes.details.rect).toEqual(boxes.spin.rect)
+		end
 	end)
 end)
 

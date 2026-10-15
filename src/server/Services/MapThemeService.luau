@@ -14,7 +14,9 @@
 	MapVoteCandidates ("candy,winter,desert") and MapVoteCounts ("2,0,1").
 
 	Rotation can be switched off and on for this server (setRotation: the host panel, for admins and a private
-	server's owner); it starts as Config/MapThemes.rotation.enabled says.
+	server's owner); it starts as Config/MapThemes.rotation.enabled says. A map's signature mutation rolls for the
+	rotation's `mapSeconds` after the map comes up (signatureLive), so staying on a map, or picking it again while it is
+	up, never rolls it longer than the rotation would.
 
 	Commands, this server only: /map <id> switches now, /map vote starts a vote, /map list. Anyone in Studio; in live
 	servers the admins in Config/LiveOps.adminUserIds. The host panel (HostService) calls the same functions.
@@ -43,6 +45,7 @@ type Vote = { endsAt: number, candidates: { string }, votes: { [number]: string 
 
 local random = Random.new()
 local current = MapThemes.order[1]
+local since = 0 -- server time the current map came up
 local switchAt = 0
 local vote: Vote? = nil
 local published = ""
@@ -63,6 +66,17 @@ end
 
 function MapThemeService.current(): string
 	return current
+end
+
+-- Server time the current map came up (a switch to the map already up keeps it).
+function MapThemeService.since(): number
+	return since
+end
+
+-- Whether the current map's signature mutation rolls now: for the rotation's `mapSeconds` after it came up, so a
+-- server kept on one map stops rolling it (MapThemeRules.signatureLive).
+function MapThemeService.signatureLive(): boolean
+	return MapThemeRules.signatureLive(now() - since, MapThemes.rotation)
 end
 
 -- Only votes of players still in the server count.
@@ -113,6 +127,7 @@ function MapThemeService.switchTo(themeId: string, announce: boolean)
 	switchAt = now() + MapThemes.rotation.mapSeconds
 	if themeId ~= current then
 		current = themeId
+		since = now()
 		local ok, err = pcall(MapBuilder.restyle, themeId, MapThemes.transitionSeconds)
 		if not ok then
 			warn(`[MapThemes] restyling as {themeId} failed: {err}`)
@@ -255,6 +270,7 @@ end
 -- Starts the rotation. `firstMap` is the map MapBuilder.build was dressed as.
 function MapThemeService.start(firstMap: string)
 	current = if MapThemes.themes[firstMap] then firstMap else MapThemes.order[1]
+	since = now()
 	switchAt = now() + MapThemes.rotation.mapSeconds
 	publish()
 	Remotes.onIntent("VoteMap", onVote)

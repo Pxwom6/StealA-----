@@ -6,7 +6,7 @@
 	    checks it before Roblox's prompt opens (StoreRules.purchaseRefusal, on the server's own state): the product
 	    exists on the Creator Hub (or this is Studio), a Lucky Spin pack needs the player's Roblox policy to allow paid
 	    random items (PlayerPolicy, looked up first: it may yield, the checks after it don't) and fewer than
-	    Config/Spin.paidBankFull spins banked, the Starter Pack must not be owned and needs a free podium. A refusal
+	    Config/Spin.maxBanked spins banked, the Starter Pack must not be owned and needs a free podium. A refusal
 	    says why (a toast); otherwise the client is told to open the prompt (PurchaseApproved), or in Studio, for a
 	    product with no id yet, the fake receipt runs at once (MonetizationService.grantInStudio). The receipt path
 	    checks again: a client can always open a prompt by itself.
@@ -83,7 +83,7 @@ local function context(session: Session, key: string, paidRandomAllowed: boolean
 		visible = StoreRules.visible(Monetization.products[key].id, RunService:IsStudio()),
 		paidRandomAllowed = paidRandomAllowed,
 		spins = data.spin.spins,
-		spinBankFull = Spin.paidBankFull,
+		spinBankFull = Spin.maxBanked,
 		starterOwned = StarterPackRules.owns(data.flags),
 		-- the Starter Pack's Snackling needs a podium a prize could take (a carrying thief keeps the last one)
 		podiumFree = Inventory.prizeMayTakePodium(data.creatures, session.capacity, session.carry ~= nil),

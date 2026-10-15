@@ -148,8 +148,8 @@ local function giftEveryone(minutes: number): number
 end
 
 -- Runs a checked command in this server, through the services that own each thing. `actor` (nil for a message from
--- another server) hears how it went when there is nothing else to see.
-local function apply(command: Command, actor: Session?)
+-- another server) hears how it went when there is nothing else to see; `role` is who sent it.
+local function apply(command: Command, actor: Session?, role: HostRules.Role)
 	local kind = command.kind
 	if kind == "mapSwitch" and command.id then
 		MapThemeService.switchTo(command.id, true)
@@ -165,7 +165,13 @@ local function apply(command: Command, actor: Session?)
 				else Theme.text.hostRotationNowOff
 		)
 	elseif kind == "modStart" and command.id and command.minutes then
-		ModifierService.startModifier(command.id, command.minutes * 60, true)
+		-- an owner's is theirs to stop or change (HostRules.check)
+		ModifierService.startModifier(
+			command.id,
+			command.minutes * 60,
+			true,
+			if role == "owner" then "owner" else "admin"
+		)
 	elseif kind == "modStop" then
 		if ModifierService.current() == nil then
 			notify(actor, Theme.text.hostModNoneRunning)
@@ -207,7 +213,14 @@ end
 -- "All servers", sends it to every other server. A broadcast is filtered first (that yields); from the cooldown check
 -- on nothing yields until it has run here.
 function HostService.run(session: Session, role: HostRules.Role, command: Command, requested: HostRules.Scope)
-	local refusal = HostRules.check(role, command, requested, Modifiers.modifiers, ModifierService.current())
+	local refusal = HostRules.check(
+		role,
+		command,
+		requested,
+		Modifiers.modifiers,
+		ModifierService.current(),
+		ModifierService.startedBy() == "owner"
+	)
 	if refusal then
 		local key = "hostRefused" .. string.upper(string.sub(refusal, 1, 1)) .. string.sub(refusal, 2)
 		notify(session, UiTheme.text(key), "error")
@@ -246,7 +259,7 @@ function HostService.run(session: Session, role: HostRules.Role, command: Comman
 		HostRules.startCooldown(list, group, seconds, t)
 		HostService.refresh(session)
 	end
-	apply(command, session)
+	apply(command, session, role)
 	log(session, role, command, scope :: HostRules.Scope)
 
 	if scope == "all" and not global then
@@ -298,7 +311,7 @@ local function onRemote(message: CrossServer.Message)
 	if command == nil or HostRules.effectiveScope(command, "all") ~= "all" then
 		return
 	end
-	apply(command, nil)
+	apply(command, nil, "admin")
 end
 
 -- Chat commands (admins; every server, as they always were) ---------------------------------------------------------

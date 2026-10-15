@@ -648,6 +648,19 @@ local Theme = {
 		spinAnnounce = "🎰 {player} won {prize} on the Lucky Spin!",
 		spinOdds = "Odds",
 		spinOddsBack = "Back",
+		-- The Details list (UI/OddsDetails, Logic/SpinOdds): every outcome of a spin and its exact chance, as Roblox's
+		-- Paid Random Items policy asks (its `spinDetailsRounded` wording is the policy's own)
+		spinDetails = "📋 Details",
+		spinDetailsTitle = "🎰 Every Lucky Spin prize",
+		spinDetailsReel = "Each spin wins one of these:",
+		spinDetailsCash = "{icon} {label}: {amount}",
+		spinDetailsCashTime = "{time} of your income",
+		spinDetailsSnackling = "{icon} {label}: a Snackling from the list below",
+		spinDetailsSnacklingMutation = "{icon} {label}: a {mutation} Snackling from the list below",
+		spinDetailsSnacklings = "Which Snackling, chance per spin:",
+		spinDetailsFixed = "These odds never change: events and luck boosts don't apply to the Lucky Spin.",
+		spinDetailsRounded = "Probabilities are rounded; total of displayed individual probabilities may not equal 100%.",
+		spinDetailsSold = "With a full base, a Snackling you win is sold for its refund.",
 		-- Shown in the Spin and Gifts tabs while the base is full (Snackling prizes are sold for their refund then)
 		prizesBaseFull = "⚠️ Base full: Snackling prizes will be sold",
 
@@ -753,6 +766,7 @@ local Theme = {
 		hostRefusedNotAllowed = "Only hosts can do that.",
 		hostRefusedAdminOnly = "Only game admins can do that.",
 		hostRefusedNotHostable = "Private servers can't use that modifier.",
+		hostRefusedNotYours = "This modifier runs to its end: you can start yours when it's over.",
 		hostInvalid = "That didn't work. Check your choices and try again.",
 		hostWait = "Wait {time} before doing that again.",
 		hostSentAll = "🌍 Sent to every server!",
@@ -761,7 +775,7 @@ local Theme = {
 		hostStudioLocal = "Studio: this ran in your test session only.",
 		hostVoteStarted = "Map vote started!",
 		hostRotationNowOn = "Map rotation on: a new map every {minutes} minutes.",
-		hostRotationNowOff = "Map rotation off: this map stays.",
+		hostRotationNowOff = "Map rotation off: this map stays until the server closes.",
 		hostModStopped = "Modifier stopped.",
 		hostModNoneRunning = "No modifier is running.",
 		hostEventStarted = "Event started: {event}",
@@ -792,7 +806,10 @@ local Theme = {
 		runawayRewardFull = "🏃 Base full: {creature} sold for you. +{cash}",
 		-- Snack Attack (Config/Boss): a giant Snackling over the belt
 		bossName = "Giant {creature}",
+		-- the hint under its health bar, for the player's last input: touch, mouse, gamepad (R2 at the centre dot)
 		bossHint = "Tap to hit!",
+		bossHintClick = "Click to hit!",
+		bossHintGamepad = "Aim at it, press R2!",
 		bossAppeared = "👾 A giant {creature} is raiding the belt! Tap it together to take it down!",
 		bossDefeated = "👾 The giant {creature} is down! {player} hit hardest and won a {rarity} {prize}!",
 		bossDown = "👾 The giant {creature} is down!",
@@ -885,11 +902,11 @@ local Theme = {
 		},
 		LuckySpins3 = {
 			name = "3 Lucky Spins",
-			description = "3 more Lucky Spins. Each spin wins one prize, with these exact chances:",
+			description = "3 more Lucky Spins. Each spin wins one prize: Details lists every Snackling's chance.",
 		},
 		LuckySpins10 = {
 			name = "10 Lucky Spins",
-			description = "10 more Lucky Spins. Each spin wins one prize, with these exact chances:",
+			description = "10 more Lucky Spins. Each spin wins one prize: Details lists every Snackling's chance.",
 		},
 	} :: { [string]: { name: string, description: string } },
 

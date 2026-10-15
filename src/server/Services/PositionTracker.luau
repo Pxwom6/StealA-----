@@ -4,7 +4,8 @@
 	this samples every player's root part a few times per second (Gameplay.tracking.sampleInterval) against a walking
 	movement budget (Logic/StealRules.stepWalkTrack: jumps and short lag stalls are fine). A step the budget can't pay
 	for records `session.flaggedAt` (the position is untrusted for a couple of seconds); a gross one (a teleport)
-	also records `session.teleportedAt`.
+	also records `session.teleportedAt`. A sample that moved at all records `session.activeAt` (who is playing, for a
+	Snack Attack giant's health; Logic/BossRules.counts).
 
 	isTrusted(session, position, carryStartedAt) is what tagging uses: a tag only counts when the tagger hasn't been
 	flagged in the last couple of seconds, wasn't caught teleporting since just before that carry started, and their
@@ -31,6 +32,9 @@ local Sessions = require(script.Parent.Sessions)
 type Session = Sessions.Session
 
 local CFG = Gameplay.tracking
+-- A sample this far (studs) from the one before means the player is moving (session.activeAt): walking covers about
+-- four between samples, a character left standing none.
+local MOVED_STUDS = 0.5
 
 local PositionTracker = {}
 
@@ -68,6 +72,13 @@ function PositionTracker.record(session: Session, position: Vector3)
 		return -- a stale position from before a server move: not evidence of anything
 	end
 	local track = session.walk
+	if
+		track ~= nil
+		and Vector3.new(position.X - track.lastX, position.Y - track.lastY, position.Z - track.lastZ).Magnitude
+			> MOVED_STUDS
+	then
+		session.activeAt = t
+	end
 	if track == nil then
 		session.walk = StealRules.newWalkTrack(position.X, position.Y, position.Z, t, walkLimits(session))
 	elseif not StealRules.stepWalkTrack(track, position.X, position.Y, position.Z, t, walkLimits(session)) then

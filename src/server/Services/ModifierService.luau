@@ -59,6 +59,9 @@ local LIGHTING_SECONDS = 4
 local random = Random.new()
 local current: string? = nil
 local last: string? = nil
+local run = 0 -- bumped by every start, a restart of the running modifier included
+-- Who started the running modifier: "schedule", "owner" (a private server's owner, from the host panel) or "admin".
+local startedBy = "admin"
 local endsAt = 0
 local nextAt = 0
 local effects = ModifierRules.none()
@@ -90,6 +93,20 @@ function ModifierService.endsAt(): number
 	return if current then endsAt else 0
 end
 
+-- A number that changes every time a modifier starts, also when the one running is started again (an admin's longer
+-- Supply Drop over the schedule's own): the drop services plan their drops again from then (DropService,
+-- BossService).
+function ModifierService.run(): number
+	return run
+end
+
+-- Who started the running modifier ("schedule", "owner" or "admin"; nil when none runs). A private server's owner may
+-- only stop or replace one they started (Logic/HostRules.check), so they can't cut the random schedule's short and
+-- roll the next one sooner.
+function ModifierService.startedBy(): string?
+	return if current then startedBy else nil
+end
+
 -- What a player's action is checked against right now (belt prices, the steal hold, tag reach): the current effects,
 -- or for Config/Modifiers schedule.changeGraceSeconds after a change the kinder of the old and new values.
 function ModifierService.actionEffects(): ModifierRules.Effects
@@ -114,6 +131,7 @@ local function publish()
 	workspace:SetAttribute("Modifier", current or "")
 	workspace:SetAttribute("ModifierEndsAt", if current then endsAt else 0)
 	workspace:SetAttribute("ModifierNextAt", if current then 0 else nextAt)
+	workspace:SetAttribute("ModifierByOwner", current ~= nil and startedBy == "owner") -- the host panel's Stop
 end
 
 local function setEffects(id: string?)
@@ -130,8 +148,9 @@ local function setEffects(id: string?)
 	end
 end
 
--- Starts modifier `id` now for `seconds` (ending whatever runs). `announce` shows the banner to everyone.
-function ModifierService.startModifier(id: string, seconds: number, announce: boolean)
+-- Starts modifier `id` now for `seconds` (ending whatever runs). `announce` shows the banner to everyone. `source`:
+-- who starts it ("schedule", "owner" or "admin", the default: /mod and an admin's host panel).
+function ModifierService.startModifier(id: string, seconds: number, announce: boolean, source: string?)
 	local def = Modifiers.modifiers[id]
 	if def == nil then
 		return
@@ -139,6 +158,8 @@ function ModifierService.startModifier(id: string, seconds: number, announce: bo
 	LiveOpsService.endBoosts(LUCK_SOURCE)
 	current = id
 	last = id
+	run += 1
+	startedBy = source or "admin"
 	endsAt = now() + seconds
 	setEffects(id)
 	if effects.luck > 1 then
@@ -181,7 +202,7 @@ local function step()
 	elseif Modifiers.schedule.enabled and t >= nextAt then
 		local id = ModifierRules.pick(Modifiers, last, nextRandom)
 		if id then
-			ModifierService.startModifier(id, Modifiers.schedule.durationSeconds, true)
+			ModifierService.startModifier(id, Modifiers.schedule.durationSeconds, true, "schedule")
 		else
 			nextAt = t + Modifiers.schedule.gapMaxSeconds
 			publish()

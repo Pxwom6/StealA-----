@@ -1,7 +1,7 @@
 --!strict
 --[[
 	The always-on HUD, laid out for thumbs on a landscape phone. Logic/ScreenLayout decides where everything goes and
-	tools/layoutCheck.luau checks it on five screens (DECISIONS.md #47); this controller builds the cash pill, the
+	tools/layoutCheck.luau checks it on nine screens (DECISIONS.md #47); this controller builds the cash pill, the
 	feature buttons and the action area, and puts every HUD element the other controllers hand it (HudController.place)
 	exactly where ScreenLayout.layout says: again whenever one of them shows or hides, the screen changes size, or
 	Roblox's player list or top bar does.

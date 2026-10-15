@@ -2,6 +2,7 @@
 --[[
 	Lucky Spin rules (Config/Spin) on the saved `data.spin` (Types.SpinState): whether a spin is available (the free
 	one first, then a banked one), using one, banking spins from gifts, picking the prize by weight, and validation.
+	What a Snackling prize can be, and every outcome's exact chance, is Logic/SpinOdds.
 	Pure: no Roblox APIs; random numbers come in as a function returning [0, 1).
 ]]
 
@@ -16,10 +17,10 @@ local SpinRules = {}
 
 export type Source = "free" | "banked"
 
--- The highest Config/Spin.paidBankFull may go (a bank that full takes minutes to spin through).
-SpinRules.MAX_PAID_BANK_FULL = 200
--- Receipts that could still land on a bank at paidBankFull (retries building up while a player is away, several
--- prompts open at once): validatePacks keeps that many of the biggest pack under the save's limit.
+-- The highest Config/Spin.maxBanked may go (a bank that full takes minutes to spin through).
+SpinRules.MAX_BANKED = 200
+-- Receipts that could still land on a full bank (retries building up while a player is away, several prompts open at
+-- once): validatePacks keeps that many of the biggest pack under the save's limit.
 SpinRules.RECEIPT_BACKLOG = 50
 
 -- Which spin a player would use now: the free one when it is ready, else a banked one; nil when there is none.
@@ -42,7 +43,8 @@ function SpinRules.consume(state: SpinState, source: Source, now: number, config
 	state.total += 1
 end
 
--- Banks `count` spins up to config.maxBanked; returns how many did not fit (the caller pays those as cash).
+-- Banks `count` spins (a gift's, an achievement's) up to config.maxBanked, the bank's one size, bought spins in it or
+-- not; returns how many did not fit (the caller pays those as cash).
 function SpinRules.bank(state: SpinState, count: number, config: SpinConfig): number
 	local room = math.max(0, config.maxBanked - state.spins)
 	local banked = math.min(room, count)
@@ -50,9 +52,9 @@ function SpinRules.bank(state: SpinState, count: number, config: SpinConfig): nu
 	return count - banked
 end
 
--- Banks every spin a Lucky Spin pack paid for, past maxBanked and past paidBankFull if need be: a purchase is never
--- lost or clipped. (Buying is refused while the bank holds paidBankFull or more, StoreRules.purchaseRefusal, but two
--- receipts can still land together; validatePacks keeps far more than that under the save's limit.)
+-- Banks every spin a Lucky Spin pack paid for, past maxBanked if need be: a purchase is never lost or clipped.
+-- (Buying is refused while the bank holds maxBanked or more, StoreRules.purchaseRefusal, but two receipts can still
+-- land together; validatePacks keeps far more than that under the save's limit.)
 function SpinRules.bankPaid(state: SpinState, count: number)
 	state.spins += math.max(0, math.floor(count))
 end
@@ -90,17 +92,8 @@ function SpinRules.validate(config: SpinConfig, mutations: { [string]: any }): {
 	if not (config.freeEverySeconds >= 3600 and config.freeEverySeconds <= 7 * 86400) then
 		table.insert(problems, "freeEverySeconds must be between an hour and a week")
 	end
-	if not (config.maxBanked >= 1 and config.maxBanked <= 1000 and config.maxBanked % 1 == 0) then
-		table.insert(problems, "maxBanked must be a whole number from 1 to 1000")
-	end
-	if
-		not (
-			config.paidBankFull >= config.maxBanked
-			and config.paidBankFull <= SpinRules.MAX_PAID_BANK_FULL
-			and config.paidBankFull % 1 == 0
-		)
-	then
-		table.insert(problems, `paidBankFull must be a whole number from maxBanked to {SpinRules.MAX_PAID_BANK_FULL}`)
+	if not (config.maxBanked >= 1 and config.maxBanked <= SpinRules.MAX_BANKED and config.maxBanked % 1 == 0) then
+		table.insert(problems, `maxBanked must be a whole number from 1 to {SpinRules.MAX_BANKED}`)
 	end
 	for _, message in
 		GiftRules.rewardProblems({
@@ -139,6 +132,18 @@ function SpinRules.validate(config: SpinConfig, mutations: { [string]: any }): {
 		for _, message in GiftRules.rewardProblems(segment.reward, name, mutations, false) do
 			table.insert(problems, message)
 		end
+		-- A spin's prizes never depend on what is live (Logic/SpinOdds): a gated mutation (an event's, a map's, a
+		-- weather's) would come only some of the time, or out of its season.
+		local reward = segment.reward :: any
+		local mutation = if reward.kind == "creature" and reward.mutation ~= nil
+			then mutations[reward.mutation]
+			else nil
+		if
+			type(mutation) == "table"
+			and (mutation.eventId ~= nil or mutation.mapTheme ~= nil or mutation.modifierId ~= nil)
+		then
+			table.insert(problems, `{name} mutation must be a permanent one (a spin's odds never change)`)
+		end
 	end
 	if not (total > 0) then
 		table.insert(problems, "the weights add up to nothing")
@@ -148,7 +153,7 @@ end
 
 -- Problems with the Lucky Spin packs for sale (`counts`: spins per pack, Config/Monetization) given Config/Spin and
 -- `saveLimit`, the most spins a save keeps (DataSchema.MAX_BANKED_SPINS): a pack's spins must never be clipped, so even
--- RECEIPT_BACKLOG of the biggest pack landing on a bank at paidBankFull stays under it.
+-- RECEIPT_BACKLOG of the biggest pack landing on a bank one short of maxBanked stays under it.
 function SpinRules.validatePacks(counts: { number }, config: SpinConfig, saveLimit: number): { string }
 	local problems: { string } = {}
 	local biggest = 0
@@ -159,7 +164,7 @@ function SpinRules.validatePacks(counts: { number }, config: SpinConfig, saveLim
 			biggest = math.max(biggest, count)
 		end
 	end
-	local worst = config.paidBankFull - 1 + SpinRules.RECEIPT_BACKLOG * biggest
+	local worst = config.maxBanked - 1 + SpinRules.RECEIPT_BACKLOG * biggest
 	if not (worst <= saveLimit) then
 		table.insert(
 			problems,

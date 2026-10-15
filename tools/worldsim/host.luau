@@ -15,7 +15,8 @@
 	    per-server action; with MessagingService down it still runs here and says so; the send cap and the intent's
 	    rate limit hold;
 	  * a private server's owner switches the map but can't again within the cooldown, never reaches other servers,
-	    runs only hostable modifiers (and their cooldown holds, even after rejoining), and is refused everything else;
+	    runs only hostable modifiers and stops only their own (and their cooldown holds, even after rejoining), and is
+	    refused everything else;
 	  * a Secret pull publishes one shout-out (an admin drop none), the publish limit holds, and shout-outs from other
 	    servers show at most one per interval, never to a player in the tutorial.
 	It fails on any error, any unexpected warning, or any check below.
@@ -524,6 +525,10 @@ local function scenario()
 	check(lastToast(OWNER) == Theme.text.hostRefusedAdminOnly, "(admins only)")
 	act(owen, "mapRotation", "server", { on = false })
 	check(workspace:GetAttribute("MapRotation") == false, "the owner turns rotation off")
+	-- forty minutes went by: the schedule may be running one (its loop looks once a second), which only an admin
+	-- may stop (review2.luau)
+	task.wait(1.1)
+	act(leo, "modStop", "server", {})
 
 	act(owen, "modStart", "server", { id = "luckyBreeze" })
 	check(workspace:GetAttribute("Modifier") == "", "a modifier that touches the economy is refused")
@@ -555,6 +560,8 @@ local function scenario()
 	act(owen, "modStart", "server", { id = "fortress" })
 	check(workspace:GetAttribute("Modifier") == "", "leaving and rejoining doesn't reset the cooldown")
 	Sim.advance(Host.owner.modifierCooldownSeconds + 1)
+	task.wait(1.1)
+	act(leo, "modStop", "server", {}) -- (the schedule's, if it started one meanwhile)
 	act(owen, "modStart", "server", { id = "fortress" })
 	check(workspace:GetAttribute("Modifier") == "fortress", "after ten minutes the owner may start another")
 	act(owen, "modStop", "server", {})

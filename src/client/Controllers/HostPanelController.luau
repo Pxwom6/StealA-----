@@ -412,13 +412,15 @@ local function buildModifiers(content: Frame, role: Role): Refresh
 			else Theme.text.hostModNone
 		minutes.Text = Format.template(Theme.text.hostMinutes, { minutes = PRESETS.modifierMinutes[modifierMinutes] })
 		startWaits = if role == "owner" then secondsLeft(state.host.modifierReadyAt) else 0
+		-- Owners may only stop or replace a modifier they started (the server's ModifierByOwner): the random
+		-- schedule's run to their end (HostRules.check; a tap says so).
+		local theirs = role == "admin" or def == nil or workspace:GetAttribute("ModifierByOwner") == true
 		if startWaits > 0 then
 			setButton(start, readyText(startWaits), "panel")
 		else
-			setButton(start, Theme.text.hostModStart, "success")
+			setButton(start, Theme.text.hostModStart, if theirs then "success" else "panel")
 		end
-		-- Owners may only stop what they could have started.
-		local stoppable = def ~= nil and (role == "admin" or def.hostable == true)
+		local stoppable = def ~= nil and theirs
 		stop.BackgroundColor3 = UiTheme.palette(if stoppable then "danger" else "panel")
 	end
 end

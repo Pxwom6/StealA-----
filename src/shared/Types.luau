@@ -631,9 +631,12 @@ export type MapThemeDef = {
 
 export type MapRotation = {
 	enabled: boolean, -- false: a server keeps its first map
-	mapSeconds: number, -- how long each map stays
+	-- how long each map stays; also how long after a map comes up its signature mutation rolls (a map kept on by a
+	-- host stops rolling it then: MapThemeRules.signatureLive)
+	mapSeconds: number,
 	voteSeconds: number, -- the vote for the next map runs this long, ending as the map changes
 	candidates: number, -- maps on the ballot (never the current one)
+	creditSeconds: number, -- on a map this long, a player has played on it (its map_<id> flag: the map achievements)
 }
 
 -- Config: server modifiers (Config/Modifiers): short random twists that change how the server plays -----------------
@@ -734,11 +737,10 @@ export type SpinSegment = {
 
 export type SpinConfig = {
 	freeEverySeconds: number, -- a free spin this long after the last free one
-	maxBanked: number, -- spins from gifts beyond this are paid as cash instead (Logic/SpinRules)
+	-- the spin bank's size: spins from gifts beyond it are paid as cash instead (SpinRules.bank), and Lucky Spin packs
+	-- (Robux) can't be bought while it is full; a pack's receipt still banks every spin it paid for (SpinRules.bankPaid)
+	maxBanked: number,
 	bankedOverflow: { incomeSeconds: number, minimum: number }, -- that cash, per spin
-	-- Lucky Spin packs (Robux) can't be bought while this many spins are banked; a pack's receipt still banks every
-	-- spin it paid for, past maxBanked and this (SpinRules.bankPaid)
-	paidBankFull: number,
 	segments: { SpinSegment },
 }
 
@@ -913,8 +915,10 @@ export type CodesConfig = { [string]: CodeDef }
 -- Rewards are IncomeReward (below): sized from the player's steady income, like a cash pack.
 -- Config: Snack Attack (Config/Boss): a giant Snackling over the middle of the belt that everyone taps together -----
 export type BossConfig = {
-	hpPerPlayer: number, -- hits it takes for each player in the server when it appears
+	hpPerPlayer: number, -- hits it takes for each player playing when it appears (BossRules.counts)
 	minHp: number,
+	-- a player counts towards its health who moved or landed a hit this recently (seconds), out of the tutorial
+	activeSeconds: number,
 	hitsPerSecond: number, -- the most hits the server counts from one player (taps beyond it are ignored)
 	burst: number, -- hits a player can land at once before the limit kicks in
 	reach: number, -- studs from its middle a player can tap it from (the server allows a little more)
@@ -927,6 +931,11 @@ export type BossConfig = {
 	-- share x their share of all hits), at least the minimum
 	luck: number, -- × server luck for the top hitter's Snackling
 	mutationChance: number, -- × mutation chances for it
+	-- The hit reaction each client draws: a red fill that fades from `peakFill` (its transparency at the strongest)
+	-- back to none over `seconds`, with a small squash. A new one starts at most every `gapSeconds` however fast hits
+	-- land, so it flashes at most 1 / gapSeconds times a second (CI: at most 2, for photosensitive players); none at
+	-- all with Reduce effects.
+	flinch: { seconds: number, gapSeconds: number, peakFill: number },
 }
 
 export type DropsConfig = {

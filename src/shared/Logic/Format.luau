@@ -7,6 +7,7 @@
 	Format.clock(75)             --> "1:15"
 	Format.duration(3725)        --> "1h 2m"
 	Format.percent(0.0123)       --> "1.23%"
+	Format.percentPrecise(0.0003409) --> "0.03409%" (odds disclosures)
 	Format.template("Hi {name}", { name = "Ana" }) --> "Hi Ana"
 ]]
 
@@ -129,6 +130,18 @@ function Format.percent(probability: number): string
 		text = string.format("%.4f", p)
 	end
 	return stripZeros(text) .. "%"
+end
+
+-- Probability (0..1) as a percentage rounded four decimal places below its first non-zero digit, the precision
+-- Roblox's Paid Random Items policy asks of rounded odds: 0.18 -> "18%", 0.0172845 -> "1.7285%",
+-- 0.00034090 -> "0.03409%". Trailing zeros are dropped.
+function Format.percentPrecise(probability: number): string
+	local p = probability * 100
+	if not (p > 0 and p < math.huge) then
+		return "0%"
+	end
+	local decimals = math.clamp(4 - math.floor(math.log10(p)), 0, 12)
+	return stripZeros(string.format(`%.{decimals}f`, p)) .. "%"
 end
 
 -- Replaces {key} with vars[key]. Unknown keys are left as-is so missing data is visible in testing.
