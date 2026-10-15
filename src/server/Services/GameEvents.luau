@@ -12,7 +12,10 @@
 	                                                                                  Snack Magnet, Auto Collect)
 	  sell          a Snackling was sold (creatureId, variant)                        EconomyService
 	  lock          the base was locked (Instant Lock included)                       LockService
-	  steal         a steal was delivered (creatureId, variant)                       StealService
+	  steal         a steal was delivered (creatureId, variant; otherUserId: whose    StealService
+	                base it came from)
+	  tag           the player tagged a thief, who dropped what they carried          StealService
+	                (otherUserId: the thief)
 	  discover      a new Snackdex entry: a new Snackling, or a new mutation of one   SnackdexService
 	                (creatureId, variant)
 	  milestone     something an achievement asks for once (milestone: an id of       DropService, BossService
@@ -40,6 +43,7 @@ export type Kind =
 	| "sell"
 	| "lock"
 	| "steal"
+	| "tag"
 	| "discover"
 	| "milestone"
 	| "found"
@@ -51,6 +55,7 @@ export type Event = {
 	amount: number?, -- cash, for "collect"
 	milestone: string?, -- for "milestone"
 	source: string?, -- for "found": where it came from
+	otherUserId: number?, -- for "steal": the robbed base's owner; for "tag": the tagged thief
 }
 
 export type Listener = (session: Session, event: Event) -> ()

@@ -7,6 +7,7 @@ local Modifiers = require("../src/shared/Config/Modifiers")
 local Monetization = require("../src/shared/Config/Monetization")
 local Mutations = require("../src/shared/Config/Mutations")
 local Theme = require("../src/shared/Config/Theme")
+local CrossServerRules = require("../src/shared/Logic/CrossServerRules")
 local Format = require("../src/shared/Logic/Format")
 local MutationRules = require("../src/shared/Logic/MutationRules")
 local ScreenLayout = require("../src/shared/Logic/ScreenLayout")
@@ -441,6 +442,39 @@ T.describe("ScreenLayout text", function()
 			end
 		end
 		T.expect(table.concat(small, ", ")).toBe("")
+	end)
+
+	T.it("fits every Treasure Hunt and Bounty Hunt banner in the narrowest banner, with long names", function()
+		local narrowest = math.huge
+		for _, device in ScreenLayout.DEVICES do
+			local d = ScreenLayout.device(device)
+			local layout = ScreenLayout.layout(d, ScreenLayout.SCENARIOS[1].state)
+			narrowest = math.min(narrowest, layout.byId.announcement.w)
+		end
+		local text = (Theme.text :: any) :: { [string]: string }
+		-- the longest display name, shortened for a banner as shout-outs are (CrossServerRules.shortName)
+		local name = CrossServerRules.shortName(string.rep("W", 20), CrossServerRules.SHOUT_NAME_LENGTH)
+		local lines: { string } = {
+			Format.template(Theme.text.treasureFound, { player = name }),
+			Format.template(Theme.text.bountyOn, { player = name }),
+			Format.template(Theme.text.bountyMoved, { player = name }),
+			Format.template(Theme.text.bountyClaimedTag, { player = name, target = name }),
+			Format.template(Theme.text.bountyClaimedSteal, { player = name, target = name }),
+			Format.template(Theme.text.bountyEscaped, { player = name }),
+		}
+		for key, line in text do
+			if string.match(key, "^treasureWhere") then
+				table.insert(lines, Format.template(Theme.text.treasureHidden, { where = line }))
+			end
+		end
+		local small: { string } = {}
+		for _, line in lines do
+			local size = fit(line, narrowest - 2 * TEXT.banner.padX, S.banner.h - 2 * TEXT.banner.padY, true)
+			if size < MIN then
+				table.insert(small, line)
+			end
+		end
+		T.expect(table.concat(small, " | ")).toBe("")
 	end)
 end)
 

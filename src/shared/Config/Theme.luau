@@ -364,6 +364,12 @@ local Theme = {
 		marshmallow = "#FFF4EC",
 		-- Gadgets (GadgetService): the banana peel's flap tips and stem (the peel itself is its gadget's colour)
 		bananaPeelTip = "#6B4A2E",
+		-- Treasure Hunt (DropService): the golden fork, and its glint (DropController)
+		goldenFork = "#FFC93C",
+		goldenForkShine = "#FFF1B8",
+		-- Bounty Hunt (Nametags, BountyService): the marker over the target's head and their outline; resting: dimmed
+		bounty = "#FFD23F",
+		bountyResting = "#B9BCCB",
 	},
 
 	-- One colour per plot (index = plot number).
@@ -800,6 +806,36 @@ local Theme = {
 		bossReward = "👾 You helped take it down: +{cash}",
 		bossPrize = "👾 Top hitter! {creature} is yours!",
 		bossPrizeFull = "👾 Top hitter! Base full: {creature} sold for you. +{cash}",
+		-- Treasure Hunt (Config/Drops treasure): a golden fork hidden on the walkways or the plaza. {where} is one of the
+		-- treasureWhere* lines below (each hiding place names one).
+		treasureHidden = "🍴 A Golden Fork is hidden {where}! Find it!",
+		treasureFound = "🍴 {player} found the Golden Fork!",
+		treasureReward = "🍴 Golden Fork! {prize}",
+		treasureMarker = "🍴",
+		treasureWhereBench = "behind a bench on the plaza",
+		treasureWhereFountain = "by the fountain",
+		treasureWhereFlowers = "in the plaza's flower beds",
+		treasureWhereNews = "behind the What's New board",
+		treasureWherePlazaTrees = "among the plaza's trees",
+		treasureWhereArch = "by the archway",
+		treasureWhereBoards = "behind a leaderboard",
+		treasureWhereFactory = "beside the Snack Factory",
+		treasureWhereWalkwayEnd = "at the far end of a walkway",
+		treasureWhereAlley = "between two bases",
+		-- Bounty Hunt (Config/Bounty): a bounty on the top earner
+		bountyOn = "🎯 The bounty is on {player}! Tag them while they carry, or rob their base!",
+		bountyMoved = "🎯 The bounty moves to {player}!",
+		bountyYou = "🎯 You're the top earner: there's a bounty on you! Guard your base!",
+		bountyClaimedTag = "🎯 {player} tagged {target} and claimed the bounty!",
+		bountyClaimedSteal = "🎯 {player} robbed {target} and claimed the bounty!",
+		bountyReward = "🎯 Bounty claimed: +{cash}!",
+		bountyClaimedOnYou = "🎯 {player} claimed your bounty. It rests for {seconds}s.",
+		bountyRefusedFriend = "🎯 No bounty for tagging or robbing a friend!",
+		bountyRefusedClaimed = "🎯 You already claimed this bounty!",
+		bountyRefusedResting = "🎯 The bounty is resting: back in {time}!",
+		bountyEscaped = "🎯 {player} got through the Bounty Hunt unclaimed!",
+		bountyMarker = "🎯 BOUNTY",
+		bountyMarkerResting = "🎯 BOUNTY 💤",
 
 		-- Gadgets (Config/Gadgets): the Shop's Gadgets tab, the buttons by TAG and what they say. Descriptions are
 		-- filled from the config: {percent} faster, lasts {seconds}, slip {slip}, recharges {cooldown} (seconds).

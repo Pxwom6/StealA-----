@@ -379,6 +379,84 @@ T.describe("GadgetRules view", function()
 		T.expect(view.readyAt.peel).toBeNil()
 		T.expect(view.readyAt.magnet).toBeNil()
 		T.expect(view.activeUntil.soda).toBe(100 + (def("soda").durationSeconds :: number))
+		T.expect(view.usedAt.soda).toBe(100) -- the button's disc runs over readyAt - usedAt
+		T.expect(view.usedAt.magnet).toBeNil()
+	end)
+end)
+
+T.describe("GadgetRules Gadget Frenzy (faster recharges)", function()
+	local FRENZY = ModifierRules.effects(Modifiers, "gadgetFrenzy").gadgetCooldown
+	local STRONGEST = Modifiers.limits.gadgetCooldown.min
+
+	T.it("halves every recharge", function()
+		T.expect(FRENZY).toBe(0.5)
+		T.expect(GadgetRules.cooldownSeconds(def("peel"), FRENZY)).toBe(def("peel").cooldownSeconds / 2)
+		T.expect(GadgetRules.cooldownSeconds(def("shield"), FRENZY)).toBe(def("shield").cooldownSeconds / 2)
+		T.expect(GadgetRules.cooldownSeconds(def("magnet"), FRENZY)).toBe(def("magnet").cooldownSeconds / 2)
+	end)
+
+	T.it("never below a gadget's fairness floor: a soda runs at most a third of the time", function()
+		local soda = def("soda")
+		local duration = soda.durationSeconds :: number
+		T.expect(GadgetRules.cooldownSeconds(soda, FRENZY)).toBe(math.max(3 * duration, soda.cooldownSeconds / 2))
+		T.expect(GadgetRules.cooldownSeconds(soda, FRENZY)).toBe(18) -- not 17.5
+	end)
+
+	T.it("keeps every gadget fair even at the strongest recharge any modifier may set", function()
+		for _, id in Gadgets.order do
+			local gadget = def(id)
+			local cooldown = GadgetRules.cooldownSeconds(gadget, STRONGEST)
+			local duration = gadget.durationSeconds or 0
+			T.expect(cooldown).toBeAtLeast(GadgetRules.MIN_COOLDOWN)
+			if gadget.kind == "speed" then
+				T.expect(cooldown).toBeAtLeast(3 * duration)
+			elseif gadget.kind == "shield" then
+				T.expect(cooldown).toBeAtLeast(5 * duration)
+			end
+		end
+	end)
+
+	T.it("changes nothing without it, and ignores a nonsense multiplier", function()
+		for _, id in Gadgets.order do
+			local gadget = def(id)
+			T.expect(GadgetRules.cooldownSeconds(gadget, nil)).toBe(gadget.cooldownSeconds)
+			T.expect(GadgetRules.cooldownSeconds(gadget, 1)).toBe(gadget.cooldownSeconds)
+			T.expect(GadgetRules.cooldownSeconds(gadget, 0 / 0)).toBe(gadget.cooldownSeconds)
+			T.expect(GadgetRules.cooldownSeconds(gadget, -1)).toBe(gadget.cooldownSeconds)
+		end
+	end)
+
+	T.it("starts the shorter recharge for a gadget used while it runs", function()
+		local state = GadgetRules.newState()
+		GadgetRules.use(state, "shield", def("shield"), 100, Gadgets, FRENZY)
+		T.expect(state.usedAt.shield).toBe(100)
+		T.expect(state.readyAt.shield).toBe(100 + def("shield").cooldownSeconds / 2)
+		-- the effect itself is untouched
+		T.expect(state.shieldUntil).toBe(100 + (def("shield").durationSeconds :: number))
+	end)
+
+	T.it("lets a gadget already recharging finish the rest at the new pace when it starts", function()
+		local state = GadgetRules.newState()
+		GadgetRules.use(state, "magnet", def("magnet"), 100, Gadgets) -- ready at 160
+		T.expect(GadgetRules.rechargeChanged(state, Gadgets, 120, 1, FRENZY)).toBe(true)
+		T.expect(state.readyAt.magnet).toBe(140) -- 40 s left, now 20
+	end)
+
+	T.it("never sooner than the floor after it was used", function()
+		local state = GadgetRules.newState()
+		GadgetRules.use(state, "soda", def("soda"), 100, Gadgets) -- ready at 135
+		GadgetRules.rechargeChanged(state, Gadgets, 100, 1, FRENZY) -- at once: 117.5 would be under the floor
+		T.expect(state.readyAt.soda).toBe(100 + 3 * (def("soda").durationSeconds :: number))
+	end)
+
+	T.it("leaves recharges as they are when it ends, and ignores gadgets already ready", function()
+		local state = GadgetRules.newState()
+		GadgetRules.use(state, "peel", def("peel"), 100, Gadgets, FRENZY)
+		local readyAt = state.readyAt.peel
+		T.expect(GadgetRules.rechargeChanged(state, Gadgets, 105, FRENZY, 1)).toBe(false)
+		T.expect(state.readyAt.peel).toBe(readyAt)
+		T.expect(GadgetRules.rechargeChanged(state, Gadgets, readyAt + 1, 1, FRENZY)).toBe(false)
+		T.expect(state.readyAt.peel).toBe(readyAt)
 	end)
 end)
 

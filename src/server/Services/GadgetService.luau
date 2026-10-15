@@ -20,6 +20,11 @@
 	            Auto Collect pass does this every few seconds, so for its owners the magnet is neither used nor sold
 	            ("auto": its button shows AUTO, GadgetRules.coveredByAutoCollect)
 
+	Gadget Frenzy (a server modifier, Config/Modifiers `gadgetCooldown`): a gadget used while it runs recharges in half
+	the time, and one already recharging when it starts finishes the rest at that pace, never under the fairness floors
+	(Logic/GadgetRules.cooldownSeconds: a soda runs at most a third of the time, a shield a fifth). When it ends,
+	recharges keep whatever they had left. Speeds, the movement caps and every other rule are untouched.
+
 	What players see: the Player attributes GadgetSpeedUntil and SlippedUntil (server time) drive the soda fizz and the
 	dizzy stars on every client (GadgetFxController); a shielded player wears a translucent bubble the server makes
 	(welded to them, massless, never collides, touches or blocks a ray; ShieldUntil says until when); peels are
@@ -45,6 +50,7 @@ local Guard = require(ReplicatedStorage.Shared.Logic.Guard)
 local ModifierRules = require(ReplicatedStorage.Shared.Logic.ModifierRules)
 local Analytics = require(script.Parent.Analytics)
 local EconomyService = require(script.Parent.EconomyService)
+local ModifierService = require(script.Parent.ModifierService)
 local Movement = require(script.Parent.Movement)
 local PlotService = require(script.Parent.PlotService)
 local PositionTracker = require(script.Parent.PositionTracker)
@@ -421,7 +427,8 @@ local function onUse(player: Player, idArg: unknown)
 		return
 	end
 
-	GadgetRules.use(session.gadgets, id, def, t, Gadgets) -- the cooldown starts here
+	-- the cooldown starts here (shorter while Gadget Frenzy runs)
+	GadgetRules.use(session.gadgets, id, def, t, Gadgets, ModifierService.effects().gadgetCooldown)
 	if def.kind == "speed" then
 		applySpeed(session)
 		player:SetAttribute("GadgetSpeedUntil", session.gadgets.speedUntil)
@@ -448,6 +455,7 @@ function GadgetService.devSet(session: Session, own: boolean)
 		end
 	end
 	table.clear(session.gadgets.readyAt)
+	table.clear(session.gadgets.usedAt)
 	Replication.markDirty(session)
 end
 
@@ -480,6 +488,18 @@ function GadgetService.start()
 	folder = Instance.new("Folder")
 	folder.Name = "Gadgets"
 	folder.Parent = workspace
+	-- Gadget Frenzy starting: everything still recharging catches up at once (GadgetRules.rechargeChanged).
+	local recharge = ModifierService.effects().gadgetCooldown
+	ModifierService.onChanged(function()
+		local before, after = recharge, ModifierService.effects().gadgetCooldown
+		recharge = after
+		local t = now()
+		for _, session in Sessions.all() do
+			if GadgetRules.rechargeChanged(session.gadgets, Gadgets, t, before, after) then
+				Replication.markDirty(session)
+			end
+		end
+	end)
 	Remotes.onIntent("BuyGadget", onBuy)
 	Remotes.onIntent("UseGadget", onUse)
 	task.spawn(function()

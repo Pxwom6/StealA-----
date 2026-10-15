@@ -768,6 +768,9 @@ function SeasonRules.lightingProblems(lighting: Types.SeasonLighting, name: stri
 		range(clouds.density, 0, 1, "clouds.density")
 		hex(clouds.color, "clouds.color")
 	end
+	if lighting.hideSun ~= nil and type(lighting.hideSun) ~= "boolean" then
+		table.insert(problems, `{name} lighting.hideSun must be true, false or nil`)
+	end
 	return problems
 end
 

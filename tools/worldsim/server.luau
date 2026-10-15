@@ -398,6 +398,82 @@ local function scenario()
 		check(BeltService.mutationConditions()[key] == nil, `and its mutation goes with it`)
 	end
 
+	-- Treasure Hunt: a golden fork hides away from everyone, announced with roughly where; walking into it finds it
+	local Theme = Sim.shared("Config/Theme")
+	local UiTheme = Sim.shared("UiTheme")
+	local function announced(text: string): boolean
+		for _, args in Sim.received(0, "Announce") do
+			if args[1].text == text then
+				return true
+			end
+		end
+		return false
+	end
+	Sim.chat(alice, "/mod treasureHunt")
+	task.wait(0.4)
+	Sim.advance(Modifiers.modifiers.treasureHunt.drops.firstSeconds + 0.5)
+	task.wait(0.4)
+	local fork = DropService.treasureModel()
+	local forkAt = DropService.treasurePosition()
+	check(fork ~= nil and forkAt ~= nil, "Treasure Hunt: a golden fork hides")
+	local hidingPlace = nil
+	for _, spot in Drops.treasure.spots do
+		if forkAt and math.abs(spot.x - forkAt.X) < 1e-6 and math.abs(spot.z - forkAt.Z) < 1e-6 then
+			hidingPlace = spot
+		end
+	end
+	check(hidingPlace ~= nil, "at one of the hiding places")
+	if hidingPlace then
+		local line = Sim.shared("Logic/Format").template(Theme.text.treasureHidden, {
+			where = UiTheme.text(hidingPlace.where),
+		})
+		check(announced(line), `and everyone hears roughly where ({line})`)
+	end
+	local nearestToFork = math.huge
+	for _, player in { alice, bob } do
+		local offset = (player.Character :: any).HumanoidRootPart.Position - (forkAt :: any)
+		nearestToFork = math.min(nearestToFork, roblox.Vector3.new(offset.X, 0, offset.Z).Magnitude)
+	end
+	check(
+		nearestToFork >= Drops.treasure.minPlayerDistance,
+		`never right by anyone ({math.floor(nearestToFork)} studs)`
+	)
+	local inTheWay = 0
+	for _, part in (fork :: any):GetDescendants() do
+		if part:IsA("BasePart") and (part.CanCollide or part.CanTouch or part.CanQuery or not part.Anchored) then
+			inTheWay += 1
+		end
+	end
+	check(inTheWay == 0, "it is anchored and gets in nobody's way")
+	check((fork :: any):GetAttribute("RevealAt") > workspace:GetServerTimeNow(), "and has no marker yet (RevealAt)")
+	-- Bob jumps right next to it: a teleport is only trusted after the 10 s a steal would wait
+	local bobCashFork, bobSpinsFork = bobSession.data.cash, bobSession.data.spin.spins
+	Sim.moveCharacter(bob, (forkAt :: any) + roblox.Vector3.new(1.5, 3, 0))
+	Sim.advance(1.5)
+	task.wait(0.4)
+	check(DropService.treasureModel() == fork, "teleporting onto the fork finds nothing")
+	Sim.advance(11)
+	task.wait(0.4)
+	check(DropService.treasureModel() == nil, "standing there as if he walked in finds it")
+	check(
+		bobSession.data.cash > bobCashFork or bobSession.data.spin.spins > bobSpinsFork,
+		"and pays a prize (cash or a Lucky Spin)"
+	)
+	check(
+		announced(Sim.shared("Logic/Format").template(Theme.text.treasureFound, { player = "Bob" })),
+		"announced to everyone"
+	)
+	Sim.chat(alice, "/fork 6")
+	task.wait(0.2)
+	local second = DropService.treasureModel()
+	check(second ~= nil and second ~= fork, "/fork hides another one at a chosen hiding place")
+	Sim.chat(alice, "/mod off")
+	task.wait(0.4)
+	check(DropService.treasureModel() == second, "it stays when the modifier ends, until its own time is up")
+	Sim.advance(Drops.treasure.lifetimeSeconds + 0.5)
+	task.wait(0.4)
+	check(DropService.treasureModel() == nil, "an unfound fork goes after its lifetime")
+
 	-- Stealing (with Quick Hands) and tagging --------------------------------------------------------------------------------
 	Sim.chat(bob, "/noshield")
 	local record = aliceSession.data.creatures[1]
@@ -423,6 +499,51 @@ local function scenario()
 	check(#aliceSession.data.creatures == 2, "and the owner keeps it")
 	Sim.chat(alice, "/mod off")
 	task.wait(0.1)
+
+	-- Eclipse: the sun goes (each client draws the eclipsed sun where it was), the afternoon darkens to a violet dusk,
+	-- and Eclipse Snacklings, each standing in its ring of fire, can roll only while it runs
+	local eclipseKey = MutationRules.modifierKey("eclipse")
+	local worldSky = Lighting:FindFirstChild("WorldSky")
+	check(worldSky ~= nil and worldSky.CelestialBodiesShown == true, "the sun shows on the map")
+	Sim.chat(alice, "/mod eclipse")
+	task.wait(0.1)
+	check(BeltService.mutationConditions()[eclipseKey] == true, "the Eclipse lets Eclipse Snacklings roll")
+	check(worldSky.CelestialBodiesShown == false, "it takes the sky's own sun away")
+	local eclipseSky = Modifiers.modifiers.eclipse.lighting
+	check(math.abs(Lighting.ClockTime - eclipseSky.clockTime) < 1e-3, `and darkens the sky ({Lighting.ClockTime})`)
+	Sim.chat(alice, "/spawn pizza_pup eclipse")
+	task.wait(0.1)
+	local eclipsed = lastBeltItem("pizza_pup")
+	check(eclipsed ~= nil and eclipsed.variant == "eclipse", "an Eclipse Pizza Pup rides the belt")
+	local beltNow = BeltService.belt()
+	Sim.moveCharacter(alice, roblox.Vector3.new(beltNow.startX + 2, 3, Gameplay.belt.width / 2 + 3))
+	local ownedBeforeEclipse = #aliceSession.data.creatures
+	Sim.fireServer(alice, "BuyBeltItem", eclipsed.id)
+	task.wait(0.2)
+	local boughtEclipse = aliceSession.data.creatures[#aliceSession.data.creatures]
+	check(
+		#aliceSession.data.creatures == ownedBeforeEclipse + 1 and boughtEclipse.variant == "eclipse",
+		"bought, it lands in the base"
+	)
+	local ring, ringKept = 0, 0
+	local eclipsePodium = PlotService.podium(aliceSession.plot, boughtEclipse.podium)
+	for _, child in (eclipsePodium :: any).model:GetChildren() do
+		if child:IsA("Model") and child:GetAttribute("Variant") == "eclipse" then
+			for _, part in child:GetDescendants() do
+				if part:IsA("BasePart") and part.Name == "Corona" then
+					ring += 1
+					if part:GetAttribute("MutationSkip") == true and part.Material == roblox.Enum.Material.Neon then
+						ringKept += 1
+					end
+				end
+			end
+		end
+	end
+	check(ring == 15 and ringKept == 15, `its podium model stands in a glowing ring, kept out of the tint ({ring})`)
+	Sim.chat(alice, "/mod off")
+	task.wait(0.1)
+	check(worldSky.CelestialBodiesShown == true, "the sun comes back when it ends")
+	check(BeltService.mutationConditions()[eclipseKey] == nil, "and Eclipse Snacklings stop rolling")
 
 	-- Redeem codes ------------------------------------------------------------------------------------------------------
 	local function lastToast(userId: number): string

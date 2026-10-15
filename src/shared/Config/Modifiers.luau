@@ -9,24 +9,30 @@
 	moment after), and prices, hold times and tag reach are worked out the same way on the client
 	(Logic/ModifierRules.effects).
 
-	Weather modifiers (Thunderstorm, Meteor Shower, Toxic Fog, Northern Lights, Heatwave) change nothing but the sky,
-	and unlock a mutation that only rolls while they run (Config/Mutations `modifierId`): Electric, Galaxy, Toxic,
-	Aurora and Toasted Snacklings. Their `weather` replaces the map's particles, `lighting` goes over the map's (and a
-	seasonal theme's) like a seasonal overlay, and `skyEffect` adds lightning flashes (off with Reduce effects),
-	shooting stars or the shimmering curtains of an aurora.
+	Weather modifiers (Thunderstorm, Meteor Shower, Toxic Fog, Northern Lights, Heatwave, Eclipse) change nothing but
+	the sky, and unlock a mutation that only rolls while they run (Config/Mutations `modifierId`): Electric, Galaxy,
+	Toxic, Aurora, Toasted and Eclipse Snacklings. Their `weather` replaces the map's particles, `lighting` goes over
+	the map's (and a seasonal theme's) like a seasonal overlay, and `skyEffect` adds lightning flashes (off with Reduce
+	effects), shooting stars, the shimmering curtains of an aurora, or the eclipsed sun: a black disc in a ring of fire
+	where the sun was (the overlay's `hideSun` takes the sky's own sun away).
 
-	Drop modifiers (Supply Drop, Coin Rain, Great Escape) put crates, coins or runaway Snacklings on the walkways while
-	they run (`drops`; what they hold is in Config/Drops). Snack Attack sends giant Snacklings over the belt for
-	everyone to tap together (`drops.kind = "boss"`, Config/Boss).
+	Drop modifiers (Supply Drop, Coin Rain, Great Escape, Treasure Hunt) put crates, coins, runaway Snacklings or golden
+	forks on the walkways while they run (`drops`; what they hold is in Config/Drops). Snack Attack sends giant
+	Snacklings over the belt for everyone to tap together (`drops.kind = "boss"`, Config/Boss).
+
+	Gadget Frenzy halves every gadget's recharge (`gadgetCooldown`), never below the fairness floors in
+	Logic/GadgetRules (a speed gadget runs at most a third of the time, a shield a fifth). Bounty Hunt (`bounty`) puts
+	a bounty on the server's top earner for as long as it runs: tag them while they carry a Snackling, or get one
+	stolen from their base home, for a payout sized from your own income (Config/Bounty, BountyService).
 
 	Commands: /mod <id> [minutes], /mod off, /mod list (anyone in Studio; admins in live servers, that server only).
 	Admins can also start and stop any modifier from the host panel (Config/Host), in this server or all of them.
 
 	`hostable = true`: a private server's owner may start (and stop) it from the host panel, every 10 minutes at most.
-	Only the four that change how a chase plays and leave the economy alone: Sugar Rush, Quick Hands, Fortress and
-	Snack Patrol. Nothing that raises luck, mutation chances or income, cuts prices, speeds up the belt (more rare
-	spawns an hour), drops anything, or is a weather (they unlock a mutation); CI checks (HostRules.hostableProblems).
-	Balance notes: BALANCE.md "Server modifiers".
+	Only the five that change how a chase plays and leave the economy alone: Sugar Rush, Quick Hands, Fortress, Snack
+	Patrol and Gadget Frenzy. Nothing that raises luck, mutation chances or income, cuts prices, speeds up the belt
+	(more rare spawns an hour), drops anything, pays bounties, or is a weather (they unlock a mutation); CI checks
+	(HostRules.hostableProblems). Balance notes: BALANCE.md "Server modifiers".
 ]]
 
 local Types = require("../Types")
@@ -91,6 +97,20 @@ local HEAT: Types.SeasonLighting = {
 	atmosphere = { density = 0.38, offset = 0.15, color = "#FFD8A0", decay = "#E89A5A", glare = 0.6, haze = 2.4 },
 	colorCorrection = { tint = "#FFF0DC", brightness = 0.04, contrast = 0.06, saturation = 0.08 },
 	clouds = { cover = 0.05, density = 0.2, color = "#FFFFFF" },
+}
+
+-- A total eclipse in the late afternoon: the sun goes (each client draws the eclipsed sun in its place), the day
+-- turns to a violet dusk and the horizon glows all round like a sunset (bright enough to play on every map).
+local ECLIPSE: Types.SeasonLighting = {
+	clockTime = 15.8,
+	brightness = 1.1,
+	ambient = "#5A4E7A",
+	outdoorAmbient = "#7A6C9E",
+	colorShiftTop = "#FFB88A",
+	atmosphere = { density = 0.3, offset = 0.25, color = "#C88AB8", decay = "#3A2A5E", glare = 0, haze = 1.4 },
+	colorCorrection = { tint = "#EADFFF", brightness = 0, contrast = 0.12, saturation = -0.15 },
+	clouds = { cover = 0.2, density = 0.35, color = "#5A4A7A" },
+	hideSun = true,
 }
 
 local Modifiers: ModifiersConfig = {
@@ -240,6 +260,38 @@ local Modifiers: ModifiersConfig = {
 			weather = "heat",
 			lighting = HEAT,
 		},
+		eclipse = {
+			displayName = "Eclipse",
+			icon = "🌑",
+			description = "Eclipse Snacklings can appear on the belt!",
+			color = "#B44DFF",
+			weight = 1,
+			effects = {},
+			lighting = ECLIPSE,
+			skyEffect = "eclipse",
+		},
+
+		-- Gear: every gadget recharges in half the time, never below its fairness floor (Logic/GadgetRules).
+		gadgetFrenzy = {
+			displayName = "Gadget Frenzy",
+			icon = "🔋",
+			description = "Gadgets recharge twice as fast!",
+			color = "#5C7CFF",
+			weight = 1,
+			effects = { gadgetCooldown = 0.5 },
+			hostable = true, -- private-server owners may start it (Config/Host)
+		},
+
+		-- A bounty on the server's top earner (Config/Bounty).
+		bountyHunt = {
+			displayName = "Bounty Hunt",
+			icon = "🎯",
+			description = "Tag the top earner or rob their base for a bounty!",
+			color = "#FF3D6E",
+			weight = 1,
+			effects = {},
+			bounty = true,
+		},
 
 		-- Drops on the walkways (Config/Drops).
 		supplyDrop = {
@@ -278,6 +330,15 @@ local Modifiers: ModifiersConfig = {
 			effects = {},
 			drops = { kind = "boss", firstSeconds = 8, everySeconds = 100 }, -- 3 giants (Config/Boss)
 		},
+		treasureHunt = {
+			displayName = "Treasure Hunt",
+			icon = "🍴",
+			description = "Golden Forks are hidden around the map. Find them!",
+			color = "#FFB627",
+			weight = 1,
+			effects = {},
+			drops = { kind = "treasure", firstSeconds = 6, everySeconds = 42 }, -- 7 forks, one at a time
+		},
 	},
 
 	order = {
@@ -301,6 +362,10 @@ local Modifiers: ModifiersConfig = {
 		"coinRain",
 		"greatEscape",
 		"snackAttack",
+		"eclipse",
+		"gadgetFrenzy",
+		"treasureHunt",
+		"bountyHunt",
 	},
 
 	schedule = {
@@ -324,6 +389,7 @@ local Modifiers: ModifiersConfig = {
 		stealHold = { min = 0.5, max = 2 },
 		lockDuration = { min = 0.5, max = 2 },
 		tagRange = { min = 0.75, max = 1.6 },
+		gadgetCooldown = { min = 0.5, max = 2 },
 	},
 }
 

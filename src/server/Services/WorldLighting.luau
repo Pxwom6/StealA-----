@@ -3,8 +3,8 @@
 	The world's lighting, in layers: the current map's preset at the bottom (Config/MapThemes, set by MapBuilder when it
 	builds or restyles the map), and overlays on top (a seasonal theme's mood, set by SeasonService; a weather
 	modifier's sky, set by ModifierService, above it). The highest-priority overlay decides every value it has (time of
-	day, brightness, ambient colours, haze, colour grading, and the clouds if it has them); the rest always comes from
-	the map. Every change tweens over a few seconds.
+	day, brightness, ambient colours, haze, colour grading, the clouds if it has them, and whether the sun shows); the
+	rest always comes from the map. Every change tweens over a few seconds.
 
 	This module owns the lighting instances: Lighting's own properties, its Atmosphere, Sky, Bloom, ColorCorrection and
 	SunRays children (created once, named World*), and the terrain's Clouds. Nothing else should change them, except
@@ -148,9 +148,10 @@ function WorldLighting.apply(seconds: number)
 	}, seconds)
 
 	-- Roblox's own skybox textures (a new Sky starts with them); only the sun, moon and stars change. Sizes and star
-	-- counts are whole-number properties: set, not tweened.
+	-- counts are whole-number properties: set, not tweened. An overlay with `hideSun` (Eclipse) takes the sun (and the
+	-- moon) away: each client draws the eclipsed sun where it was (WeatherController).
 	local sky = owned("Sky", "WorldSky") :: Sky
-	sky.CelestialBodiesShown = true
+	sky.CelestialBodiesShown = mood.hideSun ~= true
 	sky.SunAngularSize = preset.sky.sunAngularSize
 	sky.MoonAngularSize = preset.sky.moonAngularSize
 	sky.StarCount = preset.sky.starCount

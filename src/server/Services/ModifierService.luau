@@ -6,18 +6,21 @@
 	This service only keeps the schedule and says what is running. The systems read the effects
 	(ModifierService.effects(), resolved by Logic/ModifierRules) where they decide: BeltService (spawn interval, belt
 	capacity, prices, mutation chances), EconomyService (income, with LiveOps cash events), LockService (lock length),
-	StealService (hold time, tag reach, walking and carrying speed), PlayerLifecycle (a new character's speed) and
-	PositionTracker (its walking budget). Services that cache a value re-read it when `onChanged` fires. Luck is added
-	as a LiveOps boost (source "modifier"), so the HUD's luck pill shows it and the usual cap applies.
+	StealService (hold time, tag reach, walking and carrying speed), PlayerLifecycle (a new character's speed),
+	PositionTracker (its walking budget) and GadgetService (recharge times). Services that cache a value re-read it
+	when `onChanged` fires. Luck is added as a LiveOps boost (source "modifier"), so the HUD's luck pill shows it and
+	the usual cap applies. The drop modifiers are DropService's and BossService's and Bounty Hunt is BountyService's:
+	each follows `current()`.
 
 	Movement checks never trust a speed the client might not have yet: walkSpeedAllowance() is the larger of the
 	current and the previous multiplier for a few seconds after every change. In the same way, actionEffects() is what
 	a belt purchase, a steal hold and a tag are checked against: for a moment after a change, the kinder of the old and
 	new price, hold and reach (Logic/ModifierRules.lenient), since clients show the old ones for 0.1-0.3 s.
 
-	Weather modifiers (Thunderstorm, Meteor Shower, Toxic Fog) unlock a mutation while they run (BeltService passes
-	the running id into the mutation roll) and put their lighting over the map's through WorldLighting (above a
-	seasonal theme's). Their particles and sky effects are client-side (WeatherController).
+	Weather modifiers (Thunderstorm, Meteor Shower, Toxic Fog, Northern Lights, Heatwave, Eclipse) unlock a mutation
+	while they run (BeltService passes the running id into the mutation roll) and put their lighting over the map's
+	through WorldLighting (above a seasonal theme's; an eclipse's hides the sun). Their particles and sky effects are
+	client-side (WeatherController).
 
 	Clients read workspace attributes Modifier (id, "" = none), ModifierEndsAt and ModifierNextAt, and work out the same
 	effects from the id.

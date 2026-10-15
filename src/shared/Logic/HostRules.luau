@@ -378,6 +378,9 @@ function HostRules.hostableProblems(config: Types.ModifiersConfig, unlocks: { [s
 		if def.drops ~= nil then
 			table.insert(problems, `{name} drops things`)
 		end
+		if def.bounty == true then
+			table.insert(problems, `{name} pays bounties`)
+		end
 		if unlocks[id] then
 			table.insert(problems, `{name} unlocks a mutation`)
 		end

@@ -18,6 +18,13 @@
 	    nothing is sent while it runs; the server checks catches against the same position (DropRules.legPosition) and
 	    player positions trusted as for a steal, like crates. The first player to reach it gets it (its sell value with a full base);
 	    uncaught, it gets away after its lifetime.
+	  * Golden forks (Treasure Hunt): one at a time, stuck upright in the ground at one of the hiding places in
+	    Config/Drops (DropRules.treasureSpot: away from every player, never the same place twice running), announced
+	    with roughly where ("by the fountain"). The server finds it for whoever walks into it (a distance check every
+	    0.1 s, like coins, against positions trusted as for a steal, since the hiding places are known: a teleport there
+	    only pays off after the 10 s a steal would wait). The finder wins a prize by weight (PrizeService: a few
+	    seconds of income, or a Lucky Spin), announced. Unfound for revealSeconds it gets a marker (the client draws
+	    it from the RevealAt attribute); it goes after its lifetime.
 
 	The schedule follows server time from the moment the modifier starts (DropRules.times). Crates and coins live in
 	workspace.Drops, tagged for the client (DropController adds the prompt, the marker, the spin and the effects).
@@ -38,6 +45,7 @@ local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local GameData = require(ReplicatedStorage.Shared.GameData)
 local Types = require(ReplicatedStorage.Shared.Types)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
+local CrossServerRules = require(ReplicatedStorage.Shared.Logic.CrossServerRules)
 local DropRules = require(ReplicatedStorage.Shared.Logic.DropRules)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local Guard = require(ReplicatedStorage.Shared.Logic.Guard)
@@ -57,12 +65,14 @@ local DropService = {}
 DropService.CRATE_TAG = "SupplyCrate"
 DropService.COIN_TAG = "DropCoin"
 DropService.RUNAWAY_TAG = "Runaway"
+DropService.TREASURE_TAG = "GoldenFork"
 
 local CRATE_SIZE = 4
 local CRATE_COLOR = "#B07443"
 local BAND_COLOR = "#FFD23F"
 local CANOPY_COLOR = "#FF5C5C"
 local COIN_COLOR = "#FFD23F"
+local TREASURE_COLOR = "#FFB627" -- the Treasure Hunt banner's
 local STEP_SECONDS = 0.25
 local PICKUP_SECONDS = 0.1
 -- The server allows this much more than the client prompt's reach (a player stepping back as the hold completes).
@@ -93,12 +103,22 @@ type Runaway = {
 	expiresAt: number,
 }
 
+type Treasure = {
+	id: number,
+	model: Model,
+	position: Vector3, -- where its handle meets the ground
+	expiresAt: number,
+}
+
 local folder: Folder
 local walkwayY = 0.2
 local crates: { [number]: Crate } = {}
 local coins: { Coin } = {}
 local runaways: { [number]: Runaway } = {}
 local nextRunawayId = 1
+local treasure: Treasure? = nil -- one golden fork at a time
+local nextTreasureId = 1
+local lastTreasureSpot: number? = nil
 local nextCrateId = 1
 local random = Random.new()
 local runningId: string? = nil
@@ -505,6 +525,134 @@ local function stepRunaways()
 	end
 end
 
+-- Treasure Hunt ------------------------------------------------------------------------------------------------------
+
+local FORK_TILT = math.rad(12)
+local FORK_SINK = 0.9 -- studs of handle in the ground
+
+-- A golden fork standing on its handle at `foot`, tines up, leaning a little: about 4.5 studs tall, anchored, never
+-- collides, touched or ray cast. Eight parts.
+local function buildFork(foot: Vector3, id: number): Model
+	local model = Instance.new("Model")
+	model.Name = `GoldenFork{id}`
+	local gold = UiTheme.world("goldenFork")
+	local base = CFrame.new(foot)
+		* CFrame.Angles(0, nextRandom() * math.pi * 2, 0)
+		* CFrame.Angles(FORK_TILT, 0, 0)
+		* CFrame.new(0, -FORK_SINK, 0)
+	local function piece(name: string, props: { [string]: any }): BasePart
+		local part = newPart(props)
+		part.Name = name
+		part.Color = gold
+		part.Material = Enum.Material.Foil
+		part.Reflectance = 0.2
+		part.CastShadow = true
+		part.Parent = model
+		return part
+	end
+	-- A cylinder runs along X: this stands it up.
+	local upright = CFrame.Angles(0, 0, math.rad(90))
+	local handle = piece("Handle", {
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(3.1, 0.46, 0.46),
+		CFrame = base * CFrame.new(0, 1.55, 0) * upright,
+	})
+	model.PrimaryPart = handle
+	piece("Collar", {
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.24, 0.62, 0.62),
+		CFrame = base * CFrame.new(0, 3.1, 0) * upright,
+	})
+	piece("Neck", { Size = Vector3.new(0.7, 0.55, 0.3), CFrame = base * CFrame.new(0, 3.45, 0) })
+	piece("Head", { Size = Vector3.new(1.5, 0.42, 0.28), CFrame = base * CFrame.new(0, 3.9, 0) })
+	for index = 1, 4 do
+		local x = -0.63 + (index - 1) * 0.42
+		piece("Tine", { Size = Vector3.new(0.18, 1.35, 0.22), CFrame = base * CFrame.new(x, 4.75, 0) })
+	end
+	return model
+end
+
+local function removeTreasure()
+	local current = treasure
+	if current then
+		treasure = nil
+		current.model:Destroy()
+	end
+end
+
+-- A golden fork hides at hiding place `spotIndex` (nil: one picked away from everyone), replacing any still out.
+-- Returns its model, or nil with no hiding place.
+local function hideTreasure(t: number, spotIndex: number?): Model?
+	local cfg = Drops.treasure
+	local index = spotIndex or DropRules.treasureSpot(Drops, playerPoints(), lastTreasureSpot, nextRandom)
+	local spot = if index then cfg.spots[index] else nil
+	if index == nil or spot == nil then
+		return nil
+	end
+	removeTreasure()
+	lastTreasureSpot = index
+	local id = nextTreasureId
+	nextTreasureId += 1
+	local foot = Vector3.new(spot.x, walkwayY, spot.z)
+	local model = buildFork(foot, id)
+	model:SetAttribute("TreasureId", id)
+	model:SetAttribute("RevealAt", t + cfg.revealSeconds)
+	model:SetAttribute("ExpiresAt", t + cfg.lifetimeSeconds)
+	CollectionService:AddTag(model, DropService.TREASURE_TAG)
+	model.Parent = folder
+	treasure = { id = id, model = model, position = foot, expiresAt = t + cfg.lifetimeSeconds }
+	Announcer.broadcast({
+		text = Format.template(Theme.text.treasureHidden, { where = UiTheme.text(spot.where) }),
+		color = TREASURE_COLOR,
+		kind = "drop",
+	})
+	return model
+end
+
+local function findTreasure(session: Session, found: Treasure)
+	removeTreasure()
+	local reward = DropRules.treasurePrize(Drops.treasure.prizes, nextRandom())
+	local player = session.player
+	if reward then
+		local result = PrizeService.pay(session, reward, "TreasureFork")
+		Remotes.notify(player, Format.template(Theme.text.treasureReward, { prize = result.text }), "success")
+	end
+	Announcer.broadcast({
+		-- shortened like a shout-out's name, so it fits the narrowest banner (tests/ScreenLayout.spec)
+		text = Format.template(
+			Theme.text.treasureFound,
+			{ player = CrossServerRules.shortName(player.DisplayName, CrossServerRules.SHOUT_NAME_LENGTH) }
+		),
+		color = TREASURE_COLOR,
+		kind = "drop",
+	})
+	Remotes.fireAll("Effect", { kind = "treasure", position = found.position + Vector3.new(0, 3, 0) })
+end
+
+-- Whoever walks into the fork first finds it (positions trusted as for a steal: see the header).
+local function stepTreasure()
+	local current = treasure
+	if current == nil then
+		return
+	end
+	for _, player in Players:GetPlayers() do
+		local session = Sessions.get(player)
+		local root = if session then Sessions.rootPart(session) else nil
+		if session == nil or root == nil then
+			continue
+		end
+		local offset = root.Position - current.position
+		local horizontal = Vector3.new(offset.X, 0, offset.Z).Magnitude
+		if
+			DropRules.findsTreasure(Drops, horizontal, offset.Y)
+			and PositionTracker.isTrustedForSteal(session, root.Position)
+		then
+			findTreasure(session, current)
+			return
+		end
+	end
+end
+
 -- The schedule -------------------------------------------------------------------------------------------------------
 
 local function step()
@@ -529,6 +677,8 @@ local function step()
 			spawnRunaway(t)
 		elseif drops.kind == "coins" then
 			spawnCoins(t)
+		elseif drops.kind == "treasure" then
+			hideTreasure(t, nil)
 		end -- "boss": BossService
 	end
 	for _, crate in crates do
@@ -545,6 +695,10 @@ local function step()
 			table.remove(coins, index)
 			coin.part:Destroy()
 		end
+	end
+	local fork = treasure
+	if fork and t >= fork.expiresAt then
+		removeTreasure()
 	end
 end
 
@@ -573,6 +727,24 @@ function DropService.runawayPosition(model: Model): Vector3?
 	return if runaway then runawayPosition(runaway, now()) else nil
 end
 
+-- A golden fork hides now (Studio /fork; the server test): at hiding place `spotIndex`, or one picked away from
+-- everyone. Returns its model.
+function DropService.hideTreasure(spotIndex: number?): Model?
+	return hideTreasure(now(), spotIndex)
+end
+
+-- The golden fork out right now (tests), or nil.
+function DropService.treasureModel(): Model?
+	local current = treasure
+	return if current then current.model else nil
+end
+
+-- Where the golden fork out right now stands (where its handle meets the ground; tests), or nil.
+function DropService.treasurePosition(): Vector3?
+	local current = treasure
+	return if current then current.position else nil
+end
+
 -- The crate models out right now, by id (tests).
 function DropService.crateModels(): { [number]: Model }
 	local models: { [number]: Model } = {}
@@ -589,7 +761,7 @@ function DropService.start(walkwayTop: number)
 			maxX = Gameplay.belt.length / 2,
 			maxZ = Gameplay.map.walkwayWidth,
 			beltHalfWidth = Gameplay.belt.width / 2,
-		})
+		}, (Theme.text :: any) :: { [string]: string })
 	do
 		warn(`[Drops] config problem: {problem}`)
 	end
@@ -615,6 +787,10 @@ function DropService.start(walkwayTop: number)
 				warn(`[Drops] {err}`)
 			end
 			ok, err = pcall(stepRunaways :: () -> ...any)
+			if not ok then
+				warn(`[Drops] {err}`)
+			end
+			ok, err = pcall(stepTreasure :: () -> ...any)
 			if not ok then
 				warn(`[Drops] {err}`)
 			end
