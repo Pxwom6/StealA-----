@@ -21,8 +21,9 @@
 	  * Golden forks (Treasure Hunt): one at a time, stuck upright in the ground at one of the hiding places in
 	    Config/Drops (DropRules.treasureSpot: away from every player, never the same place twice running), announced
 	    with roughly where ("by the fountain"). The server finds it for whoever walks into it (a distance check every
-	    0.1 s, like coins, against positions trusted as for a steal, since the hiding places are known: a teleport there
-	    only pays off after the 10 s a steal would wait). The finder wins a prize by weight (PrizeService: a few
+	    0.1 s, like coins, against positions trusted as for a steal, since the hiding places are known): a player
+	    caught teleporting since it was hidden never finds it, however long they stand there (review 3: waiting out
+	    the 10 s a steal would wait was enough). The finder wins a prize by weight (PrizeService: a few
 	    seconds of income, or a Lucky Spin), announced. Unfound for revealSeconds it gets a marker (the client draws
 	    it from the RevealAt attribute); it goes after its lifetime.
 
@@ -107,6 +108,7 @@ type Treasure = {
 	id: number,
 	model: Model,
 	position: Vector3, -- where its handle meets the ground
+	hiddenAt: number, -- server time it was hidden: a player who teleported since can't find it
 	expiresAt: number,
 }
 
@@ -601,7 +603,7 @@ local function hideTreasure(t: number, spotIndex: number?): Model?
 	model:SetAttribute("ExpiresAt", t + cfg.lifetimeSeconds)
 	CollectionService:AddTag(model, DropService.TREASURE_TAG)
 	model.Parent = folder
-	treasure = { id = id, model = model, position = foot, expiresAt = t + cfg.lifetimeSeconds }
+	treasure = { id = id, model = model, position = foot, hiddenAt = t, expiresAt = t + cfg.lifetimeSeconds }
 	Announcer.broadcast({
 		text = Format.template(Theme.text.treasureHidden, { where = UiTheme.text(spot.where) }),
 		color = TREASURE_COLOR,
@@ -630,7 +632,8 @@ local function findTreasure(session: Session, found: Treasure)
 	Remotes.fireAll("Effect", { kind = "treasure", position = found.position + Vector3.new(0, 3, 0) })
 end
 
--- Whoever walks into the fork first finds it (positions trusted as for a steal: see the header).
+-- Whoever walks into the fork first finds it (positions trusted as for a steal, and no teleport since it was hidden:
+-- see the header).
 local function stepTreasure()
 	local current = treasure
 	if current == nil then
@@ -646,6 +649,7 @@ local function stepTreasure()
 		local horizontal = Vector3.new(offset.X, 0, offset.Z).Magnitude
 		if
 			DropRules.findsTreasure(Drops, horizontal, offset.Y)
+			and session.teleportedAt < current.hiddenAt
 			and PositionTracker.isTrustedForSteal(session, root.Position)
 		then
 			findTreasure(session, current)

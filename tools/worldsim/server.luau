@@ -507,7 +507,7 @@ local function scenario()
 	end
 	check(inTheWay == 0, "it is anchored and gets in nobody's way")
 	check((fork :: any):GetAttribute("RevealAt") > workspace:GetServerTimeNow(), "and has no marker yet (RevealAt)")
-	-- Bob jumps right next to it: a teleport is only trusted after the 10 s a steal would wait
+	-- Bob jumps right next to it: a teleport since it was hidden never finds it, however long he then waits there
 	local bobCashFork, bobSpinsFork = bobSession.data.cash, bobSession.data.spin.spins
 	Sim.moveCharacter(bob, (forkAt :: any) + roblox.Vector3.new(1.5, 3, 0))
 	Sim.advance(1.5)
@@ -515,7 +515,40 @@ local function scenario()
 	check(DropService.treasureModel() == fork, "teleporting onto the fork finds nothing")
 	Sim.advance(11)
 	task.wait(0.4)
-	check(DropService.treasureModel() == nil, "standing there as if he walked in finds it")
+	check(
+		DropService.treasureModel() == fork,
+		"nor standing there after (trusted for a steal again, but he teleported since it was hidden)"
+	)
+	-- the next fork, at the nearest other hiding place: Bob walks into it and finds it
+	local bobRoot = (bob.Character :: any).HumanoidRootPart
+	local from = bobRoot.Position
+	local nextIndex, nextDistance = nil, math.huge
+	for index, spot in Drops.treasure.spots do
+		local distance = roblox.Vector3.new(spot.x - from.X, 0, spot.z - from.Z).Magnitude
+		if spot ~= hidingPlace and distance >= 10 and distance < nextDistance then
+			nextIndex, nextDistance = index, distance
+		end
+	end
+	assert(nextIndex, "another hiding place")
+	Sim.chat(alice, `/fork {nextIndex}`)
+	task.wait(0.2)
+	local walkedTo = DropService.treasureModel()
+	check(walkedTo ~= nil and walkedTo ~= fork, `the next fork hides {math.floor(nextDistance)} studs away`)
+	local target = Drops.treasure.spots[nextIndex]
+	local step = Gameplay.walkSpeed * 0.8 * 0.1 -- walking, a little under full speed, in 0.1 s steps
+	local position = from
+	for _ = 1, 200 do
+		local offset = roblox.Vector3.new(target.x - position.X, 0, target.z - position.Z)
+		if DropService.treasureModel() ~= walkedTo or offset.Magnitude < 1e-3 then
+			break
+		end
+		position += if offset.Magnitude <= step then offset else offset.Unit * step
+		Sim.moveCharacter(bob, position)
+		Sim.advance(0.1)
+		task.wait(0.1)
+	end
+	task.wait(0.3)
+	check(DropService.treasureModel() == nil, "walking into it finds it")
 	check(
 		bobSession.data.cash > bobCashFork or bobSession.data.spin.spins > bobSpinsFork,
 		"and pays a prize (cash or a Lucky Spin)"
