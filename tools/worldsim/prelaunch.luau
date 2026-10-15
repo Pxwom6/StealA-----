@@ -12,7 +12,9 @@
 	mid-carry, Jackpot and saved or paid values, a cash pack bought while a thief carries a Snackling off, a runaway
 	caught by a carrying thief with one free podium, modifier change grace (sale price, tag reach), a teleport onto a
 	supply crate, analytics keys and SKUs, baseFull in the state, core loops surviving an error, and a player's
-	CharacterAdded connection after they leave. It fails on any error, any unexpected warning, or any check below.
+	CharacterAdded connection after they leave. Then on through the calendar: the Harvest Feast and an admin's /event
+	taking over from it, St Patrick's and Summer Splash 2027 by date with their weekends and codes. It fails on any
+	error, any unexpected warning, or any check below.
 ]]
 
 local fs = require("@lune/fs")
@@ -638,6 +640,117 @@ local function scenario()
 	Sim.advance(5 * 60 + 1)
 	task.wait(1.2)
 	check(workspace:GetAttribute("SeasonTheme") == "harvest", "and the feast comes back when that one runs out")
+
+	-- St Patrick's 2027 ("Lucky Clover"): on by date alone with its decorations and a lucky first weekend, LUCKY27
+	-- only while it runs, and off again a day and a half before Easter -------------------------------------------------
+	local LiveOps = Sim.shared("Config/LiveOps")
+	local function shipped(id: string): any
+		for _, event in LiveOps.events do
+			if event.id == id then
+				return event
+			end
+		end
+		error(`no event {id}`)
+	end
+	local patrick, summer, splash = shipped("StPatrick2027"), shipped("Summer2027"), shipped("SplashCash2027")
+	-- Carol redeems `code`: the Snackling it gave her, if any
+	local function redeem(code: string): any
+		local before = #c.data.creatures
+		Sim.fireServer(carol, "RedeemCode", code)
+		task.wait(0.1)
+		return if #c.data.creatures == before + 1 then c.data.creatures[#c.data.creatures] else nil
+	end
+	-- Alice (who never redeemed it) tries `code` once its event is over: is she told it has expired?
+	local function expiredForAlice(code: string): boolean
+		local toastsBefore = #Sim.received(ALICE, "Notify")
+		Sim.fireServer(alice, "RedeemCode", code)
+		task.wait(0.1)
+		local toasts = Sim.received(ALICE, "Notify")
+		for index = toastsBefore + 1, #toasts do
+			if toasts[index][1].text == Theme.text.codeExpired then
+				return a.data.flags[`code_{code}`] == nil
+			end
+		end
+		return false
+	end
+	Sim.advance(Codes.LUCKY27.startsAt - 1 - Sim.now)
+	task.wait(1.2)
+	check(workspace:GetAttribute("SeasonTheme") == "", "nothing seasonal runs the second before St Patrick's")
+	check(redeem("LUCKY27") == nil and c.data.flags.code_LUCKY27 == nil, "and LUCKY27 gives nothing yet")
+	Sim.advance(1)
+	task.wait(1.2)
+	check(
+		workspace:GetAttribute("SeasonTheme") == "clover" and workspace:FindFirstChild("SeasonDecor") ~= nil,
+		"the Lucky Clover decorations go up on 12 March by themselves"
+	)
+	check(workspace:GetAttribute("EventBannerId") == "StPatrick2027", "and its banner shows")
+	check(
+		workspace:GetAttribute("ActiveEventIds") == "StPatrick2027,StPatrickLuck2027"
+			and workspace:GetAttribute("LuckMultiplier") == 2,
+		`with 2x luck from the start of its first weekend ({workspace:GetAttribute("LuckMultiplier")})`
+	)
+	check(BeltService.mutationConditions().StPatrick2027 == true, "Clover Snacklings can roll")
+	local lucky = redeem("LUCKY27")
+	check(
+		lucky ~= nil and lucky.id == "pistachio_puff_frog" and lucky.variant == "clover",
+		"LUCKY27 gives a Clover Pistachio Puff Frog once St Patrick's has started"
+	)
+	Sim.advance(shipped("StPatrickLuck2027").endsAt - Sim.now)
+	task.wait(1.2)
+	check(
+		workspace:GetAttribute("LuckMultiplier") == 1 and workspace:GetAttribute("SeasonTheme") == "clover",
+		"the lucky weekend ends on Sunday night, the clover stays out"
+	)
+	Sim.advance(patrick.endsAt - Sim.now)
+	task.wait(1.2)
+	check(workspace:GetAttribute("SeasonTheme") == "", "the Lucky Clover decorations come down on 18 March")
+	check(
+		workspace:FindFirstChild("SeasonDecor") == nil and BeltService.mutationConditions().StPatrick2027 == nil,
+		"all of them, and the Clover mutation with them"
+	)
+	Sim.advance(Codes.EGGHUNT27.startsAt - Sim.now)
+	task.wait(1.2)
+	check(workspace:GetAttribute("SeasonTheme") == "spring", "then Easter's go up on 19 March, as before")
+	check(expiredForAlice("LUCKY27"), "and LUCKY27 is over")
+
+	-- Summer Splash 2027: on by date alone, SPLASH27 only while it runs, and its 2x Cash weekend in front of it ---------
+	Sim.advance(Codes.SPLASH27.startsAt - 1 - Sim.now)
+	task.wait(1.2)
+	check(workspace:GetAttribute("SeasonTheme") == "", "nothing seasonal runs the second before Summer Splash")
+	check(redeem("SPLASH27") == nil and c.data.flags.code_SPLASH27 == nil, "and SPLASH27 gives nothing yet")
+	Sim.advance(1)
+	task.wait(1.2)
+	check(
+		workspace:GetAttribute("SeasonTheme") == "summer" and workspace:GetAttribute("EventBannerId") == "Summer2027",
+		"the Summer Splash decorations go up on 25 June by themselves, its banner with them"
+	)
+	check(BeltService.mutationConditions().Summer2027 == true, "Sunkissed Snacklings can roll")
+	local sunny = redeem("SPLASH27")
+	check(
+		sunny ~= nil and sunny.id == "ice_pop_meerkat" and sunny.variant == "sunkissed",
+		"SPLASH27 gives a Sunkissed Ice Pop Meerkat once Summer Splash has started"
+	)
+	check(workspace:GetAttribute("CashMultiplier") == 1, "no 2x Cash yet")
+	Sim.advance(splash.startsAt - Sim.now)
+	task.wait(1.2)
+	check(
+		workspace:GetAttribute("CashMultiplier") == 2 and workspace:GetAttribute("EventBannerId") == "SplashCash2027",
+		"the Splash weekend brings 2x Cash on 2 July, its banner in front"
+	)
+	check(workspace:GetAttribute("SeasonTheme") == "summer", "beside the summer theme")
+	Sim.advance(splash.endsAt - Sim.now)
+	task.wait(1.2)
+	check(
+		workspace:GetAttribute("CashMultiplier") == 1 and workspace:GetAttribute("EventBannerId") == "Summer2027",
+		"and goes on 5 July, the Summer Splash banner back"
+	)
+	Sim.advance(summer.endsAt - Sim.now)
+	task.wait(1.2)
+	check(
+		workspace:GetAttribute("SeasonTheme") == "" and workspace:FindFirstChild("SeasonDecor") == nil,
+		"Summer Splash ends on 12 July, its decorations with it"
+	)
+	check(expiredForAlice("SPLASH27"), "and SPLASH27 with it")
 
 	print(`  ({math.floor(Sim.now - OCTOBER_15_2026)} s of server time)`)
 end

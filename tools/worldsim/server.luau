@@ -938,6 +938,81 @@ local function scenario()
 	check(BeltService.mutationConditions().Harvest2026 == nil, "and the Maple mutation with them")
 	check(math.abs(Lighting.ClockTime - mapSky.clockTime) < 1e-3, "and the map's own sky comes back")
 
+	Sim.chat(alice, "/event StPatrick2027 5")
+	task.wait(1.2)
+	check(workspace:GetAttribute("SeasonTheme") == "clover", "/event StPatrick2027 switches the Lucky Clover theme on")
+	decorParts, inTheWay, byName = decorCounts()
+	-- 6 rainbows over the gaps between the bases, each with its pot of gold, 4 more pots at the belt, 16 clover
+	-- patches, 32 bulbs, 4 giant shamrocks: 398 parts (tests/SeasonRules.spec.luau pins the same layout)
+	check(decorParts == 398, `the Lucky Clover decorations are built ({decorParts} parts)`)
+	check(
+		byName.RainbowBand == 180
+			and byName.Cloud == 6
+			and byName.Cauldron == 10
+			and byName.GoldCoin == 30
+			and byName.CloverMound == 16
+			and byName.CloverLeaf == 64
+			and byName.ShamrockStem == 4
+			and byName.ShamrockLeaf == 36
+			and byName.Bulb == 32,
+		"rainbows, pots of gold, clover patches and shamrocks, each built from the parts the budget counts"
+	)
+	check(inTheWay == 0, "and none of them gets in anyone's way")
+	local cloverLighting = Seasons.themes.clover.lighting
+	check(math.abs(Lighting.ClockTime - cloverLighting.clockTime) < 1e-3, "a fresh spring afternoon lights the map")
+	Sim.chat(alice, "/spawn pistachio_puff_frog clover")
+	task.wait(0.1)
+	local cloverFrog = lastBeltItem("pistachio_puff_frog")
+	check(cloverFrog ~= nil and cloverFrog.variant == "clover", "a Clover Pistachio Puff Frog rides the belt")
+	check(BeltService.mutationConditions().StPatrick2027 == true, "Clover Snacklings can roll while it runs")
+	Sim.chat(alice, "/event off")
+	task.wait(1.2)
+	check(workspace:FindFirstChild("SeasonDecor") == nil, "/event off takes the rainbows and the clover away")
+	check(BeltService.mutationConditions().StPatrick2027 == nil, "and the Clover mutation with them")
+
+	Sim.chat(alice, "/event Summer2027 5")
+	task.wait(1.2)
+	check(workspace:GetAttribute("SeasonTheme") == "summer", "/event Summer2027 switches the Summer Splash theme on")
+	decorParts, inTheWay, byName = decorCounts()
+	-- 6 beach umbrellas, 8 swim rings, 8 beach balls by the bases + 6 at the belt, 96 pennants, 4 sandcastles: 330
+	-- parts (tests/SeasonRules.spec.luau pins the same layout)
+	check(decorParts == 330, `the Summer Splash decorations are built ({decorParts} parts)`)
+	check(
+		byName.Canopy == 6
+			and byName.CanopyRib == 24
+			and byName.Towel == 6
+			and byName.SwimRing == 64
+			and byName.BeachBall == 14
+			and byName.BallPanel == 42
+			and byName.Pennant == 96
+			and byName.Tower == 12
+			and byName.SandBucket == 4
+			and byName.SpadeBlade == 4,
+		"umbrellas, swim rings, beach balls, bunting and sandcastles, each built from the parts the budget counts"
+	)
+	check(byName.Bulb == nil, "bunting instead of string lights")
+	check(inTheWay == 0, "and none of them gets in anyone's way")
+	local summerLighting = Seasons.themes.summer.lighting
+	check(math.abs(Lighting.ClockTime - summerLighting.clockTime) < 1e-3, "a bright midsummer noon lights the map")
+	Sim.chat(alice, "/spawn ice_pop_meerkat sunkissed")
+	task.wait(0.1)
+	local sunkissed = lastBeltItem("ice_pop_meerkat")
+	check(sunkissed ~= nil and sunkissed.variant == "sunkissed", "a Sunkissed Ice Pop Meerkat rides the belt")
+	check(BeltService.mutationConditions().Summer2027 == true, "Sunkissed Snacklings can roll while it runs")
+	-- the Splash weekend's 2x Cash is a plain cash event: it runs beside the summer theme
+	Sim.chat(alice, "/event SplashCash2027 5")
+	task.wait(0.2)
+	check(
+		workspace:GetAttribute("SeasonTheme") == "summer"
+			and workspace:GetAttribute("ActiveEventIds") == "SplashCash2027,Summer2027",
+		`/event SplashCash2027 runs beside it ({workspace:GetAttribute("ActiveEventIds")})`
+	)
+	Sim.chat(alice, "/event off")
+	task.wait(1.2)
+	check(workspace:FindFirstChild("SeasonDecor") == nil, "/event off takes the umbrellas and sandcastles away")
+	check(BeltService.mutationConditions().Summer2027 == nil, "and the Sunkissed mutation with them")
+	check(math.abs(Lighting.ClockTime - mapSky.clockTime) < 1e-3, "and the map's own sky comes back")
+
 	-- One seasonal event at a time (DECISIONS.md #58): a second /event ends the first, its Snacklings and mutation with
 	-- it; a luck event runs beside either
 	Sim.chat(alice, "/event Winter2026 5")
@@ -1074,13 +1149,16 @@ local function scenario()
 		"Alice earns the most, then Bob, then Dan"
 	)
 	-- a hunt nobody claims: the target got through it
+	local toastsBefore = #Sim.received(1001, "Notify")
 	Sim.chat(alice, "/mod bountyHunt")
 	task.wait(0.3)
 	check(alice:GetAttribute("Bounty") == "on", "Bounty Hunt: the top earner wears the bounty")
 	check(announced(Format.template(Theme.text.bountyOn, { player = "Alice" })), "and everyone hears who it is on")
+	-- any toast since the hunt started (her new Snackling's achievements can land in the same moment, on the
+	-- every-10-seconds check)
 	local aliceToasts = Sim.received(1001, "Notify")
 	local toldToGuard = false
-	for index = math.max(1, #aliceToasts - 3), #aliceToasts do
+	for index = toastsBefore + 1, #aliceToasts do
 		if aliceToasts[index][1].text == Theme.text.bountyYou then
 			toldToGuard = true
 		end
