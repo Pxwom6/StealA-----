@@ -9,8 +9,9 @@
 	    can only be bought when the player's PolicyService policy allows that (the server publishes the answer as the
 	    player attribute in Logic/PaidRandomItems); otherwise, and while that is still being looked up, it shows as
 	    blocked (the server refuses the receipt too).
-	  * Items whose id is still 0 show "Coming soon" — or, in Studio, a "(Studio) Grant" button that runs the real
-	    server receipt path, so purchases are testable before the IDs exist.
+	  * Items whose id is still 0 (not created on the Creator Hub yet) are hidden outside Studio, headers too when a
+	    section has nothing to show (Logic/StoreRules.visible). In Studio they show a "(Studio) Grant" button that runs
+	    the real server receipt path, so purchases are testable before the IDs exist.
 	Opening the store and tapping an item are reported for the analytics store funnel.
 
 	Two tabs: Shop (all of the above, first as it always was) and Gadgets (GadgetsTab: gear bought once with in-game
@@ -35,6 +36,7 @@ local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local LiveOpsRules = require(ReplicatedStorage.Shared.Logic.LiveOpsRules)
 local PaidRandomItems = require(ReplicatedStorage.Shared.Logic.PaidRandomItems)
 local RarityRoll = require(ReplicatedStorage.Shared.Logic.RarityRoll)
+local StoreRules = require(ReplicatedStorage.Shared.Logic.StoreRules)
 local LiveOps = require(ReplicatedStorage.Shared.Config.LiveOps)
 local Modal = require(script.Parent.Parent.UI.Modal)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
@@ -219,10 +221,7 @@ local function card(parent: Instance, spec: CardSpec, owned: boolean): Frame
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -12, 0.5, 0),
 		Size = UDim2.fromOffset(160, 58),
-		BackgroundColor3 = if owned or blocked
-			then UiTheme.palette("panel")
-			elseif configured or isStudio then UiTheme.palette("robux")
-			else UiTheme.palette("panel"),
+		BackgroundColor3 = if owned or blocked then UiTheme.palette("panel") else UiTheme.palette("robux"),
 		Text = "",
 		Parent = frame,
 	}, function()
@@ -251,10 +250,8 @@ local function card(parent: Instance, spec: CardSpec, owned: boolean): Frame
 		priceLabel.Text = spec.blockedText :: string
 	elseif configured then
 		fetchPrice(spec.kind, spec.id, priceLabel)
-	elseif isStudio then
-		priceLabel.Text = Theme.text.storeStudioGrant
 	else
-		priceLabel.Text = Theme.text.storeUnavailable
+		priceLabel.Text = Theme.text.storeStudioGrant -- only Studio shows an unconfigured item (fillCards)
 	end
 	return frame
 end
@@ -303,9 +300,16 @@ local function fillCards(scroller: ScrollingFrame): { [string]: Frame }
 		return order
 	end
 
+	-- Items not created on the Creator Hub yet only show in Studio, and a header only with something under it.
+	local isStudio = RunService:IsStudio()
+	local productKeys = StoreRules.visibleKeys(Monetization.storeProducts, Monetization.products, isStudio)
+	local passKeys = StoreRules.visibleKeys(Monetization.storePasses, Monetization.passes, isStudio)
+
 	-- Boosts first: they are the impulse buys and the server-hero moment.
-	header(scroller, nextOrder(), Theme.text.storeProductsHeader)
-	for _, key in Monetization.storeProducts do
+	if #productKeys > 0 then
+		header(scroller, nextOrder(), Theme.text.storeProductsHeader)
+	end
+	for _, key in productKeys do
 		local product = Monetization.products[key]
 		local detail: string? = nil
 		local blockedText: string? = nil
@@ -342,8 +346,10 @@ local function fillCards(scroller: ScrollingFrame): { [string]: Frame }
 		}, false)
 	end
 
-	header(scroller, nextOrder(), Theme.text.storePassesHeader)
-	for _, key in Monetization.storePasses do
+	if #passKeys > 0 then
+		header(scroller, nextOrder(), Theme.text.storePassesHeader)
+	end
+	for _, key in passKeys do
 		local pass = Monetization.passes[key]
 		local owned = (state.passes :: any)[key] == true
 		cards[key] = card(scroller, {

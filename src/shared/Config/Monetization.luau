@@ -4,9 +4,9 @@
 
 	IDs come from the Creator Hub (create.roblox.com → Creations → Steal a Snackling → Monetization →
 	  Passes / Developer Products). Prices are set there, not here; the comment on each line records the
-	  price it launched at. An id of 0 means "not configured yet": the store shows the item as unavailable
-	  in live servers, and in Studio the "(Studio) Grant" button simulates the purchase through the exact
-	  same receipt code path.
+	  price it launched at (or the suggested price, for an item not created yet). An id of 0 means "not
+	  configured yet": live servers hide the item everywhere it would be sold (Logic/StoreRules.visible), and in
+	  Studio the "(Studio) Grant" button simulates the purchase through the exact same receipt code path.
 
 	Display names and descriptions live in Config/Theme.luau (store section) so a re-theme never touches this file.
 

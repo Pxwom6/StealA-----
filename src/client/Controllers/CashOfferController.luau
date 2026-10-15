@@ -21,6 +21,7 @@ local Monetization = require(ReplicatedStorage.Shared.Config.Monetization)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local ScreenLayout = require(ReplicatedStorage.Shared.Logic.ScreenLayout)
+local StoreRules = require(ReplicatedStorage.Shared.Logic.StoreRules)
 local Net = require(ReplicatedStorage.Shared.Net)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
@@ -86,8 +87,8 @@ local function show(payload: any)
 		return
 	end
 	local isStudio = RunService:IsStudio()
-	if product.id == 0 and not isStudio then
-		return
+	if not StoreRules.visible(product.id, isStudio) then
+		return -- not created on the Creator Hub yet: hidden outside Studio, like in the store
 	end
 	local previous = current
 	if previous then

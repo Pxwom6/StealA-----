@@ -52,5 +52,6 @@ require("./GadgetRules.spec")
 require("./HostRules.spec")
 require("./CrossServerRules.spec")
 require("./HostPanelLayout.spec")
+require("./StoreRules.spec")
 
 T.finish()
