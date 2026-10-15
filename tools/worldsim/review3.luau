@@ -17,6 +17,9 @@
 	  * finding gadgets (GadgetService): one toast when the first gadget becomes affordable, never during the
 	    tutorial, once per account (a rejoin too)
 	  * Bounty Hunt (BountyService) never targets a newcomer still shielded, even the top earner
+	  * a full server (PlayerLifecycle): a ninth player is turned away before their save loads, so its lastSeen (their
+	    offline earnings) is untouched; a join that loads and finds no base keeps it too; with a base free they get in
+	    with all their offline earnings
 
 	It fails on any error, any unexpected warning, or any check below.
 ]]
@@ -33,7 +36,7 @@ local OCTOBER_15_2026 = 1792023721
 local KIM, NIA, PIA = 9301, 9302, 9303
 local OLA, UMA, VAL = 9304, 9305, 9306
 local WES = 9307
-local XIA, YAN = 9308, 9309
+local XIA, YAN, ZED = 9308, 9309, 9310
 
 Sim.mock("ServerPackages/ProfileStore.lua", MockProfileStore)
 Sim.virtualClock = true
@@ -42,6 +45,23 @@ Sim.shared("Config/Modifiers").schedule.enabled = false -- only /mod starts one
 Sim.shared("Config/MapThemes").rotation.enabled = false
 
 local EXPECTED_WARNINGS = { "MessagingService.SubscribeAsync is not available offline" }
+
+-- Player:Kick, recorded (the test then removes the player, as Roblox would), and every save session started, by key.
+local kicked: { [number]: string } = {}
+roblox.implementMethod("Player", "Kick", function(self: any, message: string?)
+	kicked[self.UserId] = message or ""
+end)
+local loads: { [string]: number } = {}
+local newStore = MockProfileStore.New
+MockProfileStore.New = function(name: string, template: any): any
+	local store = newStore(name, template)
+	local startSession = store.StartSessionAsync
+	store.StartSessionAsync = function(self: any, key: string, params: any): any
+		loads[key] = (loads[key] or 0) + 1
+		return startSession(self, key, params)
+	end
+	return store
+end
 
 local failures: { string } = {}
 local function check(ok: boolean, message: string)
@@ -457,6 +477,68 @@ local function bountyShield()
 	task.wait(0.3)
 end
 
+-- A full server -----------------------------------------------------------------------------------------------------
+
+local function serverFull()
+	print("A full server:")
+	local key = `Player_{ZED}`
+	local full = "This server is full. Please join another server!"
+	local players = {}
+	for index = 1, Gameplay.map.plotCount do
+		local player = join(9400 + index, `Full{index}`)
+		Sim.fireServer(player, "SkipTutorial")
+		table.insert(players, player)
+	end
+	-- Zed comes back after ten hours away, to a server whose eight bases are taken (Max Players above the plot count)
+	local away = 10 * 3600
+	MockProfileStore.saves[key] = returningSave(away)
+	local lastSeen = MockProfileStore.saves[key].lastSeen
+	local zed = Sim.addPlayer(ZED, "Zed")
+	task.wait(0.2)
+	check(kicked[ZED] == full, `a ninth player is told at once: "{kicked[ZED]}"`)
+	check(Sessions.getByUserId(ZED) == nil and (loads[key] or 0) == 0, "before their save is even loaded")
+	Sim.removePlayer(zed) -- (Roblox disconnects them)
+	task.wait(0.3)
+	check(
+		MockProfileStore.saves[key].lastSeen == lastSeen,
+		"so their lastSeen, and with it their offline earnings, is untouched"
+	)
+
+	-- (not expected any more) a join that loads, then finds no base: lastSeen stays as loaded in every save
+	Sim.removePlayer(players[1])
+	task.wait(0.3)
+	kicked[ZED] = nil
+	local assign = PlotService.assign
+	PlotService.assign = function(_session: any): number?
+		return nil
+	end
+	zed = Sim.addPlayer(ZED, "Zed")
+	task.wait(0.2)
+	PlotService.assign = assign
+	check(loads[key] == 1 and kicked[ZED] == full, "a join that loads but finds no base is turned away too")
+	Sim.removePlayer(zed)
+	task.wait(0.3)
+	check(MockProfileStore.saves[key].lastSeen == lastSeen, "and its save keeps lastSeen as it was loaded")
+
+	-- a base is free: Zed gets in, with ten hours' offline earnings
+	local welcomes = #Sim.received(ZED, "WelcomeBack")
+	zed = join(ZED, "Zed")
+	task.wait(0.2)
+	local received = Sim.received(ZED, "WelcomeBack")
+	local welcome = if #received > welcomes then received[#received][1] else nil
+	check(
+		Sessions.get(zed).plot ~= 0 and welcome ~= nil and welcome.amount > 0 and welcome.seconds >= away - 60,
+		`with a base free he gets in, offline earnings and all ({welcome and welcome.amount} for {welcome and welcome.seconds} s)`
+	)
+	for _, player in players do
+		if player ~= players[1] then
+			Sim.removePlayer(player)
+		end
+	end
+	Sim.removePlayer(zed)
+	task.wait(0.3)
+end
+
 local function scenario()
 	print("review 3 test:")
 	cashOffer()
@@ -464,6 +546,7 @@ local function scenario()
 	shieldEnds()
 	gadgetTip()
 	bountyShield()
+	serverFull()
 	print(`  ({math.floor(Sim.now - OCTOBER_15_2026)} s of server time)`)
 end
 
