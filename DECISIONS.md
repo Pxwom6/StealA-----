@@ -912,8 +912,8 @@ big in the middle of the map, which is where the steals happen.
   AchievementService sets the flag `did_<id>`: still no save-format change, but these only count from this release.
   Only ids in `AchievementRules.MILESTONES` are recorded or accepted by the config check.
 * **Reachable:** the tests check that the mutation, limited-Snackling and tier goals ask for no more than exist;
-  the 7th rebirth costs $1.17T, so it and "Trillionaire" are the long-haul pair. The time goals count hours to a tenth so
-  the bar moves from the first minutes.
+  the 7th rebirth costs $1.17T, so it and "Trillionaire" are the long-haul pair. The time goals count hours to a
+  tenth so the bar moves from the first minutes.
 * **Tests:** each new count from a save, milestones from their flags (unknown ones ignored), and the config check;
   the server test opens a crate, catches a runaway and taps a giant down, then checks Bob was paid the four
   achievements and Alice, who never hit the giant, got neither milestone.
