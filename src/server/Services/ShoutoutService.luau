@@ -79,7 +79,7 @@ local function onShout(message: CrossServer.Message)
 	local mutation = GameData.mutation(shout.variant)
 	local banner = {
 		text = Format.template(Theme.text.shoutout, {
-			player = shout.name,
+			player = CrossServerRules.shortName(shout.name, CrossServerRules.SHOUT_NAME_LENGTH),
 			rarity = string.upper(rarity.displayName),
 			creature = GameData.displayName(def, shout.variant),
 		}),

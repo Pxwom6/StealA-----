@@ -44,6 +44,9 @@ CrossServerRules.MAX_ARGS = 8
 CrossServerRules.MAX_KEY = 16
 CrossServerRules.MAX_STRING = 500 -- bytes: a 120-character message of 4-byte characters fits
 CrossServerRules.NAME_LENGTH = 20 -- Roblox display names have at most 20 characters
+-- A shout-out shows at most this many characters of the name, so it reads at 12 UI or more in the narrowest banner
+-- even for a name of 20 capital Ws (tests/HostPanelLayout.spec.luau).
+CrossServerRules.SHOUT_NAME_LENGTH = 15
 CrossServerRules.SHOUT_KIND = "shoutout"
 
 local function finite(value: unknown): number?
@@ -223,6 +226,16 @@ function CrossServerRules.cleanName(value: unknown): string?
 		return nil
 	end
 	return name
+end
+
+-- `name` cut to `maxLength` characters: a longer one keeps its first maxLength - 1 and ends in "…".
+function CrossServerRules.shortName(name: string, maxLength: number): string
+	local length = utf8.len(name)
+	if length == nil or length <= maxLength then
+		return name
+	end
+	local cut = utf8.offset(name, maxLength)
+	return if cut then string.sub(name, 1, cut - 1) .. "…" else name
 end
 
 function CrossServerRules.shoutArgs(name: string, creatureId: string, variant: string?): Args
