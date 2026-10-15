@@ -647,7 +647,7 @@ function HostPanelController.open()
 		Parent = modal.body,
 	}) :: Frame
 
-	local function select(id: string)
+	local function showTab(id: string)
 		selectedTab = id
 		for tabId, tabButton in tabButtons do
 			tabButton.BackgroundColor3 = UiTheme.palette(if tabId == id then "gold" else "panelLight")
@@ -665,7 +665,7 @@ function HostPanelController.open()
 	for index, id in tabs do
 		tabButtons[id] = button(modal.body, id, HostPanelLayout.tabButton(index), TAB_TEXT[id], "panelLight", function()
 			if selectedTab ~= id then
-				select(id)
+				showTab(id)
 			end
 		end)
 	end
@@ -694,7 +694,7 @@ function HostPanelController.open()
 			TextXAlignment = Enum.TextXAlignment.Right,
 		})
 	end
-	select(selectedTab)
+	showTab(selectedTab)
 
 	-- Countdowns tick while the panel is open; it closes if the player may no longer host.
 	task.spawn(function()
