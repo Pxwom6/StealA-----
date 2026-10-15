@@ -709,6 +709,32 @@ local Mutations: { MutationDef } = {
 		},
 		mapTheme = "pancakes",
 	},
+
+	-- Harvest Feast 2026: a glossy amber maple-syrup glaze with a warm glow, and little maple leaves in red, orange and
+	-- gold tumbling off. Rolls only while LiveOps event "Harvest2026" runs; like the other event mutations, rarer than
+	-- Golden and stronger (order 36: rolled after every other one, so no existing roll changes). Opaque and leafy where
+	-- Pancake Peaks' Syrupy is see-through glass dripping syrup.
+	{
+		id = "maple",
+		displayName = "Maple",
+		color = "#E07B24",
+		order = 36,
+		chance = 0.02,
+		incomeMultiplier = 3,
+		priceMultiplier = 2,
+		announceOnSpawn = false,
+		announceOnBuy = false,
+		announceOnSteal = false,
+		look = {
+			material = "SmoothPlastic",
+			tint = "#B8561A",
+			tintStrength = 0.55,
+			reflectance = 0.3,
+			glow = "#FFB347",
+			particles = "maple",
+		},
+		eventId = "Harvest2026",
+	},
 }
 
 return Mutations

@@ -35,6 +35,12 @@ local Codes = {
 		startsAt = 1792774800, -- 2026-10-23 17:00 UTC (Halloween2026 starts)
 		expiresAt = 1793606400, -- 2026-11-02 08:00 UTC
 	},
+	-- Harvest Feast 2026: a Maple Cranberry Crane while the event runs.
+	FEAST26 = {
+		reward = { kind = "creature", creatureId = "cranberry_crane", variant = "maple" },
+		startsAt = 1795194000, -- 2026-11-20 17:00 UTC (Harvest2026 starts)
+		expiresAt = 1796025600, -- 2026-11-30 08:00 UTC
+	},
 	-- Winter 2026: a Festive Peppermint Puffin while the event runs, and a New Year cash gift for New Year's week.
 	JINGLE26 = {
 		reward = { kind = "creature", creatureId = "peppermint_puffin", variant = "festive" },

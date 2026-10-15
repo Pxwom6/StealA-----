@@ -828,6 +828,54 @@ local Creatures: { CreatureDef } = {
 		flavor = "Hides the eggs. Keeps the jelly beans.",
 		eventId = "Easter2027",
 	},
+
+	-- Event: Harvest Feast 2026 ---------------------------------------------------------------------------------------
+	-- Only spawn while LiveOps event "Harvest2026" runs, sharing their tier's odds like the other event ones
+	-- (BALANCE.md "Harvest Feast"). Appended after everything else, so no earlier roll changes.
+	{
+		id = "cranberry_crane",
+		displayName = "Cranberry Crane",
+		rarity = "Rare",
+		price = 10500,
+		income = 140,
+		beltWeight = 30,
+		modelName = "CranberryCrane",
+		flavor = "Jiggles when it walks. Struts anyway.",
+		eventId = "Harvest2026",
+	},
+	{
+		id = "pecan_pie_porcupine",
+		displayName = "Pecan Pie Porcupine",
+		rarity = "Epic",
+		price = 125000,
+		income = 810,
+		beltWeight = 30,
+		modelName = "PecanPiePorcupine",
+		flavor = "Prickly on top. Gooey underneath.",
+		eventId = "Harvest2026",
+	},
+	{
+		id = "sweet_potato_sloth",
+		displayName = "Sweet Potato Sloth",
+		rarity = "Legendary",
+		price = 2900000,
+		income = 5650,
+		beltWeight = 30,
+		modelName = "SweetPotatoSloth",
+		flavor = "Takes it slow. Always gets seconds.",
+		eventId = "Harvest2026",
+	},
+	{
+		id = "cornucopia_kirin",
+		displayName = "Cornucopia Kirin",
+		rarity = "Mythic",
+		price = 72000000,
+		income = 48500,
+		beltWeight = 40,
+		modelName = "CornucopiaKirin",
+		flavor = "Never arrives empty-hooved.",
+		eventId = "Harvest2026",
+	},
 }
 
 return Creatures

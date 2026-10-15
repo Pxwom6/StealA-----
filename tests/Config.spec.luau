@@ -105,6 +105,11 @@ local RELEASED_CREATURE_IDS = {
 	"hot_cross_bunny",
 	"lemon_meringue_lamb",
 	"jelly_bean_jackalope",
+	-- Harvest Feast 2026 (event-only)
+	"cranberry_crane",
+	"pecan_pie_porcupine",
+	"sweet_potato_sloth",
+	"cornucopia_kirin",
 }
 
 -- Every mutation id that has shipped (saved in players' CreatureRecord.variant). APPEND-ONLY, like creature ids: a
@@ -151,6 +156,7 @@ local RELEASED_MUTATION_IDS = {
 	"buttered",
 	"porcelain",
 	"syrupy",
+	"maple", -- Harvest Feast 2026 (event-only)
 }
 
 T.describe("Config integrity", function()
@@ -508,6 +514,7 @@ local SEASONAL_EVENTS = {
 	{ eventId = "Winter2026", name = "Winter 2026", mutation = "festive" },
 	{ eventId = "Valentine2027", name = "Valentine's 2027", mutation = "sweetheart" },
 	{ eventId = "Easter2027", name = "Easter 2027", mutation = "pastel" },
+	{ eventId = "Harvest2026", name = "Harvest Feast 2026", mutation = "maple" },
 }
 
 for _, season in SEASONAL_EVENTS do
