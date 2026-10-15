@@ -121,8 +121,11 @@ local function hudState(): ScreenLayout.HudState
 	}
 end
 
+-- Places `object` on rect `r` whatever its AnchorPoint (placed elements are anchored at their centre, so pop-ins and
+-- presses scale around it).
 local function setRect(object: GuiObject, r: ScreenLayout.Rect)
-	local position = UDim2.fromOffset(r.x, r.y)
+	local anchor = object.AnchorPoint
+	local position = UDim2.fromOffset(r.x + r.w * anchor.X, r.y + r.h * anchor.Y)
 	local size = UDim2.fromOffset(r.w, r.h)
 	if object.Position ~= position then
 		object.Position = position
@@ -166,7 +169,7 @@ end
 -- shows with the attribute Tip. A newer object under the same id replaces it; destroying it frees its place.
 function HudController.place(id: string, object: GuiObject)
 	placed[id] = object
-	object.AnchorPoint = Vector2.zero
+	object.AnchorPoint = Vector2.new(0.5, 0.5)
 	object.Parent = if STATUS_IDS[id] then statusFrame else screen
 	object:GetPropertyChangedSignal("Visible"):Connect(HudController.relayout)
 	object.Destroying:Connect(function()
@@ -271,6 +274,7 @@ local function build()
 
 	cashPill = UiKit.panel({
 		Name = "Cash",
+		AnchorPoint = Vector2.new(0.5, 0.5), -- it pulses around its centre
 		Size = UDim2.fromOffset(SIZE.cash.w, SIZE.cash.h),
 		BackgroundColor3 = UiTheme.palette("panel"),
 		Parent = screen,
