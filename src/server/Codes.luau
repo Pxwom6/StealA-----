@@ -29,6 +29,8 @@ local Codes = {
 	TWENTYMAPS = { reward = { kind = "creature", creatureId = "gummy_grub", variant = "bubblegum" } },
 	-- Twenty-three maps: a Popcorn Penguin with Popcorn Drive-In's signature mutation.
 	MOVIENIGHT = { reward = { kind = "creature", creatureId = "popcorn_penguin", variant = "buttered" } },
+	-- Twenty-seven maps: a Bumble Bun with Honeycomb Hive's signature mutation, bee wings and all.
+	BUZZBUZZ = { reward = { kind = "creature", creatureId = "bumble_bun", variant = "bumblebee" } },
 	-- Halloween 2026: a Haunted Candy Corn Cat while the event runs.
 	SPOOKY26 = {
 		reward = { kind = "creature", creatureId = "candy_corn_cat", variant = "haunted" },

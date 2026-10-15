@@ -85,6 +85,58 @@ local function light(parent: BasePart, color: Color3, range: number, brightness:
 	pointLight.Parent = parent
 end
 
+-- A hexagonal prism (a honeycomb cell) `height` tall on `frame` (its bottom centre), corners `radius` from its middle,
+-- from three blocks turned 60° apart: each block is the hexagon between two opposite corners, so together they fill
+-- it exactly. `first` makes the first block (core() for a flora's solid column), kit.decor the other two. A neighbour
+-- sharing a flat side stands radius * sqrt(3) away along the frame's Z axis, turned by a multiple of 60°.
+local HEX_FLAT = math.sqrt(3)
+local function hexPrism(
+	frame: CFrame,
+	radius: number,
+	height: number,
+	props: { [string]: any },
+	first: (props: { [string]: any }) -> Part,
+	kit: Kit
+)
+	for i = 0, 2 do
+		local block = table.clone(props)
+		block.Size = Vector3.new(radius, height, radius * HEX_FLAT)
+		block.CFrame = frame * CFrame.Angles(0, math.rad(i * 60), 0) * CFrame.new(0, height / 2, 0)
+		local make: (props: { [string]: any }) -> Part = if i == 0 then first else kit.decor
+		make(block)
+	end
+end
+
+-- A soft plume rising from `at` (steam off broth and hot springs, smoke from chimneys and smokers), on an attachment
+-- under `parent`.
+local function plume(parent: BasePart, at: Vector3, color: Color3, size: number, rate: number, kit: Kit)
+	local attachment = Instance.new("Attachment")
+	attachment.Name = "Plume"
+	attachment.Parent = parent
+	attachment.WorldCFrame = CFrame.new(at)
+	kit.emitter(attachment, {
+		Name = "Plume",
+		Texture = SMOKE_TEXTURE,
+		Color = ColorSequence.new(color),
+		Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, size * 0.4),
+			NumberSequenceKeypoint.new(1, size),
+		}),
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.45),
+			NumberSequenceKeypoint.new(1, 1),
+		}),
+		Speed = NumberRange.new(3, 5),
+		SpreadAngle = Vector2.new(14, 14),
+		Acceleration = Vector3.new(0.6, 0.8, 0.2),
+		Lifetime = NumberRange.new(3, 5),
+		Rate = rate,
+		Rotation = NumberRange.new(0, 360),
+		RotSpeed = NumberRange.new(-20, 20),
+		EmissionDirection = Enum.NormalId.Top,
+	})
+end
+
 -- Flora --------------------------------------------------------------------------------------------------------------
 
 type FloraBuilder = (base: CFrame, s: number, random: Random, spot: Spot, parent: Instance, kit: Kit) -> ()
@@ -1453,6 +1505,327 @@ local flora: { [string]: FloraBuilder } = {
 				CFrame = lean * CFrame.new((-0.9 + i * 0.6) * s, 11.1 * s, 0),
 				Color = metal,
 				Material = Enum.Material.Metal,
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- A giant daisy: a stem and a leaf, three long petals crossed into a six-petalled head tipped to one side, and a
+	-- domed golden middle. Every third one is pink.
+	giantDaisy = function(base: CFrame, s: number, random: Random, spot: Spot, parent: Instance, kit: Kit)
+		core(spot, kit)({
+			Name = "Stem",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(9.4 * s, 0.8 * s),
+			CFrame = base * CFrame.new(0, 4.7 * s, 0) * UPRIGHT,
+			Color = world("flowerStem"),
+			Parent = parent,
+		})
+		local leaf = kit.decor({
+			Name = "Leaf",
+			Size = Vector3.new(4, 0.4, 1.6) * s,
+			CFrame = base * CFrame.new(1.8 * s, 3.2 * s, 0) * CFrame.Angles(0, 0, math.rad(28)),
+			Color = world("flowerStem"),
+			Parent = parent,
+		})
+		sphereMesh(leaf)
+		local head = base * CFrame.new(0, 9.6 * s, 0) * CFrame.Angles(math.rad(random:NextNumber(14, 24)), 0, 0)
+		local petalColor = if spot.seed % 3 == 0 then world("daisyPink") else world("daisy")
+		for i = 0, 2 do
+			local petal = kit.decor({
+				Name = "Petals",
+				Size = Vector3.new(7.8, 0.4, 1.9) * s,
+				CFrame = head * CFrame.Angles(0, math.rad(i * 60 + 15), 0),
+				Color = petalColor,
+				Parent = parent,
+			})
+			sphereMesh(petal)
+		end
+		local middle = kit.decor({
+			Name = "FlowerMiddle",
+			Size = Vector3.new(2.9, 1.2, 2.9) * s,
+			CFrame = head * CFrame.new(0, 0.3 * s, 0),
+			Color = world("daisyCentre"),
+			Material = Enum.Material.Sand,
+			Parent = parent,
+		})
+		sphereMesh(middle)
+	end,
+
+	-- Honeycomb cells grown up like basalt columns: a tall one (its first block is the solid core) and a short one beside
+	-- it with honey pooled on top, and a drip running down the tall one's far side.
+	honeycombColumn = function(base: CFrame, s: number, random: Random, spot: Spot, parent: Instance, kit: Kit)
+		local radius = 1.7 * s
+		local tall = (6.6 + random:NextNumber(0, 0.8)) * s
+		hexPrism(base, radius, tall, {
+			Name = "Honeycomb",
+			Color = world("honeycomb"),
+			Parent = parent,
+		}, core(spot, kit), kit)
+		local turn = CFrame.Angles(0, math.rad(random:NextInteger(0, 5) * 60), 0)
+		local side = base * turn * CFrame.new(0, 0, radius * HEX_FLAT)
+		local short = (3.4 + random:NextNumber(0, 0.9)) * s
+		hexPrism(side, radius, short, {
+			Name = "Honeycomb",
+			Color = world("honeycombDark"),
+			Parent = parent,
+		}, kit.decor, kit)
+		local pool = kit.decor({
+			Name = "Honey",
+			Size = Vector3.new(2.6, 0.8, 2.6) * s,
+			CFrame = side * CFrame.new(0, short, 0),
+			Color = world("honey"),
+			Parent = parent,
+		})
+		sphereMesh(pool)
+		pool.Reflectance = 0.2
+		local drip = kit.decor({
+			Name = "Drip",
+			Size = Vector3.new(0.9, 3, 0.6) * s,
+			CFrame = base * turn * CFrame.new(0, tall - 1.3 * s, -(radius * HEX_FLAT / 2 + 0.1 * s)),
+			Color = world("honey"),
+			Parent = parent,
+		})
+		sphereMesh(drip)
+		drip.Reflectance = 0.2
+	end,
+
+	-- A gingerbread cookie cut like a Christmas tree, standing on a gingerbread stump and turned to face the middle of
+	-- the map: a biscuit triangle with a smaller, thicker triangle of green icing through it, so both faces show icing
+	-- inside a biscuit rim, and a gumdrop on its tip.
+	cookieTree = function(base: CFrame, s: number, _random: Random, spot: Spot, parent: Instance, kit: Kit)
+		core(spot, kit)({
+			Name = "Stump",
+			Size = Vector3.new(1.6, 2.2, 1.2) * s,
+			CFrame = base * CFrame.new(0, 1.1 * s, 0),
+			Color = world("gingerbread"),
+			Material = Enum.Material.Sand,
+			Parent = parent,
+		})
+		local height, width = 10 * s, 8 * s
+		local middle = facingCentre(base.Position) * CFrame.new(0, 2 * s + height / 2, 0)
+		-- the icing is the same triangle shrunk around its incentre, so its rim is the same width on all three sides
+		local slant = math.sqrt((width / 2) ^ 2 + height ^ 2)
+		local inradius = (width * height / 2) / ((width + 2 * slant) / 2)
+		local k = (inradius - 0.65 * s) / inradius
+		for _, layer in
+			{
+				{ k = 1, lift = 0, thickness = 0.8, color = "gingerbread" },
+				{ k = k, lift = (1 - k) * inradius - (1 - k) * height / 2, thickness = 1.3, color = "cookieIcing" },
+			}
+		do
+			local h, w = height * layer.k, width * layer.k
+			for _, turn in { 0, math.pi } do
+				-- each half is a wedge across the cookie's face: its tall back on the middle line, sloping to the edge
+				kit.wedge({
+					Name = if layer.k == 1 then "Cookie" else "Icing",
+					Size = Vector3.new(layer.thickness * s, h, w / 2),
+					CFrame = middle
+						* CFrame.new(0, layer.lift, 0)
+						* CFrame.Angles(0, math.rad(90) + turn, 0)
+						* CFrame.new(0, 0, -w / 4),
+					Color = world(layer.color),
+					Material = Enum.Material.Sand,
+					Parent = parent,
+				})
+			end
+		end
+		kit.decor({
+			Name = "Gumdrop",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 1.9 * s,
+			CFrame = middle * CFrame.new(0, height / 2 + 0.2 * s, 0),
+			Color = candy(spot.seed),
+			Material = Enum.Material.Sand,
+			Parent = parent,
+		})
+	end,
+
+	-- A candy-cane lamp post: a white cane with two red bands, its hook bending over a glowing lantern (every third one
+	-- inside the wall lights the ground).
+	candyCaneLamp = function(base: CFrame, s: number, _random: Random, spot: Spot, parent: Instance, kit: Kit)
+		local height, diameter = 7.4 * s, 0.6 * s
+		core(spot, kit)({
+			Name = "Cane",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(height, diameter),
+			CFrame = base * CFrame.new(0, height / 2, 0) * UPRIGHT,
+			Color = world("candyStick"),
+			Parent = parent,
+		})
+		for _, y in { 2.4, 4.8 } do
+			kit.decor({
+				Name = "Stripe",
+				Shape = Enum.PartType.Cylinder,
+				Size = cylinderSize(0.9 * s, diameter + 0.1 * s),
+				CFrame = base * CFrame.new(0, y * s, 0) * UPRIGHT,
+				Color = world("candy1"),
+				Parent = parent,
+			})
+		end
+		local points = {
+			Vector3.new(0, height - 0.2 * s, 0),
+			Vector3.new(0.9 * s, height + 1 * s, 0),
+			Vector3.new(1.9 * s, height + 0.3 * s, 0),
+		}
+		for i = 1, 2 do
+			local a = (base * CFrame.new(points[i])).Position
+			local b = (base * CFrame.new(points[i + 1])).Position
+			kit.decor({
+				Name = "Hook",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new((b - a).Magnitude + diameter * 0.5, diameter, diameter),
+				CFrame = along(a, b),
+				Color = if i == 1 then world("candy1") else world("candyStick"),
+				Parent = parent,
+			})
+		end
+		local lantern = kit.decor({
+			Name = "Lantern",
+			Size = Vector3.new(1, 1.3, 1) * s,
+			CFrame = base * CFrame.new(1.9 * s, height - 0.7 * s, 0),
+			Color = world("lampLight"),
+			Material = Enum.Material.Neon,
+			CastShadow = false,
+			Parent = parent,
+		})
+		sphereMesh(lantern)
+		if not spot.outside and spot.seed % 3 == 0 then
+			light(lantern, world("lampLight"), 16, 1.2)
+		end
+	end,
+
+	-- A Japanese maple: a slim dark trunk under a wide, lopsided canopy of three clumps of red and orange leaves.
+	mapleTree = function(base: CFrame, s: number, random: Random, spot: Spot, parent: Instance, kit: Kit)
+		core(spot, kit)({
+			Name = "Trunk",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(6.8 * s, 0.9 * s),
+			CFrame = base * CFrame.new(0, 3.4 * s, 0) * UPRIGHT,
+			Color = world("mapleTrunk"),
+			Material = Enum.Material.Wood,
+			Parent = parent,
+		})
+		for _, clump in
+			{
+				{ size = Vector3.new(6, 3.6, 5.6), at = Vector3.new(-1.2, 7.4, 0.6), color = "mapleRed" },
+				{ size = Vector3.new(5.6, 3.4, 5.2), at = Vector3.new(1.4, 8.6, -0.8), color = "mapleOrange" },
+				{ size = Vector3.new(4.6, 3.2, 4.4), at = Vector3.new(-0.2, 10.6, 0.2), color = "mapleRed" },
+			}
+		do
+			local leaves = kit.decor({
+				Name = "Leaves",
+				Size = clump.size * s,
+				CFrame = base * CFrame.new(clump.at * s) * CFrame.Angles(0, random:NextNumber(0, math.pi), 0),
+				Color = world(clump.color),
+				Parent = parent,
+			})
+			sphereMesh(leaves)
+		end
+	end,
+
+	-- A bunch of three giant spring onions, white at the root and green above, leaning a little apart (the first
+	-- root is the solid core).
+	springOnion = function(base: CFrame, s: number, random: Random, spot: Spot, parent: Instance, kit: Kit)
+		for i = 0, 2 do
+			local grow = random:NextNumber(0.85, 1.1)
+			local stalk = base
+				* CFrame.Angles(0, i * 2.1 + random:NextNumber(-0.25, 0.25), 0)
+				* CFrame.new(0, 0, -0.6 * s)
+				* CFrame.Angles(-math.rad(random:NextNumber(5, 9)), 0, 0)
+			local make: (props: { [string]: any }) -> Part = if i == 0 then core(spot, kit) else kit.decor
+			make({
+				Name = "Root",
+				Shape = Enum.PartType.Cylinder,
+				Size = cylinderSize(3.6 * s, 1.15 * s),
+				CFrame = stalk * CFrame.new(0, 1.8 * s, 0) * UPRIGHT,
+				Color = world("onionWhite"),
+				Parent = parent,
+			})
+			kit.decor({
+				Name = "Stalk",
+				Shape = Enum.PartType.Cylinder,
+				Size = cylinderSize(8 * grow * s, 0.95 * s),
+				CFrame = stalk * CFrame.new(0, (3.5 + 4 * grow) * s, 0) * UPRIGHT,
+				Color = world("onionGreen"),
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- A chili pepper plant: a short woody stem under two leafy mounds, three red chilies hanging below the leaves.
+	chiliPlant = function(base: CFrame, s: number, random: Random, spot: Spot, parent: Instance, kit: Kit)
+		core(spot, kit)({
+			Name = "Stem",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(4.6 * s, 0.8 * s),
+			CFrame = base * CFrame.new(0, 2.3 * s, 0) * UPRIGHT,
+			Color = world("treeTrunk"),
+			Material = Enum.Material.Wood,
+			Parent = parent,
+		})
+		for _, mound in
+			{
+				{ size = Vector3.new(6.4, 4.2, 6.4), at = Vector3.new(0, 6.2, 0), shade = 0 },
+				{ size = Vector3.new(4.4, 3.2, 4.4), at = Vector3.new(0.6, 8.3, -0.4), shade = 0.12 },
+			}
+		do
+			local leaves = kit.decor({
+				Name = "Leaves",
+				Size = mound.size * s,
+				CFrame = base * CFrame.new(mound.at * s),
+				Color = world("chiliLeaf"):Lerp(Color3.new(1, 1, 1), mound.shade),
+				Material = Enum.Material.Grass,
+				Parent = parent,
+			})
+			sphereMesh(leaves)
+		end
+		for i = 0, 2 do
+			local chili = kit.decor({
+				Name = "Chili",
+				Size = Vector3.new(0.9, 3, 0.9) * s,
+				CFrame = base
+					* CFrame.Angles(0, i * 2.1 + random:NextNumber(-0.3, 0.3), 0)
+					* CFrame.new(0, 4.6 * s, -2.9 * s)
+					* CFrame.Angles(math.rad(14), 0, 0),
+				Color = world("chiliRed"),
+				Parent = parent,
+			})
+			sphereMesh(chili)
+		end
+	end,
+
+	-- A giant kebab stuck in the ground: chunks of grilled meat, red pepper, onion and green pepper on a wooden skewer
+	-- (the skewer is the solid core).
+	kebab = function(base: CFrame, s: number, random: Random, spot: Spot, parent: Instance, kit: Kit)
+		core(spot, kit)({
+			Name = "Skewer",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(9 * s, 0.35 * s),
+			CFrame = base * CFrame.new(0, 4.5 * s, 0) * UPRIGHT,
+			Color = world("skewerWood"),
+			Material = Enum.Material.Wood,
+			Parent = parent,
+		})
+		for i, piece in
+			{
+				{ y = 2.4, size = Vector3.new(2.2, 1.9, 2.2), color = "meat" },
+				{ y = 3.9, size = Vector3.new(2.4, 0.9, 2), color = "chiliRed" },
+				{ y = 5.1, size = Vector3.new(1, 2.4, 2.4), color = "onion" },
+				{ y = 6.3, size = Vector3.new(2.4, 0.9, 2), color = "pepperGreen" },
+				{ y = 7.7, size = Vector3.new(2.1, 1.8, 2.1), color = "meat" },
+			}
+		do
+			kit.decor({
+				Name = "Kebab",
+				Shape = if piece.color == "onion" then Enum.PartType.Cylinder else Enum.PartType.Block,
+				Size = piece.size * s,
+				CFrame = base
+					* CFrame.new(0, piece.y * s, 0)
+					* CFrame.Angles(0, math.rad(i * 37) + random:NextNumber(-0.2, 0.2), 0)
+					* (if piece.color == "onion" then UPRIGHT else CFrame.identity),
+				Color = world(piece.color),
+				Material = if piece.color == "meat" then Enum.Material.Pebble else Enum.Material.SmoothPlastic,
 				Parent = parent,
 			})
 		end
@@ -3765,6 +4138,944 @@ local landmarks: { [string]: LandmarkBuilder } = {
 			Parent = parent,
 		})
 		sphereMesh(berry)
+	end,
+
+	-- A giant slab of honeycomb standing on its edge with its cells facing the map: seven hexagonal cells in a flower,
+	-- wax and honey-filled ones at different depths, honey dripping from the two lowest.
+	honeycombSlab = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad((spot.index % 3 - 1) * 12), 0)
+		local radius = 6 * s
+		local step = radius * HEX_FLAT
+		local middle = frame * CFrame.new(0, step * 1.5, 0)
+		-- the middle cell (no angle), then the six round it
+		local cells: { { angle: number?, length: number, color: string } } = {
+			{ angle = nil, length = 9, color = "honey" },
+			{ angle = 30, length = 12, color = "honeycomb" },
+			{ angle = 90, length = 10, color = "honeycombDark" },
+			{ angle = 150, length = 12, color = "honeycomb" },
+			{ angle = 210, length = 8, color = "honey" },
+			{ angle = 270, length = 11, color = "honeycombDark" },
+			{ angle = 330, length = 8, color = "honey" },
+		}
+		for i, cell in cells do
+			local offset = if cell.angle
+				then Vector3.new(math.cos(math.rad(cell.angle)) * step, math.sin(math.rad(cell.angle)) * step, 0)
+				else Vector3.zero
+			-- each cell is a prism lying along the frame's Z axis: its back flush with the slab's back, its front
+			-- (a hexagon facing the map) as far forward as its length
+			local back = middle * CFrame.new(offset + Vector3.new(0, 0, 6 * s)) * CFrame.Angles(-math.rad(90), 0, 0)
+			hexPrism(back, radius, cell.length * s, {
+				Name = if cell.color == "honey" then "Honey" else "Honeycomb",
+				Color = world(cell.color),
+				Reflectance = if cell.color == "honey" then 0.2 else 0,
+				Parent = parent,
+			}, kit.decor, kit)
+			if i == 5 or i == 7 then
+				-- honey running out of the lowest two honey cells and down their fronts
+				local drip = kit.decor({
+					Name = "Drip",
+					Size = Vector3.new(2.6, 7, 1.2) * s,
+					CFrame = middle * CFrame.new(
+						offset + Vector3.new(1 * s, -step / 2 + 2.4 * s, 6 * s - cell.length * s - 0.3 * s)
+					),
+					Color = world("honey"),
+					Parent = parent,
+				})
+				sphereMesh(drip)
+				drip.Reflectance = 0.2
+			end
+		end
+	end,
+
+	-- A giant bumblebee hovering over the hills and looking at the map: a striped body, a black head with big eyes, two
+	-- glassy wings, antennae and a little stinger.
+	giantBee = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local altitude = (34 + (spot.index % 3) * 9) * s
+		local body = base * CFrame.new(0, altitude, 0) * CFrame.Angles(math.rad(6), 0, 0)
+		local yellow, black = world("beeYellow"), world("beeBlack")
+		local bodyPart = kit.decor({
+			Name = "BeeBody",
+			Size = Vector3.new(10, 10, 15) * s,
+			CFrame = body,
+			Color = yellow,
+			Parent = parent,
+		})
+		sphereMesh(bodyPart)
+		-- two black bands round the body (cylinders along it, a little wider than the body where they sit)
+		for _, band in { { z = 0.8, length = 2.2 }, { z = 4.2, length = 1.6 } } do
+			local r = 5 * math.sqrt(1 - (band.z / 7.5) ^ 2)
+			kit.decor({
+				Name = "BeeStripe",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(band.length, 2 * r + 0.3, 2 * r + 0.3) * s,
+				CFrame = body * CFrame.new(0, 0, band.z * s) * CFrame.Angles(0, math.rad(90), 0),
+				Color = black,
+				Parent = parent,
+			})
+		end
+		local head = body * CFrame.new(0, 0.6 * s, -9 * s)
+		kit.decor({
+			Name = "BeeHead",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 7 * s,
+			CFrame = head,
+			Color = black,
+			Parent = parent,
+		})
+		for _, side in { -1, 1 } do
+			kit.decor({
+				Name = "BeeEye",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.one * 3 * s,
+				CFrame = head * CFrame.new(side * 1.6 * s, 0.8 * s, -2.5 * s),
+				Color = world("daisy"),
+				Parent = parent,
+			})
+			kit.decor({
+				Name = "BeePupil",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.one * 1.5 * s,
+				CFrame = head * CFrame.new(side * 1.7 * s, 0.8 * s, -3.8 * s),
+				Color = black,
+				Parent = parent,
+			})
+			local wing = kit.decor({
+				Name = "BeeWing",
+				Size = Vector3.new(8, 0.5, 5.5) * s,
+				CFrame = body * CFrame.new(side * 5 * s, 4.6 * s, 1 * s) * CFrame.Angles(0, 0, math.rad(side * 24)),
+				Color = world("beeWing"),
+				Transparency = 0.3,
+				CastShadow = false,
+				Parent = parent,
+			})
+			sphereMesh(wing)
+			local a = (head * CFrame.new(side * 1.2 * s, 3 * s, -0.8 * s)).Position
+			local b = (head * CFrame.new(side * 2.4 * s, 6.6 * s, -2.6 * s)).Position
+			kit.decor({
+				Name = "BeeAntenna",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new((b - a).Magnitude, 0.5 * s, 0.5 * s),
+				CFrame = along(a, b),
+				Color = black,
+				Parent = parent,
+			})
+		end
+		local stinger = kit.decor({
+			Name = "BeeStinger",
+			Size = Vector3.new(1.4, 1.4, 3.2) * s,
+			CFrame = body * CFrame.new(0, -0.4 * s, 8.2 * s),
+			Color = black,
+			Parent = parent,
+		})
+		sphereMesh(stinger)
+	end,
+
+	-- A giant straw beehive (a skep): four woven rings stacked into a dome on a wooden stand, a dark doorway at the
+	-- bottom facing the map, honey running out of it.
+	beeSkep = function(base: CFrame, s: number, _spot: LandmarkSpot, parent: Instance, kit: Kit)
+		kit.decor({
+			Name = "SkepStand",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(2 * s, 28 * s),
+			CFrame = base * CFrame.new(0, 1 * s, 0) * UPRIGHT,
+			Color = world("treeTrunk"),
+			Material = Enum.Material.WoodPlanks,
+			Parent = parent,
+		})
+		for i, ring in { { d = 24, y = 4.2 }, { d = 22, y = 8.4 }, { d = 18.5, y = 12.4 }, { d = 13.5, y = 16 } } do
+			kit.decor({
+				Name = "Skep",
+				Shape = Enum.PartType.Cylinder,
+				Size = cylinderSize(4.6 * s, ring.d * s),
+				CFrame = base * CFrame.new(0, ring.y * s, 0) * UPRIGHT,
+				Color = if i % 2 == 1 then world("skep") else world("skepDark"),
+				Material = Enum.Material.Fabric,
+				Parent = parent,
+			})
+		end
+		kit.decor({
+			Name = "Skep",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 10 * s,
+			CFrame = base * CFrame.new(0, 18.4 * s, 0),
+			Color = world("skep"),
+			Material = Enum.Material.Fabric,
+			Parent = parent,
+		})
+		local door = kit.decor({
+			Name = "SkepDoor",
+			Size = Vector3.new(6, 7, 2.4) * s,
+			CFrame = base * CFrame.new(0, 2.6 * s, -11.4 * s),
+			Color = world("beeBlack"),
+			Parent = parent,
+		})
+		sphereMesh(door)
+		local honey = kit.decor({
+			Name = "Honey",
+			Size = Vector3.new(4.4, 1.2, 5) * s,
+			CFrame = base * CFrame.new(0, 2.2 * s, -13.2 * s),
+			Color = world("honey"),
+			Parent = parent,
+		})
+		sphereMesh(honey)
+		honey.Reflectance = 0.2
+	end,
+
+	-- A giant clay honey pot tied with twine, honey overflowing its neck and running down, a wooden dipper leaning in it.
+	honeyPot = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad(spot.index * 29), 0)
+		local pot = kit.decor({
+			Name = "Pot",
+			Size = Vector3.new(22, 18, 22) * s,
+			CFrame = frame * CFrame.new(0, 9 * s, 0),
+			Color = world("honeyPot"),
+			Parent = parent,
+		})
+		sphereMesh(pot)
+		kit.decor({
+			Name = "Twine",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(2 * s, 22.3 * s),
+			CFrame = frame * CFrame.new(0, 9 * s, 0) * UPRIGHT,
+			Color = world("skepDark"),
+			Material = Enum.Material.Fabric,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Neck",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(3.4 * s, 13 * s),
+			CFrame = frame * CFrame.new(0, 18 * s, 0) * UPRIGHT,
+			Color = world("honeyPot"),
+			Parent = parent,
+		})
+		local honey = kit.decor({
+			Name = "Honey",
+			Size = Vector3.new(13.6, 4, 13.6) * s,
+			CFrame = frame * CFrame.new(0, 19.8 * s, 0),
+			Color = world("honey"),
+			Parent = parent,
+		})
+		sphereMesh(honey)
+		honey.Reflectance = 0.2
+		for _, drip in { { yaw = 0, length = 7 }, { yaw = 50, length = 5 } } do
+			local part = kit.decor({
+				Name = "Drip",
+				Size = Vector3.new(2.6, drip.length, 1.6) * s,
+				CFrame = frame
+					* CFrame.Angles(0, math.rad(drip.yaw), 0)
+					* CFrame.new(0, (19 - drip.length / 2) * s, -6.8 * s),
+				Color = world("honey"),
+				Parent = parent,
+			})
+			sphereMesh(part)
+			part.Reflectance = 0.2
+		end
+		local a = (frame * CFrame.new(2 * s, 18 * s, 1 * s)).Position
+		local b = (frame * CFrame.new(8 * s, 31 * s, 4 * s)).Position
+		kit.decor({
+			Name = "Dipper",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new((b - a).Magnitude, 1.3 * s, 1.3 * s),
+			CFrame = along(a, b),
+			Color = world("treeTrunk"),
+			Material = Enum.Material.Wood,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "DipperKnob",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 2.2 * s,
+			CFrame = CFrame.new(b),
+			Color = world("treeTrunk"),
+			Material = Enum.Material.Wood,
+			Parent = parent,
+		})
+	end,
+
+	-- A gingerbread cottage: biscuit walls, a gable roof with icing along both eaves and gumdrops on the ridge, a candy
+	-- door, two windows glowing warm and a chimney puffing smoke. Its door faces the map.
+	gingerbreadHouse = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad((spot.index % 3 - 1) * 16), 0)
+		local biscuit = world("gingerbread")
+		kit.decor({
+			Name = "Walls",
+			Size = Vector3.new(22, 14, 16) * s,
+			CFrame = frame * CFrame.new(0, 7 * s, 0),
+			Color = biscuit,
+			Material = Enum.Material.Sand,
+			Parent = parent,
+		})
+		for _, turn in { 0, math.pi } do
+			-- each slope is a wedge: its tall back face on the ridge, sloping down to the eave
+			local slope = frame * CFrame.new(0, 18 * s, 0) * CFrame.Angles(0, turn, 0)
+			kit.wedge({
+				Name = "Roof",
+				Size = Vector3.new(24, 8, 9.6) * s,
+				CFrame = slope * CFrame.new(0, 0, -4.8 * s),
+				Color = world("gingerbreadDark"),
+				Material = Enum.Material.Sand,
+				Parent = parent,
+			})
+			local icing = kit.decor({
+				Name = "Icing",
+				Size = Vector3.new(24.6, 1.6, 1.8) * s,
+				CFrame = slope * CFrame.new(0, -3.8 * s, -9.4 * s),
+				Color = world("icing"),
+				Parent = parent,
+			})
+			sphereMesh(icing)
+		end
+		for i = 0, 2 do
+			kit.decor({
+				Name = "Gumdrop",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.one * 3.6 * s,
+				CFrame = frame * CFrame.new((i - 1) * 7.5 * s, 22.2 * s, 0),
+				Color = candy(spot.index + i),
+				Material = Enum.Material.Sand,
+				Parent = parent,
+			})
+		end
+		kit.decor({
+			Name = "Door",
+			Size = Vector3.new(4.6, 7.4, 0.6) * s,
+			CFrame = frame * CFrame.new(0, 3.7 * s, -8.1 * s),
+			Color = candy(spot.index + 3),
+			Parent = parent,
+		})
+		for _, side in { -1, 1 } do
+			kit.decor({
+				Name = "WindowIcing",
+				Size = Vector3.new(5, 5, 0.3) * s,
+				CFrame = frame * CFrame.new(side * 6.6 * s, 8.2 * s, -8.05 * s),
+				Color = world("icing"),
+				Parent = parent,
+			})
+			local window = kit.decor({
+				Name = "Window",
+				Size = Vector3.new(3.8, 3.8, 0.4) * s,
+				CFrame = frame * CFrame.new(side * 6.6 * s, 8.2 * s, -8.15 * s),
+				Color = world("cottageWindow"),
+				Material = Enum.Material.Neon,
+				CastShadow = false,
+				Parent = parent,
+			})
+			if side == 1 then
+				light(window, world("cottageWindow"), 22, 1.4)
+			end
+		end
+		local chimney = kit.decor({
+			Name = "Chimney",
+			Size = Vector3.new(2.8, 7, 2.8) * s,
+			CFrame = frame * CFrame.new(6.5 * s, 20.5 * s, 3.4 * s),
+			Color = world("gingerbreadDark"),
+			Material = Enum.Material.Sand,
+			Parent = parent,
+		})
+		plume(chimney, (frame * CFrame.new(6.5 * s, 24.6 * s, 3.4 * s)).Position, world("icing"), 6 * s, 2, kit)
+	end,
+
+	-- A giant gingerbread man waving at the map: a biscuit head, body, arms and legs, icing eyes, smile and cuffs, and
+	-- three gumdrop buttons.
+	gingerbreadMan = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad((spot.index % 2) * 14 - 7), 0)
+		local biscuit = world("gingerbread")
+		local depth = 3.2
+		local function piece(name: string, size: Vector3, at: CFrame, color: Color3, material: Enum.Material?)
+			local part = kit.decor({
+				Name = name,
+				Size = size * s,
+				CFrame = frame * at,
+				Color = color,
+				Material = material or Enum.Material.SmoothPlastic,
+				Parent = parent,
+			})
+			sphereMesh(part)
+		end
+		piece("Head", Vector3.new(10, 10, depth), CFrame.new(0, 31 * s, 0), biscuit, Enum.Material.Sand)
+		piece("Body", Vector3.new(13, 15.5, depth), CFrame.new(0, 19.5 * s, 0), biscuit, Enum.Material.Sand)
+		for _, side in { -1, 1 } do
+			piece(
+				"Leg",
+				Vector3.new(5.6, 13, depth),
+				CFrame.new(side * 3.6 * s, 7.4 * s, 0) * CFrame.Angles(0, 0, math.rad(side * 14)),
+				biscuit,
+				Enum.Material.Sand
+			)
+			-- the right arm waves, the left one hangs
+			local angle = if side == 1 then 38 else -22
+			local arm = CFrame.new(side * 9 * s, (23 + side * 1.5) * s, 0) * CFrame.Angles(0, 0, math.rad(angle))
+			piece("Arm", Vector3.new(12, 4.8, depth), arm, biscuit, Enum.Material.Sand)
+			piece("Cuff", Vector3.new(0.8, 4.6, depth + 0.4), arm * CFrame.new(side * 3.6 * s, 0, 0), world("icing"))
+			piece("Eye", Vector3.new(1.7, 1.9, 1), CFrame.new(side * 2.1 * s, 32.2 * s, -1.6 * s), world("icing"))
+		end
+		piece("Smile", Vector3.new(4.6, 1, 1), CFrame.new(0, 28.6 * s, -1.6 * s), world("icing"))
+		for i = 0, 2 do
+			kit.decor({
+				Name = "Button",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.one * 2.2 * s,
+				CFrame = frame * CFrame.new(0, (23.4 - i * 3.6) * s, -1.6 * s),
+				Color = candy(spot.index + i),
+				Material = Enum.Material.Sand,
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- A round gingerbread cottage under a giant sugared gumdrop for a roof: biscuit walls, a ring of white icing where the
+	-- roof sits with three drips running off it, a candy door, two warm windows and a chimney puffing smoke.
+	gumdropCottage = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad((spot.index % 3 - 1) * 20), 0)
+		-- the walls are exactly as wide as the gumdrop, so its lower half stays hidden inside them
+		kit.decor({
+			Name = "Walls",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(13 * s, 22 * s),
+			CFrame = frame * CFrame.new(0, 6.5 * s, 0) * UPRIGHT,
+			Color = world("gingerbread"),
+			Material = Enum.Material.Sand,
+			Parent = parent,
+		})
+		local roof = kit.decor({
+			Name = "GumdropRoof",
+			Size = Vector3.new(22, 22, 22) * s,
+			CFrame = frame * CFrame.new(0, 13 * s, 0),
+			Color = candy(spot.index + 1),
+			Material = Enum.Material.Sand,
+			Parent = parent,
+		})
+		sphereMesh(roof)
+		kit.decor({
+			Name = "Icing",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(1.8 * s, 22.8 * s),
+			CFrame = frame * CFrame.new(0, 13.2 * s, 0) * UPRIGHT,
+			Color = world("icing"),
+			Parent = parent,
+		})
+		for _, angle in { -38, 0, 38 } do
+			local drip = kit.decor({
+				Name = "Icing",
+				Size = Vector3.new(1.8, 3.6, 1.2) * s,
+				CFrame = frame * CFrame.Angles(0, math.rad(angle), 0) * CFrame.new(0, 11.7 * s, -11.2 * s),
+				Color = world("icing"),
+				Parent = parent,
+			})
+			sphereMesh(drip)
+		end
+		kit.decor({
+			Name = "Door",
+			Size = Vector3.new(4.4, 7.2, 1.2) * s,
+			CFrame = frame * CFrame.new(0, 3.6 * s, -10.8 * s),
+			Color = candy(spot.index + 2),
+			Parent = parent,
+		})
+		for _, side in { -1, 1 } do
+			local window = kit.decor({
+				Name = "Window",
+				Size = Vector3.new(3.2, 3.2, 0.8) * s,
+				CFrame = frame * CFrame.Angles(0, math.rad(side * 42), 0) * CFrame.new(0, 7.6 * s, -10.9 * s),
+				Color = world("cottageWindow"),
+				Material = Enum.Material.Neon,
+				CastShadow = false,
+				Parent = parent,
+			})
+			if side == 1 then
+				light(window, world("cottageWindow"), 22, 1.4)
+			end
+		end
+		local chimney = kit.decor({
+			Name = "Chimney",
+			Size = Vector3.new(2.6, 6, 2.6) * s,
+			CFrame = frame * CFrame.new(5 * s, 22 * s, 3 * s),
+			Color = world("gingerbreadDark"),
+			Material = Enum.Material.Sand,
+			Parent = parent,
+		})
+		plume(chimney, (frame * CFrame.new(5 * s, 25.4 * s, 3 * s)).Position, world("icing"), 6 * s, 2, kit)
+	end,
+
+	-- A heap of giant sugared gumdrops in candy colours.
+	gumdrops = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad(spot.index * 31), 0)
+		for i, drop in
+			{
+				{ at = Vector3.new(0, 5, 0), d = 16, h = 15 },
+				{ at = Vector3.new(11, 3.2, 4), d = 12, h = 10 },
+				{ at = Vector3.new(-10.5, 2.8, 5), d = 11, h = 9 },
+				{ at = Vector3.new(3, 2.8, -10.5), d = 11, h = 9 },
+				{ at = Vector3.new(-2.5, 13.5, 1.5), d = 9, h = 8 },
+			}
+		do
+			local gumdrop = kit.decor({
+				Name = "Gumdrop",
+				Size = Vector3.new(drop.d, drop.h, drop.d) * s,
+				CFrame = frame * CFrame.new(drop.at * s),
+				Color = candy(spot.index + i),
+				Material = Enum.Material.Sand,
+				Parent = parent,
+			})
+			sphereMesh(gumdrop)
+		end
+	end,
+
+	-- A giant bowl of ramen, steaming: a red bowl with a white band, golden broth, noodles lifted on a pair of
+	-- chopsticks and a nest of them in the broth, half an egg, naruto, chashu and a sheet of nori.
+	ramenBowl = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad(spot.index * 17), 0)
+		local top = 16 -- the broth's surface
+		for _, disc in
+			{
+				{ name = "BowlFoot", h = 2.4, d = 14, y = 1.2, color = "ramenBowl" },
+				{ name = "Bowl", h = 8, d = 32, y = 12, color = "ramenBowl" },
+				{ name = "BowlBand", h = 2.2, d = 32.4, y = 13, color = "bowlBand" },
+				{ name = "Broth", h = 0.4, d = 30.8, y = top - 0.3, color = "broth" },
+			}
+		do
+			local part = kit.decor({
+				Name = disc.name,
+				Shape = Enum.PartType.Cylinder,
+				Size = cylinderSize(disc.h * s, disc.d * s),
+				CFrame = frame * CFrame.new(0, disc.y * s, 0) * UPRIGHT,
+				Color = world(disc.color),
+				Parent = parent,
+			})
+			if disc.name == "Broth" then
+				part.Reflectance = 0.15
+				plume(part, (frame * CFrame.new(0, (top + 1) * s, 0)).Position, world("eggWhite"), 12 * s, 3, kit)
+			end
+		end
+		-- the bowl's rounded bottom: an ellipsoid whose upper half hides inside the straight wall above it
+		local bottom = kit.decor({
+			Name = "Bowl",
+			Size = Vector3.new(31.6, 14, 31.6) * s,
+			CFrame = frame * CFrame.new(0, 8.4 * s, 0),
+			Color = world("ramenBowl"),
+			Parent = parent,
+		})
+		sphereMesh(bottom)
+		local nest = kit.decor({
+			Name = "Noodles",
+			Size = Vector3.new(14, 2.4, 10) * s,
+			CFrame = frame * CFrame.new(-3 * s, (top + 0.3) * s, 2 * s) * CFrame.Angles(0, math.rad(20), 0),
+			Color = world("noodle"),
+			Material = Enum.Material.Pebble,
+			Parent = parent,
+		})
+		sphereMesh(nest)
+		local egg = kit.decor({
+			Name = "Egg",
+			Size = Vector3.new(8, 3.4, 6) * s,
+			CFrame = frame * CFrame.new(7 * s, (top + 0.5) * s, 5 * s) * CFrame.Angles(0, math.rad(-30), 0),
+			Color = world("eggWhite"),
+			Parent = parent,
+		})
+		sphereMesh(egg)
+		local yolk = kit.decor({
+			Name = "Yolk",
+			Size = Vector3.new(4.2, 1.2, 3.2) * s,
+			CFrame = frame * CFrame.new(7 * s, (top + 2) * s, 5 * s) * CFrame.Angles(0, math.rad(-30), 0),
+			Color = world("yolk"),
+			Parent = parent,
+		})
+		sphereMesh(yolk)
+		for _, slice in
+			{
+				{ name = "Naruto", d = 6.4, at = Vector3.new(-8, top + 0.6, -6), color = "eggWhite" },
+				{ name = "NarutoSwirl", d = 3.2, at = Vector3.new(-8, top + 0.75, -6), color = "narutoPink" },
+				{ name = "Chashu", d = 8, at = Vector3.new(4, top + 0.5, -8), color = "chashu" },
+			}
+		do
+			kit.decor({
+				Name = slice.name,
+				Shape = Enum.PartType.Cylinder,
+				Size = cylinderSize(1 * s, slice.d * s),
+				CFrame = frame * CFrame.new(slice.at * s) * UPRIGHT,
+				Color = world(slice.color),
+				Parent = parent,
+			})
+		end
+		kit.decor({
+			Name = "Nori",
+			Size = Vector3.new(7, 10, 0.4) * s,
+			CFrame = frame * CFrame.new(-2 * s, (top + 2.8) * s, 13.6 * s) * CFrame.Angles(math.rad(-14), 0, 0),
+			Color = world("nori"),
+			Parent = parent,
+		})
+		-- chopsticks lifting noodles out of the broth: tips over the bowl, handles out past the rim
+		local tip = Vector3.new(3, top + 9, -1)
+		for _, offset in { -0.7, 0.7 } do
+			local a = (frame * CFrame.new((tip + Vector3.new(0, 0, offset)) * s)).Position
+			local b = (frame * CFrame.new(Vector3.new(21, top + 17, -6 + offset) * s)).Position
+			kit.decor({
+				Name = "Chopstick",
+				Size = Vector3.new((a - b).Magnitude, 0.9 * s, 0.9 * s),
+				CFrame = along(a, b),
+				Color = world("chopstick"),
+				Parent = parent,
+			})
+		end
+		for i, strand in { -1.1, 0, 1.1 } do
+			local a = (frame * CFrame.new((tip + Vector3.new(strand * 0.6, -0.5, strand * 0.4)) * s)).Position
+			local b = (frame * CFrame.new(Vector3.new(tip.X + strand * 1.4 + (i - 2) * 0.6, top, strand * 1.6) * s)).Position
+			kit.decor({
+				Name = "Noodle",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new((a - b).Magnitude, 0.8 * s, 0.8 * s),
+				CFrame = along(a, b),
+				Color = world("noodle"),
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- A steaming hot spring: a wide pool of milky turquoise water ringed with dark boulders, and a paper lantern glowing
+	-- on a post beside it.
+	hotSpring = function(base: CFrame, size: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local s = size * 1.4
+		local frame = base * CFrame.Angles(0, math.rad(spot.index * 37), 0)
+		local water = kit.decor({
+			Name = "SpringWater",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(1.4 * s, 26 * s),
+			CFrame = frame * CFrame.new(0, 1 * s, 0) * UPRIGHT,
+			Color = world("springWater"),
+			Parent = parent,
+		})
+		water.Reflectance = 0.3
+		plume(water, (frame * CFrame.new(0, 2.5 * s, 0)).Position, Color3.new(1, 1, 1), 16 * s, 5, kit)
+		for i = 0, 6 do
+			local d = (5 + (i * 7) % 4) * s
+			kit.decor({
+				Name = "Boulder",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.one * d,
+				CFrame = frame * CFrame.Angles(0, math.rad(i * 360 / 7), 0) * CFrame.new(0, d * 0.22, -13.6 * s),
+				Color = world("springRock"),
+				Material = Enum.Material.Slate,
+				Parent = parent,
+			})
+		end
+		kit.decor({
+			Name = "LanternPost",
+			Size = Vector3.new(1.2, 9.6, 1.2) * s,
+			CFrame = frame * CFrame.new(-17 * s, 4.8 * s, -7 * s),
+			Color = world("cartWood"),
+			Material = Enum.Material.Wood,
+			Parent = parent,
+		})
+		local lantern = kit.decor({
+			Name = "PaperLantern",
+			Size = Vector3.new(4.4, 5.6, 4.4) * s,
+			CFrame = frame * CFrame.new(-17 * s, 12.4 * s, -7 * s),
+			Color = world("paperLantern"),
+			Material = Enum.Material.Neon,
+			CastShadow = false,
+			Parent = parent,
+		})
+		sphereMesh(lantern)
+		light(lantern, world("paperLantern"), 26, 1.4)
+		kit.decor({
+			Name = "LanternCap",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(0.8 * s, 2.6 * s),
+			CFrame = frame * CFrame.new(-17 * s, 15.2 * s, -7 * s) * UPRIGHT,
+			Color = world("nori"),
+			Parent = parent,
+		})
+	end,
+
+	-- A ramen cart (a yatai): a wooden counter on two big wheels, a roof on two posts, an indigo noren curtain, two red
+	-- paper lanterns and a stock pot steaming on the counter.
+	ramenCart = function(base: CFrame, size: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local s = size * 1.4
+		local frame = base * CFrame.Angles(0, math.rad((spot.index % 3 - 1) * 12), 0)
+		local wood = world("cartWood")
+		kit.decor({
+			Name = "Counter",
+			Size = Vector3.new(18, 7, 8) * s,
+			CFrame = frame * CFrame.new(0, 5.5 * s, 0),
+			Color = wood,
+			Material = Enum.Material.WoodPlanks,
+			Parent = parent,
+		})
+		for _, side in { -1, 1 } do
+			kit.decor({
+				Name = "Wheel",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(1.2, 8, 8) * s,
+				CFrame = frame * CFrame.new(5 * s, 4 * s, side * 4.7 * s) * CFrame.Angles(0, math.rad(90), 0),
+				Color = wood:Lerp(Color3.new(0, 0, 0), 0.35),
+				Material = Enum.Material.Wood,
+				Parent = parent,
+			})
+			kit.decor({
+				Name = "Post",
+				Size = Vector3.new(0.8, 10, 0.8) * s,
+				CFrame = frame * CFrame.new(side * 8.4 * s, 14 * s, 0),
+				Color = wood,
+				Material = Enum.Material.Wood,
+				Parent = parent,
+			})
+			local lantern = kit.decor({
+				Name = "PaperLantern",
+				Size = Vector3.new(3, 4, 3) * s,
+				CFrame = frame * CFrame.new(side * 10.4 * s, 16.2 * s, -5.2 * s),
+				Color = world("paperLantern"),
+				Material = Enum.Material.Neon,
+				CastShadow = false,
+				Parent = parent,
+			})
+			sphereMesh(lantern)
+			if side == 1 then
+				light(lantern, world("paperLantern"), 20, 1.2)
+			end
+		end
+		kit.decor({
+			Name = "Roof",
+			Size = Vector3.new(23, 1.4, 12) * s,
+			CFrame = frame * CFrame.new(0, 19.6 * s, -0.6 * s),
+			Color = wood:Lerp(Color3.new(0, 0, 0), 0.2),
+			Material = Enum.Material.WoodPlanks,
+			Parent = parent,
+		})
+		for i = -1, 1 do
+			kit.decor({
+				Name = "Noren",
+				Size = Vector3.new(5.6, 3.6, 0.2) * s,
+				CFrame = frame * CFrame.new(i * 6 * s, 17.1 * s, -6.2 * s),
+				Color = world("noren"),
+				Material = Enum.Material.Fabric,
+				Parent = parent,
+			})
+		end
+		local pot = kit.decor({
+			Name = "StockPot",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(3.6 * s, 4.4 * s),
+			CFrame = frame * CFrame.new(-4.5 * s, 10.8 * s, 0) * UPRIGHT,
+			Color = world("smokerMetal"):Lerp(Color3.new(1, 1, 1), 0.55),
+			Material = Enum.Material.Metal,
+			Parent = parent,
+		})
+		plume(pot, (frame * CFrame.new(-4.5 * s, 13 * s, 0)).Position, Color3.new(1, 1, 1), 5 * s, 3, kit)
+	end,
+
+	-- A water tower on stilts whose tank is a giant squeeze bottle of ketchup or mustard: four legs, two cross braces, a
+	-- platform, the bottle with a white label, a domed shoulder, a cap and its nozzle.
+	sauceTower = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad(spot.index * 13), 0)
+		local sauce = if spot.index % 2 == 0 then world("ketchup") else world("mustard")
+		local leg = world("towerLeg")
+		for _, corner in { { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, 1 } } do
+			kit.decor({
+				Name = "Leg",
+				Size = Vector3.new(1.6, 24, 1.6) * s,
+				CFrame = frame * CFrame.new(corner[1] * 7 * s, 12 * s, corner[2] * 7 * s),
+				Color = leg,
+				Material = Enum.Material.WoodPlanks,
+				Parent = parent,
+			})
+		end
+		for _, brace in
+			{
+				{ Vector3.new(-7, 2, -7), Vector3.new(7, 22, -7) },
+				{ Vector3.new(7, 2, -7), Vector3.new(7, 22, 7) },
+			}
+		do
+			local a, b = (frame * CFrame.new(brace[1] * s)).Position, (frame * CFrame.new(brace[2] * s)).Position
+			kit.decor({
+				Name = "Brace",
+				Size = Vector3.new((b - a).Magnitude, 1 * s, 1 * s),
+				CFrame = along(a, b),
+				Color = leg,
+				Material = Enum.Material.WoodPlanks,
+				Parent = parent,
+			})
+		end
+		for _, disc in
+			{
+				{ name = "Platform", h = 1.4, d = 19, y = 24.7, color = leg },
+				{ name = "Bottle", h = 20, d = 16, y = 35.4, color = sauce },
+				{ name = "Label", h = 7, d = 16.4, y = 34, color = world("bucketWhite") },
+				{ name = "Cap", h = 4, d = 6, y = 54.6, color = world("bucketWhite") },
+				{ name = "Nozzle", h = 4.6, d = 2.4, y = 58.9, color = sauce },
+			}
+		do
+			kit.decor({
+				Name = disc.name,
+				Shape = Enum.PartType.Cylinder,
+				Size = cylinderSize(disc.h * s, disc.d * s),
+				CFrame = frame * CFrame.new(0, disc.y * s, 0) * UPRIGHT,
+				Color = disc.color,
+				Parent = parent,
+			})
+		end
+		kit.decor({
+			Name = "Shoulder",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 16 * s,
+			CFrame = frame * CFrame.new(0, 45.4 * s, 0),
+			Color = sauce,
+			Parent = parent,
+		})
+	end,
+
+	-- A barrel smoker on legs: a black drum on its side, a firebox at one end glowing through its vent, a chimney
+	-- puffing smoke at the other.
+	smoker = function(base: CFrame, size: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local s = size * 1.5
+		local frame = base * CFrame.Angles(0, math.rad((spot.index % 3 - 1) * 14), 0)
+		local metal = world("smokerMetal")
+		kit.decor({
+			Name = "Drum",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(24, 12, 12) * s,
+			CFrame = frame * CFrame.new(0, 10 * s, 0),
+			Color = metal,
+			Material = Enum.Material.Metal,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Firebox",
+			Size = Vector3.new(8, 8, 9) * s,
+			CFrame = frame * CFrame.new(-15 * s, 8 * s, 0),
+			Color = metal,
+			Material = Enum.Material.Metal,
+			Parent = parent,
+		})
+		local vent = kit.decor({
+			Name = "FireVent",
+			Size = Vector3.new(5, 1.4, 0.3) * s,
+			CFrame = frame * CFrame.new(-15 * s, 6.4 * s, -4.6 * s),
+			Color = world("fireGlow"),
+			Material = Enum.Material.Neon,
+			CastShadow = false,
+			Parent = parent,
+		})
+		light(vent, world("fireGlow"), 22, 1.6)
+		local chimney = kit.decor({
+			Name = "Chimney",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(12 * s, 2.6 * s),
+			CFrame = frame * CFrame.new(10 * s, 20 * s, 0) * UPRIGHT,
+			Color = metal,
+			Material = Enum.Material.Metal,
+			Parent = parent,
+		})
+		plume(chimney, (frame * CFrame.new(10 * s, 26.5 * s, 0)).Position, world("campStone"), 9 * s, 3, kit)
+		for _, corner in { { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, 1 } } do
+			kit.decor({
+				Name = "Leg",
+				Size = Vector3.new(1.2, 5.6, 1.2) * s,
+				CFrame = frame * CFrame.new(corner[1] * 9 * s, 2.6 * s, corner[2] * 4 * s),
+				Color = world("towerLeg"),
+				Material = Enum.Material.Metal,
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- A big campfire: a ring of stones, three crossed logs, flames glowing orange and yellow (sparks rising), and a
+	-- sausage and a marshmallow roasting on sticks.
+	campfire = function(base: CFrame, size: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local s = size * 1.5
+		local frame = base * CFrame.Angles(0, math.rad(spot.index * 41), 0)
+		for i = 0, 4 do
+			kit.decor({
+				Name = "Stone",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.one * 4.6 * s,
+				CFrame = frame * CFrame.Angles(0, math.rad(i * 72), 0) * CFrame.new(0, 1.2 * s, -8.5 * s),
+				Color = world("campStone"),
+				Material = Enum.Material.Slate,
+				Parent = parent,
+			})
+		end
+		for i = 0, 2 do
+			kit.decor({
+				Name = "Log",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(13, 2.2, 2.2) * s,
+				CFrame = frame * CFrame.new(0, (1.3 + i * 0.9) * s, 0) * CFrame.Angles(0, math.rad(i * 60), 0),
+				Color = world("firewood"),
+				Material = Enum.Material.Wood,
+				Parent = parent,
+			})
+		end
+		local flame = kit.decor({
+			Name = "Flame",
+			Size = Vector3.new(6.4, 11, 6.4) * s,
+			CFrame = frame * CFrame.new(0, 7 * s, 0),
+			Color = world("fireGlow"),
+			Material = Enum.Material.Neon,
+			Transparency = 0.15,
+			CastShadow = false,
+			Parent = parent,
+		})
+		sphereMesh(flame)
+		local flameCore = kit.decor({
+			Name = "FlameCore",
+			Size = Vector3.new(3.6, 7, 3.6) * s,
+			CFrame = frame * CFrame.new(0, 5.6 * s, 0),
+			Color = world("flameCore"),
+			Material = Enum.Material.Neon,
+			CastShadow = false,
+			Parent = parent,
+		})
+		sphereMesh(flameCore)
+		light(flame, world("fireGlow"), 40, 2)
+		local sparks = Instance.new("Attachment")
+		sparks.Name = "Sparks"
+		sparks.Parent = flame
+		sparks.WorldCFrame = CFrame.new((frame * CFrame.new(0, 11 * s, 0)).Position)
+		kit.emitter(sparks, {
+			Name = "Sparks",
+			Texture = "rbxasset://textures/particles/sparkles_main.dds",
+			Color = ColorSequence.new(Color3.fromRGB(255, 200, 90), Color3.fromRGB(255, 90, 30)),
+			LightEmission = 1,
+			Size = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0.5),
+				NumberSequenceKeypoint.new(1, 0.1),
+			}),
+			Speed = NumberRange.new(4, 8),
+			SpreadAngle = Vector2.new(25, 25),
+			Acceleration = Vector3.new(0.5, 2, 0.3),
+			Lifetime = NumberRange.new(1.5, 2.5),
+			Rate = 6,
+			EmissionDirection = Enum.NormalId.Top,
+		})
+		for _, roast in
+			{
+				{ from = Vector3.new(14, 2, 6), to = Vector3.new(3.5, 6, 1.5), treat = "sausage" },
+				{ from = Vector3.new(-13, 2, 7), to = Vector3.new(-3, 5.5, 2), treat = "marshmallow" },
+			}
+		do
+			local a, b = (frame * CFrame.new(roast.from * s)).Position, (frame * CFrame.new(roast.to * s)).Position
+			kit.decor({
+				Name = "RoastingStick",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new((b - a).Magnitude, 0.5 * s, 0.5 * s),
+				CFrame = along(a, b),
+				Color = world("skewerWood"),
+				Material = Enum.Material.Wood,
+				Parent = parent,
+			})
+			local treat = kit.decor({
+				Name = if roast.treat == "sausage" then "Sausage" else "Marshmallow",
+				Size = if roast.treat == "sausage"
+					then Vector3.new(4.6, 1.8, 1.8) * s
+					else Vector3.new(2.2, 2.4, 2.2) * s,
+				CFrame = along(a, b) * CFrame.new((b - a).Magnitude / 2, 0, 0),
+				Color = world(roast.treat),
+				Parent = parent,
+			})
+			if roast.treat == "sausage" then
+				sphereMesh(treat)
+			end
+		end
 	end,
 }
 

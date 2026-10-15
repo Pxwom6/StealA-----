@@ -1420,7 +1420,49 @@ players can only get then, and a luck weekend when many are off school.
 without the decorations. Never remove the creature or mutation ids (they are in players' saves). Going back to the old
 Golden Hour check would need its bound raised or a rarer event mutation.
 
-### 54. Review round 2 fixes: the giant tappable everywhere, fixed spin odds, short phones, fair private servers
+### 54. Four more maps: Honeycomb Hive, Gingerbread Hollow, Ramen Hot Springs, Smokehouse Ranch
+
+* **What:** maps 24-27, built from the same pieces as the others (#32). **Honeycomb Hive** (a golden morning): a
+  beeswax floor ringed by lavender fields and a honey lake, giant daisies and honeycomb columns on the tree spots,
+  slabs of honeycomb standing on edge with their hexagonal cells facing the map, giant bumblebees hovering over the
+  hills, a straw skep, a honey pot with its dipper and giant daisies (Mango Rainforest's giant flower, recoloured),
+  bee-striped boundary walls, golden pollen. **Gingerbread Hollow** (at sundown, windows lit): a frosting-white floor
+  (warm vanilla SmoothPlastic, not Snow) under gingerbread walkways, iced Christmas-tree cookies and candy-cane lamps on
+  the tree spots, gingerbread cottages with gumdrops along the ridge and icing round the windows, round huts under a
+  giant gumdrop roof, a gingerbread man waving at the map, heaps of sugared gumdrops, candy sprinkles. **Ramen Hot
+  Springs** (a misty dawn): mossy ground and stone paving, Japanese maples and giant spring onions, giant bowls of
+  ramen (noodles lifted on chopsticks, an egg, naruto, chashu, nori, steam), steaming hot springs with a paper lantern,
+  ramen carts with an indigo noren and a stock pot, the existing steam weather. **Smokehouse Ranch** (twilight, the
+  fires glowing): a prairie with red-dirt walkways and a wooden fence, chili plants and giant kebabs, ketchup and
+  mustard squeeze bottles as water towers, barrel smokers glowing through their vents, campfires roasting a sausage and
+  a marshmallow, and a new weather, `smoke` (barbecue smoke rolling low across the ground).
+* **New pieces:** eight flora kinds and fourteen landmark kinds (ThemeProps; counted in MapThemeRules and built exactly,
+  which the world smoke test checks), a hexagonal prism helper (three blocks turned 60° apart fill a hexagon exactly)
+  for the honeycomb, and a plume helper for steam and smoke. The heaviest map, the hive, builds about 1,405 scenery
+  parts (budget 1,500).
+* **Signature mutations** (1.2% at x3 like every map's, rolled after every other mutation so no existing roll changes):
+  **Bumblebee** (fuzzy honey yellow with two glassy bee wings on its back: a new `wings` look, like Angelic's halo),
+  **Gumdrop** (sugared emerald green, sugar crystals), **Lantern** (Neon red-orange, lit like a paper lantern, warm
+  lights rising) and **Barbecue** (a glossy mahogany glaze, smoke curling up). Code `BUZZBUZZ`: a Bumblebee Bumble
+  Bun.
+* **Kept apart from the 23 maps (renders before shipping):** every map was rendered offline from above, the plaza, the
+  plots, the belt and each landmark close up, and set beside a contact sheet of the 23 existing maps. The hive first
+  read as one gold (now lavender fields round a golden floor, deeper honey cells, white daisies); the ranch at sunset
+  was orange from end to end, too close to Hot Sauce Volcano (now a blue twilight its fires glow against); Gingerbread
+  Hollow's white floor read as snow under a cold twilight (now a warm sundown, so the frosting looks like vanilla
+  icing); the ramen bowl read as a drum (now a rounded bowl on a foot), the cookie trees as plain green cones (now one
+  iced cookie with a biscuit rim, turned to the map), and the gumdrop hut's roof hid its windows. CI keeps each new
+  map's time of day at least 20 minutes from every other map's, and its flora and landmarks its own (the hive's giant
+  daisies apart). In the mutation grid, the hive's first signature (Nectar, peach) sat between Maple and Toasted, so
+  it became Bumblebee; Lantern went from matte coral to a glowing Neon.
+* **No balance change:** every signature is 1.2% at x3, so the simulation's time to each rarity and income are the
+  same as before; BALANCE.md's mutation table gains four rows.
+
+**Why:** "a ton of extra maps". Four moods no map had (a bright hive among lavender, a sugary village at sundown, a
+misty hot spring at dawn, a barbecue at twilight), and four more mutations to collect on the vote.
+**Reversal cost:** none — `weight = 0` keeps a map for `/map` only; never remove the mutation ids (they are in saves).
+
+### 55. Review round 2 fixes: the giant tappable everywhere, fixed spin odds, short phones, fair private servers
 
 * **What:** three reviewers went through everything merged after 0ac89b8. Each finding was checked again on main
   (e09833f), fixed, and given a test that fails without the fix.

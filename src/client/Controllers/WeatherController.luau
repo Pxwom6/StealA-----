@@ -2,7 +2,8 @@
 --[[
 	Weather for the current map theme (Config/MapThemes `weather`): particles drifting around this player's camera —
 	snow, embers, falling leaves, fireflies, candy sprinkles, desert dust, petals, stardust, pollen, feathers, bubbles,
-	chocolate shavings, confetti, lemonade fizz, heat shimmer, spring blossom, popping popcorn, breakfast steam or rain. One invisible box follows the camera
+	chocolate shavings, confetti, lemonade fizz, heat shimmer, spring blossom, popping popcorn, breakfast steam, barbecue
+	smoke or rain. One invisible box follows the camera
 	(it lives under the Camera, so only this client has it) and its emitter fills the air around you, which is far
 	cheaper than covering the whole map.
 
@@ -444,6 +445,25 @@ local RECIPES: { [Types.WeatherKind]: Recipe } = {
 			Rate = 16,
 			Rotation = NumberRange.new(0, 360),
 			RotSpeed = NumberRange.new(-25, 25),
+			EmissionDirection = Enum.NormalId.Top,
+		},
+	},
+	-- Barbecue smoke at sundown: faint grey wisps rolling low and sideways across the ground.
+	smoke = {
+		boxSize = Vector3.new(110, 2, 110),
+		offset = Vector3.new(0, -5, 0),
+		props = {
+			Texture = SMOKE,
+			Color = colours({ Color3.fromRGB(206, 192, 182), Color3.fromRGB(156, 142, 134) }),
+			Size = sequence({ { 0, 2 }, { 1, 6 } }),
+			Transparency = sequence({ { 0, 1 }, { 0.3, 0.8 }, { 0.75, 0.86 }, { 1, 1 } }),
+			Speed = NumberRange.new(0.8, 1.6),
+			SpreadAngle = Vector2.new(30, 30),
+			Acceleration = Vector3.new(1.6, 0.25, 0.6),
+			Lifetime = NumberRange.new(5, 8),
+			Rate = 10,
+			Rotation = NumberRange.new(0, 360),
+			RotSpeed = NumberRange.new(-15, 15),
 			EmissionDirection = Enum.NormalId.Top,
 		},
 	},

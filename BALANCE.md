@@ -218,6 +218,10 @@ the store stay exact. Golden Hour (a server modifier) is the only thing that mul
 | Buttered | on Popcorn Drive-In | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
 | Porcelain | on Tea Party Garden | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
 | Syrupy | on Pancake Peaks | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Bumblebee | on Honeycomb Hive | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Gumdrop | on Gingerbread Hollow | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Lantern | on Ramen Hot Springs | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Barbecue | on Smokehouse Ranch | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
 
 "Per server-hour" is while the mutation can roll. Any mutation on an ordinary spawn (the map's signature included,
 no modifier): 5.15% of spawns (74.2 per server-hour). Expected value of one spawn: income x1.0885, price x1.0435.
@@ -235,7 +239,9 @@ no modifier): 5.15% of spawns (74.2 per server-hour). Expected value of one spaw
 * **Map signatures** (`mapTheme`): each map has exactly one, only while it is up — about 6 in a 20-minute map. At
   x3 they sit between Golden and Diamond (rarer than Golden, weaker than Diamond; CI checks both), so a map is worth
   voting for (the vote buttons and the title card name its mutation) without making the permanent ones pointless.
-  Collectors chase all twenty-three through the Snackdex, which shows a pip for each one owned.
+  Collectors chase all twenty-seven through the Snackdex, which shows a pip for each one owned. Every map's is the
+  same 1.2% at x3, so adding maps changes no time or income in the simulation (the four newest left every table above
+  exactly as it was).
 * **Weather mutations** (`modifierId`): only while their weather modifier runs (5 minutes, a few times a day per
   server), about 2–3 per storm, each announced to the whole server so everyone races to the belt. x4 like Diamond.
 * **Event-only mutations** (with an `eventId`) roll only while that LiveOps event runs.
@@ -801,7 +807,7 @@ biggest gift is a little under a Snack Basket (35 minutes, 49 R$) for every play
 and to a big base. It happens only when Leo runs one, so the simulation leaves it out. A 30 s cooldown keeps a double
 tap from paying twice. A private server's owner can only start Sugar Rush, Quick Hands, Fortress or Snack Patrol,
 none of which changes income, prices, luck, mutations or the belt's pace, so a private server earns exactly what a
-public one does (CI checks the hostable set). They go through the maps at the rotation's pace too (DECISIONS.md #54):
+public one does (CI checks the hostable set). They go through the maps at the rotation's pace too (DECISIONS.md #55):
 a map switch every 20 minutes, a map counted for the map achievements after 3 minutes on it, its own mutation for its
 first 20 minutes up, and the random schedule's modifiers run to their end. Switching every minute used to give a
 server every map (Tourist, Explorer, Globetrotter and their titles) in under half an hour; at 3 minutes a map,
