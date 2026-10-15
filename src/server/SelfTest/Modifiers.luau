@@ -21,10 +21,12 @@ local MutationRules = require(ReplicatedStorage.Shared.Logic.MutationRules)
 local Services = script.Parent.Parent.Services
 local BeltService = require(Services.BeltService)
 local BossService = require(Services.BossService)
+local BountyService = require(Services.BountyService)
 local DropService = require(Services.DropService)
 local LockService = require(Services.LockService)
 local ModifierService = require(Services.ModifierService)
 local Movement = require(Services.Movement)
+local Nametags = require(Services.Nametags)
 local Sessions = require(Services.Sessions)
 local WorldLighting = require(Services.WorldLighting)
 local Kit = require(script.Parent.Kit)
@@ -41,6 +43,8 @@ end
 local function dropped(kind: string): boolean
 	if kind == "boss" then
 		return BossService.current() ~= nil
+	elseif kind == "treasure" then
+		return DropService.treasureModel() ~= nil
 	end
 	local crates, coins, runaways = DropService.counts()
 	if kind == "crate" then
@@ -51,6 +55,23 @@ local function dropped(kind: string): boolean
 		return runaways > 0
 	end
 	return false
+end
+
+-- Whether anything a drop modifier puts out is still out.
+local function anythingOut(): boolean
+	local crates, coins, runaways = DropService.counts()
+	return crates + coins + runaways > 0 or DropService.treasureModel() ~= nil or BossService.current() ~= nil
+end
+
+-- Who still wears a bounty (the Player attribute BountyService sets), by name.
+local function bountyWearers(): { string }
+	local names: { string } = {}
+	for _, session in Sessions.all() do
+		if session.player:GetAttribute(Nametags.BOUNTY_ATTRIBUTE) ~= nil then
+			table.insert(names, session.player.Name)
+		end
+	end
+	return names
 end
 
 -- What is wrong with modifier `id` while it runs.
@@ -83,6 +104,9 @@ local function runningIssues(id: string, lockBefore: { [Sessions.Session]: numbe
 		if mutation.modifierId == id and conditions[MutationRules.modifierKey(id)] ~= true then
 			table.insert(issues, `{mutation.id} Snacklings can't roll on the belt`)
 		end
+	end
+	if def.bounty == true and BountyService.hunt() == nil then
+		table.insert(issues, "no bounty hunt started")
 	end
 	for _, session in Sessions.all() do
 		local name = session.player.Name
@@ -166,11 +190,19 @@ local Section: Kit.Section = {
 			if clockBefore and clockAfter and not Kit.near(clockAfter, clockBefore) then
 				table.insert(issues, `the sky stays at clock {clockAfter} (it was {clockBefore})`)
 			end
+			if def.bounty == true then
+				if BountyService.hunt() ~= nil then
+					table.insert(issues, "its bounty hunt goes on after it ended")
+				end
+				local wearers = bountyWearers()
+				if #wearers > 0 then
+					table.insert(issues, `{table.concat(wearers, ", ")} still wear the bounty after it ended`)
+				end
+			end
 			if dropDef then
 				DropService.clear()
 				BossService.dismiss()
-				local crates, coins, runaways = DropService.counts()
-				if crates + coins + runaways > 0 or BossService.current() ~= nil then
+				if anythingOut() then
 					table.insert(issues, "its drops are still out after the clean-up")
 				end
 			end

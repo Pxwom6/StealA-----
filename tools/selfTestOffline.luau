@@ -154,6 +154,7 @@ local SeasonService = Sim.server("Services/SeasonService")
 local LiveOpsService = Sim.server("Services/LiveOpsService")
 local DropService = Sim.server("Services/DropService")
 local BossService = Sim.server("Services/BossService")
+local BountyService = Sim.server("Services/BountyService")
 local MapBuilder = Sim.server("Services/MapBuilder")
 local CreatureVisuals = Sim.shared("CreatureVisuals")
 local GameData = Sim.shared("GameData")
@@ -223,7 +224,9 @@ local function sessionState(): string
 		`modifier {ModifierService.current() or "none"}`,
 		`season {SeasonService.currentTheme() or "none"}`,
 		`drops {crates + coins + runaways}`,
+		`treasure {if DropService.treasureModel() then "yes" else "no"}`,
 		`giant {if BossService.current() then "yes" else "no"}`,
+		`bounty {if BountyService.hunt() or player:GetAttribute("Bounty") ~= nil then "yes" else "no"}`,
 		`test models {if workspace:FindFirstChild("SelfTestSnacklings") then "yes" else "no"}`,
 		`runner {if ServerScriptService:FindFirstChild(RUNNER_NAME) then "yes" else "no"}`,
 	}, ", ")

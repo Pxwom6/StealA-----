@@ -3,7 +3,8 @@
 	Self-test section Snacklings: builds every Snackling plain, then one (the first in the catalogue, as the world smoke
 	test does) in every mutation, with CreatureVisuals.build as /gallery does, in batches high above the north edge of
 	the map. A moment later (so a part that is not welded has fallen), each is measured in the real engine: it built
-	without an error, stands on its feet (its lowest visible part within FLOAT studs of where its feet go), fits a
+	without an error, stands on its feet (its lowest visible part, the halo, wings or ring of fire a mutation adds left
+	out, within FLOAT studs of where its feet go), fits a
 	podium (Logic/CreatureRecipe.PODIUM_FIT: as wide as the gap between podiums, as tall as the space under the
 	billboard) and, plain, stays inside its rarity's part budget; a mutated one carries its look (the Variant attribute
 	and its particle preset). Every model is destroyed straight after it is measured.
@@ -30,6 +31,10 @@ local SPACING = 12 -- studs between test models
 
 type Job = { def: Types.CreatureDef, mutation: Types.MutationDef?, label: string }
 type Measure = { lowest: number, height: number, width: number }
+
+-- What a mutation's look adds round the model (CreatureVisuals): a halo above it, wings on its back, an eclipse's ring
+-- of fire behind it (which reaches below the feet by design). Left out of where it stands, not of its size.
+local LOOK_PARTS: { [string]: boolean } = { Halo = true, Wing = true, Corona = true }
 
 -- A wedge's corners in its own space (half sizes): the bottom face and the top edge at the back (+Z).
 local WEDGE_CORNERS = {
@@ -96,7 +101,9 @@ local function measure(model: Model): Measure?
 		end
 		local position = part.Position
 		local lowX, highX, lowY, highY = reach(part)
-		lowest = math.min(lowest, position.Y + lowY)
+		if not LOOK_PARTS[part.Name] then
+			lowest = math.min(lowest, position.Y + lowY)
+		end
 		highest = math.max(highest, position.Y + highY)
 		wide = math.max(wide, math.abs(position.X - centreX + lowX), math.abs(position.X - centreX + highX))
 	end
