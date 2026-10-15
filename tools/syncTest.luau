@@ -10,6 +10,7 @@
 	  2. a place with an obsolete script and a folder that became a script: the obsolete one is reported and kept, the
 	     wrong class is fixed with its children kept;
 	  3. the same with REMOVE_STALE on: the result matches the build exactly.
+	Then a run with GITHUB_TOKEN set (a private repo): every request carries the token, and only then.
 ]]
 
 local fs = require("@lune/fs")
@@ -52,16 +53,19 @@ local function listFiles(): { { path: string, type: string } }
 	return list
 end
 
-type Result = { output: { string }, requests: number, waypoints: number }
+type Result = { output: { string }, requests: number, waypoints: number, authorized: number }
 
--- Runs the sync script against `game` with GitHub served from disk.
-local function runSync(game: any, removeStale: boolean): Result
+-- Runs the sync script against `game` with GitHub served from disk (with `token` pasted in, when given).
+local function runSync(game: any, removeStale: boolean, token: string?): Result
 	local tree = listFiles()
-	local result: Result = { output = {}, requests = 0, waypoints = 0 }
+	local result: Result = { output = {}, requests = 0, waypoints = 0, authorized = 0 }
 	local fakeHttp = {
 		HttpEnabled = true,
-		GetAsync = function(_, url: string): string
+		GetAsync = function(_, url: string, _nocache: boolean?, headers: { [string]: string }?): string
 			result.requests += 1
+			if headers and headers.Authorization == `token {token}` then
+				result.authorized += 1
+			end
 			if string.find(url, "/commits/", 1, true) then
 				return serde.encode("json", { sha = SHA, commit = { message = "Sync test\n\ndetails" } })
 			elseif string.find(url, "/git/trees/", 1, true) then
@@ -111,6 +115,9 @@ local function runSync(game: any, removeStale: boolean): Result
 	local source = fs.readFile(SCRIPT)
 	if removeStale then
 		source = string.gsub(source, "local REMOVE_STALE = false", "local REMOVE_STALE = true")
+	end
+	if token then
+		source = string.gsub(source, `local GITHUB_TOKEN = ""`, `local GITHUB_TOKEN = "{token}"`)
 	end
 	local chunk = luau.load(source, {
 		debugName = "SyncFromGitHub",
@@ -200,6 +207,7 @@ check(#diff == 0, `an empty place gets every script, exactly as Rojo builds it (
 check(first.requests == fileCount + 2, `two API calls and one download per file ({first.requests})`)
 check(contains(first.output, `{fileCount} added`), "and reports them as added")
 check(first.waypoints == 2, "inside one undo step")
+check(first.authorized == 0, "no token is sent when none is pasted in")
 
 -- 2. A stale script and a wrong class.
 local function damaged(): any
@@ -233,6 +241,14 @@ local cleaned = damaged()
 runSync(cleaned, true)
 diff = differences(cleaned, expected)
 check(#diff == 0, `REMOVE_STALE removes it ({#diff} differences)`)
+
+-- 4. A private repo: the token pasted in goes with every request.
+local private = fresh()
+local withToken = runSync(private, false, "github_pat_test")
+check(
+	withToken.requests == fileCount + 2 and withToken.authorized == withToken.requests,
+	`with GITHUB_TOKEN set, every request carries it ({withToken.authorized} of {withToken.requests})`
+)
 
 if #failures > 0 then
 	print(`studio sync test: {#failures} problem(s)`)

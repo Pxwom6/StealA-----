@@ -24,10 +24,15 @@ function Remotes.start()
 	task.spawn(function()
 		while true do
 			task.wait(60)
-			for userId, count in droppedCount do
-				if count >= DROP_WARN_THRESHOLD then
-					warn(`[Remotes] user {userId} exceeded rate limits {count} times in the last minute`)
+			local ok, err = pcall(function()
+				for userId, count in droppedCount do
+					if count >= DROP_WARN_THRESHOLD then
+						warn(`[Remotes] user {userId} exceeded rate limits {count} times in the last minute`)
+					end
 				end
+			end)
+			if not ok then
+				warn(`[Remotes] {err}`)
 			end
 			table.clear(droppedCount)
 		end

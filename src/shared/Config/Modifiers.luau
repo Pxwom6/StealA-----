@@ -309,6 +309,9 @@ local Modifiers: ModifiersConfig = {
 		gapMinSeconds = 4 * 60,
 		gapMaxSeconds = 8 * 60,
 		firstDelaySeconds = 2 * 60,
+		-- For this long after a modifier starts or ends, a belt purchase, a steal hold and a tag are checked against the
+		-- kinder of the old and new price, hold time and reach (clients show the old ones for a moment).
+		changeGraceSeconds = 1.5,
 	},
 
 	limits = {

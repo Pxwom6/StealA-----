@@ -49,6 +49,11 @@ It only touches `ReplicatedStorage.Shared`, `ServerScriptService.Server` and `St
 same mapping as `default.project.json`); custom models, ProfileStore and the place's settings stay as they are. CI
 checks it against Rojo builds of every commit (`tools/syncTest.luau`).
 
+**A private repo:** GitHub only serves its files with a token. Make a fine-grained personal access token (GitHub →
+Settings → Developer settings → Personal access tokens → Fine-grained tokens) for this repository only, with
+read-only *Contents* access and a short expiry, and paste it between the quotes of `GITHUB_TOKEN` at the top of the
+copy you paste into the Command Bar. Never commit it or put it in a script in the place; it only goes to GitHub.
+
 The PR description for each round contains a step-by-step test script (2-player local server for stealing,
 Studio test purchases, etc.).
 
@@ -57,6 +62,7 @@ Studio test purchases, etc.).
 | Command | What it does |
 | --- | --- |
 | `lune run tests/run.luau` | Unit tests for all pure game logic (no Studio needed) |
+| `lune run tools/layoutCheck.luau [--all]` | Where every HUD element lands on five phone, tablet and computer screens, and any overlap, play-zone button or small touch target (CI runs this too) |
 | `lune run tools/simulate.luau` | Economy simulation used to write `BALANCE.md` |
 | `lune run tools/importParts.luau` | Import the polished Snackling models from `art/snackling-parts/` |
 | `lune run tools/worldsim/smoke.luau` | Build the map offline in every map theme and check it (CI runs this too) |
@@ -64,6 +70,8 @@ Studio test purchases, etc.).
 | `lune run tools/worldsim/exportCreatures.luau <out.json> <ids...>` | Dump Snacklings in a row (`pizza_pup:golden`, `rarity:Mythic`, `event:Winter2026`, `mutations:pizza_pup`) |
 | `node tools/preview/render.mjs <export.json> <outPrefix>` | Render an export to PNGs offline with three.js (see [`tools/preview`](tools/preview/README.md)) |
 | `lune run tools/worldsim/server.luau` | Boot the whole server offline and play a short two-player session (CI runs this too) |
+| `lune run tools/worldsim/prelaunch.luau` | The pre-launch server fixes on the offline server, with a virtual clock (CI runs this too) |
+| `lune run tools/worldsim/gadgets.luau` | Every gadget through the real remotes on the offline server, with a virtual clock (CI runs this too) |
 | `rojo build -o build/sync.rbxl` then `lune run tools/syncTest.luau build/sync.rbxl` | Check the Studio sync script (`studio/SyncFromGitHub.luau`) offline |
 | `stylua src tests tools studio` | Format |
 | `selene src tests tools studio` | Lint |
@@ -88,16 +96,24 @@ tools               Lune scripts (balance simulation, model import, worldsim: th
 
 ### Before publishing
 
-1. **Game Settings → Places → Max Players = 8** (one base per player; see DECISIONS.md #14).
+1. **Game Settings → Places → Max Players = 8, exactly.** It is a Studio setting the code can't change: the map has
+   8 bases, one per player, and a 9th player would be kicked with "server full" (DECISIONS.md #14; the server warns in
+   the Output when it is higher).
 2. **Game Settings → Security → enable Studio Access to API Services** (to test saving/leaderboards in Studio).
 3. Game passes and developer products: done. The 4 passes and 5 products exist on the Creator Hub and their IDs
-   are in `src/shared/Config/Monetization.luau`. Change prices on the Creator Hub, not in code.
+   are in `src/shared/Config/Monetization.luau`. Change prices on the Creator Hub, not in code. Server Luck is a paid
+   random item (a boost to luck): players whose Roblox policy restricts those (PolicyService) see its card as "Not
+   available" and can't buy it, and nothing needs setting up for that (DECISIONS.md #46).
 4. Add your UserId to `adminUserIds` in `src/shared/Config/LiveOps.luau`.
 5. **Group rewards:** paste your Roblox group's ID into `groupId` in `src/shared/Config/Social.luau`
    (`TODO(owner)`; the number in the group's URL). While it is `0` the group bonus, welcome gift and Join group button
    are off and hidden; the friends bonus works either way.
 6. Optional: music and your own sounds in `src/shared/Config/Sounds.luau` (see "Sounds and music" below), models in
    `ReplicatedStorage/CreatureModels`.
+7. **Before the game goes public, make the GitHub repo private** (GitHub → the repo → Settings → General → Danger
+   Zone → Change visibility). While it is public anyone can read `src/server/Codes.luau`, so codes you haven't posted
+   yet are not secret. The Studio sync script then needs a token: see "Updating a place in Studio straight from
+   GitHub" above.
 
 **Changing the save format:** bump `DataSchema.VERSION` whenever a saved key is added, removed, renamed or changes
 meaning, and never publish a lower VERSION than before. A rollback keeps the current save code (`DataSchema`,
@@ -151,10 +167,11 @@ change:
 
 ### Map themes
 
-The same bases and belt in twenty worlds (`src/shared/Config/MapThemes.luau`): Sunny Meadow, Candy Kingdom, Frosty
-Peaks, Nacho Dunes, Hot Sauce Volcano, Midnight Market, Coconut Cove, Apple Pie Orchard, Cherry Blossom Garden, Cookie
-Moon, Mango Rainforest, Neon Noodle City, Cloud Nine, Sushi Reef, Cocoa Canyon, Cotton Candy Carnival, Pizza Piazza,
-Rock Candy Caverns, Lemonade Lagoon and Bubblegum Bayou. A server starts on a random one and changes every 20 minutes
+The same bases and belt in twenty-three worlds (`src/shared/Config/MapThemes.luau`): Sunny Meadow, Candy Kingdom,
+Frosty Peaks, Nacho Dunes, Hot Sauce Volcano, Midnight Market, Coconut Cove, Apple Pie Orchard, Cherry Blossom Garden,
+Cookie Moon, Mango Rainforest, Neon Noodle City, Cloud Nine, Sushi Reef, Cocoa Canyon, Cotton Candy Carnival, Pizza
+Piazza, Rock Candy Caverns, Lemonade Lagoon, Bubblegum Bayou, Popcorn Drive-In, Tea Party Garden and Pancake Peaks. A
+server starts on a random one and changes every 20 minutes
 after a 40-second vote in the HUD. Each map sets scenery colours, materials, lighting,
 what grows on the tree spots, ten landmarks outside the wall and the weather; gameplay positions never change.
 
@@ -166,7 +183,7 @@ what grows on the tree spots, ten landmarks outside the wall and the weather; ga
   signature mutation too (CI checks): add one to `src/shared/Config/Mutations.luau` with `mapTheme = "<id>"`.
 * **Signature mutations:** each map has one that only rolls while it is up (Honey, Sprinkled, Frozen, Fossil,
   Molten, Moonlit, Pearl, Candy Apple, Blossom, Lunar, Mossy, Cyber, Angelic with its halo, Abyssal, Fudge, Balloon,
-  Cheesy, Amethyst, Zesty, Bubblegum), named on its vote button and title card. The Globetrotter achievement asks for every map, so its target
+  Cheesy, Amethyst, Zesty, Bubblegum, Buttered, Porcelain, Syrupy), named on its vote button and title card. The Globetrotter achievement asks for every map, so its target
   follows the number of maps.
 * **Preview offline:** `lune run tools/worldsim/export.luau <id> out.json` writes any map as JSON for a 3D preview.
 
@@ -269,13 +286,13 @@ load in Studio (October 2026):
 | --- | --- | --- |
 | `15675032796` Roblox_UI_Small_Click | Roblox | every button click |
 | `15675059323` Roblox_UI_Bright_Click | Roblox | settings switches, Rare spawn |
-| `15675037413` Roblox_UI_Paper_Swipe | Roblox | a dialog opens, selling |
-| `127645268874265` CoinTransfer_01 | Roblox | success toasts, collecting cash |
+| `15675037413` Roblox_UI_Paper_Swipe | Roblox | a dialog opens, selling; pitched up, a Banana Peel slapped down |
+| `127645268874265` CoinTransfer_01 | Roblox | success toasts, collecting cash; pitched down, the Snack Magnet |
 | `15675075163` Roblox_UI_Delete | Roblox | error toasts |
-| `15675055424` Roblox_UI_Cute_Pop | Roblox | buying from the belt, Common / Uncommon spawn |
-| `15675085146` Roblox_UI_Indicator | Roblox | locking your base |
-| `15675046931` Roblox_UI_Sweep | Roblox | unlocking |
-| `15675024286` Roblox_UI_Whoosh_01 | Roblox | starting a steal; slowed right down, thunder (Thunderstorm) |
+| `15675055424` Roblox_UI_Cute_Pop | Roblox | buying from the belt, Common / Uncommon spawn; pitched up, a Fizzy Soda |
+| `15675085146` Roblox_UI_Indicator | Roblox | locking your base; pitched up, a tag bouncing off a Bubble Shield |
+| `15675046931` Roblox_UI_Sweep | Roblox | unlocking; pitched up, a Bubble Shield popping up |
+| `15675024286` Roblox_UI_Whoosh_01 | Roblox | starting a steal; slowed right down, thunder (Thunderstorm); sped up, slipping on a peel |
 | `15675012262` Roblox_UI_Whoosh_04 | Roblox | announcement banners |
 | `15675043410` Roblox_UI_Tonal_Stinger | Roblox | steal success, Epic spawn |
 | `15675062723` Roblox_UI_Whistle_Low | Roblox | tagging a thief |
@@ -298,11 +315,29 @@ Command Bar: `local s = Instance.new("Sound") s.SoundId = "rbxassetid://15675032
 
 ### Settings
 
-The gear button in the top-right corner (left of Roblox's player list on computers) opens Music, Sound effects and
-Reduce effects switches. They apply at once and are saved per player in the save's `flags` map
-(`settings_musicOff`, `settings_sfxOff`, `settings_reduceEffects`; no save-format change). Reduce effects switches off
-particles, the belt / factory animations, Bloom and SunRays on that device; client code can read it with
-`ClientSettings.reduceEffects()` (or the LocalPlayer attribute `ReduceEffects`).
+The gear button at the right end of the top-right row (lock, 👥 Friends, ⚙; under Roblox's own top-left buttons when
+its player list fills that corner on computers) opens Music, Sound effects and Reduce effects switches. They apply at
+once and are saved per player in the save's `flags` map (`settings_musicOff`, `settings_sfxOff`,
+`settings_reduceEffects`; no save-format change). Reduce effects switches off particles, the belt / factory
+animations, Bloom and SunRays on that device; client code can read it with `ClientSettings.reduceEffects()` (or the
+LocalPlayer attribute `ReduceEffects`). Whatever the setting, lights and particles on podium Snacklings far from the
+camera are switched off to save phones the work (`podiumFx` in `src/shared/Config/Gameplay.luau`).
+
+### HUD layout (phones first)
+
+The HUD is laid out for a landscape phone (667×375 is the reference) by `src/shared/Logic/ScreenLayout.luau`, and
+the game places every HUD element with it (DECISIONS.md #47): the cash pill in Roblox's top bar strip with one band
+under it (the tutorial banner, a "Need $X more?" offer, or the event / modifier / luck pills), the lock, Friends and
+gear buttons top right, the four feature buttons in a 2×2 grid top left, TAG on the right with the gadget buttons
+around it, the map vote at the bottom. Nothing tappable goes in the middle of the screen, where the character and the Buy / Steal prompts are.
+
+* **Moving or adding a HUD element:** give it a size in `ScreenLayout.SIZE` and a place in `ScreenLayout.layout`,
+  hand its frame to `HudController.place`, and keep `lune run tools/layoutCheck.luau` green: it checks 640×360,
+  667×375 and 844×390 phones, a tablet and a computer window in the busiest states (no overlaps, nothing off screen,
+  no button in the play zone or under Roblox's buttons, 44 px touch targets).
+* **Text:** HUD text is measured with the game font's real metrics (`src/shared/Logic/TextFit.luau`); the tests keep
+  every map name, banner, chip, toast and offer at 12 UI (10 px) or more, so a longer name or banner that would be
+  too small fails CI.
 
 ### Playtime gifts and the Lucky Spin
 
@@ -330,19 +365,53 @@ release that added them), so there is no save-format change.
 ### Redeem codes
 
 Players redeem codes from the Settings dialog (🎟️ Codes row). The codes live in `src/server/Codes.luau`, which never
-reaches a client, so nobody can read one you have not posted. Each works once per account (the save's `flags` map,
-`code_<CODE>`; no save-format change); typing is forgiving (any case, spaces around it), and guessing is slowed to one
-try every 5 seconds.
+reaches a game client. **They are not secret while the GitHub repo is public:** anyone can read that file there, so
+make the repo private before going public (see "Before publishing"). Each works once per account (the save's `flags`
+map, `code_<CODE>`; no save-format change); typing is forgiving (any case, spaces around it), and guessing is slowed
+to one try every 5 seconds.
 
 * **Add a code:** a new entry keyed by its text in UPPER CASE letters and digits, with a reward: cash sized from the
   player's income (`{ kind = "cash", incomeSeconds = 180, minimum = 1000 }` = 3 minutes of their income, at least
   $1,000) or a Snackling (`{ kind = "creature", creatureId = "pizza_pup", variant = "golden" }`). Optional
-  `expiresAt` (unix seconds, UTC). CI checks every code; changing them needs a publish.
+  `startsAt` and `expiresAt` (unix seconds, UTC): before `startsAt` a code answers like an unknown one. Give an event
+  code its event's start and end (`src/shared/Config/LiveOps.luau`): CI refuses a code that hands out an event
+  Snackling or mutation outside its event. CI checks every code; changing them needs a publish.
 * **Codes ready to post:** `WELCOME` (2 minutes of income), `SNACKTIME` (a Golden Pizza Pup), `FOURTEENMAPS` (3
-  minutes of income), `STORMCHASER` (an Electric Pretzel Pal), `TWENTYMAPS` (a Bubblegum Gummy Grub), `SPOOKY26` (a
-  Haunted Candy Corn Cat, until Halloween ends on 2 Nov), `JINGLE26` (a Festive Peppermint Puffin, until Winter ends on
-  4 Jan), `HAPPY2027` (5 minutes of income, until 8 Jan), `LOVE27` (a Sweetheart Candy Heart Hamster, until
-  Valentine's ends on 16 Feb) and `EGGHUNT27` (a Pastel Custard Chick, until Easter ends on 6 Apr).
+  minutes of income), `STORMCHASER` (an Electric Pretzel Pal), `TWENTYMAPS` (a Bubblegum Gummy Grub), `MOVIENIGHT`
+  (a Buttered Popcorn Penguin), and the event codes, which only work while their event runs: `SPOOKY26` (a Haunted
+  Candy Corn Cat, 23 Oct-2 Nov), `JINGLE26` (a Festive Peppermint Puffin, 18 Dec-4 Jan), `HAPPY2027` (5 minutes of
+  income, 31 Dec-8 Jan), `LOVE27` (a Sweetheart Candy Heart Hamster, 5-16 Feb) and `EGGHUNT27` (a Pastel Custard
+  Chick, 19 Mar-6 Apr).
+
+### Gadgets
+
+Gear bought once with in-game cash (never Robux) in the Shop's **Gadgets** tab and kept forever, rebirths too
+(DECISIONS.md #48). Each owned gadget gets a round button beside the TAG button (keys 1-4 on a keyboard); there are
+none until one is bought, and none during the first-time tutorial.
+
+| Gadget | Price | Does | Recharges |
+| --- | --- | --- | --- |
+| 🥤 Fizzy Soda | $1.5K | 30% faster for 6 s, carrying too (on top of the carry slowdown) | 35 s |
+| 🍌 Banana Peel | $15K | dropped at your feet on your own base's floor for 90 s; the first visitor to step on it slips (1.5 s), and a Snackling of yours they carry runs home, as after a tag | 45 s |
+| 🫧 Bubble Shield | $150K | nobody can tag you for 3 s (a bubble everyone sees); locks and peels still work | 40 s |
+| 🧲 Snack Magnet | $2.5M | collects the cash on all your pads from anywhere, as if you walked over them | 60 s |
+
+* **Tune one:** `src/shared/Config/Gadgets.luau` (price, cooldown, duration, speed, slip, peel radius). CI keeps
+  every number inside `GadgetRules.validate`: the Bubble Shield at most 5 s and recharging at least 5x as long, any
+  speed at most 1.5x and the speed cap (`maxSpeedMultiplier`, a speed modifier and a gadget together) at most 1.5x,
+  prices rising in shop order. Names and descriptions are `gadget*` keys in `src/shared/Config/Theme.luau`; a
+  description's `{percent}`, `{seconds}`, `{slip}` and `{cooldown}` are filled from the config. BALANCE.md "Gadgets"
+  has the prices against the income curve; `lune run tools/simulate.luau` prints when a free player affords each one.
+* **Add one:** an entry in `Gadgets.gadgets` with one of the kinds (`speed`, `peel`, `shield`, `magnet`), its id in
+  `order` (its shop place, button slot and key), and its name and description in `Theme.text`. A new kind needs its
+  effect in `src/server/Services/GadgetService.luau` (and its rules in `src/shared/Logic/GadgetRules.luau`). The HUD
+  makes room for `ScreenLayout.SIZE.gadget.slots` (4) buttons beside TAG on every screen; a fifth means checking
+  `lune run tools/layoutCheck.luau` still finds room on all five screens. Ids are saved in the `gadget_<id>` flags:
+  never rename one that has shipped.
+* **Analytics:** `gadget_bought` (value = price, field = gadget id), `gadget_used` (gadget id) and `gadget_effect`
+  (gadget id, and `peelDrop`, `peelSlip` or `shieldBlock`).
+* **Studio:** `/gadgets` owns every gadget and recharges them; offline, `lune run tools/worldsim/gadgets.luau` (CI)
+  plays every gadget through the real remotes.
 
 ### Studio test commands
 
@@ -362,6 +431,7 @@ These work in Studio only (`src/server/Services/DevCommands.luau`):
   `/mod supplyDrop` (first crate after 10 s); admins too, that server only)
 * `/runaway` (a Snackling escapes now, as in Great Escape), `/runaway here` (right beside you, to try catching it)
 * `/boss [hp]` (a Snack Attack giant over the belt now; tap it, e.g. `/boss 20` for a quick one)
+* `/gadgets` (own every gadget and recharge them all now), `/gadgets off` (none again)
 
 To test a seasonal event in Studio: `/event Halloween2026 5` turns Halloween on for 5 minutes (decorations, dusk
 lighting, banner with countdown, event Snacklings and Haunted on the belt), and `/event off` ends it early.

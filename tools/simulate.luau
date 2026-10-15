@@ -21,6 +21,8 @@
 	    spawn rolled as if the event ran for the whole session (event Snacklings and mutations eligible), with and
 	    without the event's luck days. The event defaults to Halloween; another one is chosen by its ids:
 	        lune run tools/simulate.luau Winter2026 WinterLuck2026 "Christmas luck"
+	  * "Gadgets" replays the free player saving for each gadget of Config/Gadgets in shop order: once the next one
+	    costs at most GADGET_SAVE_SECONDS of their income they stop buying Snacklings and podiums until they have it
 ]]
 
 local process = require("@lune/process")
@@ -29,6 +31,8 @@ local Creatures = require("../src/shared/Config/Creatures")
 local Mutations = require("../src/shared/Config/Mutations")
 local Rarities = require("../src/shared/Config/Rarities")
 local Economy = require("../src/shared/Config/Economy")
+local Gadgets = require("../src/shared/Config/Gadgets")
+local Theme = require("../src/shared/Config/Theme")
 local Gameplay = require("../src/shared/Config/Gameplay")
 local Monetization = require("../src/shared/Config/Monetization")
 local LiveOps = require("../src/shared/Config/LiveOps")
@@ -46,6 +50,8 @@ local RUNS = 60
 local HOURS = 24
 local CONTEST_WIN = 0.6
 local LOOKAHEAD = 10
+-- The gadget model: a gadget is worth saving for once it costs at most this many seconds of income.
+local GADGET_SAVE_SECONDS = 120
 
 local catalog = Catalog.build(Creatures, Rarities, Mutations)
 
@@ -55,6 +61,7 @@ type Scenario = {
 	extraPodiums: number,
 	events: { [string]: boolean }?, -- active LiveOps events (default none)
 	luck: number?, -- belt luck (default 1)
+	gadgets: { number }?, -- gadget prices to save for, in shop order (see GADGET_SAVE_SECONDS)
 }
 -- One Snackling in the simulated base, with its mutated price and income.
 type Owned = { def: Types.CreatureDef, price: number, income: number }
@@ -64,6 +71,8 @@ type RunResult = {
 	incomeAt: { [number]: number },
 	eventBought: number, -- event Snacklings bought
 	firstEventAt: number?, -- play time of the first event Snackling bought
+	gadgetAt: { [number]: number }, -- play time each gadget (by shop index) was bought
+	gadgetIncome: { [number]: number }, -- income per second when it was bought
 }
 
 local SCENARIOS: { Scenario } = {
@@ -154,6 +163,10 @@ local function simulate(scenario: Scenario, seed: number): RunResult
 	end
 	local eventBought = 0
 	local firstEventAt: number? = nil
+	local gadgetPrices = scenario.gadgets or {}
+	local gadgetAt: { [number]: number } = {}
+	local gadgetIncome: { [number]: number } = {}
+	local nextGadget = 1
 	local currentIncome = 0
 	local t = 0
 	while t < horizon do
@@ -165,6 +178,19 @@ local function simulate(scenario: Scenario, seed: number): RunResult
 		end
 		if rebirthReadyAt == nil and cash >= rebirthCost then
 			rebirthReadyAt = t
+		end
+		-- Saving for the next gadget: buy it once the cash is there; nothing else is bought meanwhile.
+		local saving = false
+		local price = gadgetPrices[nextGadget]
+		if price and price <= currentIncome * GADGET_SAVE_SECONDS then
+			if cash >= price then
+				cash -= price
+				gadgetAt[nextGadget] = t
+				gadgetIncome[nextGadget] = currentIncome
+				nextGadget += 1
+			else
+				saving = true
+			end
 		end
 
 		local id = RarityRoll.roll(catalog.rarityList, catalog.creatureList, luck, events, rng)
@@ -178,7 +204,7 @@ local function simulate(scenario: Scenario, seed: number): RunResult
 				income = MutationRules.income(catalog.mutations, def, variant),
 			}
 			else nil
-		if item and rng() < CONTEST_WIN and cash + currentIncome * LOOKAHEAD >= item.price then
+		if item and not saving and rng() < CONTEST_WIN and cash + currentIncome * LOOKAHEAD >= item.price then
 			if #owned < capacity() then
 				cash -= item.price
 				table.insert(owned, item)
@@ -204,7 +230,7 @@ local function simulate(scenario: Scenario, seed: number): RunResult
 			currentIncome = income()
 		end
 
-		if #owned >= capacity() then
+		if #owned >= capacity() and not saving then
 			local cost = EconomyMath.podiumUpgradeCost(upgrades, Economy.podiumUpgrade)
 			if cost and cost <= cash * 0.5 and capacity() < Gameplay.map.maxPodiums then
 				cash -= cost
@@ -223,6 +249,8 @@ local function simulate(scenario: Scenario, seed: number): RunResult
 		incomeAt = incomeAt,
 		eventBought = eventBought,
 		firstEventAt = firstEventAt,
+		gadgetAt = gadgetAt,
+		gadgetIncome = gadgetIncome,
 	}
 end
 
@@ -445,3 +473,47 @@ end
 
 print(`\n### Mutations while {EVENT_ID} runs\n`)
 printMutations(eventIds)
+
+-- Gadgets ----------------------------------------------------------------------------------------------------------
+
+local gadgetPrices: { number } = {}
+for _, id in Gadgets.order do
+	table.insert(gadgetPrices, Gadgets.gadgets[id].price)
+end
+local gadgetScenario: Scenario = {
+	name = "Free player buying every gadget",
+	multiplier = 1,
+	extraPodiums = 0,
+	gadgets = gadgetPrices,
+}
+local gadgetScenarios: { Scenario } = { SCENARIOS[1], gadgetScenario }
+runAll(gadgetScenarios)
+print(
+	`\n## Gadgets: a free player saving for each one in shop order, once it costs at most {GADGET_SAVE_SECONDS} s of `
+		.. "their income\n"
+)
+print("| Gadget | Price | Bought after (median) | Income then (median) | Price in seconds of that income |")
+print("| --- | --- | --- | --- | --- |")
+for index, id in Gadgets.order do
+	local def = Gadgets.gadgets[id]
+	local times: { number } = {}
+	local incomes: { number } = {}
+	for _, result in results[gadgetScenario.name] do
+		local at = result.gadgetAt[index]
+		if at then
+			table.insert(times, at)
+			table.insert(incomes, result.gadgetIncome[index])
+		end
+	end
+	local income = median(incomes) or 0
+	local name = ((Theme.text :: any) :: { [string]: string })[def.nameKey] or id
+	print(
+		`| {def.icon} {name} | {Format.cash(def.price, "$")} | {cell(times, RUNS)} | {Format.cash(income, "$")}/s `
+			.. `| {if income > 0 then math.floor(def.price / income + 0.5) else "-"} |`
+	)
+end
+printTables(
+	gadgetScenarios,
+	`\n### Median play time until the first Snackling of each rarity, with and without the gadgets ({RUNS} runs)`,
+	"### Median cash/sec after N minutes of play, with and without the gadgets"
+)

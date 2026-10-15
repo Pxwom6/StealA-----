@@ -11,13 +11,14 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
+local GadgetRules = require(ReplicatedStorage.Shared.Logic.GadgetRules)
 local LockRules = require(ReplicatedStorage.Shared.Logic.LockRules)
 local StealRules = require(ReplicatedStorage.Shared.Logic.StealRules)
 local Analytics = require(script.Parent.Analytics)
 local BeltService = require(script.Parent.BeltService)
 local DataService = require(script.Parent.DataService)
 local EconomyService = require(script.Parent.EconomyService)
-local ModifierService = require(script.Parent.ModifierService)
+local Movement = require(script.Parent.Movement)
 local PlotService = require(script.Parent.PlotService)
 local PositionTracker = require(script.Parent.PositionTracker)
 local Remotes = require(script.Parent.Remotes)
@@ -41,6 +42,9 @@ local PlayerLifecycle = {}
 
 local hooks: Hooks = { onJoined = {}, onReady = {}, onLeaving = {}, checkPasses = nil }
 local pendingReady: { [Player]: boolean } = {}
+-- Each player's CharacterAdded connection, which holds their session: disconnected when they leave, so a Player that
+-- Roblox keeps around after leaving never keeps the session (and its save data) alive.
+local characterConnections: { [Player]: RBXScriptConnection } = {}
 
 function PlayerLifecycle.hooks(): Hooks
 	return hooks
@@ -72,7 +76,7 @@ local function onCharacterAdded(session: Session, character: Model)
 	PositionTracker.reset(session, nil)
 	local humanoid = character:WaitForChild("Humanoid", 10)
 	if humanoid and humanoid:IsA("Humanoid") then
-		humanoid.WalkSpeed = Gameplay.walkSpeed * ModifierService.effects().walkSpeed -- Sugar Rush: faster
+		Movement.apply(session) -- Sugar Rush, a Fizzy Soda still running... (Movement)
 	end
 	task.defer(placeAtBase, session, character)
 end
@@ -146,6 +150,7 @@ local function onPlayerAdded(player: Player)
 		social = { friends = 0, groupMember = false },
 		tutorial = nil,
 		cashOfferAt = -math.huge,
+		gadgets = GadgetRules.newState(),
 		host = nil,
 	}
 	Sessions.add(session)
@@ -182,7 +187,7 @@ local function onPlayerAdded(player: Player)
 	createLeaderstats(player)
 	Replication.flush(session)
 
-	player.CharacterAdded:Connect(function(character: Model)
+	characterConnections[player] = player.CharacterAdded:Connect(function(character: Model)
 		onCharacterAdded(session, character)
 	end)
 	if player.Character then
@@ -197,6 +202,11 @@ end
 
 local function onPlayerRemoving(player: Player)
 	pendingReady[player] = nil
+	local connection = characterConnections[player]
+	if connection then
+		characterConnections[player] = nil
+		connection:Disconnect()
+	end
 	Remotes.forget(player)
 	local session = Sessions.get(player)
 	if session == nil then

@@ -12,6 +12,7 @@ local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
 local Social = require(ReplicatedStorage.Shared.Config.Social)
 local DailyStreak = require(ReplicatedStorage.Shared.Logic.DailyStreak)
 local EconomyMath = require(ReplicatedStorage.Shared.Logic.EconomyMath)
+local Inventory = require(ReplicatedStorage.Shared.Logic.Inventory)
 local RebirthMath = require(ReplicatedStorage.Shared.Logic.RebirthMath)
 local SettingsRules = require(ReplicatedStorage.Shared.Logic.SettingsRules)
 local SocialRules = require(ReplicatedStorage.Shared.Logic.SocialRules)
@@ -22,6 +23,8 @@ local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local Types = require(ReplicatedStorage.Shared.Types)
 local Quests = require(ReplicatedStorage.Shared.Config.Quests)
 local QuestRules = require(ReplicatedStorage.Shared.Logic.QuestRules)
+local Gadgets = require(ReplicatedStorage.Shared.Config.Gadgets)
+local GadgetRules = require(ReplicatedStorage.Shared.Logic.GadgetRules)
 local Gifts = require(ReplicatedStorage.Shared.Config.Gifts)
 local Spin = require(ReplicatedStorage.Shared.Config.Spin)
 local GiftRules = require(ReplicatedStorage.Shared.Logic.GiftRules)
@@ -84,6 +87,7 @@ function Replication.snapshot(session: Session): Types.ClientState
 		rebirthCost = RebirthMath.cost(data.rebirths, Economy.rebirth) or -1,
 		creatureCount = #data.creatures,
 		capacity = session.capacity,
+		baseFull = Inventory.findFreePodium(data.creatures, session.capacity) == nil,
 		packIncome = session.packIncome,
 		podiumUpgrades = data.podiumUpgrades,
 		nextPodiumCost = EconomyMath.podiumUpgradeCost(data.podiumUpgrades, Economy.podiumUpgrade) or -1,
@@ -136,6 +140,7 @@ function Replication.snapshot(session: Session): Types.ClientState
 			ready = SpinRules.source(data.spin, now) ~= nil,
 			rewards = spinRewards(session.packIncome),
 		},
+		gadgets = GadgetRules.view(data.flags, session.gadgets, Gadgets), -- owned, cooldowns, running effects
 		host = session.host or NO_HOST, -- HostService: the host panel's role and cooldowns
 	}
 end
@@ -163,15 +168,23 @@ function Replication.flush(session: Session)
 	end
 end
 
+local function flushDirty()
+	for _, session in Sessions.all() do
+		if session.dirty then
+			Replication.flush(session)
+		end
+	end
+end
+
 function Replication.start()
 	task.spawn(function()
 		local interval = 1 / Gameplay.replicationHz
 		while true do
 			task.wait(interval)
-			for _, session in Sessions.all() do
-				if session.dirty then
-					Replication.flush(session)
-				end
+			-- One error must not stop state updates for good.
+			local ok, err = pcall(flushDirty :: () -> ...any)
+			if not ok then
+				warn(`[Replication] {err}`)
 			end
 		end
 	end)

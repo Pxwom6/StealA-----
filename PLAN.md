@@ -46,14 +46,15 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | Data / persistence | `DataService` (ProfileStore, session-locked, autosave, BindToClose) | – | `DataSchema` (template, migrate, sanitise) |
 | Plots | `PlotService` (assign / release / reset, podium attributes) | `PlotController` (billboards, owner barrier pass-through) | `PlotAssignment`, `Inventory` |
 | Map | `MapBuilder` | – | – |
-| Conveyor | `BeltService` (weighted spawns, mutation rolls, buy validation) | `BeltController` (models pooled per creature + mutation, local prompts) | `BeltMath`, `RarityRoll`, `MutationRules`, `Catalog` |
+| Conveyor | `BeltService` (weighted spawns, mutation rolls, buy validation) | `BeltController` (models reused per creature + mutation, at most 32 spares, local prompts) | `BeltMath`, `RarityRoll`, `MutationRules`, `Catalog` |
 | Mutations | `BeltService` rolls, `EconomyService` / `PlotService` / `StealService` price, pay and show them | `MutationFxController` (rainbow hue cycling), labels in the belt / plot / interaction controllers | `MutationRules` |
 | Economy | `EconomyService` (1 s income tick, collect pads checked server-side from the owner's position, podium upgrades, sell) | `HudController` | `EconomyMath` |
-| Stealing | `StealService` (grab, carry, deliver, tag, timeout, speed sanity) | `StealController` (TAG button, alerts) | `StealRules` |
-| Base lock | `LockService` | lock pill + barrier | `LockRules` |
+| Stealing | `StealService` (grab, carry, deliver, tag, timeout, speed sanity; refuses tags on a Bubble Shield, drops a carry on a banana peel like a tag) | `StealController` (TAG button, alerts) | `StealRules` |
+| Gadgets | `GadgetService` (BuyGadget / UseGadget, banana peels and who steps on them, shield bubbles, the Snack Magnet through the pad path), `Movement` (every walking speed, and what the movement checks allow per player) | `GadgetController` (round buttons beside TAG, keys 1-4), `GadgetFxController` (soda fizz, dizzy stars, sounds), `GadgetsTab` (the Shop's Gadgets tab) | `GadgetRules`, `ScreenLayout.gadgetSlots` |
+| Base lock | `LockService` | lock button + barrier | `LockRules` |
 | Rebirth | `RebirthService` | `RebirthController` (trade-off dialog) | `RebirthMath` |
-| Base lock UI | `LockService` | `LockController` (lock button prompt, HUD pill) | `LockRules` |
-| Monetisation | `MonetizationService` (ProcessReceipt, passes) | `StoreController` | `ReceiptLedger`, `EconomyMath.cashPackAmount` |
+| Base lock UI | `LockService` | `LockController` (lock button prompt, HUD button in the top-right row) | `LockRules` |
+| Monetisation | `MonetizationService` (ProcessReceipt, passes), `PlayerPolicy` (PolicyService: paid random items) | `StoreController` | `ReceiptLedger`, `EconomyMath.cashPackAmount`, `PaidRandomItems` |
 | Retention | `RetentionService` (daily streak, offline earnings), `LeaderboardService` | `RewardsController` (Rewards panel: Daily + Quests tabs) | `DailyStreak`, `OfflineEarnings` |
 | Snackdex | `SnackdexService` (discovery on every Snackling landing in a base, tier rewards claimed automatically, sync) | `SnackdexController` (rarity / Event tabs, 3D preview cards, silhouettes, NEW! toasts) | `SnackdexRules` |
 | Daily quests | `QuestService` (daily roll per UserId + UTC day, progress from gameplay events, ClaimQuest, day reset) | `RewardsController` (Quests tab) | `QuestRules` |
@@ -66,10 +67,10 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | State sync | `Replication` (dirty-flag batching, 5 Hz) | `StateStore` | – |
 | Snackling models | podium models built by `PlotService` through `CreatureVisuals` | belt models (`BeltController`), idle bob / squash / sway (`IdleController`) | `CreatureRecipe` (recipe → parts), `IdleMotion` |
 | World & scenery | `MapBuilder` (plot decor, belt chevrons, boards, lobby spawn; `restyle` for a new map theme), `SceneryBuilder` (spawn plaza, Snack Factory, chute, flora, landmarks, boundary wall, terrain), `ThemeProps` (each theme's flora and landmarks), `WorldLighting` (map lighting + seasonal overlay) | `WorldFxController` (belt chevrons, factory cog, blinking lights; Reduce effects) | `SceneryLayout` |
-| Map themes | `MapThemeService` (first map, 20-minute rotation, the vote, `/map`) | `MapThemeController` (vote card in the top stack, new-map title card), `WeatherController` (snow / embers / leaves... around the camera) | `MapThemeRules` |
-| Server modifiers | `ModifierService` (schedule, `/mod`; belt, economy, lock, steal, movement read its effects) | `ModifierController` (HUD chip beside the luck chip; effects for belt prices, steal hold, tag reach) | `ModifierRules` |
+| Map themes | `MapThemeService` (first map, 20-minute rotation, the vote, `/map`) | `MapThemeController` (vote strip at the bottom of the screen, new-map title card), `WeatherController` (snow / embers / leaves... around the camera) | `MapThemeRules` |
+| Server modifiers | `ModifierService` (schedule, `/mod`; belt, economy, lock, steal, movement read its effects) | `ModifierController` (HUD button among the status pills; effects for belt prices, steal hold, tag reach) | `ModifierRules` |
 | Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends <n\|off>`, `/tutorial`, `/gallery [mutationId\|off]` via `DevGallery`, `/sky <clockTime>`, `/quests reset`, `/dex fill <rarity\|event>`); `/map <id\|vote\|list>` (MapThemeService); `/mod <id> [minutes]`, `/mod off`, `/mod list` (ModifierService); LiveOps `/event <id> [minutes]`, `/event off`, `/luck`, `/announce` (anyone in Studio, local only) | – | – |
-| Settings & audio | `SettingsService` (SetSetting → `settings_<key>` flags) | `ClientSettings`, `SettingsController` (top-right gear), `SoundPlayer`, `MusicController` (looping, crossfade) | `SettingsRules`, `ScreenLayout` |
+| Settings & audio | `SettingsService` (SetSetting → `settings_<key>` flags) | `ClientSettings`, `SettingsController` (the gear, top right), `SoundPlayer`, `MusicController` (looping, crossfade) | `SettingsRules`, `ScreenLayout` |
 
 ## 3. Module list
 
@@ -95,6 +96,7 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | `Tutorial` | first-time tutorial: on/off, steps in order (buy, collect, lock, steal) with their automatic endings, one-time reward, belt-target tuning |
 | `Snackdex` | collection book rewards: one-time cash per completed rarity tier (steady income, minimum), permanent income bonus per tier and its cap |
 | `Quests` | daily quests: slots per day (2 easy + 1 hard), the quest pool (kind, target or income-sized cash target, minimum rarity, text key), rewards per difficulty, all-done bonus |
+| `Gadgets` | the four gadgets (kind, icon, colour, text keys, cash price, cooldown, effect numbers), the 1.5x speed cap with a speed modifier, the speed grace, how often peels are checked |
 
 ### `src/shared/Logic` (pure, unit-tested)
 
@@ -113,11 +115,13 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `OfflineEarnings` | capped offline earnings with clock-skew protection |
 | `ReceiptLedger` | idempotent receipt de-dup (bounded ring of PurchaseIds), purchase-history append |
 | `LockRules` | lock state machine: can lock / token lock / remaining / cooldown / mandatory vulnerable window |
-| `StealRules` | can grab / can tag / can deliver / movement plausibility / carry timeout |
+| `StealRules` | can grab / can tag (a Bubble Shield last) / can deliver / movement plausibility / carry timeout |
+| `GadgetRules` | gadget ownership as `gadget_<id>` flags, can buy / can use, cooldowns, the speed a gadget gives and the movement checks allow (capped with a modifier), shield and slip state, where a peel may go and who steps on it, the client view, `Config/Gadgets` validation |
 | `DailyStreak` | UTC-day streak maths and reward lookup |
 | `DataSchema` | save template, `migrate` (versioned), `sanitise` (clamp garbage) |
 | `BeltMath` | belt item position & lifetime from spawn time |
-| `LiveOpsRules` | active events at time *t*, combined luck/cash multipliers, boost stacking, Server Luck preview, banner event, when the luck next changes, remote-config validation |
+| `LiveOpsRules` | active events at time *t*, combined luck/cash multipliers (optionally without one boost source: prize rolls leave out bought luck), boost stacking, Server Luck preview, banner event, when the luck next changes, remote-config validation |
+| `PaidRandomItems` | Roblox's Paid Random Items policy: what a PolicyService answer means (a failure counts as restricted) and the player attribute the store reads |
 | `SeasonRules` | active seasonal theme from the active event ids, decoration layout on the map (outside plots, off the belt), part count, `Config/Seasons` validation |
 | `Inventory` | podium slot operations on the save table (free slot, place, remove, find by uid) |
 | `PlotAssignment` | pick a free plot, release |
@@ -130,7 +134,10 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `MapThemeRules` | first map, vote candidates, vote counting and the winner, flora / landmark part counts and footprints, which colours maps may change, `Config/MapThemes` validation |
 | `ModifierRules` | a modifier's effects (all 1 when none), belt price and capacity under them, the next pick and gap, the fastest walking speed allowed, `Config/Modifiers` validation |
 | `SettingsRules` | player settings as `settings_<key>` flags: keys, read, apply |
-| `ScreenLayout` | HUD placement around Roblox's player list (top-right gear, tutorial banner limit) |
+| `ScreenLayout` | where every HUD element goes on any screen (around Roblox's top bar, player list and touch controls, out of the play zone), the gadget buttons' slots around TAG, and the check of it at five screens in the busiest states (`tools/layoutCheck.luau`, DECISIONS.md #47, #48) |
+| `TextFit` | TextScaled's text size from FredokaOne's real metrics: proves HUD text stays readable on phones |
+| `ModelPool` | bounded reuse pool keyed by look (belt Snackling models: one spare per kind, 32 in all, least recently used out first) |
+| `FxCulling` | lights and particles of far-away podium Snacklings off and back on, with a gap so they don't flicker |
 | `SnackdexRules` | discovery of Snacklings and (Snackling, mutation) pairs, tier progress over regular Snacklings (Event section apart), claim-once tier rewards, capped collection bonus, client view, config validation |
 | `QuestRules` | deterministic daily roll (UserId + UTC day hash), targets, day reset, progress from events, claim-once with the all-done bonus, rewards, client view, config validation |
 
@@ -145,10 +152,12 @@ aura, then the mutation look, which skips the face; tags anchored models for the
 `Remotes → DataService → MapThemeService.firstMap → MapBuilder (+ SceneryBuilder, WorldLighting) → PlotService → Analytics →
 LiveOpsService → SeasonService → MapThemeService → ModifierService → Replication → PositionTracker → EconomyService →
 BeltService →
-LockService → StealService → RebirthService → MonetizationService → RetentionService → SocialService →
+LockService → StealService → GadgetService → RebirthService → PlayerPolicy → MonetizationService → RetentionService →
+SocialService →
 TutorialService → SnackdexService → QuestService → LeaderboardService → SettingsService → DevCommands →
 PlayerLifecycle`, and wires cross-service join/leave steps through `PlayerLifecycle.hooks()` (keeps services free of
-circular requires). `Sessions` holds per-player state.
+circular requires). `Sessions` holds per-player state. `Movement` (required by PositionTracker, StealService,
+PlayerLifecycle and GadgetService) gives every Humanoid its walking speed and the movement checks their allowance.
 
 `PlayerLifecycle` owns join/leave ordering: load profile → assign plot → check passes → offline earnings →
 spawn creatures → send initial state; on leave: cancel steals involving the player → auto-collect stored cash →
@@ -159,7 +168,8 @@ release plot → release profile.
 `StateStore, ClientSettings, HudController, NotificationController, BeltController, PlotController,
 InteractionController, StealController, LockController, RebirthController, StoreController, ChatTagController,
 RewardsController, MutationFxController, SocialController, TutorialController, IdleController, SettingsController,
-MusicController, WorldFxController, SnackdexController, CashOfferController, MapThemeController, WeatherController`
+MusicController, WorldFxController, SnackdexController, CashOfferController, MapThemeController, WeatherController,
+DropController, BossController, GadgetController, GadgetFxController`
 (`ModifierController` starts right after `NotificationController`)
 (UI helpers: `UI/UiKit`, `UI/Modal`; audio: `SoundPlayer`).
 
@@ -179,7 +189,7 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `LockBase` | – | owner, near lock button, `LockRules` (cooldown, or a lock token) |
 | `Rebirth` | – | `RebirthMath.canRebirth` |
 | `ClaimDaily` | – | `DailyStreak.canClaim` |
-| `ClientEvent` | `name: string` | whitelist (`store_opened`, `store_product_clicked`) → analytics |
+| `ClientEvent` | `name: string, key: string?` | whitelist (`store_opened`, `store_product_clicked`, `cash_offer_clicked`); `key` only when it is a known product or pass key → analytics |
 | `CheckGroup` | – | group feature on, at most once per 10 s, not already checking → re-check membership (`IsInGroupAsync`, then `GetGroupsAsync`) |
 | `InvitePrompted` | – | analytics only (`invite_prompt_opened`); nothing is rewarded for inviting |
 | `SkipTutorial` | – | a tutorial is running → it ends with no reward (steps themselves only finish from gameplay the server saw) |
@@ -191,28 +201,30 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `ClaimGift` | `index: int` | the gift exists, today's playtime unlocked it and it isn't claimed yet (`GiftRules.claim`) |
 | `Spin` | – | a free spin is ready or one is banked (`SpinRules.source`), and the last reel has finished |
 | `GetAchievements` | – | rate limit only → `AchievementSync` with the player's progress |
-| `RedeemCode` | `code: string` | letters and digits, at most 24 (`CodeRules.normalize`); the code exists, has not expired and its `code_<CODE>` flag is unset; a Snackling code needs a free podium; rate limit 3 then 1 per 5 s |
+| `BuyGadget` | `id: string` | a gadget in `Config/Gadgets` (`Guard.keyOf`), not owned yet, cash ≥ its server price → `gadget_<id>` flag; a shortfall never leads to a Robux offer |
+| `UseGadget` | `id: string` | owned, no tutorial running, alive, recharged (server time, this session); a peel only on the floor of the player's own base at the trusted position the server sees (no client position), a magnet only with cash on the pads |
+| `RedeemCode` | `code: string` | at most 40 bytes before anything else, then letters and digits, at most 24 (`CodeRules.normalize`); the code exists, has started, has not expired and its `code_<CODE>` flag is unset; a Snackling code needs a free podium; rate limit 3 then 1 per 5 s |
 | `DevGrantProduct` | `key: string` | **Studio only** – runs the real receipt path with a fake receipt |
 
 Server → client:
 
 | Remote | Payload |
 | --- | --- |
-| `StateUpdate` | batched partial player state (cash, cash/sec, rebirths, multiplier, podium cap, lock, passes, carry, social bonus, tutorial step, settings, today's quests…) |
+| `StateUpdate` | batched partial player state (cash, cash/sec, rebirths, multiplier, podium cap, `baseFull`, lock, passes, carry, social bonus, tutorial step, settings, today's quests, gadgets owned with their cooldowns and running effects…) |
 | `BeltSnapshot` / `BeltSpawn` / `BeltRemove` | conveyor items `{id, creatureId, spawnAt, variant?}` (variant = mutation id) |
 | `Notify` | toast `{kind, text}` |
 | `Announce` | server-wide banner `{text, rarity, color?}` (color: a mutation's own banner) |
 | `WelcomeBack` | offline earnings popup `{amount, seconds}` |
 | `DailyInfo` | streak/claimable/reward |
 | `StealAlert` | to victim: `{thiefName, creatureId, variant?}` |
-| `Effect` | one-shot VFX cue `{kind, position, rarity}` (e.g. `tutorialComplete`, `quest`, `questsAllDone`) |
+| `Effect` | one-shot VFX cue `{kind, position, rarity}` (e.g. `tutorialComplete`, `quest`, `questsAllDone`; gadgets: `gadget`, `slip` to everyone, `shieldBlock`, `gadgetBought`) |
 | `SnackdexSync` | the whole Snackdex `{dex, discovered?, completed?}` on ready and on every change (a new entry, a tier paid) |
 | `SpinResult` | `{index, text}`: the Lucky Spin segment the server picked (the reel stops there), and the prize toast |
 | `AchievementSync` | `{ {id, progress, target, done} }` for the Trophies tab |
 
 World state the client reads from **attributes** (replicated automatically): plot `OwnerUserId`, `LockedUntil`,
 `GraceUntil`, `PodiumCount`; podium `CreatureId`, `Variant` (mutation id, "" for none), `Stored`, `Income`
-(mutation and multipliers included), `BeingStolen`; player `Carrying`, `VIP`. Rainbow parts carry the
+(mutation and multipliers included), `BeingStolen`; player `Carrying`, `VIP`, `PaidRandomItemsAllowed` (PlayerPolicy; the store offers Server Luck only when it is true), and the gadgets' `GadgetSpeedUntil`, `ShieldUntil`, `SlippedUntil` (server time; banana peels are models in `workspace.Gadgets`, a shield is a `GadgetShield` part on the character). Rainbow parts carry the
 CollectionService tag `MutationRainbow`. LiveOps state is on `workspace`: `LuckMultiplier`, `LuckEndsAt` (when the
 luck next changes), `PurchasedLuckEndsAt`, `CashMultiplier`, `ActiveEventIds`, `EventBanner`, `EventBannerId`,
 `EventTitle`, `EventEndsAt`, and `SeasonTheme` (the seasonal theme on, "" for none). The map theme is there too:
@@ -245,7 +257,8 @@ type PlayerData = {   -- exactly Types.PlayerData
     flags: { [string]: boolean },  -- onboarding funnel milestones, one-time rewards (`social_groupWelcome`),
                                    -- tutorial progress (`tutorial_<step>`, `tutorial_done`), settings (`settings_<key>`),
                                    -- redeemed codes (`code_<CODE>`), achievements paid (`ach_<id>`),
-                                   -- maps played on (`map_<id>`), achievement milestones (`did_<id>`)
+                                   -- maps played on (`map_<id>`), achievement milestones (`did_<id>`),
+                                   -- gadgets owned (`gadget_<id>`)
     firstJoin: number, lastSeen: number,
     gifts: { day: number, seconds: number, claimed: { number } },  -- playtime gifts today (v4)
     spin: { nextFreeAt: number, spins: number, total: number },     -- the Lucky Spin (v4)
@@ -340,13 +353,15 @@ Two "come back tomorrow" loops (DECISIONS.md #24), both server-authoritative and
 
 ## 11. Map themes
 
-Twenty dressings of the same map (DECISIONS.md #29, #32, #38, #39): Sunny Meadow, Candy Kingdom, Frosty Peaks, Nacho
-Dunes, Hot Sauce Volcano, Midnight Market, Coconut Cove, Apple Pie Orchard, Cherry Blossom Garden, Cookie Moon, Mango
-Rainforest, Neon Noodle City, Cloud Nine, Sushi Reef, Cocoa Canyon, Cotton Candy Carnival, Pizza Piazza, Rock Candy
-Caverns, Lemonade Lagoon and Bubblegum Bayou (`Config/MapThemes`). Each changes the scenery's colours,
+Twenty-three dressings of the same map (DECISIONS.md #29, #32, #38, #39, #45): Sunny Meadow, Candy Kingdom, Frosty
+Peaks, Nacho Dunes, Hot Sauce Volcano, Midnight Market, Coconut Cove, Apple Pie Orchard, Cherry Blossom Garden, Cookie
+Moon, Mango Rainforest, Neon Noodle City, Cloud Nine, Sushi Reef, Cocoa Canyon, Cotton Candy Carnival, Pizza Piazza,
+Rock Candy Caverns, Lemonade Lagoon, Bubblegum Bayou, Popcorn Drive-In, Tea Party Garden and Pancake Peaks
+(`Config/MapThemes`). Each changes the scenery's colours,
 the ground / walkway / wall materials, the lighting, what grows on the tree spots, ten big landmarks outside the wall
 and the weather around each player; plots, the belt and every gameplay position never move. A server starts on a
-random map and changes it every 20 minutes after a 40-second vote between three others (HUD top stack, `VoteMap`).
+random map and changes it every 20 minutes after a 40-second vote between three others (a strip at the bottom of the
+HUD, `VoteMap`).
 `MapBuilder.restyle` swaps the scenery in about 30 ms; `WorldLighting` keeps a seasonal mood (Halloween) on top of
 whatever map is on. Studio: `/map <id>`, `/map vote`, `/map list`. Offline: `lune run tools/worldsim/smoke.luau`
 (CI) builds and restyles every map; `lune run tools/worldsim/export.luau <id>` writes one as JSON for a 3D preview.
@@ -358,17 +373,28 @@ Hour, Clearance Sale, Golden Hour, Lucky Breeze, Cash Splash, Sugar Rush, Quick 
 Snack Party and Jackpot, five weathers (Thunderstorm, Meteor Shower, Toxic Fog, Northern Lights, Heatwave) that change
 the sky and unlock a mutation (DECISIONS.md #31, #40), three drops (Supply Drop, Coin Rain, Great Escape;
 DropService, `Config/Drops`, DECISIONS.md #33, #40) and Snack Attack (giant Snacklings over the belt that everyone taps
-together; BossService, `Config/Boss`, DECISIONS.md #42). A banner announces it, a chip beside the luck chip counts it down (tap it for the description), and
+together; BossService, `Config/Boss`, DECISIONS.md #42). A banner announces it, a button among the HUD's status pills counts it down (tap it for the description), and
 each system applies the effect where it decides (belt, economy, locks, steals, movement), the client showing the same
 prices, hold time and tag reach. Studio: `/mod <id> [minutes]`, `/mod off`, `/mod list`. Offline:
 `lune run tools/worldsim/server.luau` (CI) boots the server and plays a session that checks them.
 
 ## 13. Map and weather mutations
 
-Twenty-five gated mutations (DECISIONS.md #31, `Config/Mutations`): one signature per map that only rolls on that map
-(Honey, Sprinkled, Frozen, Fossil, Molten, Moonlit, Pearl, Candy Apple, Blossom, Lunar, Mossy, Cyber, Angelic,
-Abyssal, Fudge, Balloon, Cheesy, Amethyst, Zesty, Bubblegum; 1.2%, x3) and one per weather modifier that
+Twenty-eight gated mutations (DECISIONS.md #31, `Config/Mutations`): one signature per map that only rolls on that
+map (Honey, Sprinkled, Frozen, Fossil, Molten, Moonlit, Pearl, Candy Apple, Blossom, Lunar, Mossy, Cyber, Angelic,
+Abyssal, Fudge, Balloon, Cheesy, Amethyst, Zesty, Bubblegum, Buttered, Porcelain, Syrupy; 1.2%, x3) and one per weather modifier that
 only rolls while it runs (Electric, Galaxy, Toxic, Aurora, Toasted; 2%, x4, announced). `BeltService.mutationConditions()` passes the
 running events, the map and the modifier into `MutationRules.roll`; permanent rolls never change. The vote buttons
 and the map title card name each map's mutation; the Snackdex shows a pip for each one owned. Mutation looks gained
 particle presets (`MutationLook.particles`, built by `CreatureVisuals`).
+
+## 14. Gadgets
+
+Gear bought once with in-game cash and kept forever (DECISIONS.md #48, `Config/Gadgets`), from the Shop's Gadgets tab:
+**Fizzy Soda** (30% faster for 6 s, carrying too), **Banana Peel** (dropped on your own base's floor: the first visitor
+to step on it slips, and a Snackling of yours they carry runs home), **Bubble Shield** (no tags for 3 s) and **Snack
+Magnet** (every pad's cash, from anywhere). Each owned gadget gets a round button beside TAG (keys 1-4;
+`ScreenLayout.gadgetSlots`, covered by the layout check), hidden during the tutorial. `GadgetService` checks everything
+(`GadgetRules`); `Movement` keeps every walking speed and the movement checks' allowance together (capped at 1.5x with
+a speed modifier). Ownership is the save's `gadget_<id>` flags (no schema bump); cooldowns are session-only server time.
+Studio: `/gadgets` (own all, recharged), `/gadgets off`. Offline: `lune run tools/worldsim/gadgets.luau` (CI).

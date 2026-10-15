@@ -3,11 +3,9 @@
 	First-time tutorial UI. The server decides the step (TutorialService → StateUpdate `tutorial`); this controller only
 	shows it, and Skip sends the SkipTutorial intent.
 
-	* Banner in the HUD's top stack, right under the cash (HudController.TOP_ORDER.tutorial, so it can never cover
-	  the cash, the event / luck pills or the lock pill; the Friends button hides during the tutorial): a "1/4" badge,
-	  one short line and a small Skip button; the steal step adds a one-line tip about the new-player shield. It is
-	  sized every frame so the stack never reaches the carry banner or the screen bottom (fitBanner): the tip only when
-	  it fits, and while carrying one line or nothing.
+	* Banner right under the cash pill, in the HUD's band (HudController places it; the status pills, the vote and
+	  the Friends button wait for the tutorial to end, Logic/ScreenLayout): a "1/4" badge, one short line and a Skip
+	  button; the steal step adds a one-line tip about the new-player shield, not while carrying (fitBanner).
 	* 3D guide: a glowing beam from the player's feet to the target with pulses flowing toward it, a bouncing arrow
 	  above the target that shows through walls, and a highlight on the target. Targets (Logic/TutorialRules):
 	  buy → the nearest belt item you can afford (re-picked every frame as items move, sell or fall off); collect →
@@ -40,18 +38,15 @@ local NotificationController = require(script.Parent.NotificationController)
 local PlotController = require(script.Parent.PlotController)
 local SoundPlayer = require(script.Parent.SoundPlayer)
 local StateStore = require(script.Parent.StateStore)
-local StealController = require(script.Parent.StealController)
 
 local TutorialController = {}
 
--- Banner size in reference pixels (UiKit scales it to the device).
-local BANNER_WIDTH = 420
-local BANNER_HEIGHT = 64
-local TIP_HEIGHT = 24
-local CARRY_BANNER_GAP = 4 -- the stack stays this far above the carry banner
+-- Banner size in reference pixels (UiKit scales it to the device); HudController sets its width (Logic/ScreenLayout).
+local SIZE = ScreenLayout.SIZE
+local BANNER_HEIGHT = SIZE.tutorial.h
+local TIP_HEIGHT = SIZE.tutorial.tip
+local CARRY_BANNER_GAP = 4 -- the banner stays this far above the carry banner
 local SCREEN_BOTTOM_MARGIN = 8 -- and this far above the bottom of the screen
-local ACTION_AREA_GAP = 6 -- the banner's right edge stays this far left of the TAG button area
-local MIN_BANNER_WIDTH = 300 -- as wide as the top stack
 
 -- Guide look.
 local BEAM_WIDTH = 1.3
@@ -93,6 +88,7 @@ local hidPlayerList = false -- we switched Roblox's player list off so the banne
 local skippedStep = "" -- the step Skip was pressed on (hidden until the server moves on)
 local beltTargetId: number? = nil
 local renderConnection: RBXScriptConnection? = nil
+local fitKey = "" -- what fitBanner last decided for (the step, carrying, the screen)
 
 local function myRoot(): BasePart?
 	local character = localPlayer.Character
@@ -300,33 +296,6 @@ local function setLine(textKey: string)
 	end
 end
 
--- UI units (reference px) the banner may take in the top stack, its gap included: down to the screen bottom, or to the
--- carry banner while it shows (bottom centre, StealController), minus what the other pills already use.
-local function spaceForBanner(carrying: boolean): number
-	local scale = UiKit.scaleFor(workspace.CurrentCamera.ViewportSize)
-	local screen = HudController.screen()
-	local stack = HudController.topStack()
-	local layout = stack:FindFirstChildOfClass("UIListLayout")
-	local padding = if layout then layout.Padding.Offset else 0
-	local used = stack.Position.Y.Offset
-	for _, child in stack:GetChildren() do
-		if child ~= banner and child:IsA("GuiObject") and child.Visible then
-			-- Fixed-size pills by their size (a pressed button's UIScale must not count), auto-sized ones as drawn.
-			local height = if child.AutomaticSize == Enum.AutomaticSize.None
-				then child.Size.Y.Offset
-				else child.AbsoluteSize.Y / scale
-			used += height + padding -- each other pill is one list gap away from the banner
-		end
-	end
-	local carryBanner = StealController.carryBanner()
-	local bottom = if carrying
-			and carryBanner
-			and carryBanner.Visible
-		then (carryBanner.AbsolutePosition.Y - screen.AbsolutePosition.Y) / scale - CARRY_BANNER_GAP
-		else screen.AbsoluteSize.Y / scale - SCREEN_BOTTOM_MARGIN
-	return bottom - used
-end
-
 -- Roblox draws its player list (top right on computers) above every game UI. When even the narrowest banner would
 -- run under it, the list is switched off while the banner shows and back on afterwards (only if we switched it off).
 local function setPlayerListHidden(hide: boolean)
@@ -342,53 +311,42 @@ local function setPlayerListHidden(hide: boolean)
 		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, true)
 		hidPlayerList = false
 	end
+	HudController.relayout()
 end
 
--- Sizes the banner so the top stack never reaches anything below it (DECISIONS.md #21): with the steal step's tip
--- (how long your shield lasts, or what yellow shields are) when there is room, one line when not, hidden while
--- carrying if even one line doesn't fit (the carry banner says what to do then). Across, it also stays left of
--- Roblox's player list on computers (Logic/ScreenLayout), so Skip is never under it.
+-- How the banner shows (DECISIONS.md #21, #47): with the steal step's tip (how long your shield lasts, or what yellow
+-- shields are) when not carrying, else one line; hidden only if even that couldn't stay above the carry banner (it
+-- always can now: the banner is the band under the cash). On computers Roblox's player list is switched off while the
+-- centred banner would run under it (Logic/ScreenLayout.tutorialDevice), so Skip is always reachable. Decided again
+-- only when the step, carrying or the screen change; the tip's countdown ticks every frame.
 local function fitBanner(state: Types.ClientState)
 	local carrying = state.carrying ~= ""
-	local mode = TutorialRules.bannerMode(
-		spaceForBanner(carrying),
-		BANNER_HEIGHT + TIP_HEIGHT,
-		BANNER_HEIGHT,
-		step == "steal" and not carrying
-	)
-	if mode == "full" then
+	local device = HudController.device(true) -- as if the player list showed, so hiding it never undoes the decision
+	local key = `{step}|{carrying}|{device.width}|{device.height}|{device.playerList}`
+	if key ~= fitKey then
+		fitKey = key
+		local bottom = if carrying
+			then device.height - SIZE.carry.bottom - SIZE.carry.h - CARRY_BANNER_GAP
+			else device.height - SCREEN_BOTTOM_MARGIN
+		local mode = TutorialRules.bannerMode(
+			bottom - ScreenLayout.bandTop(device),
+			BANNER_HEIGHT + TIP_HEIGHT,
+			BANNER_HEIGHT,
+			step == "steal" and not carrying
+		)
+		banner:SetAttribute("Tip", mode == "full")
+		tipLabel.Visible = mode == "full"
+		banner.Visible = mode ~= "hidden"
+		setPlayerListHidden(
+			banner.Visible and device.playerList > 0 and ScreenLayout.tutorialDevice(device).playerList == 0
+		)
+	end
+	if tipLabel.Visible then
 		local remaining = state.graceUntil - workspace:GetServerTimeNow()
 		tipLabel.Text = if remaining > 0
 			then Format.template(Theme.text.tutorialShieldTip, { time = Format.clock(remaining) })
 			else Theme.text.tutorialShieldOtherTip
 	end
-	tipLabel.Visible = mode == "full"
-	-- Centred on the screen like the whole stack; narrowed on small phones (e.g. 640x360) to clear the TAG button,
-	-- and on computers to clear the player list (measured as if shown, so hiding it never undoes the decision).
-	local scale = UiKit.scaleFor(workspace.CurrentCamera.ViewportSize)
-	local screen = HudController.screen()
-	local actionArea = HudController.actionArea()
-	local screenWidth = screen.AbsoluteSize.X / scale
-	local playerList = HudController.playerListWidth(hidPlayerList)
-	local rightLimit = ScreenLayout.bannerRightLimit(
-		(actionArea.AbsolutePosition.X - screen.AbsolutePosition.X) / scale,
-		screenWidth,
-		playerList
-	)
-	local width =
-		TutorialRules.bannerWidth(BANNER_WIDTH, screenWidth / 2, rightLimit, ACTION_AREA_GAP, MIN_BANNER_WIDTH)
-	banner.Size = UDim2.fromOffset(width, BANNER_HEIGHT + (if mode == "full" then TIP_HEIGHT else 0))
-	banner.Visible = mode ~= "hidden"
-	setPlayerListHidden(
-		banner.Visible
-			and ScreenLayout.bannerNeedsPlayerListHidden(
-				screenWidth / 2,
-				width,
-				screenWidth,
-				playerList,
-				ACTION_AREA_GAP
-			)
-	)
 end
 
 local function render()
@@ -443,6 +401,7 @@ local function setStep(newStep: string, view: Types.TutorialView)
 	if newStep ~= step then
 		step = newStep
 		beltTargetId = nil
+		fitKey = ""
 		if visible then
 			badgeLabel.Text = Format.template(Theme.text.tutorialStepBadge, { index = view.index, count = view.count })
 			setLine(TutorialRules.TEXT_KEYS[newStep] or "")
@@ -454,6 +413,7 @@ local function setStep(newStep: string, view: Types.TutorialView)
 		end
 	end
 	if not visible then
+		fitKey = ""
 		banner.Visible = false
 		setPlayerListHidden(false)
 		if renderConnection then
@@ -469,11 +429,9 @@ end
 local function buildBanner()
 	banner = UiKit.panel({
 		Name = "TutorialBanner",
-		LayoutOrder = HudController.TOP_ORDER.tutorial,
-		Size = UDim2.fromOffset(BANNER_WIDTH, BANNER_HEIGHT),
+		Size = UDim2.fromOffset(SIZE.tutorial.w, BANNER_HEIGHT),
 		BackgroundColor3 = UiTheme.palette("panel"),
 		Visible = false,
-		Parent = HudController.topStack(),
 	})
 	local stroke = banner:FindFirstChildOfClass("UIStroke")
 	if stroke then
@@ -497,11 +455,12 @@ local function buildBanner()
 		Parent = badge,
 	})
 
-	-- One line, as large as fits (two lines on the narrowest phones).
+	-- One line, as large as fits (two lines on the narrowest phones), left of Skip.
+	local skipRoom = SIZE.skip.inset + SIZE.skip.w + 8
 	lineLabel = UiKit.label({
 		Name = "Line",
 		Position = UDim2.fromOffset(66, 6),
-		Size = UDim2.new(1, -66 - 88, 0, BANNER_HEIGHT - 12),
+		Size = UDim2.new(1, -66 - skipRoom, 0, BANNER_HEIGHT - 12),
 		TextWrapped = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Text = "",
@@ -524,8 +483,8 @@ local function buildBanner()
 	UiKit.button({
 		Name = "Skip",
 		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -10, 0, BANNER_HEIGHT / 2),
-		Size = UDim2.fromOffset(72, 44),
+		Position = UDim2.new(1, -SIZE.skip.inset, 0, BANNER_HEIGHT / 2),
+		Size = UDim2.fromOffset(SIZE.skip.w, SIZE.skip.h),
 		BackgroundColor3 = UiTheme.palette("panelLight"),
 		Text = Theme.text.tutorialSkip,
 		Parent = banner,
@@ -542,6 +501,7 @@ local function buildBanner()
 		end
 		Net.get("SkipTutorial"):FireServer()
 	end)
+	HudController.place("tutorial", banner)
 end
 
 function TutorialController.start()

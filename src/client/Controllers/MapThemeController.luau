@@ -2,15 +2,17 @@
 --[[
 	Map themes on the client (the server side is MapThemeService):
 
-	  * The vote card, in the HUD's top stack while a vote runs: "Vote for the next map! 0:32" over one button per
-	    candidate (icon, name, its signature mutation, votes so far). Tapping one sends the VoteMap intent; the player's
-	    pick is outlined and can be changed until the vote ends.
+	  * The vote strip at the bottom of the screen while a vote runs, between the thumbstick and the jump button
+	    (Logic/ScreenLayout.voteStrip; HudController places it): "Vote for the next map! 0:32" over one button per
+	    candidate (icon, the name on up to two lines, its signature mutation, votes so far). Tapping one sends the
+	    VoteMap intent; the player's pick is outlined and can be changed until the vote ends.
 	  * The title card when the map changes: the map's icon, name, tagline and signature mutation ("Molten Snacklings
 	    appear on this map!") drop in under the top stack for a few seconds (the server's "Welcome to ..."
 	    announcement goes to chat only; see NotificationController).
 
-	Everything comes from workspace attributes (MapTheme, MapVoteEndsAt, MapVoteCandidates, MapVoteCounts). The vote card
-	stays hidden during the first-time tutorial.
+	Everything comes from workspace attributes (MapTheme, MapVoteEndsAt, MapVoteCandidates, MapVoteCounts). The vote
+	stays hidden during the first-time tutorial (and until the first state says there is none, so a new player never
+	sees it flash), and while carrying a Snackling home (the carry banner is there then).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -23,6 +25,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local MutationRules = require(ReplicatedStorage.Shared.Logic.MutationRules)
+local ScreenLayout = require(ReplicatedStorage.Shared.Logic.ScreenLayout)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local HudController = require(script.Parent.HudController)
 local SoundPlayer = require(script.Parent.SoundPlayer)
@@ -30,9 +33,9 @@ local StateStore = require(script.Parent.StateStore)
 
 local MapThemeController = {}
 
-local CARD_WIDTH = 290
-local CHOICE_HEIGHT = 68
-local CHOICE_GAP = 6
+local VOTE = ScreenLayout.SIZE.vote
+local VOTE_TEXT = ScreenLayout.TEXT.vote
+local TITLE = ScreenLayout.SIZE.titleCard
 local TITLE_SECONDS = 4
 
 local card: Frame
@@ -56,9 +59,11 @@ local function split(text: string): { string }
 	return list
 end
 
-local function inTutorial(): boolean
+-- The vote waits while the first-time tutorial runs, until the first state arrives (a brand-new player joining
+-- mid-vote would see it pop in with a sound, then vanish), and while carrying a Snackling home.
+local function voteHidden(): boolean
 	local state = StateStore.get()
-	return state ~= nil and state.tutorial.step ~= ""
+	return state == nil or state.tutorial.step ~= "" or state.carrying ~= ""
 end
 
 local function vote(themeId: string)
@@ -89,7 +94,9 @@ local function buildChoices(candidates: { string })
 	end
 	choiceButtons = {}
 	myVote = nil
-	local width = (CARD_WIDTH - CHOICE_GAP * (#candidates - 1)) / math.max(1, #candidates)
+	-- Equal shares of the strip, as Logic/ScreenLayout.voteChoice measures them.
+	local count = math.max(1, #candidates)
+	local share = UDim2.new(1 / count, -VOTE.choiceGap * (count - 1) / count, 1, 0)
 	for index, id in candidates do
 		local theme = MapThemes.themes[id]
 		if theme == nil then
@@ -98,41 +105,57 @@ local function buildChoices(candidates: { string })
 		local button = UiKit.button({
 			Name = id,
 			LayoutOrder = index,
-			Size = UDim2.fromOffset(width, CHOICE_HEIGHT),
+			Size = share,
 			BackgroundColor3 = UiTheme.color(theme.accentColor),
 			Parent = choices,
 		}, function()
 			vote(id)
 		end)
+		-- Narrow padding: the name gets the button's whole width (two lines, never under 12; tests/ScreenLayout.spec).
+		local padding = button:FindFirstChildOfClass("UIPadding")
+		if padding then
+			padding.PaddingLeft = UDim.new(0, VOTE_TEXT.padX)
+			padding.PaddingRight = UDim.new(0, VOTE_TEXT.padX)
+			padding.PaddingTop = UDim.new(0, VOTE_TEXT.padY)
+			padding.PaddingBottom = UDim.new(0, VOTE_TEXT.padY)
+		end
 		UiKit.label({
 			Name = "Icon",
 			Text = theme.icon,
-			Size = UDim2.new(1, 0, 0, 24),
+			Size = UDim2.new(1, 0, 0, VOTE_TEXT.icon),
 			Parent = button,
 		})
-		UiKit.label({
+		local name = UiKit.label({
 			Name = "MapName",
 			Text = theme.displayName,
-			Size = UDim2.new(1, 0, 0, 16),
-			Position = UDim2.fromOffset(0, 26),
+			TextWrapped = true,
+			Size = UDim2.new(1, 0, 0, VOTE_TEXT.name),
+			Position = UDim2.fromOffset(0, VOTE_TEXT.icon),
 			Parent = button,
+		})
+		UiKit.new("UITextSizeConstraint", {
+			MinTextSize = ScreenLayout.TEXT.minSize,
+			MaxTextSize = 18,
+			Parent = name,
 		})
 		local signature = MutationRules.forMap(Mutations, id)
 		if signature then
 			UiKit.label({
 				Name = "Mutation",
 				Text = Format.template(Theme.text.mapVoteMutation, { mutation = signature.displayName }),
-				Size = UDim2.new(1, -6, 0, 16),
-				Position = UDim2.fromOffset(3, 46),
+				Size = UDim2.new(1, 0, 0, VOTE_TEXT.mutation),
+				Position = UDim2.fromOffset(0, VOTE_TEXT.icon + VOTE_TEXT.name),
 				Parent = button,
 			})
 		end
+		-- Votes so far, in the button's top-right corner.
 		local badge = UiKit.new("Frame", {
 			Name = "Votes",
 			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.new(1, 8, 0, -12),
+			Position = UDim2.new(1, 2, 0, -6),
 			Size = UDim2.fromOffset(24, 22),
 			BackgroundColor3 = UiTheme.palette("panel"),
+			ZIndex = 2,
 			Parent = button,
 		}) :: Frame
 		UiKit.corner(11).Parent = badge
@@ -142,7 +165,7 @@ local function buildChoices(candidates: { string })
 			Name = "Check",
 			Text = "✓",
 			AnchorPoint = Vector2.new(0, 0),
-			Position = UDim2.fromOffset(-10, -12),
+			Position = UDim2.fromOffset(-2, -6),
 			Size = UDim2.fromOffset(22, 22),
 			TextColor3 = UiTheme.palette("success"),
 			Visible = false,
@@ -173,7 +196,7 @@ local function refreshVote()
 		and candidatesText ~= ""
 	voteEndsAt = if running then endsAt :: number else 0
 	local wasVisible = card.Visible
-	card.Visible = running and not inTutorial()
+	card.Visible = running and not voteHidden()
 	if not running then
 		shownCandidates = ""
 		return
@@ -209,11 +232,14 @@ local function showTitleCard(themeId: string)
 	local accent = UiTheme.color(theme.accentColor)
 	local signature = MutationRules.forMap(Mutations, themeId)
 	local screen = HudController.screen()
+	-- Under the top stack, clear of the buttons beside it (Logic/ScreenLayout).
+	local height = if signature then TITLE.h else 96
+	local top = HudController.stackBottom() + ScreenLayout.GAP
+	local x, width = HudController.overlaySpan(TITLE.w, height, top)
 	local titleCard = UiKit.panel({
 		Name = "MapTitleCard",
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 150),
-		Size = UDim2.fromOffset(400, if signature then 120 else 96),
+		Position = UDim2.fromOffset(x, top),
+		Size = UDim2.fromOffset(width, height),
 		BackgroundColor3 = accent,
 		Parent = screen,
 	})
@@ -279,23 +305,21 @@ end
 function MapThemeController.start()
 	card = UiKit.new("Frame", {
 		Name = "MapVote",
-		LayoutOrder = HudController.TOP_ORDER.mapVote,
-		Size = UDim2.fromOffset(CARD_WIDTH, 26 + CHOICE_HEIGHT + 8),
+		Size = UDim2.fromOffset(VOTE.maxW, VOTE.header + VOTE.gap + VOTE.choice),
 		BackgroundTransparency = 1,
 		Visible = false,
-		Parent = HudController.topStack(),
 	}) :: Frame
 	header = UiKit.label({
 		Name = "Header",
 		Text = "",
-		Size = UDim2.new(1, 0, 0, 22),
+		Size = UDim2.new(1, 0, 0, VOTE.header),
 		TextColor3 = UiTheme.palette("gold"),
 		Parent = card,
 	})
 	choices = UiKit.new("Frame", {
 		Name = "Choices",
-		Position = UDim2.fromOffset(0, 30),
-		Size = UDim2.new(1, 0, 0, CHOICE_HEIGHT),
+		Position = UDim2.fromOffset(0, VOTE.header + VOTE.gap),
+		Size = UDim2.new(1, 0, 0, VOTE.choice),
 		BackgroundTransparency = 1,
 		Parent = card,
 	}) :: Frame
@@ -303,9 +327,10 @@ function MapThemeController.start()
 		FillDirection = Enum.FillDirection.Horizontal,
 		HorizontalAlignment = Enum.HorizontalAlignment.Center,
 		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(0, CHOICE_GAP),
+		Padding = UDim.new(0, VOTE.choiceGap),
 		Parent = choices,
 	})
+	HudController.place("vote", card)
 
 	for _, name in { "MapVoteEndsAt", "MapVoteCandidates", "MapVoteCounts" } do
 		workspace:GetAttributeChangedSignal(name):Connect(refreshVote)

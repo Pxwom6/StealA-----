@@ -266,11 +266,17 @@ function LeaderboardService.start(world: MapBuilder.World)
 
 	task.spawn(function()
 		while true do
-			for _, session in Sessions.all() do
-				LeaderboardService.writePlayer(session)
-			end
-			for _, board in boards do
-				refresh(board)
+			-- One error must not stop the leaderboards for good.
+			local ok, err = pcall(function()
+				for _, session in Sessions.all() do
+					LeaderboardService.writePlayer(session)
+				end
+				for _, board in boards do
+					refresh(board)
+				end
+			end)
+			if not ok then
+				warn(`[Leaderboards] {err}`)
 			end
 			task.wait(Gameplay.leaderboardRefreshSeconds)
 		end

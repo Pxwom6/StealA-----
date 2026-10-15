@@ -7,6 +7,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types = require(ReplicatedStorage.Shared.Types)
+local GadgetRules = require(ReplicatedStorage.Shared.Logic.GadgetRules)
 local LockRules = require(ReplicatedStorage.Shared.Logic.LockRules)
 local StealRules = require(ReplicatedStorage.Shared.Logic.StealRules)
 
@@ -94,6 +95,9 @@ export type Session = {
 	social: Social, -- written by SocialService, read by EconomyService and Replication
 	tutorial: TutorialRun?, -- written by TutorialService, read by Replication
 	cashOfferAt: number, -- os.clock() of the last "Need $X more?" offer (CashOfferService), -inf: never
+	-- Gadget cooldowns and effects (GadgetService; Logic/GadgetRules), read by Movement and StealService. Ownership
+	-- is saved in data.flags (`gadget_<id>`); this is runtime only.
+	gadgets: GadgetRules.State,
 	host: Types.HostView?, -- what this player may host (HostService; nil: nothing), read by Replication
 }
 

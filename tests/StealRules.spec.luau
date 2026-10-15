@@ -450,6 +450,46 @@ T.describe("StealRules movement and timing", function()
 		T.expect(ok2).toBe(false)
 		T.expect(why2).toBe("distance")
 	end)
+	T.it("carry budget: Sugar Rush ending mid-carry never cancels an honest thief", function()
+		local steal = Gameplay.steal -- the real config
+		local carry = Gameplay.walkSpeed * steal.carrySpeedMultiplier
+		local function limitsAt(allowance: number): any
+			return {
+				maxSpeed = carry * allowance,
+				tolerance = steal.speedCheckTolerance,
+				budgetSeconds = steal.speedBudgetSeconds,
+				leeway = steal.speedCheckLeeway,
+			}
+		end
+		for _, rushFor in { 2, 10, 30 } do -- Sugar Rush ends this many seconds into the carry
+			local track = StealRules.newCarryTrack(0, 3, 0, 0, limitsAt(1.25))
+			local x, allOk = 0, true
+			for i = 1, 300 do -- 60 s of 0.2 s ticks, always in a straight line away from the grab point
+				local t = i * 0.2
+				-- the client runs 25% faster until 0.2 s after the end; the checks allow it for 4 s after (walkSpeedAllowance)
+				x += carry * (if t <= rushFor + 0.2 then 1.25 else 1) * 0.2
+				local allowance = if t < rushFor + 4 then 1.25 else 1
+				local ok = StealRules.stepCarryTrack(track, x, 3, 0, t, limitsAt(allowance))
+				allOk = allOk and ok
+			end
+			T.expect(allOk).toBe(true)
+		end
+	end)
+	T.it("carry budget: after the speed drops, a jump toward home is still caught", function()
+		local fast = { maxSpeed = 12.5, tolerance = 1.6, budgetSeconds = 3, leeway = 6 }
+		local slow = { maxSpeed = 10, tolerance = 1.6, budgetSeconds = 3, leeway = 6 }
+		local track = StealRules.newCarryTrack(0, 3, 0, 0, fast)
+		local x, t = 0, 0
+		for _ = 1, 50 do -- 10 s at the fast speed
+			t += 0.2
+			x += 12.5 * 0.2
+			T.expect((StealRules.stepCarryTrack(track, x, 3, 0, t, fast))).toBe(true)
+		end
+		track.budget = 1000 -- even with budget to spare, the straight line can't jump ahead of the speed allowed
+		local ok, why = StealRules.stepCarryTrack(track, x + 30, 3, 0, t + 0.2, slow)
+		T.expect(ok).toBe(false)
+		T.expect(why).toBe("distance")
+	end)
 	T.it("carry budget: flying up spends the budget, falling doesn't", function()
 		local limits = { maxSpeed = 10, tolerance = 1.6, budgetSeconds = 3, leeway = 6 }
 		local up = StealRules.newCarryTrack(0, 3, 0, 0, limits)

@@ -6,7 +6,8 @@
 	  `stored` cash (saved, so it survives rejoining). "Income" and "price" always mean the creature's mutated
 	  values (GameData.income / GameData.price with the record's variant).
 	* Collecting: 4×/s the server checks whether each owner's character stands on one of their collect pads and
-	  moves that podium's stored cash into their wallet. Purely position-based: no client remote can collect.
+	  moves that podium's stored cash into their wallet. Purely position-based: no client remote can collect. The
+	  Snack Magnet gadget (GadgetService) collects every pad at once through the same path (collectPad).
 	* Intents: BuyPodium, SellCreature.
 	All cash changes go through addCash / trySpend so the HUD is marked dirty and analytics are logged.
 ]]
@@ -33,6 +34,7 @@ local CashOfferService = require(script.Parent.CashOfferService)
 local GameEvents = require(script.Parent.GameEvents)
 local LiveOps = require(ReplicatedStorage.Shared.Config.LiveOps)
 local LiveOpsService = require(script.Parent.LiveOpsService)
+local MapBuilder = require(script.Parent.MapBuilder)
 local ModifierService = require(script.Parent.ModifierService)
 local PlotService = require(script.Parent.PlotService)
 local Remotes = require(script.Parent.Remotes)
@@ -55,11 +57,11 @@ local function multiplierInputs(session: Session): EconomyMath.MultiplierInputs
 		doubleCashMultiplier = perks.doubleCashMultiplier,
 		isVip = session.passes.VIP,
 		vipIncomeBonus = perks.vipIncomeBonus,
-		-- LiveOps cash events and a server modifier (Cash Splash) together, under the same cap.
-		eventCashMultiplier = math.min(
-			LiveOps.limits.maxCashMultiplier,
-			LiveOpsService.cashMultiplier() * ModifierService.effects().income
-		),
+		-- LiveOps cash events and a server modifier (Cash Splash, Jackpot) together under the same cap in live income;
+		-- the modifier is left out of everything paid or saved from income (EconomyMath.rewardMultiplier).
+		eventCashMultiplier = LiveOpsService.cashMultiplier(),
+		modifierIncomeMultiplier = ModifierService.effects().income,
+		maxCashMultiplier = LiveOps.limits.maxCashMultiplier,
 		socialBonus = SocialRules.totalBonus(session.social.friends, session.social.groupMember, Social),
 		-- Earned for good (completed Snackdex tiers): part of the steady income packs and rewards are sized from.
 		collectionBonus = SnackdexRules.incomeBonus(session.data.snackdex, Snackdex),
@@ -84,8 +86,8 @@ end
 -- Recomputes cached income / multiplier / capacity and pushes them to the world and the HUD.
 function EconomyService.refresh(session: Session)
 	local inputs = multiplierInputs(session)
-	-- The live multiplier includes temporary bonuses (LiveOps events, friends & group): it drives income ticks and the
-	-- HUD only. Anything paid out or saved uses rewardIncome or packIncome below.
+	-- The live multiplier includes temporary bonuses (LiveOps events, server modifiers, friends & group): it drives
+	-- income ticks and the HUD only. Anything paid out or saved uses rewardIncome or packIncome below.
 	session.multiplier = EconomyMath.incomeMultiplier(inputs)
 	session.capacity = EconomyService.capacity(session)
 	local incomes: { number } = {}
@@ -95,18 +97,14 @@ function EconomyService.refresh(session: Session)
 		if def then
 			local baseIncome = GameData.income(def, record.variant)
 			table.insert(incomes, baseIncome)
-			table.insert(packSources, {
-				baseIncome = baseIncome,
-				podium = record.podium,
-				inTransit = session.plot ~= 0 and PlotService.isBusy(session.plot, record.podium),
-			})
+			table.insert(packSources, { baseIncome = baseIncome, podium = record.podium })
 		end
 	end
 	session.incomePerSecond = EconomyMath.totalIncome(incomes, session.multiplier)
 	session.rewardIncome = EconomyMath.totalIncome(incomes, EconomyMath.rewardMultiplier(inputs))
 	session.packIncome = EconomyMath.packIncome(packSources, session.capacity, EconomyMath.permanentMultiplier(inputs))
 	local stats = session.data.stats
-	-- Saved (and on the global leaderboard): never inflated by the temporary social bonus.
+	-- Saved (and on the global leaderboard): never inflated by the social bonus or a server modifier.
 	stats.bestCashPerSecond = math.max(stats.bestCashPerSecond, session.rewardIncome)
 	if session.plot ~= 0 then
 		PlotService.syncPodiums(session)
@@ -177,6 +175,34 @@ function EconomyService.collect(session: Session, podium: number): number
 	return amount
 end
 
+-- Collects one pad the way stepping on it does: the podium's stored cash into the wallet, the floating "+$X" over the
+-- pad, and the "collect" gameplay event (tutorial, quests). The pad check and the Snack Magnet both come here.
+-- Returns the amount.
+function EconomyService.collectPad(session: Session, podium: MapBuilder.PodiumRefs): number
+	local amount = EconomyService.collect(session, podium.index)
+	if amount > 0 then
+		Remotes.fire(session.player, "Effect", {
+			kind = "collect",
+			amount = amount,
+			position = podium.padPosition,
+		})
+		-- Only a pad collect is this event (not selling, not leaving): tutorial, quests.
+		GameEvents.emit(session, { kind = "collect", amount = amount })
+	end
+	return amount
+end
+
+-- What collecting every active pad would pay right now (the Snack Magnet checks there is something first).
+function EconomyService.collectable(session: Session): number
+	local total = 0
+	for _, record in session.data.creatures do
+		if record.podium <= session.capacity and record.stored >= 1 then
+			total += math.floor(record.stored)
+		end
+	end
+	return total
+end
+
 local function incomeTick(dt: number)
 	for _, session in Sessions.all() do
 		if session.plot == 0 then
@@ -226,16 +252,7 @@ local function padCheck()
 			end
 		end
 		if nearest then
-			local amount = EconomyService.collect(session, nearest.index)
-			if amount > 0 then
-				Remotes.fire(session.player, "Effect", {
-					kind = "collect",
-					amount = amount,
-					position = nearest.padPosition,
-				})
-				-- Only a pad collect is this event (not selling, not leaving): tutorial, quests.
-				GameEvents.emit(session, { kind = "collect", amount = amount })
-			end
+			EconomyService.collectPad(session, nearest)
 		end
 	end
 end
@@ -314,12 +331,16 @@ function EconomyService.start()
 	LiveOpsService.onCashMultiplierChanged(refreshAll)
 	ModifierService.onChanged(refreshAll)
 
+	-- One error must not stop income or collecting for good: each loop's body runs protected.
 	task.spawn(function()
 		local last = os.clock()
 		while true do
 			task.wait(Gameplay.incomeTickSeconds)
 			local now = os.clock()
-			incomeTick(now - last)
+			local ok, err = pcall(incomeTick :: (number) -> ...any, now - last)
+			if not ok then
+				warn(`[EconomyService] income tick: {err}`)
+			end
 			last = now
 		end
 	end)
@@ -327,7 +348,10 @@ function EconomyService.start()
 	task.spawn(function()
 		while true do
 			task.wait(PAD_CHECK_INTERVAL)
-			padCheck()
+			local ok, err = pcall(padCheck :: () -> ...any)
+			if not ok then
+				warn(`[EconomyService] pad check: {err}`)
+			end
 		end
 	end)
 end

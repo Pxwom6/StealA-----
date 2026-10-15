@@ -147,6 +147,10 @@ local RELEASED_MUTATION_IDS = {
 	"toasted",
 	"sweetheart", -- Valentine's 2027 (event-only)
 	"pastel", -- Easter 2027 (event-only)
+	-- map signatures of the maps after the first twenty
+	"buttered",
+	"porcelain",
+	"syrupy",
 }
 
 T.describe("Config integrity", function()
@@ -459,6 +463,8 @@ T.describe("Config integrity", function()
 				"InvitePrompted",
 				"SkipTutorial",
 				"DevGrantProduct",
+				"BuyGadget",
+				"UseGadget",
 				"HostAction",
 			}
 		do

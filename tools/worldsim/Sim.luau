@@ -33,6 +33,17 @@ local Sim = {}
 -- Server time returned by workspace:GetServerTimeNow(). Move it forward with Sim.advance.
 Sim.now = 1_800_000_000
 Sim.isStudio = true
+-- When on, the game's os.clock() and os.time() follow Sim.now too, so what the game times with os.clock (the carry
+-- budget, rate limits, income ticks) and dates with os.time (codes, daily rewards) moves only when the test moves
+-- it. Set it before booting the server.
+Sim.virtualClock = false
+-- Game passes each fake player owns: Sim.ownedPasses[userId][passId] = true (nobody owns any by default).
+Sim.ownedPasses = {} :: { [number]: { [number]: boolean } }
+-- PolicyService answers per fake player: Sim.policies[userId] = the policy table, or "error" for a failed lookup.
+-- Default: nothing restricted.
+Sim.policies = {} :: { [number]: any }
+-- What the game logged with AnalyticsService, oldest first: { method = "LogCustomEvent", args = { ... } }.
+Sim.analytics = {} :: { { method: string, args: { any } } }
 -- Everything the game sent to `warn` (a smoke test fails on any).
 Sim.warnings = {} :: { string }
 -- Terrain calls in order: { op = "FillBall", args = { ... } }.
@@ -818,14 +829,25 @@ setmetatable(Players, {
 wrappers[realPlayers] = Players
 reals[Players] = realPlayers
 
--- Services that answer offline: nobody owns a pass, analytics go nowhere.
+-- Services that answer offline: passes from Sim.ownedPasses, policies from Sim.policies, analytics are recorded.
 local MarketplaceService: any = unavailable("MarketplaceService")
-function MarketplaceService.UserOwnsGamePassAsync(_self: any, _userId: number, _passId: number): boolean
-	return false
+function MarketplaceService.UserOwnsGamePassAsync(_self: any, userId: number, passId: number): boolean
+	local owned = Sim.ownedPasses[userId]
+	return owned ~= nil and owned[passId] == true
+end
+local PolicyService: any = unavailable("PolicyService")
+function PolicyService.GetPolicyInfoForPlayerAsync(_self: any, player: any): { [string]: any }
+	local policy = Sim.policies[unwrap(player).UserId]
+	if policy == "error" then
+		error("PolicyService could not be reached")
+	end
+	return policy or { ArePaidRandomItemsRestricted = false, AreAdsAllowed = true, AllowedExternalLinkReferences = {} }
 end
 local AnalyticsService: any = setmetatable({}, {
-	__index = function(_, _key: string): any
-		return function() end
+	__index = function(_, key: string): any
+		return function(_self: any, ...: any)
+			table.insert(Sim.analytics, { method = key, args = table.pack(...) :: any })
+		end
 	end,
 })
 
@@ -915,6 +937,7 @@ local serviceStubs: { [string]: any } = {
 	DataStoreService = unavailable("DataStoreService"),
 	MessagingService = MessagingService,
 	MarketplaceService = MarketplaceService,
+	PolicyService = PolicyService,
 	BadgeService = unavailable("BadgeService"),
 	SocialService = unavailable("SocialService"),
 	GroupService = unavailable("GroupService"),
@@ -989,8 +1012,32 @@ local gameProxy = setmetatable({}, {
 local cache: { [string]: any } = {}
 local loading: { [string]: boolean } = {}
 
+-- The game's `os`: the real one, except that clock() and time() follow Sim.now while Sim.virtualClock is on. The
+-- virtual clock() counts from a fixed point long before any Sim.now, so it stays positive whatever Sim.now a test
+-- starts from, and moves exactly with it.
+local VIRTUAL_CLOCK_ORIGIN = 1_000_000_000
+local realClock = os.clock
+local gameOs = setmetatable({
+	clock = function(): number
+		if Sim.virtualClock then
+			return Sim.now - VIRTUAL_CLOCK_ORIGIN
+		end
+		return realClock()
+	end,
+	time = function(date: any?): number
+		if date ~= nil then
+			return os.time(date)
+		end
+		if Sim.virtualClock then
+			return math.floor(Sim.now)
+		end
+		return os.time()
+	end,
+}, { __index = os })
+
 local globals: { [string]: any } = {
 	game = gameProxy,
+	os = gameOs,
 	workspace = wrap(realWorkspace),
 	Instance = Instance,
 	Vector3 = roblox.Vector3,
@@ -1013,7 +1060,7 @@ local globals: { [string]: any } = {
 	Random = Random,
 	TweenInfo = TweenInfo,
 	task = task,
-	tick = os.clock,
+	tick = gameOs.clock,
 	typeof = function(value: any): string
 		return if reals[value] ~= nil then "Instance" else kindOf(value)
 	end,

@@ -3,8 +3,10 @@
 	Renders the conveyor locally. The server only sends {id, creatureId, spawnAt, variant}; positions come from
 	Logic/BeltMath and the shared server clock, so movement costs zero network traffic.
 
-	Models are pooled per creature type and mutation (built once, reused forever) and each item gets a local "Buy"
-	prompt that sends the BuyBeltItem intent — the server re-validates price, range and space. A mutated item shows
+	Models are reused per creature type and mutation: one leaving the belt is parked out of sight (y = -500) for the next
+	item that looks the same, at most one per kind and Gameplay.belt.modelPool.max in all, the least recently used
+	destroyed first (Logic/ModelPool), so a long session doesn't pile up hundreds of spare models on a phone. Each item
+	gets a local "Buy" prompt that sends the BuyBeltItem intent — the server re-validates price, range and space. A mutated item shows
 	the mutation's name in its colour, its mutated name ("Golden Pizza Pup") and its mutated price and income; a
 	limited-time (event) Snackling has a small "EVENT" tag in its event's colour on top. Prices follow a running server
 	modifier (Clearance Sale), worked out like the server does.
@@ -26,6 +28,7 @@ local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local CreatureVisuals = require(ReplicatedStorage.Shared.CreatureVisuals)
 local BeltMath = require(ReplicatedStorage.Shared.Logic.BeltMath)
 local IdleMotion = require(ReplicatedStorage.Shared.Logic.IdleMotion)
+local ModelPool = require(ReplicatedStorage.Shared.Logic.ModelPool)
 local ModifierRules = require(ReplicatedStorage.Shared.Logic.ModifierRules)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local ClientSettings = require(script.Parent.ClientSettings)
@@ -60,7 +63,7 @@ local BeltController = {}
 local belt = BeltMath.centered(Gameplay.belt.length, Gameplay.belt.travelSeconds)
 local surfaceY = Gameplay.belt.surfaceY
 local active: { [number]: Active } = {}
-local pools: { [string]: { Pooled } } = {}
+local pool = ModelPool.new(Gameplay.belt.modelPool.perKind, Gameplay.belt.modelPool.max) :: ModelPool.Pool<Pooled>
 local folder: Folder
 local hidden = CFrame.new(0, -500, 0) -- parked pooled models (MutationFxController skips anything below y = -400)
 
@@ -190,25 +193,23 @@ local function build(creatureId: string, variant: string?): Pooled
 end
 
 local function acquire(creatureId: string, variant: string?): Pooled
-	local pool = pools[poolKey(creatureId, variant)]
-	if pool and #pool > 0 then
-		local pooled = table.remove(pool) :: Pooled
+	local pooled = ModelPool.take(pool, poolKey(creatureId, variant))
+	if pooled then
 		pooled.prompt.Enabled = true
 		return pooled
 	end
 	return build(creatureId, variant)
 end
 
+-- Parks the model out of sight for reuse; the pool hands back what no longer fits (this one, or the least recently
+-- parked), which is destroyed with its billboard and prompt.
 local function release(pooled: Pooled)
 	pooled.prompt.Enabled = false
 	CreatureVisuals.applySquash(pooled.squash, 0)
 	pooled.model:PivotTo(hidden)
-	local pool = pools[pooled.key]
-	if pool == nil then
-		pool = {}
-		pools[pooled.key] = pool
+	for _, extra in ModelPool.park(pool, pooled.key, pooled) do
+		extra.model:Destroy()
 	end
-	table.insert(pool, pooled)
 end
 
 local function refreshAffordability(cash: number)
@@ -232,10 +233,8 @@ local function refreshPrices()
 	for _, entry in active do
 		update(entry.pooled)
 	end
-	for _, pool in pools do
-		for _, pooled in pool do
-			update(pooled)
-		end
+	for _, pooled in ModelPool.items(pool) do
+		update(pooled)
 	end
 	local state = StateStore.get()
 	if state then

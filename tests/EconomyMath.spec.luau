@@ -75,19 +75,48 @@ T.describe("EconomyMath cash pack basis", function()
 		T.expect(evented.eventCashMultiplier).toBe(3) -- the caller's inputs are not modified
 	end)
 
-	T.it("counts only creatures on active podiums that are not being stolen", function()
+	T.it("counts the creatures on active podiums, including one a thief is carrying off", function()
 		local sources: { EconomyMath.PackSource } = {
-			{ baseIncome = 10, podium = 1, inTransit = false },
-			{ baseIncome = 20, podium = 8, inTransit = false },
-			{ baseIncome = 400, podium = 2, inTransit = true }, -- being carried off by a thief
-			{ baseIncome = 1000, podium = 12, inTransit = false }, -- beyond capacity (e.g. a refunded pass)
+			{ baseIncome = 10, podium = 1 },
+			{ baseIncome = 20, podium = 8 },
+			-- being carried off by a thief: still the owner's until delivery, so a pack bought while a thief grabs it
+			-- pays what its card showed a moment before (it used to drop out and pay a fraction)
+			{ baseIncome = 400, podium = 2 },
+			{ baseIncome = 1000, podium = 12 }, -- beyond capacity (e.g. a refunded pass)
 		}
-		T.expect(EconomyMath.packIncome(sources, 8, 2)).toBe(60)
-		T.expect(EconomyMath.packIncome(sources, 12, 1)).toBe(1030)
+		T.expect(EconomyMath.packIncome(sources, 8, 2)).toBe(860)
+		T.expect(EconomyMath.packIncome(sources, 12, 1)).toBe(1430)
 		T.expect(EconomyMath.packIncome({}, 8, 2)).toBe(0)
 		-- So a pack bought mid-event / mid-steal pays what the player's steady income says.
 		local pack = { incomeSeconds = 3600, minimum = 1000 }
-		T.expect(EconomyMath.cashPackAmount(EconomyMath.packIncome(sources, 8, 2), pack)).toBe(210000)
+		T.expect(EconomyMath.cashPackAmount(EconomyMath.packIncome(sources, 8, 2), pack)).toBe(3000000)
+	end)
+
+	T.it("ignores a server modifier (Cash Splash, Jackpot), like a LiveOps event", function()
+		local jackpot = inputs({ rebirthMultiplier = 1.5, modifierIncomeMultiplier = 2 })
+		T.expect(EconomyMath.permanentMultiplier(jackpot)).toBe(1.5)
+		T.expect(jackpot.modifierIncomeMultiplier).toBe(2) -- the caller's inputs are not modified
+	end)
+end)
+
+T.describe("EconomyMath server modifiers", function()
+	T.it("raise live income, capped together with a LiveOps cash event", function()
+		T.expect(EconomyMath.incomeMultiplier(inputs({ modifierIncomeMultiplier = 2 }))).toBe(2)
+		T.expect(EconomyMath.incomeMultiplier(inputs({ modifierIncomeMultiplier = 1.5, eventCashMultiplier = 2 })))
+			.toBe(3)
+		local capped = inputs({ modifierIncomeMultiplier = 2, eventCashMultiplier = 2, maxCashMultiplier = 3 })
+		T.expect(EconomyMath.incomeMultiplier(capped)).toBe(3)
+		T.expect(EconomyMath.incomeMultiplier(inputs({ modifierIncomeMultiplier = 0 / 0 }))).toBe(1)
+	end)
+
+	T.it("never reach daily rewards, offline earnings or the saved best cash/sec (Jackpot doubled them)", function()
+		local jackpot = inputs({ rebirthMultiplier = 1.5, modifierIncomeMultiplier = 2, maxCashMultiplier = 3 })
+		T.expect(EconomyMath.rewardMultiplier(jackpot)).toBe(1.5)
+		T.expect(EconomyMath.incomeMultiplier(jackpot)).toBe(3)
+		-- a LiveOps cash event, run by every server on a published date, still counts there (DECISIONS #19)
+		local both = inputs({ eventCashMultiplier = 2, modifierIncomeMultiplier = 2, maxCashMultiplier = 3 })
+		T.expect(EconomyMath.rewardMultiplier(both)).toBe(2)
+		T.expect(EconomyMath.incomeMultiplier(both)).toBe(3)
 	end)
 end)
 
@@ -135,7 +164,7 @@ T.describe("EconomyMath Snackdex collection bonus", function()
 		-- live: everything
 		T.expect(EconomyMath.incomeMultiplier(all)).toBeNear(1.5 * 1.09 * 2 * 1.3)
 		T.expect(all.collectionBonus).toBe(0.09) -- the caller's inputs are not modified
-		local sources: { EconomyMath.PackSource } = { { baseIncome = 100, podium = 1, inTransit = false } }
+		local sources: { EconomyMath.PackSource } = { { baseIncome = 100, podium = 1 } }
 		T.expect(EconomyMath.packIncome(sources, 8, EconomyMath.permanentMultiplier(all))).toBeNear(163.5)
 	end)
 end)

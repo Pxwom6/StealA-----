@@ -190,6 +190,9 @@ the store stay exact. Golden Hour (a server modifier) is the only thing that mul
 | Bubblegum | on Bubblegum Bayou | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
 | Aurora | during Northern Lights | 2% | 28.8 | x4 | x2.5 | x0.63 | spawn |
 | Toasted | during Heatwave | 2% | 28.8 | x4 | x2.5 | x0.63 | spawn |
+| Buttered | on Popcorn Drive-In | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Porcelain | on Tea Party Garden | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Syrupy | on Pancake Peaks | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
 
 "Per server-hour" is while the mutation can roll. Any mutation on an ordinary spawn (the map's signature included,
 no modifier): 5.15% of spawns (74.2 per server-hour). Expected value of one spawn: income x1.0885, price x1.0435.
@@ -207,7 +210,7 @@ no modifier): 5.15% of spawns (74.2 per server-hour). Expected value of one spaw
 * **Map signatures** (`mapTheme`): each map has exactly one, only while it is up — about 6 in a 20-minute map. At
   x3 they sit between Golden and Diamond (rarer than Golden, weaker than Diamond; CI checks both), so a map is worth
   voting for (the vote buttons and the title card name its mutation) without making the permanent ones pointless.
-  Collectors chase all twenty through the Snackdex, which shows a pip for each one owned.
+  Collectors chase all twenty-three through the Snackdex, which shows a pip for each one owned.
 * **Weather mutations** (`modifierId`): only while their weather modifier runs (5 minutes, a few times a day per
   server), about 2–3 per storm, each announced to the whole server so everyone races to the belt. x4 like Diamond.
 * **Event-only mutations** (with an `eventId`) roll only while that LiveOps event runs.
@@ -474,13 +477,13 @@ half the time.
 | Clearance Sale | belt prices x0.7 (rounded to whole cash, at least 1) | about 1% off what an always-buying player spends |
 | Golden Hour | every mutation chance x3 (5.15% → 15.5% of spawns; 7.15% → 21.5% while Halloween runs) | about +5% mutations |
 | Lucky Breeze | 2x luck (a LiveOps boost: shows in the luck pill, capped with everything else at 6x) | rare odds doubled ~3.6% of the time (with Snack Party) |
-| Cash Splash | income x1.5 (with LiveOps cash events, capped at 3x) | about +1.2% income; cash packs and quest rewards are not inflated (they use the steady income) |
+| Cash Splash | live income x1.5 (with LiveOps cash events, capped at 3x) | about +1.2% income; cash packs, quest and daily rewards, offline earnings and the saved best cash/sec are not inflated (DECISIONS.md #46) |
 | Sugar Rush | everyone walks (and carries) 25% faster | – |
 | Quick Hands | the steal hold is 0.75 s instead of 1.5 | – |
 | Fortress | locks started while it runs last 1.5x (the open window grows with them: at least half the lock) | – |
 | Snack Patrol | tag reach 13 → 19.5 studs | – |
 | Snack Party (rare) | spawns every 1.7 s and 2x luck | – |
-| Jackpot (rare) | income x2 (with LiveOps cash events, capped at 3x) | about +0.9% income |
+| Jackpot (rare) | live income x2 (with LiveOps cash events, capped at 3x) | about +0.9% income; nothing paid or saved from income doubles |
 | Thunderstorm | rain, lightning and a dark sky; Electric Snacklings can roll (2% of spawns) | about 2–3 Electric per storm |
 | Meteor Shower | a starry midnight with shooting stars; Galaxy Snacklings can roll (2%) | about 2–3 Galaxy per shower |
 | Toxic Fog | green haze and glowing spores; Toxic Snacklings can roll (2%) | about 2–3 Toxic per fog |
@@ -550,6 +553,62 @@ last gift) Rare 30%, Epic 11%, Legendary 2.9%, Mythic 0.48%. A player who plays 
 roughly 9 minutes of extra income a day from gifts and spins, about +15% for that hour: a reason to come back and stay,
 not a new economy. Every prize scales with steady income like a cash pack, and the server decides every spin.
 
+## Gadgets
+
+Gadgets (`Config/Gadgets.luau`, DECISIONS.md #48) are bought once with in-game cash, never Robux, and kept forever.
+Their prices are fixed, so they work as goals on the way up: each one costs about two minutes of a free player's
+income at the point in the curve where it is meant to arrive. The simulation (`lune run tools/simulate.luau`, last
+tables) replays the free player saving for each in shop order as soon as it costs at most 120 s of their income,
+buying nothing else meanwhile:
+
+| Gadget | Price | Does | Recharges | Bought after (median) | Income then | Price in seconds of it |
+| --- | --- | --- | --- | --- | --- | --- |
+| 🥤 Fizzy Soda | $1.5K | +30% speed for 6 s, carrying too | 35 s | 2m 50s | $14/s | 107 |
+| 🍌 Banana Peel | $15K | a trap on your own floor for 90 s: slip 1.5 s, drop your Snackling | 45 s | 7m 2s | $132/s | 114 |
+| 🫧 Bubble Shield | $150K | no tags for 3 s | 40 s | 15m 30s | $1.43K/s | 104 |
+| 🧲 Snack Magnet | $2.5M | every pad's cash, from anywhere | 60 s | 52m 37s | $22.6K/s | 110 |
+
+So the first one comes in the first few minutes, around the first Uncommon, and the last within the first hour,
+between the first Legendary and the first rebirth. What buying all four costs the chase (same model, 60 runs):
+
+| Rarity | Free player | Free player buying every gadget |
+| --- | --- | --- |
+| Uncommon | 1m 52s | 3m 45s |
+| Rare | 4m 52s | 8m 25s |
+| Epic | 11m 5s | 14m 42s |
+| Legendary | 30m 52s | 35m 0s |
+| Mythic | 1h 57m | 1h 50m |
+| Secret | 9h 35m | 8h 31m |
+| First rebirth affordable | 1h 2m | 1h 8m |
+
+| Play time | Free player | Free player buying every gadget |
+| --- | --- | --- |
+| 10m | $1.01K/s | $448/s |
+| 30m | $8.68K/s | $6.02K/s |
+| 1h | $31.5K/s | $25.4K/s |
+| 3h | $173K/s | $180K/s |
+
+A few minutes later in the first half hour and about six minutes to the first rebirth, then nothing (the Mythic and
+Secret differences are the belt's luck); real players keep buying while they save, so the delay is smaller. None of
+the gadgets changes income: the magnet moves cash from the pads to the wallet sooner, and cash waiting on a pad is
+never stolen anyway (the owner keeps it when a Snackling is grabbed).
+
+**The speed cap.** A speed modifier and a speed gadget multiply, but never past `maxSpeedMultiplier` = **1.5x**, and
+the movement checks (PositionTracker's walking budget, the carry budget and its straight-line cap) allow exactly what
+the server gave, kept 4 s after a faster speed ends, under the same cap (CI checks the cap is at most 1.5x and never
+slows a modifier alone):
+
+| | Walking | Carrying (x0.62) |
+| --- | --- | --- |
+| Normal | 16 studs/s | 9.9 |
+| Fizzy Soda (x1.3) | 20.8 | 12.9 |
+| Sugar Rush (x1.25) | 20 | 12.4 |
+| Both (x1.625, capped at x1.5) | 24 | 14.9 |
+
+A thief is always slower than a tagger on foot (14.9 < 16), so the soda is a head start, not an escape. **The
+shield** is up at most 3 s in every 40 (7.5%; CI keeps any shield at most 5 s and recharging at least 5x as long), and
+only tags bounce off it. **A peel** is one trap per owner at a time, gone after one slip or 90 s.
+
 ## Other knobs
 
 **Podiums** (`Economy.podiumUpgrade`): 8 to start, then +1 at a time for
@@ -570,8 +629,9 @@ Cash and Snacklings reset; podium upgrades, passes and stats stay.
 The first rebirth lands around the first-Legendary stage (~1 h free); later ones need Mythic-level income, so
 rebirths become a multi-session goal. The multiplier is saved when earned, so later tuning never lowers it.
 
-**Cash packs** (`Economy.cashPacks`) pay N seconds of the buyer's steady income (creatures on active podiums that
-are not being stolen, at the rebirth and pass multipliers, without LiveOps cash events or the friend & group bonus),
+**Cash packs** (`Economy.cashPacks`) pay N seconds of the buyer's steady income (creatures on active podiums, one a
+thief is carrying off included, at the rebirth and pass multipliers, without LiveOps cash events, server modifiers or
+the friend & group bonus),
 rounded down to 2 significant digits, with a floor so they are worth something on day one. They therefore stay
 meaningful at every stage instead of becoming worthless (fixed amounts) or game-breaking (huge fixed amounts).
 

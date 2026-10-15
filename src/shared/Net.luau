@@ -36,6 +36,8 @@ export type ClientToServer =
 	| "ClaimGift"
 	| "Spin"
 	| "GetAchievements"
+	| "BuyGadget"
+	| "UseGadget"
 	| "HostAction"
 
 export type ServerToClient =
@@ -80,6 +82,8 @@ local CLIENT_TO_SERVER: { ClientToServer } = {
 	"ClaimGift",
 	"Spin",
 	"GetAchievements",
+	"BuyGadget",
+	"UseGadget",
 	"HostAction",
 }
 

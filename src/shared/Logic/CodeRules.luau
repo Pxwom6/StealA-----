@@ -15,15 +15,18 @@ type CodeDef = Types.CodeDef
 local CodeRules = {}
 
 CodeRules.MAX_LENGTH = 24
+-- The longest text worth looking at: a code with a few spaces around it. Anything longer is refused before any pattern
+-- runs (the trim below is quadratic in a long run of spaces: 64 KB of them took 28 s and froze the server).
+CodeRules.MAX_TYPED_LENGTH = CodeRules.MAX_LENGTH + 16
 CodeRules.FLAG_PREFIX = "code_" -- the achievements count these flags (AchievementRules)
 
 -- Why a code can't be redeemed (a Theme.text key each: code<Reason>).
 export type Refusal = "invalid" | "unknown" | "expired" | "used"
 
 -- The code as stored: letters and digits only, upper case; nil for anything else (empty, too long, symbols, spaces
--- inside). Spaces around it are forgiven.
+-- inside). Spaces around it are forgiven. `text` comes straight from a client: its length is checked first.
 function CodeRules.normalize(text: unknown): string?
-	if type(text) ~= "string" then
+	if type(text) ~= "string" or #text > CodeRules.MAX_TYPED_LENGTH then
 		return nil
 	end
 	local trimmed = string.match(text, "^%s*(.-)%s*$") or ""
@@ -50,7 +53,8 @@ function CodeRules.check(
 		return nil, nil, "invalid"
 	end
 	local def = config[code]
-	if def == nil then
+	-- Before its start a code answers like one that doesn't exist, so nobody can confirm an event code early.
+	if def == nil or (def.startsAt ~= nil and now < def.startsAt) then
 		return nil, code, "unknown"
 	end
 	if def.expiresAt ~= nil and now >= def.expiresAt then
@@ -99,6 +103,13 @@ function CodeRules.validate(config: CodesConfig, creatures: { [string]: any }, m
 		end
 		if def.expiresAt ~= nil and not (def.expiresAt > 1600000000) then
 			problem(`{name} expiresAt must be a unix time in seconds`)
+		end
+		if def.startsAt ~= nil then
+			if not (def.startsAt > 1600000000) then
+				problem(`{name} startsAt must be a unix time in seconds`)
+			elseif def.expiresAt ~= nil and not (def.startsAt < def.expiresAt) then
+				problem(`{name} startsAt must be before expiresAt`)
+			end
 		end
 	end
 	return problems

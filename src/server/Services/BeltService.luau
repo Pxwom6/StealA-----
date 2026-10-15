@@ -204,9 +204,11 @@ local function onBuy(player: Player, idArg: unknown)
 	end
 	local def = GameData.catalog.creatures[item.creatureId]
 	local mutation = GameData.mutation(item.variant)
-	-- A running modifier (Clearance Sale) changes belt prices; the client shows the same (ModifierRules.beltPrice).
-	local price = ModifierRules.beltPrice(GameData.price(def, item.variant), ModifierService.effects())
-	if not EconomyService.trySpend(session, price, "Shop", def.id) then
+	-- A running modifier (Clearance Sale) changes belt prices; the client shows the same (ModifierRules.beltPrice). Just
+	-- after a change the lower of the old and new price is charged: the client may still show the old one.
+	local price = ModifierRules.beltPrice(GameData.price(def, item.variant), ModifierService.actionEffects())
+	-- The economy event's item SKU is the rarity (7 values), never the creature id: Roblox keeps at most 100 SKUs.
+	if not EconomyService.trySpend(session, price, "Shop", def.rarity) then
 		CashOfferService.notEnoughCash(session, price) -- "Need $X more?" offer, or the usual toast
 		return
 	end
@@ -280,7 +282,11 @@ function BeltService.start(beltDef: BeltMath.Belt)
 	Remotes.onIntent("BuyBeltItem", onBuy)
 	task.spawn(function()
 		while true do
-			spawnOne()
+			-- One error must not stop the belt for good.
+			local ok, err = pcall(spawnOne :: () -> ...any)
+			if not ok then
+				warn(`[BeltService] spawn: {err}`)
+			end
 			task.wait(Gameplay.belt.spawnInterval * ModifierService.effects().spawnInterval) -- Rush Hour: faster
 		end
 	end)

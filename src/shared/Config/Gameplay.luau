@@ -39,6 +39,9 @@ local Gameplay = {
 		buyRange = 16,
 		latencyTolerance = 0.75, -- seconds of belt movement forgiven when checking buy range
 		maxItems = 16,
+		-- Each client keeps spare belt models to reuse (BeltController, Logic/ModelPool): at most `perKind` per
+		-- Snackling and mutation pair and `max` in all, the least recently used going first (CI keeps max in 8-64).
+		modelPool = { perKind = 1, max = 32 },
 	},
 
 	collect = {
@@ -114,6 +117,10 @@ local Gameplay = {
 		newPlayerSeconds = 240, -- total play time during which a new player's base cannot be stolen from
 	},
 
+	-- Each client switches the lights and particles of podium Snacklings off beyond `offBeyond` studs from the camera
+	-- and back on within `onWithin` (Logic/FxCulling; the gap stops flicker), checking every `checkSeconds`.
+	podiumFx = { onWithin = 90, offBeyond = 110, checkSeconds = 0.5 },
+
 	replicationHz = 5, -- player state is batched to clients this many times per second
 	incomeTickSeconds = 1,
 	leaderboardRefreshSeconds = 120,
@@ -148,6 +155,10 @@ local Gameplay = {
 		ClaimGift = { burst = 6, perSecond = 2 }, -- playtime gifts: each pays once a day (GiftRules.claim)
 		Spin = { burst = 2, perSecond = 0.5 }, -- the Lucky Spin (SpinService also waits for the reel)
 		GetAchievements = { burst = 3, perSecond = 0.5 }, -- the Trophies tab asking for progress
+		-- Gadgets (GadgetService): buying pays once per gadget; using one is also held back by its own cooldown, so
+		-- this only stops spam (four gadgets pressed one after another still fit the burst).
+		BuyGadget = { burst = 3, perSecond = 1 },
+		UseGadget = { burst = 6, perSecond = 3 },
 		-- The host panel (HostService): admins and private-server owners only; owners also have cooldowns per action.
 		HostAction = { burst = 4, perSecond = 1 },
 	} :: { [string]: RateLimit },

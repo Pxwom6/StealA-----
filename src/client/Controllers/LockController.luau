@@ -1,8 +1,9 @@
 --!strict
 --[[
-	Base-lock UI: the in-world lock button prompt and status board on YOUR base, plus a HUD pill that always
-	shows lock state ("Lock ready" / "Locked 0:42" / "Lock in 0:30"). Tapping the pill while the lock recharges
-	calls `onPillTappedWhileRecharging` (the store uses it to offer Instant Lock).
+	Base-lock UI: the in-world lock button prompt and status board on YOUR base, plus a HUD button that always
+	shows lock state ("Lock ready" / "Locked 0:42" / "Lock in 0:30"), in the top-right row beside Friends and the gear
+	(a full 44 px target, clear of the prompts in the middle of the screen; Logic/ScreenLayout). Tapping it while the
+	lock recharges calls `onPillTappedWhileRecharging` (the store uses it to offer Instant Lock).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -11,6 +12,7 @@ local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local Net = require(ReplicatedStorage.Shared.Net)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
+local ScreenLayout = require(ReplicatedStorage.Shared.Logic.ScreenLayout)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local HudController = require(script.Parent.HudController)
 local PlotController = require(script.Parent.PlotController)
@@ -114,12 +116,11 @@ local function update()
 end
 
 function LockController.start()
+	local corner = ScreenLayout.SIZE.corner
 	pill = UiKit.button({
-		Name = "LockPill",
-		LayoutOrder = HudController.TOP_ORDER.lock,
-		Size = UDim2.fromOffset(210, 34),
+		Name = "LockButton",
+		Size = UDim2.fromOffset(corner.lock, corner.button),
 		BackgroundColor3 = UiTheme.palette("success"),
-		Parent = HudController.topStack(),
 	}, function()
 		local view = describe()
 		if view.recharging then
@@ -128,7 +129,9 @@ function LockController.start()
 			NotificationController.toast(Theme.text.lockAction .. ": " .. view.text, "info")
 		end
 	end)
-	pillLabel = UiKit.label({ Size = UDim2.fromScale(1, 1), Parent = pill })
+	-- Two lines when it needs them ("🔒 Instant / lock x2"), so the text stays big.
+	pillLabel = UiKit.label({ Size = UDim2.fromScale(1, 1), TextWrapped = true, Parent = pill })
+	HudController.place("lock", pill)
 
 	Net.get("Effect").OnClientEvent:Connect(function(payload: { kind: string, position: Vector3? })
 		if payload.kind == "lock" and payload.position then

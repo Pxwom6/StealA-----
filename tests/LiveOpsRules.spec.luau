@@ -33,6 +33,16 @@ T.describe("LiveOpsRules events", function()
 		}
 		T.expect(LiveOpsRules.luckMultiplier(events, many, 150, limits)).toBe(6)
 	end)
+	T.it("leaves one source's boosts out when asked (prize rolls leave out bought Server Luck)", function()
+		local boosts = {
+			{ multiplier = 2, endsAt = 500, source = "purchase" },
+			{ multiplier = 1.5, endsAt = 500, source = "modifier" },
+		}
+		T.expect(LiveOpsRules.luckMultiplier(events, boosts, 150, limits)).toBe(6) -- 2 event x 2 bought x 1.5 modifier
+		T.expect(LiveOpsRules.luckMultiplier(events, boosts, 150, limits, "purchase")).toBe(3) -- event and modifier stay
+		T.expect(LiveOpsRules.luckMultiplier({}, boosts, 150, limits, "purchase")).toBe(1.5)
+		T.expect(LiveOpsRules.luckMultiplier({}, { boosts[1] }, 150, limits, "purchase")).toBe(1)
+	end)
 	T.it("combines cash multipliers", function()
 		T.expect(LiveOpsRules.cashMultiplier(events, 250, limits)).toBe(2)
 		T.expect(LiveOpsRules.cashMultiplier(events, 50, limits)).toBe(1)

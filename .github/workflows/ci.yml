@@ -56,11 +56,20 @@ jobs:
       - name: Lune unit tests
         run: lune run tests/run.luau
 
+      - name: HUD layout check (five screens, the busiest states; nothing overlaps, off screen or in the play zone)
+        run: lune run tools/layoutCheck.luau
+
       - name: World smoke test (builds every map theme offline)
         run: lune run tools/worldsim/smoke.luau
 
       - name: Server test (boots the server offline and plays a short session)
         run: lune run tools/worldsim/server.luau
+
+      - name: Pre-launch server fixes (offline server, virtual clock, one scenario per fixed review finding)
+        run: lune run tools/worldsim/prelaunch.luau
+
+      - name: Gadgets (offline server, virtual clock, every gadget through the real remotes)
+        run: lune run tools/worldsim/gadgets.luau
 
       - name: Host test (the host panel, cross-server LiveOps and shout-outs, offline)
         run: lune run tools/worldsim/host.luau

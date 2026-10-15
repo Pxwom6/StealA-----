@@ -3,12 +3,18 @@
 	The Snack Shop.
 	  * Forever perks (game passes) show "Owned" once bought.
 	  * Cash packs show the exact amount you'd get right now (scaled to your steady income: no event boost, no
-	    creature that is being stolen or parked beyond your podium capacity).
+	    creature parked beyond your podium capacity; one a thief is carrying off still counts).
 	  * Server Luck shows the exact belt odds now vs. with the boost before you buy (random effect → disclose odds);
-	    while a bought boost is running, buying only adds time, and the card says so.
+	    while a bought boost is running, buying only adds time, and the card says so. It is a paid random item, so it
+	    can only be bought when the player's PolicyService policy allows that (the server publishes the answer as the
+	    player attribute in Logic/PaidRandomItems); otherwise, and while that is still being looked up, it shows as
+	    blocked (the server refuses the receipt too).
 	  * Items whose id is still 0 show "Coming soon" — or, in Studio, a "(Studio) Grant" button that runs the real
 	    server receipt path, so purchases are testable before the IDs exist.
 	Opening the store and tapping an item are reported for the analytics store funnel.
+
+	Two tabs: Shop (all of the above, first as it always was) and Gadgets (GadgetsTab: gear bought once with in-game
+	cash, never Robux).
 ]]
 
 local MarketplaceService = game:GetService("MarketplaceService")
@@ -22,14 +28,17 @@ local Monetization = require(ReplicatedStorage.Shared.Config.Monetization)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local GameData = require(ReplicatedStorage.Shared.GameData)
 local Net = require(ReplicatedStorage.Shared.Net)
+local Types = require(ReplicatedStorage.Shared.Types)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local EconomyMath = require(ReplicatedStorage.Shared.Logic.EconomyMath)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local LiveOpsRules = require(ReplicatedStorage.Shared.Logic.LiveOpsRules)
+local PaidRandomItems = require(ReplicatedStorage.Shared.Logic.PaidRandomItems)
 local RarityRoll = require(ReplicatedStorage.Shared.Logic.RarityRoll)
 local LiveOps = require(ReplicatedStorage.Shared.Config.LiveOps)
 local Modal = require(script.Parent.Parent.UI.Modal)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
+local GadgetsTab = require(script.Parent.GadgetsTab)
 local HudController = require(script.Parent.HudController)
 local LockController = require(script.Parent.LockController)
 local SoundPlayer = require(script.Parent.SoundPlayer)
@@ -41,6 +50,15 @@ local localPlayer = Players.LocalPlayer
 local priceCache: { [string]: number } = {}
 
 local CARD_HEIGHT = 112
+-- The tab bar, like the Rewards panel's (52 tall: a full touch target on a phone).
+local TAB_BAR_HEIGHT = 52
+local TAB_WIDTH = 150
+local CONTENT_TOP = 58
+
+export type Tab = "shop" | "gadgets"
+
+-- The open store's Gadgets tab, refreshed with every state update (nil while the store is closed).
+local gadgetsRefresh: ((state: Types.ClientState) -> ())? = nil
 
 local function copyVars(): { [string]: any }
 	local perks = Monetization.perks
@@ -301,7 +319,9 @@ local function fillCards(scroller: ScrollingFrame): { [string]: Frame }
 			detail = oddsText(maxed)
 			rich = true
 			accent = UiTheme.palette("luck")
-			if maxed then
+			if not PaidRandomItems.allowedByAttribute(localPlayer:GetAttribute(PaidRandomItems.ATTRIBUTE)) then
+				blockedText = Theme.text.storeLuckUnavailable -- a paid random item this player's policy doesn't allow
+			elseif maxed then
 				blockedText = Theme.text.storeLuckMaxed
 			end
 		elseif product.kind == "LockToken" then
@@ -337,7 +357,8 @@ local function fillCards(scroller: ScrollingFrame): { [string]: Frame }
 	return cards
 end
 
-function StoreController.open(focusKey: string?)
+-- Opens the store on `tab` (default: Shop), scrolled to the card `focusKey` when given.
+function StoreController.open(focusKey: string?, tab: Tab?)
 	if StateStore.get() == nil then
 		return
 	end
@@ -349,8 +370,30 @@ function StoreController.open(focusKey: string?)
 		for _, connection in watchers do
 			connection:Disconnect()
 		end
+		gadgetsRefresh = nil
 	end)
+	local tabBar = UiKit.new("Frame", {
+		Name = "Tabs",
+		Size = UDim2.new(1, 0, 0, TAB_BAR_HEIGHT),
+		BackgroundTransparency = 1,
+		Parent = modal.body,
+	}) :: Frame
+	UiKit.new("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 8),
+		Parent = tabBar,
+	})
+	local content = UiKit.new("Frame", {
+		Name = "Content",
+		Position = UDim2.fromOffset(0, CONTENT_TOP),
+		Size = UDim2.new(1, 0, 1, -CONTENT_TOP),
+		BackgroundTransparency = 1,
+		Parent = modal.body,
+	}) :: Frame
 	local scroller = UiKit.new("ScrollingFrame", {
+		Name = "Shop",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
@@ -358,8 +401,45 @@ function StoreController.open(focusKey: string?)
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
 		ScrollingDirection = Enum.ScrollingDirection.Y,
-		Parent = modal.body,
+		Parent = content,
 	}) :: ScrollingFrame
+	local gadgetsView = UiKit.new("Frame", {
+		Name = "GadgetsTab",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Visible = false,
+		Parent = content,
+	}) :: Frame
+	local refreshGadgets = GadgetsTab.build(gadgetsView)
+	gadgetsRefresh = refreshGadgets
+	local tabButtons: { [string]: TextButton } = {}
+	local function selectTab(id: Tab)
+		scroller.Visible = id == "shop"
+		gadgetsView.Visible = id == "gadgets"
+		for key, button in tabButtons do
+			button.BackgroundColor3 = if key == id then UiTheme.palette("gold") else UiTheme.palette("panelLight")
+		end
+		local state = StateStore.get()
+		if id == "gadgets" and state then
+			refreshGadgets(state)
+		end
+	end
+	local tabs: { { id: Tab, text: string } } = {
+		{ id = "shop", text = Theme.text.storeTabShop },
+		{ id = "gadgets", text = Theme.text.storeTabGadgets },
+	}
+	for order, entry in tabs do
+		tabButtons[entry.id] = UiKit.button({
+			Name = entry.id,
+			LayoutOrder = order,
+			Size = UDim2.fromOffset(TAB_WIDTH, TAB_BAR_HEIGHT),
+			BackgroundColor3 = UiTheme.palette("panelLight"),
+			Text = entry.text,
+			Parent = tabBar,
+		}, function()
+			selectTab(entry.id)
+		end)
+	end
 	UiKit.new("UIListLayout", {
 		SortOrder = Enum.SortOrder.LayoutOrder,
 		Padding = UDim.new(0, 8),
@@ -413,6 +493,9 @@ function StoreController.open(focusKey: string?)
 	for _, name in LUCK_ATTRIBUTES do
 		table.insert(watchers, workspace:GetAttributeChangedSignal(name):Connect(queueRefill))
 	end
+	-- The policy lookup can finish while the store is open.
+	table.insert(watchers, localPlayer:GetAttributeChangedSignal(PaidRandomItems.ATTRIBUTE):Connect(queueRefill))
+	selectTab(tab or "shop")
 end
 
 function StoreController.start()
@@ -423,6 +506,13 @@ function StoreController.start()
 	LockController.onPillTappedWhileRecharging = function()
 		StoreController.open("InstantLock")
 	end
+	-- Cash and ownership change while the Gadgets tab is open: its prices turn green, bought ones say "Owned".
+	StateStore.onChange(function(state)
+		local refresh = gadgetsRefresh
+		if refresh then
+			refresh(state)
+		end
+	end)
 end
 
 return StoreController
