@@ -57,12 +57,83 @@ keeps its own, so set them once by hand (and check them before publishing):
 | Explorer → Workspace → Properties | **StreamingEnabled** off | every client needs the whole generated map (DECISIONS.md #3) |
 | Explorer → Workspace → Properties | **PlayerCharacterDestroyBehavior** = Enabled, if this Studio shows it | Roblox destroys a leaving player's character (less memory in a long server). Scripts can't set it: the Command Bar says "PlayerCharacterDestroyBehavior is not a valid member of Workspace". If the panel doesn't show it either, leave it: the game already lets go of everything it holds for a leaving player |
 | Explorer → TextChatService → Properties | **ChatVersion** = TextChatService | the chat commands (`/mod`, `/boss`...) and chat titles use it |
-| Game Settings → Places (or the Creator Hub's place settings) | **Max Players** = 8 | 8 bases; the server warns in the Output when it is higher (the live place is at 12) |
+| Game Settings → Places (or the Creator Hub's place settings) | **Max Players** = 8 | 8 bases; the server warns in the Output when it is higher (a Studio test can say 12 while the live place is at 8) |
 
 **A private repo:** GitHub only serves its files with a token. Make a fine-grained personal access token (GitHub →
 Settings → Developer settings → Personal access tokens → Fine-grained tokens) for this repository only, with
 read-only *Contents* access and a short expiry, and paste it between the quotes of `GITHUB_TOKEN` at the top of the
 copy you paste into the Command Bar. Never commit it or put it in a script in the place; it only goes to GitHub.
+
+### Studio self-test
+
+What CI can't see offline, checked in the real engine: [`studio/SelfTest.luau`](studio/SelfTest.luau) drives the
+running game for about two minutes during a Play test and prints one line per area, then a verdict. It never touches
+a DataStore or a save, never publishes or teleports, and puts the session back as it found it.
+
+1. Sync the latest code into the place (above, or Rojo). Leave Game Settings → **Security** → *Studio Access to API
+   Services* **off**: with it on the test refuses to run, so nothing it does (maps switched, modifiers run, coins
+   dropped) can reach a real save.
+2. Press **Play** (Play Solo is enough; every player in the test is checked).
+3. View → **Command Bar**. The Command Bar runs in the edit DataModel until you switch the test view: on the
+   **Test** tab click **Toggle Server View** (the item's name flips each click; once it reads *Toggle Client View*,
+   the Command Bar is on the server).
+4. Paste the whole of `studio/SelfTest.luau` into the Command Bar and press Enter. Or, with Game Settings →
+   Security → *Allow HTTP Requests* on, paste this one line instead (it runs the file as it is on `main`):
+
+   ```lua
+   loadstring(game:GetService("HttpService"):GetAsync("https://raw.githubusercontent.com/Pxwom6/StealA-----/main/studio/SelfTest.luau", true))()
+   ```
+
+   In the edit view, on the client view, before a sync or with API access on it says so in one line (e.g.
+   `SELFTEST: this ran on the client view. Click Test > Toggle Server View, then paste again.`) and does nothing
+   else.
+5. Wait about two minutes (maps, modifiers and events switch meanwhile, without their start banners). The end of
+   the Output then reads like this; a section that found something says `FAIL` and its first problem, as a warning:
+
+   ```
+   SELFTEST ===== summary: 7 sections in 102.3 s, 3 Studio message(s) ignored; report: ServerStorage.SelfTestReport
+   SELFTEST Assets: ok 22 assets loaded (20 from Config, 2 in what the game built) (2.4 s)
+   SELFTEST Maps: ok 27 maps, decoration 768-1084 parts of 1500 (14.2 s)
+   SELFTEST Modifiers: ok 24 modifiers started and ended (5 drops came) (72.4 s)
+   SELFTEST Events: ok 5 events, decorations 220-386 parts of 400 (3.2 s)
+   SELFTEST Snacklings: FAIL cookie_crab: floats 0.50 studs above its feet (9.1 s)
+   SELFTEST Remotes: ok 47 remotes, PolicyService answered for 1, MessagingService off in Studio (0.0 s)
+   SELFTEST Players: ok 1 player(s): Player1 on plot 1, walking 16; state sent (0.2 s)
+   SELFTEST DONE: 1 problem(s), 0 warning(s)
+   SELFTEST   1. Snacklings: cookie_crab: floats 0.50 studs above its feet
+   ```
+
+   The first three problems are listed under `DONE` (with none, the first warnings). The full report is the
+   StringValue **ServerStorage.SelfTestReport**: `print(game.ServerStorage.SelfTestReport.Value)` in the Command Bar
+   (still on the server view) prints every problem, warning and note under its section, and what the server logged.
+
+| Section | What it checks |
+| --- | --- |
+| Assets | every asset id in `Config` (sounds, music...) and in what the game built (particle textures, decals, images, meshes, skies, sounds, custom models) loads through ContentProvider; a failure is named by its config key or instance |
+| Maps | every map theme, switched to as a vote does and back: no error or warning, every flora kind and landmark built, decoration within the `Config/Scenery` budget, no gameplay part moved, the ground's material, the sky's time of day |
+| Modifiers | every modifier started and ended (no banner): published, its effects as `Logic/ModifierRules` says, luck, sky, its mutation on the belt, walking speed and lock length; a drop modifier's first crate, coins, runaway, giant or golden fork comes; Bounty Hunt's hunt starts and ends; once ended nothing is left (drops cleared) |
+| Events | every seasonal event on and off: its theme, decorations within `Config/Seasons.maxParts` and out of everyone's way, its lighting and mutation; once ended the decorations go |
+| Snacklings | every Snackling plain and every mutation on one, built as `/gallery` does: no error, stands on its feet, fits a podium, within its rarity's part budget, carries its mutation look |
+| Remotes | every remote in `Shared/Net` exists (and nothing else is there); PolicyService answers or counts as restricted; MessagingService off in Studio |
+| Players | each player has a session, a plot, leaderstats and the right walking speed, and their state replicates |
+
+An error logged while a section runs counts against it, and so does a warning (the game's loops turn the errors they
+catch into warnings). What the server logged before the test (since it started, or since the last run) is listed
+under "Before the test": an error is a problem, a warning a warning. What Studio logs with API access off that says
+nothing about the game is left out and only counted ("Studio message(s) ignored"): DataStoreService's
+`StudioAccessToApisNotAllowed` errors (and the game's warnings quoting them), CorePackages (UIBlox) warnings and
+`[PlayerLifecycle] Max Players is 12` (so check Max Players in Game Settings yourself, above).
+
+**The HUD half:** [`studio/SelfTestClient.luau`](studio/SelfTestClient.luau). Press Play (for a phone, pick
+Test → Device first, e.g. an iPhone in landscape), wait for the HUD, then click **Toggle Client View** until the
+Command Bar is on the client (the item then reads *Toggle Server View*) and paste the whole file (the one-line fetch
+can't work there: the client can't use HttpService). A few seconds later the lines starting `SELFTEST client`
+compare every HUD element as Roblox drew it with where `Logic/ScreenLayout` puts it on this screen, then report
+overlaps, anything off screen or under Roblox's buttons, touch targets under 44 px, and any label whose text is
+clipped or under 12 UI; the last one is `SELFTEST client DONE: <n> problem(s), <m> warning(s)`.
+
+CI runs both pastes end to end on the offline server (`tools/selfTestOffline.luau`), so a change can't quietly break
+them; what only Studio can answer (assets, the physics, the real HUD) is what they are for.
 
 The PR description for each round contains a step-by-step test script (2-player local server for stealing,
 Studio test purchases, etc.).
@@ -89,6 +160,7 @@ Studio test purchases, etc.).
 | `lune run tools/worldsim/exportSkins.luau [mapId] [out.json] [--vip]` | Dump a map with a different base skin on every base, for a 3D preview |
 | `lune run tools/worldsim/exportSeason.luau <mapId> <eventId> [out.json]` | Dump a map with a seasonal event's theme on (decorations and lighting), for a 3D preview |
 | `rojo build -o build/sync.rbxl` then `lune run tools/syncTest.luau build/sync.rbxl` | Check the Studio sync script (`studio/SyncFromGitHub.luau`) offline |
+| `lune run tools/selfTestOffline.luau` | The Studio self-test (`studio/SelfTest.luau`, `src/server/SelfTest`, `studio/SelfTestClient.luau`) end to end on the offline server, with stand-ins for ContentProvider and the HUD: where it refuses, a clean run, a fault in every section (CI runs this too) |
 | `stylua src tests tools studio` | Format |
 | `selene src tests tools studio` | Lint |
 | `rojo sourcemap default.project.json -o sourcemap.json` | Sourcemap for luau-lsp |

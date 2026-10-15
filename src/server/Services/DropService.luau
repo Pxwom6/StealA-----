@@ -757,6 +757,22 @@ function DropService.crateModels(): { [number]: Model }
 	return models
 end
 
+-- Removes every crate, coin, runaway and hidden treasure out now, unopened, uncaught and unfound (the Studio
+-- self-test cleans up with it).
+function DropService.clear()
+	for _, crate in crates do
+		removeCrate(crate)
+	end
+	for _, coin in coins do
+		coin.part:Destroy()
+	end
+	table.clear(coins)
+	for _, runaway in runaways do
+		removeRunaway(runaway)
+	end
+	removeTreasure()
+end
+
 function DropService.start(walkwayTop: number)
 	walkwayY = walkwayTop
 	for _, problem in

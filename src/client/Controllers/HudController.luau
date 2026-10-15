@@ -173,9 +173,11 @@ end
 -- Hands a HUD element to the layout under `id` (an id of Logic/ScreenLayout.layout: "lock", "friends", "gear",
 -- "tutorial", "cashOffer", "event", "modifier", "luck", "gadget1"... in slot order, or "vote" for the vote strip). It is parented to the HUD and
 -- placed and sized from then on; it shows and hides itself (Visible), and the tutorial banner says whether its tip
--- shows with the attribute Tip. A newer object under the same id replaces it; destroying it frees its place.
+-- shows with the attribute Tip. A newer object under the same id replaces it; destroying it frees its place. Its
+-- attribute HudId is that id (studio/SelfTestClient.luau measures each placed frame against the layout by it).
 function HudController.place(id: string, object: GuiObject)
 	placed[id] = object
+	object:SetAttribute("HudId", id)
 	object.AnchorPoint = Vector2.new(0.5, 0.5)
 	object.Parent = if STATUS_IDS[id] then statusFrame else screen
 	object:GetPropertyChangedSignal("Visible"):Connect(HudController.relayout)
@@ -286,6 +288,7 @@ local function build()
 		BackgroundColor3 = UiTheme.palette("panel"),
 		Parent = screen,
 	})
+	cashPill:SetAttribute("HudId", "cash")
 	cashLabel = UiKit.label({
 		Name = "Amount",
 		Size = UDim2.new(1, -16, 0, SIZE.cash.amount),
@@ -316,6 +319,7 @@ local function build()
 		BackgroundTransparency = 1,
 		Parent = screen,
 	}) :: Frame
+	actionArea:SetAttribute("HudId", "actionArea")
 end
 
 function HudController.start()

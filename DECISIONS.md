@@ -1624,3 +1624,44 @@ gear twist that makes chases wild, a hunt around the plaza, and a twist that giv
 leader (and the leader a reason to defend).
 **Reversal cost:** none — `weight = 0` keeps any of them for `/mod` only. Never remove the `eclipse` mutation id (it is
 in saves). `hideSun`, the `tag` event and the gadgets view's `usedAt` are additive.
+
+### 57. A self-test inside Studio: one paste, the live services, a verdict on one screen
+
+* **What:** `studio/SelfTest.luau`, pasted into the Command Bar on the server view of a Play test, checks in the real
+  engine what CI can only check offline: every asset loads; every map, modifier and seasonal event switches on and
+  off cleanly; every Snackling and mutation builds, stands and fits a podium; every remote is there; every player is
+  set up. Seven sections (`src/server/SelfTest`), each in a pcall and timed, print one line each, then a summary of at
+  most 12 lines ending `SELFTEST DONE: <n> problem(s), <m> warning(s)` and the first problems; the full report is the
+  StringValue `ServerStorage.SelfTestReport`. `studio/SelfTestClient.luau` is the HUD half, on the client view.
+* **The paste makes a Script, the Script runs a module:** code run in the Command Bar gets its own copies of the
+  modules it requires (a Command Bar `MapThemeService.switchTo` drives a copy that never started). So the paste only
+  checks where it runs, then makes the Script `SnacklingSelfTest` in ServerScriptService, which runs like the game's
+  own: `require(ServerScriptService.Server.SelfTest).run(script)`, then removes itself. The Command Bar can't write
+  some properties, so making it is in a pcall and its Source is read back; a Script Studio never starts is reported
+  after 5 s and taken away. The test ships in the place (a module nothing else requires; `run` refuses outside
+  Studio), so it always matches the code that was synced. The one-line `loadstring(HttpService:GetAsync(...))` paste
+  runs the file from `main` (HTTP requests on); the client half must be pasted whole (no HttpService on the client).
+* **Safe for saves:** it refuses with Studio API access on (ProfileStore's `DataStoreState` is "Access": a map played
+  on or a coin picked up would go into a real profile), never calls a DataStore, MessagingService, TeleportService or
+  a publish, and puts the session back (the first map, no modifier or test event, drops cleared with the new
+  `DropService.clear` and `BossService.dismiss`, test models gone), then checks that it did.
+* **What counts:** `LogService:GetLogHistory()` since the last run (an error logged before the test is a problem, a
+  warning a warning) and `LogService.MessageOut` during it: an error or warning while a section runs counts against
+  it, as in the offline tests. What Studio logs with API access off that says nothing about the game
+  (`Kit.STUDIO_NOISE`: StudioAccessToApisNotAllowed, CorePackages, "[PlayerLifecycle] Max Players is") is left out
+  and only counted.
+* **Measured as CI measures:** Snacklings by each part's real shape (as `CreatureRecipe.compileImported`, a
+  mutation's halo, wings and ring of fire left out of where it stands), decoration as MapBuilder and SeasonService
+  count it, the sky by WorldLighting's top layer; the HUD by HudController's new `HudId` attributes against
+  `Logic/ScreenLayout`, then ScreenLayout's own overlap, off-screen and touch-target checks and `Logic/TextFit`'s
+  12 UI minimum.
+* **Checked offline:** `tools/selfTestOffline.luau` (CI) runs both pastes on the offline server, with stand-ins for
+  ContentProvider and LogService: every place it must refuse, a clean run, a fault planted in every section, nothing
+  loading at all, PolicyService failing, and the HUD half on a phone HUD laid out by ScreenLayout, then with two
+  faults planted.
+
+**Why:** a Studio playtest is where a deleted audio id, an error only the engine raises in a map, a Snackling the
+physics pulls apart or a label the real text renderer clips shows first; one paste and two minutes replace playing
+through every map, modifier and event by hand, and say exactly what to fix.
+**Reversal cost:** none — nothing in the game requires `SelfTest` (delete the folder and the two pastes).
+`DropService.clear`, `BossService.dismiss` and the `HudId` attributes are additive.

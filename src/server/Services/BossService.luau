@@ -325,6 +325,14 @@ function BossService.hitsBy(player: Player): number
 	return if current then current.hits[tostring(player.UserId)] or 0 else 0
 end
 
+-- The giant up now (if any) goes at once, paying nobody (the Studio self-test cleans up with it).
+function BossService.dismiss()
+	local giant = current
+	if giant then
+		remove(giant)
+	end
+end
+
 function BossService.start(walkwayTop: number)
 	walkwayY = walkwayTop
 	local rarityIds: { [string]: boolean } = {}
