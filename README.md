@@ -445,8 +445,8 @@ The gear button at the right end of the top-right row (lock, 👥 Friends, ⚙; 
 its player list fills that corner on computers) opens Music, Sound effects and Reduce effects switches. They apply at
 once and are saved per player in the save's `flags` map (`settings_musicOff`, `settings_sfxOff`,
 `settings_reduceEffects`; no save-format change). Reduce effects switches off particles, the belt / factory
-animations, Bloom and SunRays on that device; client code can read it with `ClientSettings.reduceEffects()` (or the
-LocalPlayer attribute `ReduceEffects`). Whatever the setting, lights and particles on podium Snacklings far from the
+animations, Bloom and SunRays, lightning flashes and a Snack Attack giant's red flinch on that device; client code
+can read it with `ClientSettings.reduceEffects()` (or the LocalPlayer attribute `ReduceEffects`). Whatever the setting, lights and particles on podium Snacklings far from the
 camera are switched off to save phones the work (`podiumFx` in `src/shared/Config/Gameplay.luau`). Its last row opens 🎨 Style
 (see "Titles, base skins and What's New") and 🎟️ Codes, and for admins and a private server's owner also 🛠️ Host
 panel (see "Host panel and live events").
