@@ -4,7 +4,8 @@ How the economy is shaped, and how long each rarity takes to reach. Every number
 modules in `src/shared/Config/` and is reproduced by:
 
 ```sh
-lune run tools/simulate.luau      # ~1-2 min, prints the tables below
+lune run tools/simulate.luau        # ~1-2 min, prints the tables below
+lune run tools/simulate.luau store  # just the store additions' table (instant)
 ```
 
 Re-run it after any change to `Creatures.luau`, `Rarities.luau`, `Mutations.luau`, `Economy.luau`,
@@ -771,6 +772,43 @@ Snackling only fills its pip (no cash).
 A full day pays about **21 minutes of steady income** (at least $2K), between the daily streak's day-5 (18 min) and
 day-6 (25 min) rewards, and it takes a session of real play to earn (CI keeps a day under an hour). Collect targets are
 fixed from steady income when the day's quests are rolled, so they always mean a few minutes of normal play.
+
+## Store additions (Auto Collect, Lucky Spin packs, Starter Pack)
+
+Paid items (DECISIONS.md #52) at their suggested prices; Leo sets the real prices on the Creator Hub. What each pays,
+from the live config (`lune run tools/simulate.luau store`), next to the cash packs that cost about the same. A spin
+wins a Snackling (at 2x luck, Golden and Diamond included) 29.5% of the time; the cash is a spin's average. The
+Starter Pack's "all of it" column counts its Golden Cupcake Cub at its belt price ($18.7K, earning $320/s) and its two
+gadgets at their cash prices ($16.5K).
+
+| Steady income | 3 Lucky Spins (25 R$) | 10 Lucky Spins (69 R$) | Starter Pack (49 R$): cash | Starter Pack: all of it | Snack Pack (25 R$) | Snack Basket (49 R$) | Snack Crate (75 R$) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| $0/s | $1.92K + 0.9 Snacklings | $6.4K + 3.0 Snacklings | $60K | $95.2K | $2.5K | $6K | $15K |
+| $100/s | $27.4K (5 min) + 0.9 | $91.5K (15 min) + 3.0 | $240K (40 min) | $275K | $90K (15 min) | $210K (35 min) | $360K (60 min) |
+| $1K/s | $274K + 0.9 | $915K + 3.0 | $2.4M | $2.43M | $900K | $2.1M | $3.6M |
+| $10K/s | $2.74M + 0.9 | $9.15M + 3.0 | $24M | $24M | $9M | $21M | $36M |
+| $100K/s | $27.4M + 0.9 | $91.5M + 3.0 | $240M | $240M | $90M | $210M | $360M |
+| $1M/s | $274M + 0.9 | $915M + 3.0 | $2.4B | $2.4B | $900M | $2.1B | $3.6B |
+
+**Auto Collect** (149 R$) pays nothing extra: it collects the pads every 5 s, so a holder earns exactly what a free
+player who walks to their pads earns, and cash waiting on a pad was never stealable anyway. It does what the Snack
+Magnet does, so holders are never sold the magnet ($2.5M saved) and its button shows AUTO.
+
+**Lucky Spin packs** are the fun buy, not the value buy. In cash a spin pays about 90 seconds of income, so 3 spins
+are about 5 minutes for 25 R$ (a third of the Snack Pack) and 10 spins about 15 minutes for 69 R$ (a quarter of the
+75 R$ Snack Crate). The Snacklings make up the rest mainly for newer players: at 2x luck one is Rare or better 29% of
+the time (Epic 7.2%, Legendary 1.9%), a big step early on and pocket change at high income. To move them closer to
+the cash ladder, give more spins per pack (`Monetization.products`, the `spins` field) or lower the price; don't change
+the prize table, which the free spin shares and whose odds the store publishes. Buying is refused from 40 banked spins
+on (`Spin.paidBankFull`), so nobody stockpiles packs they haven't spun.
+
+**The Starter Pack** (49 R$, once) beats the same-price Snack Basket at every income: 40 minutes of income instead of
+35, a floor of $60K (the price of the cheapest Epic) instead of $6K, plus the Snackling and the gadgets. For a new
+player it is worth about 16 Baskets ($95.2K, and a $320/s Snackling when their whole base makes a few dollars a
+second); later it is a Basket and a seventh. That is the point of a starter offer, and it is once per account, so it
+can't become a better way to buy cash than the ladder. The Golden Cupcake Cub sits on a podium like any other
+Snackling and can be stolen; it is a strong Rare for a new player and earns less than any Epic (from $400/s). A test
+keeps the cash above the Basket's at every income, floor included.
 
 ## Tuning checklist
 

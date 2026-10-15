@@ -12,6 +12,7 @@
 ]]
 
 local EconomyMath = require("./EconomyMath")
+local StoreRules = require("./StoreRules")
 
 export type Offer = {
 	key: string, -- Monetization.products key
@@ -26,7 +27,8 @@ local CashOfferRules = {}
 
 -- The cheapest cash pack that pays at least `shortfall` at this steady income (see EconomyMath.packIncome).
 -- Products not created on the Creator Hub yet (id 0) only count when `allowUnconfigured` (Studio, where the store
--- grants them through the test path). nil when the shortfall is not a positive number or no pack covers it.
+-- grants them through the test path): the store's own rule (StoreRules.visible). nil when the shortfall is not a
+-- positive number or no pack covers it.
 function CashOfferRules.pick(
 	shortfall: number,
 	incomePerSecond: number,
@@ -41,7 +43,12 @@ function CashOfferRules.pick(
 	for _, key in storeOrder do
 		local product = products[key]
 		local pack = cashPacks[key]
-		if product ~= nil and product.kind == "Cash" and pack ~= nil and (product.id ~= 0 or allowUnconfigured) then
+		if
+			product ~= nil
+			and product.kind == "Cash"
+			and pack ~= nil
+			and StoreRules.visible(product.id, allowUnconfigured)
+		then
 			local amount = EconomyMath.cashPackAmount(incomePerSecond, pack)
 			if amount >= shortfall then
 				return { key = key, amount = amount, shortfall = shortfall }

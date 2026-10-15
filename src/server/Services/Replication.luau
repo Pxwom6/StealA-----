@@ -6,6 +6,7 @@
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
@@ -29,6 +30,9 @@ local Gifts = require(ReplicatedStorage.Shared.Config.Gifts)
 local Spin = require(ReplicatedStorage.Shared.Config.Spin)
 local GiftRules = require(ReplicatedStorage.Shared.Logic.GiftRules)
 local SpinRules = require(ReplicatedStorage.Shared.Logic.SpinRules)
+local Monetization = require(ReplicatedStorage.Shared.Config.Monetization)
+local StarterPackRules = require(ReplicatedStorage.Shared.Logic.StarterPackRules)
+local StoreRules = require(ReplicatedStorage.Shared.Logic.StoreRules)
 local Remotes = require(script.Parent.Remotes)
 local Sessions = require(script.Parent.Sessions)
 
@@ -142,6 +146,19 @@ function Replication.snapshot(session: Session): Types.ClientState
 		},
 		gadgets = GadgetRules.view(data.flags, session.gadgets, Gadgets), -- owned, cooldowns, running effects
 		host = session.host or NO_HOST, -- HostService: the host panel's role and cooldowns
+		-- The Starter Pack: bought (its card hides), and whether its one-time offer card is due (StoreService marks the
+		-- state dirty when that changes with play time).
+		store = {
+			starterOwned = StarterPackRules.owns(data.flags),
+			starterOffer = StarterPackRules.offerDue(
+				StarterPackRules.offerContext(
+					data,
+					session.tutorial ~= nil,
+					StoreRules.visible(Monetization.products.StarterPack.id, RunService:IsStudio())
+				),
+				Monetization.starterPack
+			),
+		},
 	}
 end
 

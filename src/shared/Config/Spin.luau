@@ -15,6 +15,9 @@ local Spin: Types.SpinConfig = {
 	freeEverySeconds = 12 * 3600,
 	maxBanked = 20,
 	bankedOverflow = { incomeSeconds = 60, minimum = 400 },
+	-- Lucky Spin packs (Config/Monetization) can't be bought with this many spins banked ("spin some first!"); a
+	-- receipt that arrives anyway banks every spin it paid for, past any cap.
+	paidBankFull = 40,
 
 	segments = {
 		{

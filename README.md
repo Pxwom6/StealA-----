@@ -62,8 +62,8 @@ Studio test purchases, etc.).
 | Command | What it does |
 | --- | --- |
 | `lune run tests/run.luau` | Unit tests for all pure game logic (no Studio needed) |
-| `lune run tools/layoutCheck.luau [--all]` | Where every HUD element lands on five phone, tablet and computer screens, and any overlap, play-zone button or small touch target; also whether the Style, What's New and host panel dialogs fit (CI runs this too) |
-| `lune run tools/simulate.luau` | Economy simulation used to write `BALANCE.md` |
+| `lune run tools/layoutCheck.luau [--all]` | Where every HUD element lands on five phone, tablet and computer screens, and any overlap, play-zone button or small touch target; also whether the Style, What's New and host panel dialogs fit, and the store's dialogs (CI runs this too) |
+| `lune run tools/simulate.luau [store]` | Economy simulation used to write `BALANCE.md` (`store`: only what the store items pay) |
 | `lune run tools/importParts.luau` | Import the polished Snackling models from `art/snackling-parts/` |
 | `lune run tools/worldsim/smoke.luau` | Build the map offline in every map theme and check it (CI runs this too) |
 | `lune run tools/worldsim/export.luau <mapId> [out.json]` | Dump one map theme's built world as JSON for a 3D preview |
@@ -74,6 +74,7 @@ Studio test purchases, etc.).
 | `lune run tools/worldsim/prelaunch.luau` | The pre-launch server fixes on the offline server, with a virtual clock (CI runs this too) |
 | `lune run tools/worldsim/gadgets.luau` | Every gadget through the real remotes on the offline server, with a virtual clock (CI runs this too) |
 | `lune run tools/worldsim/cosmetics.luau` | Titles, base skins and What's New through the real remotes on the offline server (CI) |
+| `lune run tools/worldsim/store.luau` | Auto Collect, the Lucky Spin packs and the Starter Pack through the real receipt path on the offline server (CI) |
 | `lune run tools/worldsim/exportSkins.luau [mapId] [out.json] [--vip]` | Dump a map with a different base skin on every base, for a 3D preview |
 | `rojo build -o build/sync.rbxl` then `lune run tools/syncTest.luau build/sync.rbxl` | Check the Studio sync script (`studio/SyncFromGitHub.luau`) offline |
 | `stylua src tests tools studio` | Format |
@@ -103,10 +104,11 @@ tools               Lune scripts (balance simulation, model import, worldsim: th
    8 bases, one per player, and a 9th player would be kicked with "server full" (DECISIONS.md #14; the server warns in
    the Output when it is higher).
 2. **Game Settings → Security → enable Studio Access to API Services** (to test saving/leaderboards in Studio).
-3. Game passes and developer products: done. The 4 passes and 5 products exist on the Creator Hub and their IDs
-   are in `src/shared/Config/Monetization.luau`. Change prices on the Creator Hub, not in code. Server Luck is a paid
+3. Game passes and developer products: the first 4 passes and 8 products exist on the Creator Hub and their IDs are
+   in `src/shared/Config/Monetization.luau`. Change prices on the Creator Hub, not in code. Server Luck is a paid
    random item (a boost to luck): players whose Roblox policy restricts those (PolicyService) see its card as "Not
-   available" and can't buy it, and nothing needs setting up for that (DECISIONS.md #46).
+   available" and can't buy it, and nothing needs setting up for that (DECISIONS.md #46). **Four newer items are not
+   created yet** and stay hidden until they are: see "Store items to create on the Creator Hub" below.
 4. Add your UserId to `adminUserIds` in `src/shared/Config/LiveOps.luau`.
 5. **Group rewards:** paste your Roblox group's ID into `groupId` in `src/shared/Config/Social.luau`
    (`TODO(owner)`; the number in the group's URL). While it is `0` the group bonus, welcome gift and Join group button
@@ -119,6 +121,39 @@ tools               Lune scripts (balance simulation, model import, worldsim: th
    Zone → Change visibility). While it is public anyone can read `src/server/Codes.luau`, so codes you haven't posted
    yet are not secret. The Studio sync script then needs a token: see "Updating a place in Studio straight from
    GitHub" above.
+
+#### Store items to create on the Creator Hub
+
+Auto Collect, the two Lucky Spin packs and the Starter Pack are in the game, but their ids are `0`, so live servers
+hide them (Studio shows them with a "(Studio) Grant" button). For each one:
+
+1. Creator Hub → **Creations** → Steal a Snackling → **Monetization** → **Passes** (Auto Collect) or **Developer
+   Products** (the other three) → **Create**.
+2. Upload the icon (a square image, 512×512; Roblox shows passes in a circle, so keep the art in the middle), and type
+   the name and description from the table.
+3. The price: a developer product takes it on the same page. A pass takes it afterwards: open the pass → **Sales** →
+   switch on **Item for Sale** → type the price → **Save Changes**.
+4. Copy the item's **ID** (from the list, or the number in its page's address) and paste it into
+   `src/shared/Config/Monetization.luau` in place of the `0` on the line in the last column. Keep the price comment on
+   that line in step with what you set.
+5. Publish (Rojo, or the Studio sync script). The item shows in live servers from then on.
+
+| Item | Type | Name | Description | Suggested price | Icon idea | Paste its id into |
+| --- | --- | --- | --- | --- | --- | --- |
+| Auto Collect | Game pass | Auto Collect | The cash on all your pads is collected for you every 5 seconds, wherever you are. Forever. | 149 R$ | A purple magnet pulling gold coins off a glowing green collect pad, with an "AUTO" ribbon | `passes.AutoCollect` (`AutoCollect = { id = 0 }`) |
+| 3 Lucky Spins | Developer product | 3 Lucky Spins | 3 more spins of the Lucky Spin. Prizes are random: every prize's exact chance is shown in the game before you buy. | 25 R$ | The Lucky Spin wheel with a pink "x3" badge | `products.LuckySpins3` |
+| 10 Lucky Spins | Developer product | 10 Lucky Spins | 10 more spins of the Lucky Spin. Prizes are random: every prize's exact chance is shown in the game before you buy. | 69 R$ | Three stacked wheels with a gold "x10" badge and sparkles | `products.LuckySpins10` |
+| Starter Pack | Developer product | Starter Pack | One time only: cash, a Golden Cupcake Cub and the Fizzy Soda and Banana Peel gadgets. Nothing random. | 49 R$ | A gift box with a golden Cupcake Cub peeking out, a soda can and a banana peel beside it, a "STARTER" banner | `products.StarterPack` |
+
+* **Nothing to set up for the policy check:** the Lucky Spin packs are paid random items, so players whose Roblox
+  policy restricts those never see them and can't buy them (PolicyService, as for Server Luck). If the Creator Hub's
+  experience questionnaire asks whether the game sells paid random items, the answer is yes: Server Luck and the Lucky
+  Spin packs, both with their odds shown in the game.
+* **Test it in Studio first:** while an id is `0`, "(Studio) Grant" runs the real receipt path; once it is in, Studio
+  opens Roblox's test purchase prompt (free in Studio). `/starter reset` lets you buy the Starter Pack again and
+  `/starter offer` brings its one-time offer up; `/spins 40` banks 40 spins, enough to see the packs refuse.
+* **What they pay** at a few incomes is in BALANCE.md "Store additions". Once they are live, a line about them in What's
+  New (`src/shared/Config/Updates.luau`) tells returning players.
 
 **Changing the save format:** bump `DataSchema.VERSION` whenever a saved key is added, removed, renamed or changes
 meaning, and never publish a lower VERSION than before. A rollback keeps the current save code (`DataSchema`,
@@ -458,6 +493,9 @@ none until one is bought, and none during the first-time tutorial.
 | 🫧 Bubble Shield | $150K | nobody can tag you for 3 s (a bubble everyone sees); locks and peels still work | 40 s |
 | 🧲 Snack Magnet | $2.5M | collects the cash on all your pads from anywhere, as if you walked over them | 60 s |
 
+The Auto Collect pass does the Snack Magnet's job every 5 s, so for its owners the magnet's button says AUTO (a tap
+explains) and the Gadgets tab doesn't sell it to them.
+
 * **Tune one:** `src/shared/Config/Gadgets.luau` (price, cooldown, duration, speed, slip, peel radius). CI keeps
   every number inside `GadgetRules.validate`: the Bubble Shield at most 5 s and recharging at least 5x as long, any
   speed at most 1.5x and the speed cap (`maxSpeedMultiplier`, a speed modifier and a gadget together) at most 1.5x,
@@ -547,6 +585,31 @@ shows the card again (without API access every Studio session counts as a first 
 `/style` unlocks every title and skin for you for that session, and `/style off` goes back to what you earned.
 Offline: `lune run tools/worldsim/cosmetics.luau` (CI) plays it all through the real remotes.
 
+### Store additions: Auto Collect, Lucky Spin packs and the Starter Pack
+
+Three Robux items beside the original passes and cash packs (DECISIONS.md #52), each hidden until its id is in
+`src/shared/Config/Monetization.luau` (see "Store items to create on the Creator Hub"):
+
+| Item | What the player gets | Where it is sold |
+| --- | --- | --- |
+| 🧲 Auto Collect (pass) | the cash on all their pads every 5 s, wherever they are, as if they walked over them (the "+$" floats over pads near the camera, with no sound or toast); their Snack Magnet says AUTO | the Shop's Forever perks |
+| 🎰 3 / 10 Lucky Spins | that many spins banked for the Lucky Spin (Rewards → Spin); every prize's exact chance is on the card, and in the Spin tab's Odds beside the buttons | the Shop, and two buttons beside the Spin tab's reel |
+| 🎁 Starter Pack (once per account) | 40 minutes of their income in cash (at least $60K), a Golden Cupcake Cub, and the Fizzy Soda and Banana Peel (their cash prices if owned) | first in the Shop until bought; once, a small offer under the cash after the first rebirth or 30 minutes of play |
+
+* **Fair by design:** the spin packs only show where the player's Roblox policy allows paid random items (and the
+  server refuses them otherwise); buying is refused while 40 spins are banked, but a pack that lands anyway banks
+  every spin. The Starter Pack can't be bought twice, and a second purchase that slips through pays its whole value in
+  cash. Each purchase is checked on the server before Roblox's prompt opens, and again when the receipt arrives.
+* **Tune it:** `perks.autoCollectSeconds` and `starterPack` (its cash, Snackling, mutation, gadgets and when its offer
+  shows) in `src/shared/Config/Monetization.luau`, `paidBankFull` in `src/shared/Config/Spin.luau`; the texts are the
+  `store` entries and the `spinPack*` and `starter*` keys in `src/shared/Config/Theme.luau`. CI checks them.
+  `lune run tools/simulate.luau store` prints what each pays (BALANCE.md "Store additions").
+* **Analytics:** `product_viewed` (the item, and where: `store`, `spin` or `offer`), the store funnel's
+  ProductPrompted (the item, and where), `product_refused` (the item, and why), `product_purchased` and
+  `starter_pack_duplicate`.
+* **Studio:** "(Studio) Grant" on every item without an id, `/spins <n>`, `/starter reset`, `/starter offer`. Offline:
+  `lune run tools/worldsim/store.luau` (CI) plays all of it through the real receipt path.
+
 ### Studio test commands
 
 These work in Studio only (`src/server/Services/DevCommands.luau`):
@@ -570,6 +633,7 @@ These work in Studio only (`src/server/Services/DevCommands.luau`):
   no panel, or as an admin again; reopen Settings after)
 * `/style` (every title and base skin unlocked for you this session, not saved), `/style off` (only what you earned),
   `/news` (the What's New card again)
+* `/starter reset` (buy the Starter Pack again), `/starter offer` (and its one-time offer card comes up)
 
 To test a seasonal event in Studio: `/event Halloween2026 5` turns Halloween on for 5 minutes (decorations, dusk
 lighting, banner with countdown, event Snacklings and Haunted on the belt), and `/event off` ends it early.

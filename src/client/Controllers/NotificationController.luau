@@ -31,6 +31,9 @@ local BANNER_TEXT = ScreenLayout.TEXT.banner
 local MAX_TOASTS = TOAST.max
 local TOAST_SECONDS = 2.6
 local BANNER_SECONDS = 4.5
+-- A quiet collect (Auto Collect, every few seconds wherever the player is) floats its "+$" only over pads this close
+-- to the camera (studs), with no sound.
+local QUIET_COLLECT_RANGE = 70
 
 local screen: ScreenGui -- announcement banners, above the HUD and below dialogs
 local toastScreen: ScreenGui -- toasts, above dialogs
@@ -252,18 +255,28 @@ function NotificationController.start()
 			else nil
 		NotificationController.announce(payload.text, payload.rarity, color)
 	end)
-	Net.get("Effect").OnClientEvent:Connect(function(payload: { kind: string, amount: number?, position: Vector3? })
-		local position = payload.position
-		if position == nil then
-			return
-		end
-		if payload.kind == "collect" and payload.amount then
-			NotificationController.floatText(position, "+" .. UiTheme.cash(payload.amount), UiTheme.palette("cash"))
-			SoundPlayer.world("collect")
-		elseif payload.kind == "podium" then
-			NotificationController.sparkle(position + Vector3.new(0, 2, 0), UiTheme.palette("gold"))
-		end
-	end)
+	Net.get("Effect").OnClientEvent
+		:Connect(function(payload: { kind: string, amount: number?, position: Vector3?, quiet: boolean? })
+			local position = payload.position
+			if position == nil then
+				return
+			end
+			if payload.kind == "collect" and payload.amount then
+				local text = "+" .. UiTheme.cash(payload.amount)
+				if payload.quiet then
+					-- Auto Collect: the same "+$" over the pad, but only near the camera and without a sound each time.
+					local camera = workspace.CurrentCamera
+					if camera and (camera.CFrame.Position - position).Magnitude <= QUIET_COLLECT_RANGE then
+						NotificationController.floatText(position, text, UiTheme.palette("cash"))
+					end
+				else
+					NotificationController.floatText(position, text, UiTheme.palette("cash"))
+					SoundPlayer.world("collect")
+				end
+			elseif payload.kind == "podium" then
+				NotificationController.sparkle(position + Vector3.new(0, 2, 0), UiTheme.palette("gold"))
+			end
+		end)
 end
 
 return NotificationController

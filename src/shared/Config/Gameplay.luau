@@ -166,6 +166,8 @@ local Gameplay = {
 		EquipStyle = { burst = 4, perSecond = 1 },
 		-- What's New (NewsService): the card was shown; once per update in practice.
 		SeenNews = { burst = 2, perSecond = 0.2 },
+		-- Asking to buy a Lucky Spin pack or the Starter Pack (StoreService checks it, then the client prompts).
+		RequestPurchase = { burst = 3, perSecond = 0.5 },
 	} :: { [string]: RateLimit },
 }
 

@@ -54,7 +54,7 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | Base lock | `LockService` | lock button + barrier | `LockRules` |
 | Rebirth | `RebirthService` | `RebirthController` (trade-off dialog) | `RebirthMath` |
 | Base lock UI | `LockService` | `LockController` (lock button prompt, HUD button in the top-right row) | `LockRules` |
-| Monetisation | `MonetizationService` (ProcessReceipt, passes), `PlayerPolicy` (PolicyService: paid random items) | `StoreController` | `ReceiptLedger`, `EconomyMath.cashPackAmount`, `PaidRandomItems` |
+| Monetisation | `MonetizationService` (ProcessReceipt, passes; Lucky Spin packs and the Starter Pack granted there too), `PlayerPolicy` (PolicyService: paid random items), `StoreService` (the store's analytics, RequestPurchase: spin packs and the Starter Pack checked before the prompt, the Starter Pack's offer coming due), `AutoCollectService` (the Auto Collect pass, through the pad path) | `StoreController` (the Shop: odds on the spin packs' cards, the Starter Pack's lines), `PurchaseController` (ask the server, then prompt), `SpinTab` (pack buttons beside the reel), `CashOfferController` (the Starter Pack's one-time offer in the offer strip), `UI/OddsGrid` | `ReceiptLedger`, `EconomyMath.cashPackAmount`, `PaidRandomItems`, `StoreRules`, `StarterPackRules`, `AutoCollectRules`, `StoreLayout` |
 | Retention | `RetentionService` (daily streak, offline earnings), `LeaderboardService` | `RewardsController` (Rewards panel: Daily + Quests tabs) | `DailyStreak`, `OfflineEarnings` |
 | Snackdex | `SnackdexService` (discovery on every Snackling landing in a base, tier rewards claimed automatically, sync) | `SnackdexController` (rarity / Event tabs, 3D preview cards, silhouettes, NEW! toasts) | `SnackdexRules` |
 | Daily quests | `QuestService` (daily roll per UserId + UTC day, progress from gameplay events, ClaimQuest, day reset) | `RewardsController` (Quests tab) | `QuestRules` |
@@ -88,7 +88,7 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | `Mutations` | rare variants of any creature (Golden, Diamond, Rainbow; event-only Haunted and Festive): id, name, colour, chance per spawn, income / price multipliers, announce flags, look (material, tint, sparkles, rainbow, glow light), optional `eventId` |
 | `Economy` | start cash, podium upgrade curve, sell refund, offline earnings, rebirth curve, cash packs, daily rewards |
 | `Gameplay` | belt timing, plot geometry, steal/tag ranges, carry speed, lock/grace timers, rate limits |
-| `Monetization` | game-pass and developer-product IDs (**placeholders, TODO**), perk values, store layout |
+| `Monetization` | game-pass and developer-product IDs (0 = not created on the Creator Hub yet: hidden in live servers), perk values (Auto Collect's interval), store layout, the Starter Pack's contents and offer timing, the items whose views are logged |
 | `LiveOps` | admin user IDs, scheduled events (luck / cash multipliers, banner, countdown title; Halloween 2026 and its luck weekend, Winter 2026 with Christmas luck and New Year's 2x cash, Valentine's 2027 and its luck weekend, Easter 2027 and its luck weekend), luck-boost limits |
 | `Seasons` | seasonal themes keyed by LiveOps event id (`Halloween2026` → `halloween`, `Winter2026` → `winter`, `Valentine2027` → `valentine`, `Easter2027` → `spring`): lighting mood, weather, decoration counts, colours, part budget |
 | `Sounds` | sound effects `{ id, volume, pitch }` (built-in `rbxasset://sounds/` files), music tracks (**empty, TODO**) and the crossfade time |
@@ -136,6 +136,10 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `UpdateRules` | What's New: the newest update, show / count as seen / nothing on join (never a first session or the tutorial), the `news_<number>` flag, `Config/Updates` validation |
 | `NewsLayout` | where the What's New card's lines and button go, and the plaza board's, held to the HUD's rules (and a board readable from across the plaza) by tests |
 | `PaidRandomItems` | Roblox's Paid Random Items policy: what a PolicyService answer means (a failure counts as restricted) and the player attribute the store reads |
+| `StoreRules` | which store items show (an id of 0 only in Studio), who may buy a Lucky Spin pack or the Starter Pack before the prompt (`purchaseRefusal`: the policy, a full spin bank, owned, a full base), the refusal messages, the paid random kinds, the analytics surfaces |
+| `StarterPackRules` | the Starter Pack: its fixed contents (cash sized from income, its Snackling, gadgets or their cash price), its whole worth in cash (a second receipt), when its one-time offer is due and may show, `Config/Monetization.starterPack` validation |
+| `AutoCollectRules` | the Auto Collect pass's timing (first collect at once, then one per interval), its config limits |
+| `StoreLayout` | where the store additions go in their dialogs: the Spin tab with and without the pack buttons, the odds grid, a pack's and the Starter Pack's Shop cards, held to the HUD's rules on five screens (`tools/layoutCheck.luau`) |
 | `SeasonRules` | active seasonal theme from the active event ids, decoration layout on the map (outside plots, off the belt), part count, `Config/Seasons` validation |
 | `Inventory` | podium slot operations on the save table (free slot, place, remove, find by uid) |
 | `PlotAssignment` | pick a free plot, release |
@@ -166,7 +170,8 @@ aura, then the mutation look, which skips the face; tags anchored models for the
 `Remotes → DataService → MapThemeService.firstMap → MapBuilder (+ SceneryBuilder, WorldLighting) → PlotService → Analytics →
 LiveOpsService → SeasonService → MapThemeService → ModifierService → Replication → PositionTracker → EconomyService →
 BeltService →
-LockService → StealService → GadgetService → RebirthService → PlayerPolicy → MonetizationService → RetentionService →
+LockService → StealService → GadgetService → AutoCollectService → RebirthService → PlayerPolicy → MonetizationService →
+StoreService → RetentionService →
 SocialService →
 TutorialService → SnackdexService → QuestService → LeaderboardService → SettingsService → CodeService → GiftService →
 SpinService → AchievementService → StyleService → NewsService → HostService → ShoutoutService → CrossServer →
@@ -181,12 +186,12 @@ release plot → release profile.
 ### `src/client`
 `init.client.luau` waits for `game:IsLoaded()` then starts controllers:
 `StateStore, ClientSettings, HudController, NotificationController, BeltController, PlotController,
-InteractionController, StealController, LockController, RebirthController, StoreController, ChatTagController,
+InteractionController, StealController, LockController, RebirthController, PurchaseController, StoreController, ChatTagController,
 RewardsController, MutationFxController, SocialController, TutorialController, IdleController, SettingsController,
 MusicController, WorldFxController, SnackdexController, CashOfferController, MapThemeController, WeatherController,
 DropController, BossController, GadgetController, GadgetFxController, WhatsNewController`
 (`ModifierController` starts right after `NotificationController`)
-(UI helpers: `UI/UiKit`, `UI/Modal`; audio: `SoundPlayer`). Dialogs opened from others need no start:
+(UI helpers: `UI/UiKit`, `UI/Modal`, `UI/OddsGrid`; audio: `SoundPlayer`). Dialogs opened from others need no start:
 `CodesController`, `StyleController` and `HostPanelController` (all from Settings).
 
 ## 4. Remotes (all in `ReplicatedStorage.Remotes`, created by the server)
@@ -205,7 +210,8 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `LockBase` | – | owner, near lock button, `LockRules` (cooldown, or a lock token) |
 | `Rebirth` | – | `RebirthMath.canRebirth` |
 | `ClaimDaily` | – | `DailyStreak.canClaim` |
-| `ClientEvent` | `name: string, key: string?` | whitelist (`store_opened`, `store_product_clicked`, `cash_offer_clicked`); `key` only when it is a known product or pass key → analytics |
+| `ClientEvent` | `name: string, key: string?` | whitelist (`store_opened`, `store_product_clicked`, `cash_offer_clicked`, `store_viewed`); `key` only when it is a known product or pass key, `store_viewed`'s only `spin` or `offer` (the Starter Pack's offer then never shows again: `starter_offer`) → analytics (StoreService) |
+| `RequestPurchase` | `key: string, surface: string` | a Lucky Spin pack or the Starter Pack (`StoreRules.CHECKED_KINDS`), `surface` one of `StoreRules.SURFACES`; the policy looked up first (it may yield), then `StoreRules.purchaseRefusal` on server state (on the Creator Hub or Studio, paid random items allowed, fewer than `Spin.paidBankFull` spins banked, not owned, a free podium) → `PurchaseApproved` (Studio with no id: the fake receipt), or a toast saying why |
 | `CheckGroup` | – | group feature on, at most once per 10 s, not already checking → re-check membership (`IsInGroupAsync`, then `GetGroupsAsync`) |
 | `InvitePrompted` | – | analytics only (`invite_prompt_opened`); nothing is rewarded for inviting |
 | `SkipTutorial` | – | a tutorial is running → it ends with no reward (steps themselves only finish from gameplay the server saw) |
@@ -230,7 +236,7 @@ Server → client:
 
 | Remote | Payload |
 | --- | --- |
-| `StateUpdate` | batched partial player state (cash, cash/sec, rebirths, multiplier, podium cap, `baseFull`, lock, passes, carry, social bonus, tutorial step, settings, today's quests, gadgets owned with their cooldowns and running effects…) |
+| `StateUpdate` | batched partial player state (cash, cash/sec, rebirths, multiplier, podium cap, `baseFull`, lock, passes, carry, social bonus, tutorial step, settings, today's quests, gadgets owned with their cooldowns and running effects, `store` = the Starter Pack owned and its offer due…) |
 | `BeltSnapshot` / `BeltSpawn` / `BeltRemove` | conveyor items `{id, creatureId, spawnAt, variant?}` (variant = mutation id) |
 | `Notify` | toast `{kind, text}` |
 | `Announce` | server-wide banner `{text, rarity, color?}` (color: a mutation's own banner) |
@@ -240,6 +246,7 @@ Server → client:
 | `Effect` | one-shot VFX cue `{kind, position, rarity}` (e.g. `tutorialComplete`, `quest`, `questsAllDone`; gadgets: `gadget`, `slip` to everyone, `shieldBlock`, `gadgetBought`) |
 | `SnackdexSync` | the whole Snackdex `{dex, discovered?, completed?}` on ready and on every change (a new entry, a tier paid) |
 | `SpinResult` | `{index, text}`: the Lucky Spin segment the server picked (the reel stops there), and the prize toast |
+| `PurchaseApproved` | `{key}`: the server checked it, so the client opens Roblox's prompt (only for its own request of the last 15 s) |
 | `AchievementSync` | `{ {id, progress, target, done} }` for the Trophies tab |
 | `StyleSync` | `{title, skin, titles, skins}`: what is worn, and `{id, unlocked, progress, target}` for each title and skin |
 | `WhatsNew` | `{number}`: show the What's New card for that update when nothing is in the way |
@@ -281,7 +288,8 @@ type PlayerData = {   -- exactly Types.PlayerData
                                    -- redeemed codes (`code_<CODE>`), achievements paid (`ach_<id>`),
                                    -- maps played on (`map_<id>`), achievement milestones (`did_<id>`),
                                    -- gadgets owned (`gadget_<id>`), the worn title and base skin
-                                   -- (`title_<id>`, `skin_<id>`), the newest What's New seen (`news_<n>`)
+                                   -- (`title_<id>`, `skin_<id>`), the newest What's New seen (`news_<n>`),
+                                   -- the Starter Pack bought (`starter_pack`) and its offer shown (`starter_offer`)
     firstJoin: number, lastSeen: number,
     gifts: { day: number, seconds: number, claimed: { number } },  -- playtime gifts today (v4)
     spin: { nextFreeAt: number, spins: number, total: number },     -- the Lucky Spin (v4)
@@ -451,3 +459,18 @@ carrying), and a board on the spawn plaza (built by `MapBuilder` outside the Sce
 shows it to everyone. All saved as flags (`title_<id>`, `skin_<id>`, `news_<number>`). Studio: `/style [off]`,
 `/news`. Offline: `lune run tools/worldsim/cosmetics.luau` (CI); `lune run tools/worldsim/exportSkins.luau` for a 3D
 preview of every skin.
+
+## 17. Store additions: Auto Collect, Lucky Spin packs and the Starter Pack
+
+Three Robux items within the fairness rules (DECISIONS.md #52), each with id 0 until Leo creates it on the Creator Hub
+(README "Store items to create on the Creator Hub"); an id of 0 is hidden in live servers and granted through the test
+receipt in Studio, for every store item (`StoreRules.visible`). **Auto Collect** (a pass): every 5 s
+`AutoCollectService` collects a holder's pads through `EconomyService.collectPad`, quietly; their Snack Magnet shows
+AUTO and is neither used nor sold to them. **3 / 10 Lucky Spins**: paid random items, so the odds are on their Shop
+card and in the Spin tab's Odds beside their buttons (`UI/OddsGrid`), they show only where PolicyService allows paid
+random items, buying is refused at `Spin.paidBankFull` banked spins and a receipt always banks every spin
+(`SpinRules.bankPaid`). **Starter Pack**: fixed contents once per account (`starter_pack`), a cash-only second receipt,
+and a one-time offer (`starter_offer`) after the first rebirth or 30 minutes of play. The spin packs and the Starter
+Pack are checked on the server before the prompt (`RequestPurchase` → `PurchaseApproved`, `StoreService`) and again at
+the receipt. Studio: "(Studio) Grant", `/spins <n>`, `/starter [reset|offer]`. Offline:
+`lune run tools/worldsim/store.luau` (CI).

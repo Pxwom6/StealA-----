@@ -116,7 +116,7 @@ local function onPlayerAdded(player: Player)
 
 	local passes: Sessions.Passes = if hooks.checkPasses
 		then hooks.checkPasses(player)
-		else { DoubleCash = false, VIP = false, ExtraPodiums = false, LongerLock = false }
+		else { DoubleCash = false, VIP = false, ExtraPodiums = false, LongerLock = false, AutoCollect = false }
 	if player.Parent ~= Players then
 		DataService.release(profile)
 		return

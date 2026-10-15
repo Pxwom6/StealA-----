@@ -6,8 +6,10 @@
 
 	  beltPurchase  a Snackling was bought from the belt (creatureId, variant)       BeltService
 	  acquired      a Snackling landed in the player's base: bought, stolen or        EconomyService.giveCreature,
-	                any other way (creatureId, variant)                               StealService (delivery)
-	  collect       cash collected from a pad, not from selling (amount)             EconomyService (pad check)
+	                any other way (creatureId, variant)                               StealService (delivery),
+	                                                                                  MonetizationService (Starter Pack)
+	  collect       cash collected from a pad, not from selling (amount)             EconomyService (pad check,
+	                                                                                  Snack Magnet, Auto Collect)
 	  sell          a Snackling was sold (creatureId, variant)                        EconomyService
 	  lock          the base was locked (Instant Lock included)                       LockService
 	  steal         a steal was delivered (creatureId, variant)                       StealService
@@ -17,9 +19,10 @@
 	                AchievementRules.MILESTONES): a crate opened, a runaway caught,
 	                a Snack Attack takedown shared or led
 	  found         a new Snackling came to the player any way but a steal, kept or   BeltService, PrizeService,
-	                sold because the base was full (creatureId, variant, source:      CodeService
-	                "belt", "adminDrop", "Code", or the prize's sku: "Gift",
-	                "Spin", "SupplyCrate", "Runaway", "SnackAttack", "Achievement")
+	                sold because the base was full (creatureId, variant, source:      CodeService, MonetizationService
+	                "belt", "adminDrop", "Code", "StarterPack", or the prize's sku:
+	                "Gift", "Spin", "SupplyCrate", "Runaway", "SnackAttack",
+	                "Achievement")
 
 	Listeners run at once, in the order they subscribed (the bootstrap starts TutorialService first), each in its own
 	pcall: a listener's bug can only ever cost that listener, never the gameplay code that emitted the event or the

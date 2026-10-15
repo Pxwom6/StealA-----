@@ -31,6 +31,7 @@ export type BuyContext = {
 	owned: boolean,
 	cash: number,
 	price: number, -- the server's price (Config/Gadgets), never the client's
+	covered: boolean?, -- the player's Auto Collect pass already does what it does (GadgetRules.coveredByAutoCollect)
 }
 
 export type UseContext = {
@@ -39,6 +40,7 @@ export type UseContext = {
 	alive: boolean, -- the character exists and isn't dead
 	now: number,
 	readyAt: number?, -- State.readyAt[id]
+	covered: boolean?, -- the player's Auto Collect pass already does what it does
 }
 
 -- Where the player wants to drop a peel: at their own feet (the server's view of their root).
@@ -96,12 +98,21 @@ function GadgetRules.newState(): State
 	}
 end
 
--- Whether a gadget can be bought. Reasons: "unknown" | "owned" | "cash".
+-- The Auto Collect pass collects every pad every few seconds, which is all the Snack Magnet does. For its owners the
+-- magnet's button shows "AUTO" and stays harmless: it is never used (its cooldown never starts) and never sold to them
+-- for cash it would waste; both say why. Every other gadget is untouched.
+function GadgetRules.coveredByAutoCollect(def: GadgetDef, hasAutoCollect: boolean): boolean
+	return hasAutoCollect and def.kind == "magnet"
+end
+
+-- Whether a gadget can be bought. Reasons: "unknown" | "owned" | "auto" | "cash".
 function GadgetRules.canBuy(ctx: BuyContext): (boolean, string?)
 	if not ctx.exists then
 		return false, "unknown"
 	elseif ctx.owned then
 		return false, "owned"
+	elseif ctx.covered then
+		return false, "auto"
 	elseif not (ctx.price >= 0 and ctx.cash >= ctx.price) then
 		return false, "cash"
 	end
@@ -109,10 +120,12 @@ function GadgetRules.canBuy(ctx: BuyContext): (boolean, string?)
 end
 
 -- Whether a gadget can be used now (the kind's own checks come after: GadgetRules.canPlacePeel...).
--- Reasons, in this order: "notOwned" | "tutorial" | "dead" | "cooldown".
+-- Reasons, in this order: "notOwned" | "auto" | "tutorial" | "dead" | "cooldown".
 function GadgetRules.canUse(ctx: UseContext): (boolean, string?)
 	if not ctx.owned then
 		return false, "notOwned"
+	elseif ctx.covered then
+		return false, "auto"
 	elseif ctx.inTutorial then
 		return false, "tutorial"
 	elseif not ctx.alive then
@@ -234,6 +247,7 @@ function GadgetRules.messageKey(reason: string): string?
 		height = "peelOnFloor",
 		untrusted = "stealConnectionHiccup",
 		empty = "magnetEmpty",
+		auto = "magnetAuto",
 	}
 	return map[reason]
 end
@@ -242,6 +256,7 @@ end
 GadgetRules.REASONS = table.freeze({
 	"unknown",
 	"owned",
+	"auto",
 	"cash",
 	"notOwned",
 	"tutorial",
