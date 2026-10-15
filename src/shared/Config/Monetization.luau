@@ -17,6 +17,8 @@
 	    and are sold only to players whose Roblox policy allows paid random items (PlayerPolicy)
 ]]
 
+local Types = require("../Types")
+
 export type PassKey = "DoubleCash" | "VIP" | "ExtraPodiums" | "LongerLock" | "AutoCollect"
 export type ProductKey =
 	"CashBite"
@@ -59,6 +61,7 @@ local Monetization = {
 		-- Not created yet (README "Before publishing"): paste the Creator Hub ids here.
 		LuckySpins3 = { id = 0, kind = "Spins", spins = 3 }, -- 3 Lucky Spins, suggested 25 R$
 		LuckySpins10 = { id = 0, kind = "Spins", spins = 10 }, -- 10 Lucky Spins, suggested 69 R$
+		StarterPack = { id = 0, kind = "StarterPack" }, -- Starter Pack, suggested 49 R$ (once per account)
 	} :: { [string]: ProductDef },
 
 	-- Perk values (balance knobs).
@@ -78,6 +81,7 @@ local Monetization = {
 	-- Order of items in the store UI.
 	storePasses = { "DoubleCash", "AutoCollect", "VIP", "ExtraPodiums", "LongerLock" } :: { string },
 	storeProducts = {
+		"StarterPack", -- first: the one-time best value (hidden once bought)
 		"ServerLuck",
 		"LuckySpins3",
 		"LuckySpins10",
@@ -91,7 +95,19 @@ local Monetization = {
 	} :: { string },
 
 	-- Items whose views are logged (product_viewed: 01 key, 02 where it was seen), once per session each.
-	viewTracked = { "AutoCollect", "LuckySpins3", "LuckySpins10" } :: { string },
+	viewTracked = { "StarterPack", "AutoCollect", "LuckySpins3", "LuckySpins10" } :: { string },
+
+	-- The Starter Pack (Logic/StarterPackRules): fixed contents, once per account. Cash sized from steady income like a
+	-- cash pack (40 minutes, more than the same-price Snack Basket's 35), a Golden Cupcake Cub (the top Rare, earning
+	-- like an Epic) and the first two gadgets, or their cash prices for gadgets already owned. Its offer card shows once,
+	-- after the first rebirth or 30 minutes of total play, whichever comes first. BALANCE.md "Store additions".
+	starterPack = {
+		cash = { incomeSeconds = 40 * 60, minimum = 60000 },
+		creatureId = "cupcake_cub",
+		variant = "golden",
+		gadgets = { "soda", "peel" },
+		offer = { afterRebirths = 1, afterPlaySeconds = 30 * 60, showSeconds = 10 },
+	} :: Types.StarterPackConfig,
 
 	-- "Need $X more?": when a belt or podium purchase fails for lack of cash, offer the cheapest cash pack that covers
 	-- the gap (Logic/CashOfferRules). Never during the first-time tutorial, and at most one offer per cooldown.

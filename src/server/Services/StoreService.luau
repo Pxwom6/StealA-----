@@ -16,8 +16,14 @@
 	                             tracked item (Monetization.viewTracked) the Shop shows this player
 	    store_product_clicked    ProductPrompted (01 key) for the items the client prompts by itself
 	    cash_offer_clicked       cash_offer_clicked (01 cash pack key)
-	    store_viewed             product_viewed (01 key, 02 the surface: "spin" for the Spin tab's pack buttons)
+	    store_viewed             product_viewed (01 key, 02 the surface: "spin" for the Spin tab's pack buttons,
+	                             "offer" for the Starter Pack's offer card, which then never shows again: the save flag
+	                             StarterPackRules.OFFER_FLAG, set only while the offer is due)
 	A view is logged at most once per item and surface per session.
+
+	The Starter Pack's offer card is due after the first rebirth or the configured play time (StarterPackRules.offerDue,
+	sent in StateUpdate `store`); play time grows without a state update, so every few seconds the state is marked
+	dirty for whoever's due-ness changed.
 
 	Analytics (beyond MonetizationService's purchases): ProductPrompted (01 key, 02 surface) when a checked purchase is
 	approved, product_refused (01 key, 02 reason: StoreRules.REASONS) when it isn't.
@@ -26,26 +32,35 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Gadgets = require(ReplicatedStorage.Shared.Config.Gadgets)
 local Monetization = require(ReplicatedStorage.Shared.Config.Monetization)
 local Spin = require(ReplicatedStorage.Shared.Config.Spin)
+local GameData = require(ReplicatedStorage.Shared.GameData)
 local DataSchema = require(ReplicatedStorage.Shared.Logic.DataSchema)
 local Guard = require(ReplicatedStorage.Shared.Logic.Guard)
+local Inventory = require(ReplicatedStorage.Shared.Logic.Inventory)
 local PaidRandomItems = require(ReplicatedStorage.Shared.Logic.PaidRandomItems)
 local SpinRules = require(ReplicatedStorage.Shared.Logic.SpinRules)
+local StarterPackRules = require(ReplicatedStorage.Shared.Logic.StarterPackRules)
 local StoreRules = require(ReplicatedStorage.Shared.Logic.StoreRules)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local Analytics = require(script.Parent.Analytics)
 local MonetizationService = require(script.Parent.MonetizationService)
 local PlayerPolicy = require(script.Parent.PlayerPolicy)
 local Remotes = require(script.Parent.Remotes)
+local Replication = require(script.Parent.Replication)
 local Sessions = require(script.Parent.Sessions)
 
 type Session = Sessions.Session
 
 local StoreService = {}
 
+local OFFER_CHECK_SECONDS = 5
+
 -- "key|surface" views already logged, per session.
 local viewed: { [Session]: { [string]: boolean } } = setmetatable({}, { __mode = "k" }) :: any
+-- Whether the Starter Pack's offer was due at the last check, per session.
+local lastDue: { [Session]: boolean } = setmetatable({}, { __mode = "k" }) :: any
 
 local function logView(session: Session, key: string, surface: string)
 	local seen = viewed[session]
@@ -63,14 +78,25 @@ end
 
 -- The purchase check's view of `session` (StoreRules.PurchaseContext) for product `key`.
 local function context(session: Session, key: string, paidRandomAllowed: boolean): StoreRules.PurchaseContext
+	local data = session.data
 	return {
 		visible = StoreRules.visible(Monetization.products[key].id, RunService:IsStudio()),
 		paidRandomAllowed = paidRandomAllowed,
-		spins = session.data.spin.spins,
+		spins = data.spin.spins,
 		spinBankFull = Spin.paidBankFull,
-		starterOwned = false,
-		podiumFree = true,
+		starterOwned = StarterPackRules.owns(data.flags),
+		-- the Starter Pack's Snackling needs a podium a prize could take (a carrying thief keeps the last one)
+		podiumFree = Inventory.prizeMayTakePodium(data.creatures, session.capacity, session.carry ~= nil),
 	}
+end
+
+-- Whether the Starter Pack's one-time offer card is due for `session` (the same rule as its StateUpdate).
+local function offerDue(session: Session): boolean
+	local forSale = StoreRules.visible(Monetization.products.StarterPack.id, RunService:IsStudio())
+	return StarterPackRules.offerDue(
+		StarterPackRules.offerContext(session.data, session.tutorial ~= nil, forSale),
+		Monetization.starterPack
+	)
 end
 
 -- Whether tracked item `key` shows (and can be bought) on `surface` for this player right now.
@@ -86,6 +112,8 @@ local function shownTo(session: Session, key: string): boolean
 	end
 	if StoreRules.PAID_RANDOM_KINDS[product.kind] then
 		return PaidRandomItems.allowedByAttribute(session.player:GetAttribute(PaidRandomItems.ATTRIBUTE))
+	elseif product.kind == "StarterPack" then
+		return not StarterPackRules.owns(session.data.flags)
 	end
 	return true
 end
@@ -141,7 +169,7 @@ local function onClientEvent(player: Player, nameArg: unknown, arg: unknown)
 			Analytics.custom(session, "cash_offer_clicked", nil, { key })
 		end
 	elseif name == "store_viewed" then
-		local surface = Guard.oneOf(arg, { "spin" })
+		local surface = Guard.oneOf(arg, { "spin", "offer" })
 		if surface == "spin" then
 			for _, key in Monetization.viewTracked do
 				local product = Monetization.products[key]
@@ -149,6 +177,11 @@ local function onClientEvent(player: Player, nameArg: unknown, arg: unknown)
 					logView(session, key, surface)
 				end
 			end
+		elseif surface == "offer" and offerDue(session) then
+			-- The offer card showed: once per account.
+			session.data.flags[StarterPackRules.OFFER_FLAG] = true
+			Replication.markDirty(session)
+			logView(session, "StarterPack", surface)
 		end
 	else
 		-- Only known keys reach a breakdown field: any other string from a client would add a value to the analytics
@@ -170,8 +203,36 @@ function StoreService.start()
 	for _, problem in SpinRules.validatePacks(packs, Spin, DataSchema.MAX_BANKED_SPINS) do
 		warn(`[Store] config problem: {problem}`)
 	end
+	for _, problem in
+		StarterPackRules.validate(
+			Monetization.starterPack,
+			GameData.catalog.creatures,
+			GameData.catalog.mutations,
+			Gadgets.order
+		)
+	do
+		warn(`[Store] Starter Pack config problem: {problem}`)
+	end
 	Remotes.onIntent("ClientEvent", onClientEvent)
 	Remotes.onIntent("RequestPurchase", onRequestPurchase)
+	-- Play time crosses the offer's mark without a state update: mark the state dirty when the due-ness changes.
+	task.spawn(function()
+		while true do
+			task.wait(OFFER_CHECK_SECONDS)
+			local ok, err = pcall(function()
+				for _, session in Sessions.all() do
+					local due = offerDue(session)
+					if lastDue[session] ~= due then
+						lastDue[session] = due
+						Replication.markDirty(session)
+					end
+				end
+			end)
+			if not ok then
+				warn(`[Store] {err}`)
+			end
+		end
+	end)
 end
 
 return StoreService

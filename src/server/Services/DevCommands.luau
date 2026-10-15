@@ -25,6 +25,9 @@
 	                        right beside you, to test catching it
 	  /boss [hp]            a Snack Attack giant appears over the belt now (tap it to test), e.g. /boss 20 for a quick one
 	  /gadgets [off]        own every gadget (Config/Gadgets) and recharge them all now; /gadgets off removes them again
+	  /starter [reset|offer]
+	                        the Starter Pack again: reset forgets it was bought and its offer was shown; offer also
+	                        makes its one-time offer card due now (enough play time), to see it come up
 	  /hostas <owner|none|admin>
 	                        try the host panel (Settings) as a private server's owner, as a player with no panel, or
 	                        as an admin again (in Studio everyone is an admin)
@@ -45,8 +48,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
 
+local Monetization = require(ReplicatedStorage.Shared.Config.Monetization)
 local GameData = require(ReplicatedStorage.Shared.GameData)
 local SnackdexRules = require(ReplicatedStorage.Shared.Logic.SnackdexRules)
+local StarterPackRules = require(ReplicatedStorage.Shared.Logic.StarterPackRules)
 
 local BeltService = require(script.Parent.BeltService)
 local BossService = require(script.Parent.BossService)
@@ -299,11 +304,33 @@ function DevCommands.start()
 			"info"
 		)
 	end)
+	add("starter", function(player: Player, args: { string })
+		local session = Sessions.get(player)
+		if session == nil then
+			return
+		end
+		local flags = session.data.flags
+		flags[StarterPackRules.OWNED_FLAG] = nil
+		flags[StarterPackRules.OFFER_FLAG] = nil
+		local offer = string.lower(args[1] or "") == "offer"
+		if offer then
+			local stats = session.data.stats
+			stats.playTime = math.max(stats.playTime, Monetization.starterPack.offer.afterPlaySeconds)
+		end
+		Replication.markDirty(session)
+		Remotes.notify(
+			player,
+			if offer
+				then "[Studio] Starter Pack reset; its offer card is due now"
+				else "[Studio] Starter Pack reset: it can be bought again",
+			"info"
+		)
+	end)
 	print(
 		"[DevCommands] Studio commands enabled: /cash <n>, /spawn <creatureId> [mutationId], /noshield, /friends <n|off>,"
 			.. " /tutorial, /gallery [mutationId|off], /sky <clockTime>,"
 			.. " /quests reset, /dex fill <rarity|event>, /map <id|vote|list>, /playtime <min>, /spins <n|free>,"
-			.. " /runaway [here], /boss [hp], /gadgets [off], /hostas <owner|none|admin>"
+			.. " /runaway [here], /boss [hp], /gadgets [off], /starter [reset|offer], /hostas <owner|none|admin>"
 			.. " (LiveOps: /event <id> [minutes], /event off, /luck <x> <min>)"
 	)
 end

@@ -156,4 +156,28 @@ T.describe("StoreRules: Lucky Spin packs before the prompt", function()
 	end)
 end)
 
+T.describe("StoreRules: the Starter Pack before the prompt", function()
+	T.it("is checked before the prompt, and is not a paid random item (fixed contents)", function()
+		T.expect(StoreRules.CHECKED_KINDS.StarterPack).toBe(true)
+		T.expect(StoreRules.PAID_RANDOM_KINDS.StarterPack).toBeNil()
+		T.expect(StoreRules.purchaseRefusal("StarterPack", context({ paidRandomAllowed = false }))).toBeNil()
+	end)
+
+	T.it("is refused once owned: the server says no before a second prompt opens", function()
+		T.expect(StoreRules.purchaseRefusal("StarterPack", context({ starterOwned = true }))).toBe("owned")
+		T.expect(StoreRules.messageKey("owned")).toBe("starterOwned")
+	end)
+
+	T.it("needs a free podium for its Snackling", function()
+		T.expect(StoreRules.purchaseRefusal("StarterPack", context({ podiumFree = false }))).toBe("baseFull")
+		T.expect(StoreRules.purchaseRefusal("StarterPack", context({ podiumFree = false, starterOwned = true })))
+			.toBe("owned")
+		T.expect(StoreRules.messageKey("baseFull")).toBe("starterBaseFull")
+	end)
+
+	T.it("is hidden before it exists on the Creator Hub, outside Studio", function()
+		T.expect(StoreRules.purchaseRefusal("StarterPack", context({ visible = false }))).toBe("unavailable")
+	end)
+end)
+
 return nil

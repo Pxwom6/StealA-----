@@ -55,5 +55,6 @@ require("./HostPanelLayout.spec")
 require("./StoreRules.spec")
 require("./AutoCollectRules.spec")
 require("./StoreLayout.spec")
+require("./StarterPackRules.spec")
 
 T.finish()

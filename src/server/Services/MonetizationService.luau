@@ -26,20 +26,26 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Gadgets = require(ReplicatedStorage.Shared.Config.Gadgets)
 local Monetization = require(ReplicatedStorage.Shared.Config.Monetization)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
+local GameData = require(ReplicatedStorage.Shared.GameData)
 local Types = require(ReplicatedStorage.Shared.Types)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
+local GadgetRules = require(ReplicatedStorage.Shared.Logic.GadgetRules)
 local Guard = require(ReplicatedStorage.Shared.Logic.Guard)
+local Inventory = require(ReplicatedStorage.Shared.Logic.Inventory)
 local LiveOpsRules = require(ReplicatedStorage.Shared.Logic.LiveOpsRules)
 local ReceiptLedger = require(ReplicatedStorage.Shared.Logic.ReceiptLedger)
 local SpinRules = require(ReplicatedStorage.Shared.Logic.SpinRules)
+local StarterPackRules = require(ReplicatedStorage.Shared.Logic.StarterPackRules)
 local StoreRules = require(ReplicatedStorage.Shared.Logic.StoreRules)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local Analytics = require(script.Parent.Analytics)
 local Announcer = require(script.Parent.Announcer)
 local DataService = require(script.Parent.DataService)
 local EconomyService = require(script.Parent.EconomyService)
+local GameEvents = require(script.Parent.GameEvents)
 local LiveOpsService = require(script.Parent.LiveOpsService)
 local LockService = require(script.Parent.LockService)
 local PlayerPolicy = require(script.Parent.PlayerPolicy)
@@ -241,9 +247,68 @@ type AfterGrant = () -> ()
 -- follow-up and analytics wait for the retry that finds them saved.
 local unconfirmed: { [string]: AfterGrant } = {}
 
+-- A Starter Pack's grant, worked out (StarterPackRules): what to write, and what to tell the buyer.
+type StarterGrant = {
+	cash: number,
+	unlock: { string }, -- gadget ids whose flags it sets
+	creature: { id: string, variant: string?, podium: number }?, -- the Snackling and its free podium
+	duplicate: boolean, -- the pack was owned already: the whole pack's value in cash instead
+	text: string, -- the toast
+}
+
+local function gadgetPrice(id: string): number
+	local def = Gadgets.gadgets[id]
+	return if def then def.price else 0
+end
+
+-- What a Starter Pack receipt grants `session` now, `quotedCash` being its income-sized cash fixed when the receipt
+-- was first seen. Changes nothing.
+local function prepareStarter(session: Session, quotedCash: number): StarterGrant
+	local config = Monetization.starterPack
+	local data = session.data
+	local def = GameData.catalog.creatures[config.creatureId]
+	if def == nil then
+		error(`the Starter Pack's Snackling {config.creatureId} is missing; check Config/Monetization`)
+	end
+	local creatureName = GameData.displayName(def, config.variant)
+	local creaturePrice = GameData.price(def, config.variant)
+	local contents = StarterPackRules.contents(config, quotedCash, function(id: string): boolean
+		return GadgetRules.owns(data.flags, id)
+	end, gadgetPrice)
+	if StarterPackRules.owns(data.flags) then
+		-- Bought already (the server refuses that before the prompt): the whole pack's worth in cash, so nothing paid
+		-- for is lost.
+		local value = StarterPackRules.cashValue(contents, creaturePrice, gadgetPrice)
+		return {
+			cash = value,
+			unlock = {},
+			creature = nil,
+			duplicate = true,
+			text = Format.template(Theme.text.starterDuplicate, { amount = UiTheme.cash(value) }),
+		}
+	end
+	-- Its Snackling takes a free podium (a carrying thief's last one stays for the delivery); with none, its full belt
+	-- price is paid instead (buying is refused with a full base, so only a base filled since the prompt gets here).
+	local podium = if Inventory.prizeMayTakePodium(data.creatures, session.capacity, session.carry ~= nil)
+		then EconomyService.freePodium(session)
+		else nil
+	local cash = contents.cash + contents.gadgetCash + (if podium then 0 else creaturePrice)
+	return {
+		cash = cash,
+		unlock = contents.gadgets,
+		creature = if podium then { id = def.id, variant = config.variant, podium = podium } else nil,
+		duplicate = false,
+		text = Format.template(
+			if podium then Theme.text.starterBought else Theme.text.starterBoughtFull,
+			{ creature = creatureName, amount = UiTheme.cash(cash) }
+		),
+	}
+end
+
 -- Works out everything a product grants WITHOUT changing anything (it may throw: nothing is lost, Roblox retries).
 -- Returns `apply`, which only writes the precomputed results (plain table writes: no yields, nothing that can fail;
--- see ReceiptLedger), and a follow-up that runs once the purchase is confirmed saved (announcements, auto-lock...).
+-- see ReceiptLedger), a follow-up that runs once the purchase is confirmed saved (announcements, auto-lock...), and
+-- `landed`, which runs right after a grant this call made (podiums, gameplay events), saved yet or not.
 -- `paidRandomAllowed`: the buyer's policy allows paid random items (PlayerPolicy, looked up before this step).
 local function prepareProduct(
 	session: Session,
@@ -251,7 +316,7 @@ local function prepareProduct(
 	receipt: { [string]: any },
 	quotedCash: number,
 	paidRandomAllowed: boolean
-): (() -> (), AfterGrant?)
+): (() -> (), AfterGrant?, (() -> ())?)
 	local product = Monetization.products[key]
 	local perks = Monetization.perks
 	local data = session.data
@@ -266,7 +331,9 @@ local function prepareProduct(
 	local historySize = Monetization.purchaseHistorySize
 	local cash, tokens, spins = 0, 0, 0
 	local newBoosts: { LiveOpsRules.Boost }? = nil
+	local starter: StarterGrant? = nil
 	local after: AfterGrant
+	local landed: (() -> ())? = nil
 
 	if product.kind == "Cash" then
 		cash = quotedCash
@@ -334,6 +401,35 @@ local function prepareProduct(
 				"success"
 			)
 		end
+	elseif product.kind == "StarterPack" then
+		local grant = prepareStarter(session, quotedCash)
+		starter = grant
+		cash = grant.cash
+		after = function()
+			Analytics.economySource(session, grant.cash, "IAP", key)
+			Remotes.notify(session.player, grant.text, "success")
+			if grant.duplicate then
+				-- Logged so Leo can see how often a second prompt still gets bought.
+				Analytics.custom(session, "starter_pack_duplicate", grant.cash, { key })
+				warn(
+					`[Monetization] {session.player.Name} bought the Starter Pack again: paid {grant.cash} cash instead`
+				)
+			end
+		end
+		landed = function()
+			EconomyService.refresh(session) -- the Snackling's podium, the gadget buttons
+			local creature = grant.creature
+			if creature then
+				local event = { kind = "acquired" :: "acquired", creatureId = creature.id, variant = creature.variant }
+				GameEvents.emit(session, event) -- the Snackdex, quests
+				GameEvents.emit(session, {
+					kind = "found",
+					creatureId = creature.id,
+					variant = creature.variant,
+					source = "StarterPack",
+				})
+			end
+		end
 	else
 		error(`unknown product kind for {key}`)
 	end
@@ -347,12 +443,22 @@ local function prepareProduct(
 		-- Every spin paid for, past the bank's caps: a purchase is never clipped (buying is refused at
 		-- Config/Spin.paidBankFull, before the prompt; see StoreService).
 		SpinRules.bankPaid(data.spin, spins)
+		if starter then
+			data.flags[StarterPackRules.OWNED_FLAG] = true -- once per account, saved with the purchase
+			for _, id in starter.unlock do
+				data.flags[GadgetRules.flag(id)] = true
+			end
+			local creature = starter.creature
+			if creature then
+				Inventory.add(data, creature.id, creature.podium, os.time(), creature.variant)
+			end
+		end
 		if newBoosts then
 			LiveOpsService.setBoosts(newBoosts) -- the only write outside the save
 		end
 		Replication.markDirty(session) -- a flag: shows the new cash/tokens now, not after the save lands
 	end
-	return apply, after
+	return apply, after, landed
 end
 
 -- Shared receipt path for real purchases and Studio test grants.
@@ -376,10 +482,14 @@ local function processFor(player: Player, key: string, receipt: { [string]: any 
 	-- A cash pack's amount is fixed the first time its receipt reaches the player's session (and saved with the data),
 	-- so if that grant fails and Roblox retries after the player's income changed (e.g. they rebirthed), the retry
 	-- pays what the purchase was worth then. A receipt that finds no session yet waits for the load (see above).
+	-- The Starter Pack's income-sized cash is quoted the same way.
 	local quotedCash = 0
-	if Monetization.products[key].kind == "Cash" and profile:IsActive() then
+	local kind = Monetization.products[key].kind
+	if (kind == "Cash" or kind == "StarterPack") and profile:IsActive() then
 		quotedCash = ReceiptLedger.quote(session.data.cashPackQuotes, purchaseId, function(): number
-			return EconomyService.cashPackAmount(session, key)
+			return if kind == "Cash"
+				then EconomyService.cashPackAmount(session, key)
+				else StarterPackRules.cash(Monetization.starterPack, session.packIncome)
 		end, Monetization.purchaseIdCacheSize)
 	end
 	local decision = ReceiptLedger.process(purchaseId, Monetization.purchaseIdCacheSize, {
@@ -397,10 +507,19 @@ local function processFor(player: Player, key: string, receipt: { [string]: any 
 			return (profile.Data :: any) :: { [string]: any }
 		end,
 		prepare = function(): () -> ()
-			local apply, followUp = prepareProduct(session, key, receipt, quotedCash, paidRandomAllowed)
+			local apply, followUp, landed = prepareProduct(session, key, receipt, quotedCash, paidRandomAllowed)
 			return function()
 				apply()
 				after = followUp -- set only once this call's grant went through
+				if landed then
+					-- The grant stands from here: show it while the save is on its way (the save waits yield).
+					task.defer(function()
+						local ok, err = pcall(landed :: () -> ...any)
+						if not ok then
+							warn(`[Monetization] after granting {key}: {err}`)
+						end
+					end)
+				end
 			end
 		end,
 		saveAndWait = function()

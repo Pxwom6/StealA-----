@@ -484,6 +484,17 @@ local Theme = {
 		spinPackBankFull = "Your spin bank is full ({count} spins)! Spin some first.",
 		starterOwned = "You already have the Starter Pack!",
 		starterBaseFull = "Free a podium first: the Starter Pack's Snackling needs one!",
+		-- The Starter Pack (Config/Monetization.starterPack): its Shop card lines, what buying it says, its offer card
+		starterCashLine = "💵 +{amount} cash ({minutes} min of your income)",
+		starterCreatureLine = "✨ {creature} (earns {income})",
+		starterGadget = "{icon} {name}",
+		starterGadgetOwned = "{icon} {name}: owned, so +{amount}",
+		starterBought = "🎁 Starter Pack! {creature} and +{amount} are yours!",
+		starterBoughtFull = "🎁 Starter Pack! Base full: {creature} paid as cash, +{amount}",
+		starterDuplicate = "🎁 You already had the Starter Pack: +{amount} cash instead!",
+		starterOfferTitle = "🎁 Starter Pack!", -- the offer strip: short, it shares the strip with two buttons
+		starterOfferBody = "{creature}, {count} gadgets, cash",
+		starterOfferButton = "See it",
 
 		-- World signs (SceneryBuilder, LeaderboardService)
 		factorySign = "SNACK FACTORY",
@@ -776,6 +787,10 @@ local Theme = {
 		ServerLuck = {
 			name = "Server Luck",
 			description = "{luckMultiplier}x rare odds on the belt for EVERYONE in this server for {luckMinutes} minutes. Buying again adds time.",
+		},
+		StarterPack = {
+			name = "Starter Pack",
+			description = "Once per account. All of this, nothing random:",
 		},
 		LuckySpins3 = {
 			name = "3 Lucky Spins",

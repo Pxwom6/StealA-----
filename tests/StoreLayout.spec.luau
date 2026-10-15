@@ -157,9 +157,48 @@ T.describe("StoreLayout Shop cards", function()
 		end
 	end)
 
+	T.it("fits the Starter Pack's card: its lines under the buy button, apart and inside", function()
+		local boxes, height = L.starterCard(3)
+		T.expect(table.concat(L.problems(boxes, C.w, height), "; ")).toBe("")
+		T.expect(boxes.buy.rect.y + boxes.buy.rect.h).toBeAtMost(boxes.line1.rect.y)
+		T.expect(boxes.line3 ~= nil and boxes.line4 == nil).toBe(true)
+		T.expect(fit(Theme.store.StarterPack.name, boxes.title.rect, false)).toBeAtLeast(MIN)
+	end)
+
 	T.it("is as wide as the Shop's content less its scroll bar", function()
 		T.expect(C.w).toBe(L.content(L.STORE).w - 8)
 		T.expect(C.textX + C.textW).toBeAtMost(C.w - C.buy.right - C.buy.w)
+	end)
+end)
+
+T.describe("StoreLayout: the Starter Pack's offer strip", function()
+	T.it("fits its title, body and button in the narrowest offer strip, like a cash offer", function()
+		local O, P = ScreenLayout.SIZE.cashOffer, ScreenLayout.TEXT.cashOffer
+		local starter = Monetization.starterPack
+		local body =
+			Format.template(Theme.text.starterOfferBody, { creature = "Golden Cupcake Cub", count = #starter.gadgets })
+		T.expect(starter.creatureId).toBe("cupcake_cub") -- the name above
+		local small: { string } = {}
+		for _, width in { O.w, O.minW } do
+			local textW = width - O.text - O.inset - O.close - ScreenLayout.GAP - O.buy - ScreenLayout.GAP
+			if TextFit.fit(Theme.text.starterOfferTitle, textW, P.title, false) < MIN then
+				table.insert(small, `title at {width}`)
+			end
+			if TextFit.fit(body, textW, P.body, true) < MIN then
+				table.insert(small, `body at {width}`)
+			end
+		end
+		local button = ScreenLayout.TEXT.button
+		local buttonSize = TextFit.fit(
+			Theme.text.starterOfferButton,
+			O.buy - 2 * button.padX,
+			O.h - 2 * O.inset - 2 * button.padY,
+			false
+		)
+		if buttonSize < MIN then
+			table.insert(small, "button")
+		end
+		T.expect(table.concat(small, ", ")).toBe("")
 	end)
 end)
 

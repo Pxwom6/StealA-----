@@ -51,7 +51,8 @@ function PurchaseController.context(key: string, state: Types.ClientState): Stor
 		paidRandomAllowed = PurchaseController.paidRandomAllowed(),
 		spins = state.spin.spins,
 		spinBankFull = Spin.paidBankFull,
-		starterOwned = false,
+		starterOwned = state.store.starterOwned,
+		-- the server also keeps a carrying thief's last podium for the delivery (Inventory.prizeMayTakePodium)
 		podiumFree = not state.baseFull,
 	}
 end

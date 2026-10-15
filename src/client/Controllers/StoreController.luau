@@ -9,6 +9,9 @@
 	    can only be bought when the player's PolicyService policy allows that (the server publishes the answer as the
 	    player attribute in Logic/PaidRandomItems); otherwise, and while that is still being looked up, it shows as
 	    blocked (the server refuses the receipt too).
+	  * The Starter Pack comes first until it is bought (then it hides): one line per thing it gives, nothing random:
+	    its cash as a receipt would quote it now, its Snackling, and each gadget (or its cash price when owned). Its
+	    buy button asks first, like the Lucky Spin packs'.
 	  * Lucky Spin packs show every prize's exact chance on the card (UI/OddsGrid, laid out by Logic/StoreLayout). They
 	    are paid random items too, so they show only to players whose policy allows them (hidden otherwise, and while
 	    it is being looked up). Their buy button asks first (PurchaseController: the client's check, then the
@@ -29,6 +32,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
+local Gadgets = require(ReplicatedStorage.Shared.Config.Gadgets)
 local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
 local Monetization = require(ReplicatedStorage.Shared.Config.Monetization)
 local Spin = require(ReplicatedStorage.Shared.Config.Spin)
@@ -42,6 +46,7 @@ local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local LiveOpsRules = require(ReplicatedStorage.Shared.Logic.LiveOpsRules)
 local PaidRandomItems = require(ReplicatedStorage.Shared.Logic.PaidRandomItems)
 local RarityRoll = require(ReplicatedStorage.Shared.Logic.RarityRoll)
+local StarterPackRules = require(ReplicatedStorage.Shared.Logic.StarterPackRules)
 local StoreLayout = require(ReplicatedStorage.Shared.Logic.StoreLayout)
 local StoreRules = require(ReplicatedStorage.Shared.Logic.StoreRules)
 local LiveOps = require(ReplicatedStorage.Shared.Config.LiveOps)
@@ -291,6 +296,8 @@ local function shows(state: Types.ClientState): string
 	local parts = {
 		tostring(PurchaseController.paidRandomAllowed()),
 		tostring(state.spin.spins >= Spin.paidBankFull),
+		tostring(state.store.starterOwned),
+		tostring(#state.gadgets.owned), -- the Starter Pack's card prices the gadgets it no longer unlocks
 	}
 	for _, key in Monetization.storePasses do
 		table.insert(parts, tostring((state.passes :: any)[key] == true))
@@ -298,12 +305,71 @@ local function shows(state: Types.ClientState): string
 	return table.concat(parts, "|")
 end
 
+-- The Starter Pack's lines: its cash (income-sized, as a receipt now would quote it), its Snackling, and each gadget
+-- (or its cash price when already owned). Fixed contents: nothing random.
+local function starterLines(state: Types.ClientState): { string }
+	local config = Monetization.starterPack
+	local owned: { [string]: boolean } = {}
+	for _, id in state.gadgets.owned do
+		owned[id] = true
+	end
+	local contents = StarterPackRules.contents(
+		config,
+		StarterPackRules.cash(config, state.packIncome),
+		function(id: string): boolean
+			return owned[id] == true
+		end,
+		function(id: string): number
+			local def = Gadgets.gadgets[id]
+			return if def then def.price else 0
+		end
+	)
+	local lines = {
+		Format.template(
+			Theme.text.starterCashLine,
+			{ amount = UiTheme.cash(contents.cash), minutes = math.floor(config.cash.incomeSeconds / 60) }
+		),
+	}
+	local def = GameData.catalog.creatures[config.creatureId]
+	if def then
+		table.insert(
+			lines,
+			Format.template(Theme.text.starterCreatureLine, {
+				creature = GameData.displayName(def, config.variant),
+				income = UiTheme.perSecond(GameData.income(def, config.variant)),
+			})
+		)
+	end
+	local gadgets: { string } = {}
+	for _, id in config.gadgets do
+		local gadget = Gadgets.gadgets[id]
+		if gadget then
+			local vars =
+				{ icon = gadget.icon, name = UiTheme.text(gadget.nameKey), amount = UiTheme.cash(gadget.price) }
+			table.insert(
+				gadgets,
+				Format.template(if owned[id] then Theme.text.starterGadgetOwned else Theme.text.starterGadget, vars)
+			)
+		end
+	end
+	table.insert(lines, table.concat(gadgets, "  +  "))
+	return lines
+end
+
 -- A card for a product bought through PurchaseController (Logic/StoreRules.CHECKED_KINDS): a Lucky Spin pack, with
--- the exact chance of every prize across the card. Its buy button asks before Roblox's prompt opens.
+-- the exact chance of every prize across the card, or the Starter Pack with one line per thing it gives. Its buy
+-- button asks before Roblox's prompt opens.
 local function checkedCard(parent: Instance, key: string, order: number, state: Types.ClientState): Frame
 	local copy = Theme.store[key]
-	local boxes, height = StoreLayout.packCard()
-	local accent = UiTheme.palette("luck")
+	local starter = Monetization.products[key].kind == "StarterPack"
+	local lines: { string } = if starter then starterLines(state) else {}
+	local boxes: { [string]: StoreLayout.Box }, height: number
+	if starter then
+		boxes, height = StoreLayout.starterCard(#lines)
+	else
+		boxes, height = StoreLayout.packCard()
+	end
+	local accent = if starter then UiTheme.palette("gold") else UiTheme.palette("luck")
 	local frame = UiKit.panel({
 		Name = key,
 		LayoutOrder = order,
@@ -335,7 +401,23 @@ local function checkedCard(parent: Instance, key: string, order: number, state: 
 		Parent = frame,
 	})
 	place(description, boxes.description.rect)
-	OddsGrid.build(frame, boxes.odds.rect, frame.ZIndex + 1)
+	if starter then
+		for index, text in lines do
+			local line = UiKit.label({
+				Name = `Line{index}`,
+				Text = text,
+				FontFace = UiTheme.bodyFont,
+				TextScaled = false,
+				TextSize = 15,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextColor3 = UiTheme.palette("gold"),
+				Parent = frame,
+			})
+			place(line, boxes[`line{index}`].rect)
+		end
+	else
+		OddsGrid.build(frame, boxes.odds.rect, frame.ZIndex + 1)
+	end
 
 	local full = PurchaseController.refusal(key, state) == "bankFull"
 	local buy = UiKit.button({
@@ -406,7 +488,9 @@ local function fillCards(scroller: ScrollingFrame): { [string]: Frame }
 		local product = Monetization.products[key]
 		if StoreRules.CHECKED_KINDS[product.kind] then
 			-- Lucky Spin packs: paid random items, so only for players whose policy allows them (hidden otherwise).
-			local hidden = StoreRules.PAID_RANDOM_KINDS[product.kind] and not PurchaseController.paidRandomAllowed()
+			-- The Starter Pack: hidden once bought.
+			local hidden = (StoreRules.PAID_RANDOM_KINDS[product.kind] and not PurchaseController.paidRandomAllowed())
+				or (product.kind == "StarterPack" and state.store.starterOwned)
 			if not hidden then
 				cards[key] = checkedCard(scroller, key, nextOrder(), state)
 			end

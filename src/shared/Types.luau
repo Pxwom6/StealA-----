@@ -701,6 +701,17 @@ export type SpinConfig = {
 	segments: { SpinSegment },
 }
 
+-- Config: the Starter Pack (Config/Monetization.starterPack; rules: Logic/StarterPackRules) ---------------------------
+
+export type StarterPackConfig = {
+	cash: { incomeSeconds: number, minimum: number }, -- sized from steady income like a cash pack, with a floor
+	creatureId: string, -- a Snackling of the permanent roster (no eventId)...
+	variant: string?, -- ...with this permanent mutation (no eventId, mapTheme or modifierId)
+	gadgets: { string }, -- gadgets it unlocks (Config/Gadgets ids); one already owned pays its cash price instead
+	-- The one-time offer card: after this many rebirths or this much total play time, whichever comes first.
+	offer: { afterRebirths: number, afterPlaySeconds: number, showSeconds: number },
+}
+
 -- Config: achievements (Config/Achievements) -------------------------------------------------------------------------
 
 -- What an achievement counts (Logic/AchievementRules.progress reads each from the save):
@@ -1245,6 +1256,12 @@ export type HostView = {
 	giftReadyAt: number, -- server time an admin may gift everyone again (a double tap never pays twice)
 }
 
+-- The store's one-time items as the client sees them (Logic/StarterPackRules).
+export type StoreView = {
+	starterOwned: boolean, -- the Starter Pack was bought (save flag starter_pack): its card hides
+	starterOffer: boolean, -- its one-time offer card is due (StarterPackRules.offerDue)
+}
+
 -- What the server sends the owning client in StateUpdate (see server/Services/Replication.luau).
 -- Costs of -1 mean "not available" (max reached).
 export type ClientState = {
@@ -1282,6 +1299,7 @@ export type ClientState = {
 	spin: SpinView,
 	gadgets: GadgetsView,
 	host: HostView,
+	store: StoreView,
 }
 
 export type BeltItem = { id: number, creatureId: string, spawnAt: number, variant: string? }
