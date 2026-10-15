@@ -121,6 +121,132 @@ T.describe("LiveOpsRules events", function()
 	end)
 end)
 
+T.describe("LiveOpsRules.oneSeasonAtATime", function()
+	local seasonal = { Halloween = true, Winter = true, Easter = true }
+	local halloween: LiveOpsRules.EventDef =
+		{ id = "Halloween", startsAt = 0, endsAt = 1000, bannerText = "Halloween!", title = "Halloween" }
+	local luck: LiveOpsRules.EventDef = { id = "Luck", startsAt = 300, endsAt = 700, luckMultiplier = 2 }
+	local cash: LiveOpsRules.EventDef = { id = "Cash", startsAt = 0, endsAt = 2000, cashMultiplier = 2 }
+	-- an admin's /event Winter 100 s into Halloween's window
+	local winter: LiveOpsRules.EventDef =
+		{ id = "Winter", startsAt = 400, endsAt = 500, bannerText = "Winter!", title = "Winter" }
+
+	T.it("lets a second seasonal event end the first the moment it starts", function()
+		local list = LiveOpsRules.oneSeasonAtATime({ halloween, luck, cash, winter }, seasonal)
+		T.expect(LiveOpsRules.activeEventIds(list, 399)).toEqual({ Halloween = true, Luck = true, Cash = true })
+		T.expect(LiveOpsRules.activeEventIds(list, 400)).toEqual({ Winter = true, Luck = true, Cash = true })
+		T.expect(LiveOpsRules.activeEventIds(list, 499)).toEqual({ Winter = true, Luck = true, Cash = true })
+		local banner = LiveOpsRules.bannerEvent(list, 450) :: LiveOpsRules.EventDef
+		T.expect(banner.id).toBe("Winter")
+		T.expect(banner.endsAt).toBe(500)
+	end)
+
+	T.it("brings a scheduled one back when the one that took over ends, if its own dates still say so", function()
+		local list = LiveOpsRules.oneSeasonAtATime({ halloween, luck, cash, winter }, seasonal)
+		T.expect(LiveOpsRules.activeEventIds(list, 500)).toEqual({ Halloween = true, Luck = true, Cash = true })
+		local banner = LiveOpsRules.bannerEvent(list, 600) :: LiveOpsRules.EventDef
+		T.expect(banner.id).toBe("Halloween")
+		T.expect(banner.endsAt).toBe(1000)
+		T.expect(LiveOpsRules.activeEventIds(list, 1000)).toEqual({ Cash = true })
+		-- before the takeover, Halloween's own countdown runs to the moment Winter starts
+		T.expect((LiveOpsRules.bannerEvent(list, 100) :: LiveOpsRules.EventDef).endsAt).toBe(400)
+		-- an admin event that outlasts the scheduled one leaves nothing behind it
+		local long = table.clone(winter)
+		long.endsAt = 1500
+		local later = LiveOpsRules.oneSeasonAtATime({ halloween, long }, seasonal)
+		T.expect(LiveOpsRules.activeEventIds(later, 1200)).toEqual({ Winter = true })
+		T.expect(LiveOpsRules.activeEventIds(later, 1500)).toEqual({})
+	end)
+
+	T.it("leaves luck and cash events running beside any seasonal event, untouched", function()
+		local list = LiveOpsRules.oneSeasonAtATime({ halloween, luck, cash, winter }, seasonal)
+		T.expect(LiveOpsRules.luckMultiplier(list, {}, 450, limits)).toBe(2)
+		T.expect(LiveOpsRules.cashMultiplier(list, 450, limits)).toBe(2)
+		local plain: { LiveOpsRules.EventDef } = {}
+		for _, event in list do
+			if not seasonal[event.id] then
+				table.insert(plain, event)
+			end
+		end
+		T.expect(plain).toEqual({ luck, cash })
+	end)
+
+	T.it("keeps the list's order, so the banner rule still reads it", function()
+		local list = LiveOpsRules.oneSeasonAtATime({ halloween, luck, cash, winter }, seasonal)
+		local order: { string } = {}
+		for _, event in list do
+			table.insert(order, event.id)
+		end
+		-- Halloween before and after the takeover, then the others as listed
+		T.expect(order).toEqual({ "Halloween", "Halloween", "Luck", "Cash", "Winter" })
+	end)
+
+	T.it("never lets two copies of one event cut each other", function()
+		-- scheduled, and extended by /event: still one event
+		local again: LiveOpsRules.EventDef = { id = "Halloween", startsAt = 200, endsAt = 1200 }
+		local list = LiveOpsRules.oneSeasonAtATime({ halloween, again }, seasonal)
+		T.expect(list).toEqual({ halloween, again })
+		T.expect(LiveOpsRules.activeEventIds(list, 1100)).toEqual({ Halloween = true })
+	end)
+
+	T.it("gives a tie on the same start to the one listed last: an admin's /event beats the schedule", function()
+		-- LiveOpsService lists config, then remote config, then what admins started
+		local scheduled: LiveOpsRules.EventDef = { id = "Winter", startsAt = 100, endsAt = 300 }
+		local started: LiveOpsRules.EventDef = { id = "Easter", startsAt = 100, endsAt = 200 }
+		local list = LiveOpsRules.oneSeasonAtATime({ scheduled, started }, seasonal)
+		T.expect(LiveOpsRules.activeEventIds(list, 150)).toEqual({ Easter = true })
+		T.expect(LiveOpsRules.activeEventIds(list, 250)).toEqual({ Winter = true })
+		T.expect(LiveOpsRules.activeEventIds(LiveOpsRules.oneSeasonAtATime({ started, scheduled }, seasonal), 150))
+			.toEqual({ Winter = true })
+	end)
+
+	T.it("changes nothing with fewer than two seasonal events", function()
+		local list = { halloween, luck, cash }
+		T.expect(LiveOpsRules.oneSeasonAtATime(list, seasonal)).toEqual(list)
+		T.expect(LiveOpsRules.oneSeasonAtATime({ halloween, winter }, {})).toEqual({ halloween, winter })
+	end)
+
+	T.it("never runs two seasonal events at once, whatever the windows (the newest open one runs)", function()
+		local rng = T.seededRandom(58)
+		for _ = 1, 200 do
+			local list: { LiveOpsRules.EventDef } = {}
+			for _, id in { "Halloween", "Winter", "Easter", "Halloween", "Luck", "Cash" } do
+				local startsAt = math.floor(rng() * 1000)
+				table.insert(list, { id = id, startsAt = startsAt, endsAt = startsAt + 1 + math.floor(rng() * 600) })
+			end
+			local cut = LiveOpsRules.oneSeasonAtATime(list, seasonal)
+			for t = 0, 1600, 7 do
+				local running: { string } = {}
+				for id in LiveOpsRules.activeEventIds(cut, t) do
+					if seasonal[id] then
+						table.insert(running, id)
+					end
+				end
+				-- the open seasonal window that started last (on a tie, the one listed last), if any
+				local newest: LiveOpsRules.EventDef? = nil
+				for _, event in list do
+					if seasonal[event.id] and t >= event.startsAt and t < event.endsAt then
+						local best = newest
+						if best == nil or event.startsAt >= best.startsAt then
+							newest = event
+						end
+					end
+				end
+				if newest then
+					T.expect(running).toEqual({ newest.id })
+				else
+					T.expect(#running).toBe(0)
+				end
+				-- plain events are exactly as listed
+				local plain = LiveOpsRules.activeEventIds(list, t)
+				local after = LiveOpsRules.activeEventIds(cut, t)
+				T.expect(after.Luck).toBe(plain.Luck)
+				T.expect(after.Cash).toBe(plain.Cash)
+			end
+		end
+	end)
+end)
+
 local function findShipped(id: string): LiveOpsRules.EventDef
 	for _, event in LiveOps.events do
 		if event.id == id then

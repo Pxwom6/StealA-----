@@ -222,9 +222,24 @@ local EGG_TURNS = { 0.2, -0.3, 0.35, -0.15 }
 -- Hay bales are set down a little crooked, as if by hand (radians off the walkway direction).
 local BALE_TURNS = { 0.1, -0.14, 0.06, -0.08 }
 
+-- The seasonal-theme events: the ids of the LiveOps events that switch a theme on. Only one of them runs at a time
+-- (LiveOpsRules.oneSeasonAtATime, DECISIONS.md #58), so only one's Snacklings and mutation can be live at once
+-- (MutationRules.worstCaseTotal).
+function SeasonRules.seasonalEventIds(config: SeasonsConfig): { [string]: boolean }
+	local ids: { [string]: boolean } = {}
+	for eventId, themeId in config.eventThemes do
+		if config.themes[themeId] ~= nil then
+			ids[eventId] = true
+		end
+	end
+	return ids
+end
+
 -- The theme to show for the active events: among active events that map to a theme, the highest-priority theme
 -- (ties: the alphabetically first event id, so every server agrees). Returns the theme id and the event that
--- switched it on, or nil when no themed event is active.
+-- switched it on, or nil when no themed event is active. Since only one seasonal event runs at a time
+-- (seasonalEventIds), the live game only ever has one to choose from; the priority is for anything else that passes
+-- several (tests, older configs).
 function SeasonRules.activeTheme(config: SeasonsConfig, activeEventIds: { [string]: boolean }): (string?, string?)
 	local bestTheme: string? = nil
 	local bestEvent: string? = nil

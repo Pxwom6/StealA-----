@@ -417,6 +417,47 @@ T.describe("MutationRules gates: map themes and server modifiers", function()
 		end
 		T.expect(total).toBeNear(MutationRules.worstCaseTotal(all, "fortress"))
 	end)
+
+	T.it("counts one seasonal event's mutations at a time, and every plain event's", function()
+		-- three seasonal events (Halloween's 0.05, Winter's 0.03 + 0.02, Easter's 0.01) and a luck weekend's 0.01
+		local list = table.clone(all)
+		for _, entry in
+			{
+				{ id = "festive", chance = 0.03, event = "Winter" },
+				{ id = "frosted", chance = 0.02, event = "Winter" },
+				{ id = "pastel", chance = 0.01, event = "Easter" },
+				{ id = "lucky", chance = 0.01, event = "LuckWeekend" },
+			}
+		do
+			table.insert(list, F.mutation(entry.id, 20 + #list, entry.chance, entry.event))
+		end
+		local seasonal = { Halloween = true, Winter = true, Easter = true }
+		-- 0.125 permanent + 0.01 (the luck weekend's, which can run beside anything) + 0.05 (Halloween's, the strongest
+		-- seasonal event; Winter's two make 0.05 too) + 0.04 (one map) + 0.05 (one modifier)
+		T.expect(MutationRules.worstCaseTotal(list, nil, seasonal)).toBeNear(0.275)
+		T.expect(MutationRules.worstCaseTotal(list, "fortress", seasonal)).toBeNear(0.225)
+		-- without the seasonal ids every event counts at once: the upper bound it used to be
+		T.expect(MutationRules.worstCaseTotal(list)).toBeNear(0.335)
+		-- and it is exactly the worst that can roll together
+		local worst = 0
+		local together: { { [string]: boolean } } = {
+			{ Halloween = true, LuckWeekend = true },
+			{ Winter = true, LuckWeekend = true },
+			{ Easter = true, LuckWeekend = true },
+		}
+		for _, events in together do
+			for _, map in { "volcano", "winter", "meadow" } do
+				for _, modifier in { "thunderstorm", "fortress" } do
+					local sum = 0
+					for _, entry in MutationRules.odds(list, MutationRules.conditions(events, map, modifier)) do
+						sum += entry.chance
+					end
+					worst = math.max(worst, sum)
+				end
+			end
+		end
+		T.expect(worst).toBeNear(MutationRules.worstCaseTotal(list, nil, seasonal))
+	end)
 end)
 
 return nil

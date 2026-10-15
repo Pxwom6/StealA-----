@@ -785,6 +785,8 @@ local Theme = {
 		hostModStopped = "Modifier stopped.",
 		hostModNoneRunning = "No modifier is running.",
 		hostEventStarted = "Event started: {event}",
+		-- one seasonal event at a time: starting one ends the one before it
+		hostEventReplaced = "Event started: {event} (ended {ended})",
 		hostEventsEnded = "Events ended: {count}",
 		hostGiftReceived = "🎁 A gift from the host: +{amount}!",
 		hostGiftSent = "🎁 Gift sent to {count} players!",

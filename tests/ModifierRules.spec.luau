@@ -2,13 +2,19 @@
 local T = require("./TestKit")
 local ModifierRules = require("../src/shared/Logic/ModifierRules")
 local MutationRules = require("../src/shared/Logic/MutationRules")
+local SeasonRules = require("../src/shared/Logic/SeasonRules")
 local Modifiers = require("../src/shared/Config/Modifiers")
 local Mutations = require("../src/shared/Config/Mutations")
+local Seasons = require("../src/shared/Config/Seasons")
 local Types = require("../src/shared/Types")
 
--- The most mutation chance that can be live while a modifier runs (only one modifier runs at a time).
+-- The seasonal events, which run one at a time (DECISIONS.md #58).
+local SEASONAL = SeasonRules.seasonalEventIds(Seasons)
+
+-- The most mutation chance that can be live while a modifier runs (only one modifier and one seasonal event run at a
+-- time), as ModifierService works it out.
 local function mutationTotal(modifierId: string): number
-	return MutationRules.worstCaseTotal(Mutations, modifierId)
+	return MutationRules.worstCaseTotal(Mutations, modifierId, SEASONAL)
 end
 
 -- The modifiers a mutation waits for (Config/Mutations modifierId).
@@ -331,16 +337,21 @@ T.describe("ModifierRules.validate", function()
 	T.it("refuses making mutations too common", function()
 		local problems = ModifierRules.validate(Modifiers, constant(0.2)) -- 0.2 x Golden Hour's 3 = 0.6
 		T.expect(mentions(problems, "too common")).toBeTruthy()
+		-- the bound is a quarter of all spawns: 9% of spawns at Golden Hour's x3 is already over it
+		T.expect(ModifierRules.MAX_LIVE_MUTATION_CHANCE).toBe(0.25)
+		T.expect(mentions(ModifierRules.validate(Modifiers, constant(0.09)), "too common")).toBeTruthy()
+		T.expect(mentions(ModifierRules.validate(Modifiers, constant(0.08)), "too common")).toBe(false)
 	end)
 
 	T.it("counts only the mutations that can roll while the multiplying modifier itself runs", function()
-		-- one modifier at a time: during Golden Hour no weather mutation can roll, so it multiplies everything
-		-- permanent, every event's (only an admin's /event could run them all at once) and the strongest map's
-		local goldenHour = MutationRules.worstCaseTotal(Mutations, "goldenHour")
-		T.expect(goldenHour).toBeLessThan(MutationRules.worstCaseTotal(Mutations))
-		T.expect(goldenHour * ModifierRules.effects(Modifiers, "goldenHour").mutationChance).toBeLessThan(0.5)
-		T.expect(MutationRules.worstCaseTotal(Mutations, "thunderstorm"))
-			.toBeNear(MutationRules.worstCaseTotal(Mutations))
+		-- one modifier at a time: during Golden Hour no weather mutation can roll, and one seasonal event at a time, so
+		-- it multiplies everything permanent, one event's and the strongest map's
+		local goldenHour = mutationTotal("goldenHour")
+		T.expect(goldenHour).toBeLessThan(mutationTotal("thunderstorm"))
+		local live = goldenHour * ModifierRules.effects(Modifiers, "goldenHour").mutationChance
+		T.expect(live).toBeLessThan(ModifierRules.MAX_LIVE_MUTATION_CHANCE)
+		T.expect(live).toBeGreaterThan(0.2) -- 21.45% today: the bound is close
+		T.expect(mutationTotal("thunderstorm")).toBeNear(MutationRules.worstCaseTotal(Mutations, nil, SEASONAL))
 	end)
 
 	T.it("checks the order, the text and the schedule", function()

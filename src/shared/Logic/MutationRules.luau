@@ -85,36 +85,49 @@ function MutationRules.isEligible(mutation: MutationDef, active: { [string]: boo
 	return true
 end
 
--- The highest total mutation chance per spawn that can ever be live at once: every permanent and event mutation
--- (events may overlap), plus the strongest single map's signature mutations (one map at a time) and the strongest
--- single modifier's (one modifier at a time). Validation keeps this well below 1. With `modifierId`, the most that can
--- be live while that modifier runs: its own mutations take the strongest modifier's place, since no other modifier
+-- The highest total mutation chance per spawn that can ever be live at once: every permanent mutation, the strongest
+-- single map's signature mutations (one map at a time) and the strongest single modifier's (one modifier at a time),
+-- and the event mutations. `seasonal` (SeasonRules.seasonalEventIds) names the seasonal-theme events, which only ever
+-- run one at a time (LiveOpsRules.oneSeasonAtATime): of those, only the strongest single event's mutations count;
+-- every other event's do (a luck or cash event can overlap anything). Without `seasonal`, every event mutation counts,
+-- as if all of them ran together: an upper bound. Validation keeps this well below 1. With `modifierId`, the most that
+-- can be live while that modifier runs: its own mutations take the strongest modifier's place, since no other modifier
 -- runs then (Golden Hour unlocks none, so no weather mutation rolls during it).
-function MutationRules.worstCaseTotal(mutations: { MutationDef }, modifierId: string?): number
+function MutationRules.worstCaseTotal(
+	mutations: { MutationDef },
+	modifierId: string?,
+	seasonal: { [string]: boolean }?
+): number
 	local total = 0
 	local byMap: { [string]: number } = {}
 	local byModifier: { [string]: number } = {}
+	local bySeason: { [string]: number } = {}
 	for _, mutation in mutations do
 		local chance = math.max(0, mutation.chance)
 		if mutation.mapTheme ~= nil then
 			byMap[mutation.mapTheme] = (byMap[mutation.mapTheme] or 0) + chance
 		elseif mutation.modifierId ~= nil then
 			byModifier[mutation.modifierId] = (byModifier[mutation.modifierId] or 0) + chance
+		elseif mutation.eventId ~= nil and seasonal ~= nil and seasonal[mutation.eventId] then
+			bySeason[mutation.eventId] = (bySeason[mutation.eventId] or 0) + chance
 		else
 			total += chance
 		end
 	end
-	local bestMap, bestModifier = 0, 0
+	local bestMap, bestModifier, bestSeason = 0, 0, 0
 	for _, chance in byMap do
 		bestMap = math.max(bestMap, chance)
 	end
 	for _, chance in byModifier do
 		bestModifier = math.max(bestModifier, chance)
 	end
+	for _, chance in bySeason do
+		bestSeason = math.max(bestSeason, chance)
+	end
 	if modifierId ~= nil then
 		bestModifier = byModifier[modifierId] or 0
 	end
-	return total + bestMap + bestModifier
+	return total + bestSeason + bestMap + bestModifier
 end
 
 -- The signature mutation of map theme `themeId` (the first by order), or nil.

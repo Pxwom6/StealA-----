@@ -11,9 +11,14 @@
 	     server). In Studio anyone can use them, and they only affect that Studio session:
 	       /luck <multiplier> <minutes>      e.g. /luck 2 30
 	       /event <eventId> [minutes]        start a configured event now (its durationSeconds, or `minutes`); an
-	                                         event that is already running is only extended, never doubled
+	                                         event that is already running is only extended, never doubled; a
+	                                         seasonal one ends any other seasonal event that is running
 	       /event off [eventId]              end events started with /event (all of them, or just that one)
 	       /announce <text>
+
+	One seasonal event at a time (DECISIONS.md #58): the events Config/Seasons maps to a theme never run together.
+	Whichever started last runs; one it took over from steps aside and comes back when it ends, if its dates still say
+	so. CI keeps their dates apart. Luck and cash events overlap anything.
 
 	Event fields (all times are Unix seconds, UTC):
 	  id              unique string; creatures and mutations with a matching `eventId` only spawn while it is

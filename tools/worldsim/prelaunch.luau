@@ -616,6 +616,29 @@ local function scenario()
 		"FEAST26 gives a Maple Cranberry Crane once the Harvest Feast has started"
 	)
 
+	-- One seasonal event at a time (DECISIONS.md #58): an admin's /event takes over from the scheduled one, which
+	-- steps aside, and comes back by its dates when the admin's ends --------------------------------------------------
+	local BeltService = Sim.server("Services/BeltService")
+	chat(alice, "/event Winter2026 5")
+	task.wait(1.2)
+	check(workspace:GetAttribute("SeasonTheme") == "winter", "an admin's /event Winter2026 takes over from the feast")
+	check(
+		BeltService.mutationConditions().Harvest2026 == nil and workspace:GetAttribute("EventBannerId") == "Winter2026",
+		"the Harvest Feast steps aside: no Maple rolls, and Winter's banner shows"
+	)
+	chat(alice, "/event off")
+	task.wait(1.2)
+	check(
+		workspace:GetAttribute("SeasonTheme") == "harvest" and BeltService.mutationConditions().Harvest2026 == true,
+		"/event off brings the Harvest Feast back, its dates still say so"
+	)
+	chat(alice, "/event Winter2026 5")
+	task.wait(1.2)
+	check(workspace:GetAttribute("SeasonTheme") == "winter", "the next /event takes over again")
+	Sim.advance(5 * 60 + 1)
+	task.wait(1.2)
+	check(workspace:GetAttribute("SeasonTheme") == "harvest", "and the feast comes back when that one runs out")
+
 	print(`  ({math.floor(Sim.now - OCTOBER_15_2026)} s of server time)`)
 end
 

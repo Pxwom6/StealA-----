@@ -39,10 +39,12 @@ local Host = require(ReplicatedStorage.Shared.Config.Host)
 local LiveOps = require(ReplicatedStorage.Shared.Config.LiveOps)
 local Modifiers = require(ReplicatedStorage.Shared.Config.Modifiers)
 local Mutations = require(ReplicatedStorage.Shared.Config.Mutations)
+local Seasons = require(ReplicatedStorage.Shared.Config.Seasons)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local ModifierRules = require(ReplicatedStorage.Shared.Logic.ModifierRules)
 local MutationRules = require(ReplicatedStorage.Shared.Logic.MutationRules)
+local SeasonRules = require(ReplicatedStorage.Shared.Logic.SeasonRules)
 local Announcer = require(script.Parent.Announcer)
 local LiveOpsService = require(script.Parent.LiveOpsService)
 local Remotes = require(script.Parent.Remotes)
@@ -283,8 +285,10 @@ function ModifierService.start()
 			unlocks[mutation.modifierId] = true
 		end
 	end
+	-- one seasonal event at a time (LiveOpsService), one map and this modifier
+	local seasonal = SeasonRules.seasonalEventIds(Seasons)
 	local function liveMutationChance(modifierId: string): number
-		return MutationRules.worstCaseTotal(Mutations, modifierId)
+		return MutationRules.worstCaseTotal(Mutations, modifierId, seasonal)
 	end
 	for _, problem in ModifierRules.validate(Modifiers, liveMutationChance, unlocks) do
 		warn(`[Modifiers] config problem: {problem}`)

@@ -8,7 +8,8 @@
 	workspace.SeasonDecor within Config/Seasons.maxParts, every one anchored and out of everyone's way (no collisions,
 	touches or raycasts), the lighting layers want the theme's mood, and the event's mutation can roll on the belt.
 	Once ended: the decorations are gone and the theme is back to what it was. An event that is already running (by its
-	dates, or started before the test) is left alone, and so is one another running event outranks.
+	dates, or started before the test) is left alone; each of the others takes over from it while it is checked (one
+	seasonal event at a time, DECISIONS.md #58), and it comes back after. One that still doesn't come on is noted.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -73,11 +74,14 @@ local Section: Kit.Section = {
 		end
 		table.sort(eventIds)
 
+		-- Starting a seasonal event ends any other one an admin started (one at a time): each check puts them back.
+		local startedBefore = LiveOpsService.startedEvents()
 		local started: { string } = {}
 		ctx.onCleanup(function()
 			for _, eventId in started do
 				LiveOpsService.endEvents(eventId)
 			end
+			LiveOpsService.restoreStartedEvents(startedBefore)
 		end)
 		local checked, fewest, most = 0, math.huge, 0
 		for _, eventId in eventIds do
@@ -101,7 +105,7 @@ local Section: Kit.Section = {
 			task.wait(ctx.options.settleSeconds)
 			local wanted = SeasonRules.activeTheme(Seasons, LiveOpsService.activeEventIds())
 			if wanted ~= themeId then
-				ctx.note(`{eventId}: {wanted} outranks its theme ({themeId}) right now: not checked`)
+				ctx.note(`{eventId}: {wanted} is on instead of its theme ({themeId}): not checked`)
 			else
 				checked += 1
 				if SeasonService.currentTheme() ~= themeId or workspace:GetAttribute("SeasonTheme") ~= themeId then
@@ -131,6 +135,7 @@ local Section: Kit.Section = {
 			if not endedOk then
 				table.insert(issues, `endEvents failed: {Kit.short(tostring(endErr))}`)
 			end
+			LiveOpsService.restoreStartedEvents(startedBefore)
 			local index = table.find(started, eventId)
 			if index then
 				table.remove(started, index)

@@ -345,6 +345,20 @@ local function scenario()
 		string.find(workspace:GetAttribute("ActiveEventIds") :: string, "Winter2026", 1, true) ~= nil,
 		"starts a configured event"
 	)
+	-- One seasonal event at a time: a second one from the panel ends the first, and says so; a luck event stays
+	act(leo, "eventStart", "server", { id = "WinterLuck2026", minutes = 5 })
+	task.wait(0.2)
+	act(leo, "eventStart", "server", { id = "Valentine2027", minutes = 5 })
+	task.wait(1.2)
+	check(
+		workspace:GetAttribute("ActiveEventIds") == "Valentine2027,WinterLuck2026",
+		`a second seasonal event ends the first, a luck event runs on ({workspace:GetAttribute("ActiveEventIds")})`
+	)
+	check(workspace:GetAttribute("SeasonTheme") == "valentine", "and its theme takes over")
+	check(
+		string.find(lastToast(ADMIN), "(ended Winter2026)", 1, true) ~= nil,
+		`and the admin is told what it ended ({lastToast(ADMIN)})`
+	)
 	act(leo, "eventStop", "server", {})
 	task.wait(0.2)
 	check(string.find(workspace:GetAttribute("ActiveEventIds") :: string, "Winter2026", 1, true) == nil, "and ends it")

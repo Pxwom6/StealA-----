@@ -184,8 +184,19 @@ local function apply(command: Command, actor: Session?, role: HostRules.Role)
 	elseif kind == "luck" and command.multiplier and command.minutes then
 		LiveOpsService.startLuck(command.multiplier, command.minutes)
 	elseif kind == "eventStart" and command.id then
-		if LiveOpsService.startEvent(command.id, command.minutes) then
-			notify(actor, Format.template(Theme.text.hostEventStarted, { event = command.id }), "success")
+		-- a seasonal event ends any other seasonal one (one at a time, LiveOpsService)
+		local started, ended = LiveOpsService.startEvent(command.id, command.minutes)
+		if started then
+			notify(
+				actor,
+				if #ended > 0
+					then Format.template(
+						Theme.text.hostEventReplaced,
+						{ event = command.id, ended = table.concat(ended, ", ") }
+					)
+					else Format.template(Theme.text.hostEventStarted, { event = command.id }),
+				"success"
+			)
 		end
 	elseif kind == "eventStop" then
 		local ended = LiveOpsService.endEvents(command.id)

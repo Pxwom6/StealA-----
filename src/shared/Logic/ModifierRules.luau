@@ -158,11 +158,17 @@ function ModifierRules.maxWalkSpeed(config: ModifiersConfig): number
 	return best
 end
 
+-- The most of all spawns that may roll a mutation while any modifier runs (its own `mutationChance` included). Golden
+-- Hour's x3 of every mutation that can roll beside it (every permanent one, one seasonal event's, the strongest map's:
+-- 21.45% today) is what this bounds, close enough that a stronger Golden Hour, or a mutation added to what it
+-- multiplies, shows up here (DECISIONS.md #58; it was 50% while every event's mutations counted at once).
+ModifierRules.MAX_LIVE_MUTATION_CHANCE = 0.25
+
 -- Problems with Config/Modifiers (an empty list means valid). `liveMutationChance(id)` is the most mutation chance per
--- spawn that can be live at once while modifier `id` runs (MutationRules.worstCaseTotal(mutations, id)): multiplied by
--- that modifier's own mutation multiplier it must stay well below 1. `unlocks`: the modifiers a mutation is gated on
--- (Config/Mutations modifierId); such a modifier may have no other effect. So may one that drops things or puts a
--- bounty on the top earner.
+-- spawn that can be live at once while modifier `id` runs (MutationRules.worstCaseTotal(mutations, id, seasonal)):
+-- multiplied by that modifier's own mutation multiplier it must stay below MAX_LIVE_MUTATION_CHANCE. `unlocks`: the
+-- modifiers a mutation is gated on (Config/Mutations modifierId); such a modifier may have no other effect. So may one
+-- that drops things or puts a bounty on the top earner.
 function ModifierRules.validate(
 	config: ModifiersConfig,
 	liveMutationChance: (modifierId: string) -> number,
@@ -240,7 +246,7 @@ function ModifierRules.validate(
 			end
 		end
 		local live = liveMutationChance(id) * ModifierRules.effects(config, id).mutationChance
-		if live >= 0.5 then
+		if live >= ModifierRules.MAX_LIVE_MUTATION_CHANCE then
 			problem(`{name} would make mutations too common ({live})`)
 		end
 	end

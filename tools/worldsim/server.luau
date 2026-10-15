@@ -938,6 +938,32 @@ local function scenario()
 	check(BeltService.mutationConditions().Harvest2026 == nil, "and the Maple mutation with them")
 	check(math.abs(Lighting.ClockTime - mapSky.clockTime) < 1e-3, "and the map's own sky comes back")
 
+	-- One seasonal event at a time (DECISIONS.md #58): a second /event ends the first, its Snacklings and mutation with
+	-- it; a luck event runs beside either
+	Sim.chat(alice, "/event Winter2026 5")
+	task.wait(1.2)
+	Sim.chat(alice, "/event WinterLuck2026 5")
+	task.wait(0.2)
+	Sim.chat(alice, "/event Easter2027 5")
+	task.wait(1.2)
+	check(workspace:GetAttribute("SeasonTheme") == "spring", "a second seasonal /event switches its own theme on")
+	check(
+		workspace:GetAttribute("ActiveEventIds") == "Easter2027,WinterLuck2026",
+		`and ends the first, the luck event running on ({workspace:GetAttribute("ActiveEventIds")})`
+	)
+	local conditions = BeltService.mutationConditions()
+	check(conditions.Easter2027 == true and conditions.Winter2026 == nil, "Pastel rolls now, Festive no longer does")
+	decorParts = decorCounts()
+	check(decorParts == 330, `only the spring decorations stand ({decorParts} parts)`)
+	Sim.chat(alice, "/event off Easter2027")
+	task.wait(1.2)
+	check(
+		workspace:GetAttribute("ActiveEventIds") == "WinterLuck2026" and workspace:GetAttribute("SeasonTheme") == "",
+		"the first one stays ended: it was started with /event, so nothing brings it back"
+	)
+	Sim.chat(alice, "/event off")
+	task.wait(1.2)
+
 	-- Bounty Hunt: a bounty on the top earner, claimed by a tag or a steal, once per hunter, never by a friend, and
 	-- resting between claims -------------------------------------------------------------------------------------------
 	local Bounty = Sim.shared("Config/Bounty")

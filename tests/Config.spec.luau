@@ -17,6 +17,9 @@ local LiveOps = require("../src/shared/Config/LiveOps")
 local MapThemes = require("../src/shared/Config/MapThemes")
 local Modifiers = require("../src/shared/Config/Modifiers")
 local LiveOpsRules = require("../src/shared/Logic/LiveOpsRules")
+local ModifierRules = require("../src/shared/Logic/ModifierRules")
+local SeasonRules = require("../src/shared/Logic/SeasonRules")
+local Seasons = require("../src/shared/Config/Seasons")
 local StealRules = require("../src/shared/Logic/StealRules")
 local Types = require("../src/shared/Types")
 
@@ -546,6 +549,55 @@ local SEASONAL_EVENTS = {
 	{ eventId = "Harvest2026", name = "Harvest Feast 2026", mutation = "maple" },
 }
 
+-- One seasonal event at a time (DECISIONS.md #58): the events that switch on a theme never run together (LiveOps
+-- cuts them to one, and their dates never overlap). What can be live beside one is every plain event (luck, cash):
+-- those whose dates overlap it, and any other an admin starts beside it with /event.
+local SEASONAL = SeasonRules.seasonalEventIds(Seasons)
+
+local function shippedEvent(id: string): Types.EventDef
+	for _, event in LiveOps.events do
+		if event.id == id then
+			return event
+		end
+	end
+	error(`no event {id} in Config/LiveOps`)
+end
+
+local function liveBeside(eventId: string): { [string]: boolean }
+	local this = shippedEvent(eventId)
+	local live: { [string]: boolean } = { [eventId] = true }
+	for _, event in LiveOps.events do
+		if not SEASONAL[event.id] then
+			live[event.id] = true
+		elseif event.id ~= eventId and event.startsAt < this.endsAt and this.startsAt < event.endsAt then
+			error(`seasonal events {eventId} and {event.id} overlap on the calendar`)
+		end
+	end
+	return live
+end
+
+T.describe("One seasonal event at a time", function()
+	T.it("never schedules two seasonal events on the same dates", function()
+		local seasonal: { Types.EventDef } = {}
+		for _, event in LiveOps.events do
+			if SEASONAL[event.id] then
+				table.insert(seasonal, event)
+			end
+		end
+		T.expect(#seasonal).toBeAtLeast(#SEASONAL_EVENTS)
+		for i, a in seasonal do
+			for j = i + 1, #seasonal do
+				local b = seasonal[j]
+				if a.startsAt < b.endsAt and b.startsAt < a.endsAt then
+					error(`{a.id} and {b.id} overlap: two seasonal events can never run together`)
+				end
+			end
+		end
+		-- so cutting them to one at a time changes nothing on the calendar
+		T.expect(LiveOpsRules.oneSeasonAtATime(LiveOps.events, SEASONAL)).toEqual(LiveOps.events)
+	end)
+end)
+
 for _, season in SEASONAL_EVENTS do
 	local eventId = season.eventId
 
@@ -666,35 +718,27 @@ for _, season in SEASONAL_EVENTS do
 			T.expect(def.incomeMultiplier).toBeGreaterThan((golden :: Types.MutationDef).incomeMultiplier)
 		end)
 
-		T.it(
-			"keeps every mutation chance live during the event below 10%, and every event at once below 15%",
-			function()
-				-- the events whose dates overlap this one's (its luck weekend...) can run with it
-				local window: Types.EventDef? = nil
-				for _, event in LiveOps.events do
-					if event.id == eventId then
-						window = event
-					end
+		T.it("is the only seasonal mutation live while it runs, everything together below 10%", function()
+			-- the events whose dates overlap this one's (its luck weekend...) run with it; no other seasonal event can
+			-- (one at a time), but an admin could start every plain one beside it with /event
+			local this = shippedEvent(eventId)
+			local together: { [string]: boolean } = {}
+			for _, event in LiveOps.events do
+				if event.startsAt < this.endsAt and this.startsAt < event.endsAt then
+					together[event.id] = true
+					T.expect(event.id == eventId or not SEASONAL[event.id]).toBe(true)
 				end
-				local this = window :: Types.EventDef
-				local together: { [string]: boolean } = {}
-				for _, event in LiveOps.events do
-					if event.startsAt < this.endsAt and this.startsAt < event.endsAt then
-						together[event.id] = true
-					end
-				end
-				T.expect(together[eventId]).toBe(true)
-				T.expect(total(together)).toBeLessThan(0.1)
-				-- an admin could still start every event at once (`/event`)
-				local allEvents: { [string]: boolean } = {}
-				for _, mutation in Mutations do
-					if mutation.eventId then
-						allEvents[mutation.eventId] = true
-					end
-				end
-				T.expect(total(allEvents)).toBeLessThan(0.15)
 			end
-		)
+			T.expect(together[eventId]).toBe(true)
+			T.expect(total(together)).toBeLessThan(0.1)
+			local beside = liveBeside(eventId)
+			T.expect(total(beside)).toBeLessThan(0.1)
+			for _, mutation in Mutations do
+				if mutation.eventId and mutation.eventId ~= eventId then
+					T.expect(MutationRules.isEligible(mutation, beside)).toBe(SEASONAL[mutation.eventId] ~= true)
+				end
+			end
+		end)
 
 		T.it("rolls after the permanent mutations, so their rolls are unchanged", function()
 			local def = found :: Types.MutationDef
@@ -822,57 +866,49 @@ T.describe("Map and weather mutations", function()
 		end
 	end)
 
-	T.it(
-		"keeps any one event with the strongest map and modifier below 10%, and every event at once below 20%",
-		function()
-			-- Seasonal events are months apart, so one event's mutations at a time is what players meet; an admin could
-			-- still start them all together (`/event`), which must stay sane too.
-			local permanent, strongestMap, strongestModifier = 0, 0, 0
-			local byEvent: { [string]: number } = {}
-			for _, mutation in Mutations do
-				local gate = MutationRules.gate(mutation)
-				if gate == nil then
-					permanent += mutation.chance
-				elseif gate == "map" then
-					strongestMap = math.max(strongestMap, mutation.chance)
-				elseif gate == "modifier" then
-					strongestModifier = math.max(strongestModifier, mutation.chance)
-				else
-					local eventId = mutation.eventId :: string
-					byEvent[eventId] = (byEvent[eventId] or 0) + mutation.chance
-				end
-			end
-			for _, chance in byEvent do
-				T.expect(permanent + chance + strongestMap + strongestModifier).toBeLessThan(0.1)
-			end
-			local worst = MutationRules.worstCaseTotal(Mutations)
-			T.expect(worst).toBeLessThan(0.2)
-			local events: { [string]: boolean } = {}
-			for _, mutation in Mutations do
-				if mutation.eventId then
-					events[mutation.eventId] = true
-				end
-			end
-			local seen = 0
+	T.it("keeps any one seasonal event with every plain event, the strongest map and modifier below 10%", function()
+		-- What can roll together: one seasonal event (they run one at a time, DECISIONS.md #58), every luck and cash
+		-- event (an admin can start them beside it), one map and one modifier. MutationRules.worstCaseTotal with the
+		-- seasonal ids is exactly the worst of those.
+		local worst = MutationRules.worstCaseTotal(Mutations, nil, SEASONAL)
+		T.expect(worst).toBeLessThan(0.1)
+		local seen = 0
+		for eventId in SEASONAL do
+			local beside = liveBeside(eventId)
 			for _, themeId in MapThemes.order do
 				for _, modifierId in Modifiers.order do
-					local live = total(MutationRules.conditions(events, themeId, modifierId))
+					local live = total(MutationRules.conditions(beside, themeId, modifierId))
 					T.expect(live).toBeAtMost(worst + 1e-12)
 					seen = math.max(seen, live)
 				end
 			end
-			T.expect(seen).toBeNear(worst, 1e-12)
 		end
-	)
+		T.expect(seen).toBeNear(worst, 1e-12)
+		-- counting every event at once (which can no longer happen) is only an upper bound now
+		T.expect(MutationRules.worstCaseTotal(Mutations)).toBeAtLeast(worst)
+	end)
 
-	T.it("stays sane with Golden Hour on any map (one modifier at a time)", function()
-		local strongest = 1
-		for _, id in Modifiers.order do
-			strongest = math.max(strongest, Modifiers.modifiers[id].effects.mutationChance or 1)
+	T.it("keeps Golden Hour below 25% during any seasonal event on any map, a bound it comes close to", function()
+		-- one modifier at a time: during Golden Hour no weather mutation can roll, so it multiplies everything
+		-- permanent, one seasonal event's and the map's
+		local multiplier = ModifierRules.effects(Modifiers, "goldenHour").mutationChance
+		local before = MutationRules.worstCaseTotal(Mutations, "goldenHour", SEASONAL)
+		local worst = before * multiplier
+		T.expect(worst).toBeLessThan(ModifierRules.MAX_LIVE_MUTATION_CHANCE)
+		local seen = 0
+		for eventId in SEASONAL do
+			local beside = liveBeside(eventId)
+			for _, themeId in MapThemes.order do
+				local live = total(MutationRules.conditions(beside, themeId, "goldenHour"), multiplier)
+				T.expect(live).toBeAtMost(worst + 1e-12)
+				seen = math.max(seen, live)
+			end
 		end
-		for _, themeId in MapThemes.order do
-			T.expect(total(MutationRules.conditions({}, themeId, "goldenHour"), strongest)).toBeLessThan(0.3)
-		end
+		T.expect(seen).toBeNear(worst, 1e-12)
+		-- the bound still means something: Golden Hour at its config limit (x4), or one more seasonal mutation's 2%
+		-- under its x3, would break it
+		T.expect(before * Modifiers.limits.mutationChance.max).toBeGreaterThan(ModifierRules.MAX_LIVE_MUTATION_CHANCE)
+		T.expect((before + 0.02) * multiplier).toBeGreaterThan(ModifierRules.MAX_LIVE_MUTATION_CHANCE)
 	end)
 
 	T.it("makes signatures a chase between Golden and Diamond, and weather ones like Diamond", function()

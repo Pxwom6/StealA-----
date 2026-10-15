@@ -287,7 +287,9 @@ function Catalog.validateMutations(mutations: { MutationInfo }): { string }
 			problem(`mutation {id} look.particles {look.particles} is not a known preset`)
 		end
 	end
-	-- Only one map and one modifier are ever live at once: the most that can roll together (MutationRules).
+	-- Only one map and one modifier are ever live at once: the most that can roll together (MutationRules), with every
+	-- event's mutations counted as if they all ran at once (a bound above the real one: only one seasonal event runs
+	-- at a time, and the tighter checks in tests/Config.spec.luau and ModifierRules.validate use that).
 	local worst = MutationRules.worstCaseTotal(mutations)
 	if not (worst < 1) then
 		problem(`mutation chances add up to {worst}; together they must stay below 1`)

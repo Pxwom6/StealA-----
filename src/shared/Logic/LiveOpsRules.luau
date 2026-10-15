@@ -48,6 +48,85 @@ function LiveOpsRules.activeEventIds(events: { EventDef }, now: number): { [stri
 	return ids
 end
 
+-- One seasonal-theme event at a time (DECISIONS.md #58). `seasonal` holds the ids of the events that switch on a
+-- seasonal theme (SeasonRules.seasonalEventIds). Returns `events` with every seasonal event's window cut wherever a
+-- seasonal event with another id that started later runs, so at any moment at most one seasonal id is active: the one
+-- whose open copy started last (on the same start, the copy listed last: LiveOpsService lists config, then remote
+-- config, then what admins started, so an admin's /event wins a tie). A seasonal event takes over the moment it starts
+-- (by its dates, by remote config or by an admin); the one it took over from is cut while it runs, and comes back when
+-- it ends if its own window is still open (a scheduled event steps aside for an admin's). Copies of one id never cut
+-- each other. Other events (luck, cash) pass through untouched, and the list keeps its order (the banner is the first
+-- active event that has one). Pure and timeless: activeEvents and everything built on it can read the result at any
+-- time.
+function LiveOpsRules.oneSeasonAtATime(events: { EventDef }, seasonal: { [string]: boolean }): { EventDef }
+	local copies: { EventDef } = {} -- in list order
+	local ids: { [string]: boolean } = {}
+	local idCount = 0
+	for _, event in events do
+		if seasonal[event.id] and event.endsAt > event.startsAt then
+			table.insert(copies, event)
+			if not ids[event.id] then
+				ids[event.id] = true
+				idCount += 1
+			end
+		end
+	end
+	if idCount < 2 then
+		return table.clone(events)
+	end
+	-- Every start and end splits time into spans on which the one running can't change.
+	local edges: { number } = {}
+	local seenEdge: { [number]: boolean } = {}
+	for _, event in copies do
+		for _, t in { event.startsAt, event.endsAt } do
+			if not seenEdge[t] then
+				seenEdge[t] = true
+				table.insert(edges, t)
+			end
+		end
+	end
+	table.sort(edges)
+	-- running[k]: the seasonal id that runs on [edges[k], edges[k + 1]), or nil when none does: the id of the open copy
+	-- that started last (later in the list on a tie: `>=`, since copies are in list order).
+	local running: { [number]: string } = {}
+	for k = 1, #edges - 1 do
+		local t = edges[k]
+		local best: EventDef? = nil
+		for _, event in copies do
+			if isActive(event, t) and (best == nil or event.startsAt >= best.startsAt) then
+				best = event
+			end
+		end
+		if best then
+			running[k] = best.id
+		end
+	end
+	local result: { EventDef } = {}
+	for _, event in events do
+		if not (seasonal[event.id] and event.endsAt > event.startsAt) then
+			table.insert(result, event)
+			continue
+		end
+		-- the runs of spans inside this copy's window where its id is the one running
+		local pieceStart: number? = nil
+		for k = 1, #edges do
+			local runs = k < #edges
+				and edges[k] >= event.startsAt
+				and edges[k + 1] <= event.endsAt
+				and running[k] == event.id
+			if runs and pieceStart == nil then
+				pieceStart = edges[k]
+			elseif not runs and pieceStart ~= nil then
+				local piece = table.clone(event)
+				piece.startsAt, piece.endsAt = pieceStart, edges[k]
+				table.insert(result, piece)
+				pieceStart = nil
+			end
+		end
+	end
+	return result
+end
+
 -- The active events with each id counted once: the same event can be listed more than once (scheduled in config,
 -- re-listed by remote config, started again with /event), and must never stack with itself. Keeps the order in which
 -- each id first appears, and of its active copies the one that ends last.

@@ -11,6 +11,11 @@
 	  * admin actions: startLuck, startEvent, endEvents and announce, run by HostService for the host panel and the
 	    admin chat commands (/luck, /event <id> [minutes], /event off [id], /announce), in this server or, through
 	    CrossServer, every server
+
+	One seasonal-theme event at a time (Config/Seasons; DECISIONS.md #58): whichever started last runs
+	(LiveOpsRules.oneSeasonAtATime). Starting one with /event or the host panel ends every other seasonal event an admin
+	started, and a scheduled one steps aside until it ends (then it comes back if its dates still say so). Luck and
+	cash events overlap anything.
 ]]
 
 local DataStoreService = game:GetService("DataStoreService")
@@ -19,9 +24,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextService = game:GetService("TextService")
 
 local LiveOps = require(ReplicatedStorage.Shared.Config.LiveOps)
+local Seasons = require(ReplicatedStorage.Shared.Config.Seasons)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local LiveOpsRules = require(ReplicatedStorage.Shared.Logic.LiveOpsRules)
+local SeasonRules = require(ReplicatedStorage.Shared.Logic.SeasonRules)
 local Types = require(ReplicatedStorage.Shared.Types)
 local Announcer = require(script.Parent.Announcer)
 
@@ -30,9 +37,14 @@ local LiveOpsService = {}
 -- The source of luck boosts bought with Robux (Server Luck).
 LiveOpsService.PURCHASE_SOURCE = "purchase"
 
+-- The events that switch on a seasonal theme: only one of them runs at a time.
+local SEASONAL = SeasonRules.seasonalEventIds(Seasons)
+
 local configEvents: { Types.EventDef } = table.clone(LiveOps.events)
 local remoteEvents: { Types.EventDef } = {}
 local adminEvents: { Types.EventDef } = {}
+-- Every event with the seasonal ones cut to one at a time, worked out again whenever a list changes.
+local resolved: { Types.EventDef }? = nil
 local boosts: { LiveOpsRules.Boost } = {}
 local cashListeners: { () -> () } = {}
 local lastCashMultiplier = 1
@@ -43,14 +55,24 @@ function LiveOpsService.now(): number
 	return workspace:GetServerTimeNow()
 end
 
+-- Whether event `id` switches on a seasonal theme (only one such event runs at a time).
+function LiveOpsService.isSeasonal(id: string): boolean
+	return SEASONAL[id] == true
+end
+
+-- Every event, scheduled (config and remote config) and started by admins, as the rules see it: each seasonal event
+-- cut wherever a later one runs (LiveOpsRules.oneSeasonAtATime), so the active ones never include two.
 function LiveOpsService.events(): { Types.EventDef }
-	local all: { Types.EventDef } = {}
-	for _, list in { configEvents, remoteEvents, adminEvents } do
-		for _, event in list do
-			table.insert(all, event)
+	if resolved == nil then
+		local all: { Types.EventDef } = {}
+		for _, list in { configEvents, remoteEvents, adminEvents } do
+			for _, event in list do
+				table.insert(all, event)
+			end
 		end
+		resolved = LiveOpsRules.oneSeasonAtATime(all, SEASONAL)
 	end
-	return all
+	return resolved :: { Types.EventDef }
 end
 
 -- The luck belt rolls use: events and every boost (the bought one included; the store card shows these odds).
@@ -123,9 +145,22 @@ end
 -- Starts a configured (or ad-hoc) event right now for `seconds`. If that event id is already running (scheduled,
 -- remote config, or started earlier), this only extends it: it ends at the later of its current end and now +
 -- `seconds`, never sooner, and never runs twice (the rules count each event id once, LiveOpsRules.distinctActiveEvents).
--- Use `/event off` first to shorten an event started this way.
-function LiveOpsService.startEventNow(event: Types.EventDef, seconds: number)
+-- Use `/event off` first to shorten an event started this way. A seasonal-theme event ends every other one: those an
+-- admin started are gone for good, and a scheduled one steps aside while this one runs (LiveOpsRules.oneSeasonAtATime).
+-- Returns the ids of the seasonal events that were running and no longer are (sorted).
+function LiveOpsService.startEventNow(event: Types.EventDef, seconds: number): { string }
 	local now = LiveOpsService.now()
+	local before = LiveOpsService.activeEventIds()
+	local seasonal = LiveOpsService.isSeasonal(event.id)
+	-- the other seasonal events an admin started end first, so they never stretch this one
+	local kept: { Types.EventDef } = {}
+	for _, running in adminEvents do
+		if running.id == event.id or not (seasonal and LiveOpsService.isSeasonal(running.id)) then
+			table.insert(kept, running)
+		end
+	end
+	adminEvents = kept
+	resolved = nil
 	local endsAt = now + seconds
 	for _, running in LiveOpsRules.activeEvents(LiveOpsService.events(), now) do
 		if running.id == event.id then
@@ -135,7 +170,7 @@ function LiveOpsService.startEventNow(event: Types.EventDef, seconds: number)
 	local copy = table.clone(event)
 	copy.startsAt = now
 	copy.endsAt = endsAt
-	local kept: { Types.EventDef } = {}
+	kept = {}
 	for _, running in adminEvents do
 		if running.id ~= event.id then
 			table.insert(kept, running)
@@ -143,11 +178,22 @@ function LiveOpsService.startEventNow(event: Types.EventDef, seconds: number)
 	end
 	table.insert(kept, copy)
 	adminEvents = kept
+	resolved = nil
+	local after = LiveOpsService.activeEventIds()
+	local ended: { string } = {}
+	for id in before do
+		if id ~= event.id and not after[id] and LiveOpsService.isSeasonal(id) then
+			table.insert(ended, id)
+		end
+	end
+	table.sort(ended)
 	LiveOpsService.publishAttributes()
+	return ended
 end
 
 -- Ends events started with /event (startEventNow): every one, or only those with `id`. Scheduled (config and
--- remote-config) events are not affected: change their dates to end them. Returns how many were ended.
+-- remote-config) events are not affected: change their dates to end them (a scheduled seasonal event an admin's had
+-- taken over from comes back as soon as that one ends). Returns how many were ended.
 function LiveOpsService.endStartedEvents(id: string?): number
 	local kept: { Types.EventDef } = {}
 	for _, event in adminEvents do
@@ -157,12 +203,26 @@ function LiveOpsService.endStartedEvents(id: string?): number
 	end
 	local ended = #adminEvents - #kept
 	adminEvents = kept
+	resolved = nil
 	LiveOpsService.publishAttributes()
 	return ended
 end
 
 function LiveOpsService.setRemoteEvents(events: { Types.EventDef })
 	remoteEvents = events
+	resolved = nil
+	LiveOpsService.publishAttributes()
+end
+
+-- The events started with /event (a copy), and putting such a list back: the Studio self-test switches every seasonal
+-- event on in turn, which ends any an admin had started, and leaves the session as it found it with these.
+function LiveOpsService.startedEvents(): { Types.EventDef }
+	return table.clone(adminEvents)
+end
+
+function LiveOpsService.restoreStartedEvents(events: { Types.EventDef })
+	adminEvents = table.clone(events)
+	resolved = nil
 	LiveOpsService.publishAttributes()
 end
 
@@ -285,19 +345,23 @@ function LiveOpsService.startLuck(multiplier: number, minutes: number)
 end
 
 -- Starts configured event `id` now, for `minutes` or else its own durationSeconds (30 minutes without one), with
--- its banner. Returns false when no event has that id.
-function LiveOpsService.startEvent(id: string, minutes: number?): boolean
+-- its banner; a seasonal one ends any other seasonal event that was running (startEventNow). Returns false when no
+-- event has that id, else true and the ids of the seasonal events it ended.
+function LiveOpsService.startEvent(id: string, minutes: number?): (boolean, { string })
 	local event = LiveOpsService.findConfiguredEvent(id)
 	if event == nil then
-		return false
+		return false, {}
 	end
 	local seconds = if minutes then minutes * 60 else event.durationSeconds or 1800
-	LiveOpsService.startEventNow(event, seconds)
+	local ended = LiveOpsService.startEventNow(event, seconds)
 	print(`[LiveOps] {event.id} running for at least {seconds // 60} min`)
+	if #ended > 0 then
+		print(`[LiveOps] one seasonal event at a time: {table.concat(ended, ", ")} ended`)
+	end
 	if event.bannerText then
 		Announcer.broadcast({ text = event.bannerText, rarity = "Mythic", kind = "admin" })
 	end
-	return true
+	return true, ended
 end
 
 -- Ends events started by an admin (every one, or only `id`); returns how many.
