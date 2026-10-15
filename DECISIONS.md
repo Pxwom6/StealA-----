@@ -921,3 +921,59 @@ big in the middle of the map, which is where the steals happen.
 **Why:** a longer ladder for players who have finished the first 25, and trophies that point at the newer systems
 (the modifiers, the daily reward, codes) and soften the first steal against you.
 **Reversal cost:** none — an achievement removed stops showing; its ids stay in the shipped list.
+
+### 44. Easter 2027: the fourth seasonal event, four new kinds of decoration and a blossom weather
+
+* **What:** `Easter2027` (Fri 19 Mar 17:00 UTC → Tue 6 Apr 07:00 UTC) with `EasterLuck2027` (2× luck from Good
+  Friday to Easter Monday): Custard Chick (Rare), Hot Cross Bunny (Epic), Lemon Meringue Lamb (Legendary) and Jelly
+  Bean Jackalope (Mythic), hand-built polished models (`art/snackling-parts/batch-6.json`, prompt for a Claude
+  Design redo next to it) with recipe fallbacks; the Pastel mutation (everything washed towards a lilac white, a pale
+  pink glow, pastel sugar sparkles); code `EGGHUNT27` (a Pastel Custard Chick until the event ends).
+* **The `spring` theme:** four new prop kinds, laid out in the same spots as the others so any theme can mix them:
+  giant painted eggs (a pastel shell, two painted bands, two dots) after the roses beside each entrance and along the
+  belt, chocolate bunnies (1.3× scale, about 11 studs: landmarks by the factory) in the corner spots after the giant
+  hearts, blossom trees between the bases (behind the decorated trees when a theme has both) and butterflies over the
+  walkway, lower than the balloons and nearer the bases. Pastel string lights, lamps, a bright spring morning and a
+  new weather, `blossoms` (soft pastel petals drifting down), complete it: 330 parts, under the 400 budget.
+* **Mutation bounds:** a fourth 2% event mutation takes "every event at once" (only possible with `/event`) to
+  15.15% of spawns, so that bound moved from 15% to 20%. The per-event check now looks at what can really run
+  together, the events whose dates overlap (the luck weekend): 5.95% for Easter, and any one event with the
+  strongest map and modifier is still 9.15%, under 10%.
+* **Renders before shipping:** the chick's eyes first sat inside its head (its centre is set back) and the lamb's
+  toasted meringue read as spikes until they became golden caps on rounder puffs; the bunny's head hid the cross on
+  its bun from the podium view, so the bun moved back, its icing got thicker and a small cross went on its forehead.
+  The decorations were checked on the meadow map: eggs, butterflies and the bunnies were made bigger after the first
+  render, where they read as specks next to the plots.
+* **Tests:** the dates and the luck weekend; the layout (330 parts, the configured counts, nothing on plots, the belt
+  or the lobby, eggs facing the walkway in two different colours, blossom trees clear of the plot walls, butterflies
+  above head height, bunnies clear of the factory and the chute, every prop kind mixing with the others without
+  overlapping); the event Snacklings and mutation like the other events; the server test turns Easter on (330 parts
+  by name, the lighting, a Pastel Jackalope on the belt) and off.
+
+**Why:** spring between Valentine's and the summer, with Snacklings and a mutation players can only get then.
+**Reversal cost:** none — move the dates, or drop the `Easter2027` line from Config/Seasons to keep the Snacklings
+without the decorations. Never remove the creature or mutation ids (they are in players' saves).
+
+### 45. Three more maps: Popcorn Drive-In, Tea Party Garden, Pancake Peaks
+
+* **What:** maps 21-23, built from the same pieces as the others (DECISIONS.md #32): Popcorn Drive-In (a starry
+  night lawn of popcorn trees and corn stalks; two glowing drive-in screens, giant striped popcorn buckets and soda
+  cups; popcorn popping all around), Tea Party Garden (an afternoon lawn of clipped topiaries and cone topiaries in
+  terracotta pots; a steaming giant teapot, teacups of tea, a three-tier cake stand and tumbled sugar cubes; falling
+  petals) and Pancake Peaks (a breakfast morning: pancake-brown hills round a syrup lake, blueberry bushes and giant
+  forks; towering pancake stacks with butter and syrup drips, syrup bottles and a waffle tower; steam rising).
+* **New pieces:** six flora kinds and ten landmark kinds (ThemeProps; counted in MapThemeRules and built exactly,
+  which the world smoke test checks), two weathers (popcorn: puffs jumping up and falling; steam: soft wisps rising),
+  and a particle preset (popcorn) for Buttered. The heaviest of the three builds about 1,370 scenery parts (budget
+  1,500).
+* **Signature mutations:** Buttered (golden and glossy, popcorn popping), Porcelain (glazed white, glinting) and
+  Syrupy (amber glass, dripping), 1.2% at x3 like every map's, rolled after every other mutation so no existing roll
+  changes. Code `MOVIENIGHT`: a Buttered Popcorn Penguin.
+* **Colours:** two world colours already existed (`hedge`, `strawberry`, used by other maps), so the new maps use
+  them rather than redefining them (Tea Party Garden sets its own hedge green in its palette). Pancake Peaks first
+  rendered as one orange: its ground went creamier than its pancake-brown hills and its haze bluer, and its
+  blueberry bushes grew so they read next to the forks.
+
+**Why:** "a ton of extra maps". Three themes unlike the twenty before them: a night out, a garden party and a
+breakfast.
+**Reversal cost:** none — `weight = 0` keeps a map for `/map` only; never remove the mutation ids (they are in saves).

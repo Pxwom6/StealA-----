@@ -27,6 +27,8 @@ local Codes = {
 	STORMCHASER = { reward = { kind = "creature", creatureId = "pretzel_pal", variant = "electric" } },
 	-- Twenty maps: a Gummy Grub with Bubblegum Bayou's signature mutation.
 	TWENTYMAPS = { reward = { kind = "creature", creatureId = "gummy_grub", variant = "bubblegum" } },
+	-- Twenty-three maps: a Popcorn Penguin with Popcorn Drive-In's signature mutation.
+	MOVIENIGHT = { reward = { kind = "creature", creatureId = "popcorn_penguin", variant = "buttered" } },
 	-- Halloween 2026: a Haunted Candy Corn Cat while the event runs.
 	SPOOKY26 = {
 		reward = { kind = "creature", creatureId = "candy_corn_cat", variant = "haunted" },
@@ -49,6 +51,12 @@ local Codes = {
 		reward = { kind = "creature", creatureId = "candy_heart_hamster", variant = "sweetheart" },
 		startsAt = 1801846800, -- 2027-02-05 17:00 UTC (Valentine2027 starts)
 		expiresAt = 1802764800, -- 2027-02-16 08:00 UTC
+	},
+	-- Easter 2027: a Pastel Custard Chick while the event runs.
+	EGGHUNT27 = {
+		reward = { kind = "creature", creatureId = "custard_chick", variant = "pastel" },
+		startsAt = 1805475600, -- 2027-03-19 17:00 UTC (Easter2027 starts)
+		expiresAt = 1806994800, -- 2027-04-06 07:00 UTC
 	},
 }
 

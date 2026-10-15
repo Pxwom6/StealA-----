@@ -28,6 +28,7 @@ local Seasons: SeasonsConfig = {
 		Halloween2026 = "halloween",
 		Winter2026 = "winter",
 		Valentine2027 = "valentine",
+		Easter2027 = "spring",
 	},
 
 	themes = {
@@ -163,9 +164,56 @@ local Seasons: SeasonsConfig = {
 				arrow = "#F2C14E",
 			},
 		},
+
+		spring = {
+			displayName = "Easter",
+			accentColor = "#B48CFF",
+			priority = 1,
+			weather = "blossoms",
+			lighting = {
+				clockTime = 10.2, -- a bright spring morning
+				brightness = 2.6,
+				ambient = "#8A8A9E",
+				outdoorAmbient = "#BFC6DA",
+				colorShiftTop = "#FFF2D6",
+				atmosphere = {
+					density = 0.24, -- a light spring haze
+					offset = 0.1,
+					color = "#E8F0FF",
+					decay = "#BCCBEA",
+					glare = 0.2,
+					haze = 1.1,
+				},
+				colorCorrection = { tint = "#FFFCF4", brightness = 0.03, contrast = 0.05, saturation = 0.14 },
+				clouds = { cover = 0.5, density = 0.4, color = "#FFFFFF" },
+			},
+			decorations = {
+				eggsPerPlot = 2,
+				beltEggsPerSide = 3,
+				bulbsPerPlot = 8,
+				lampsBetweenPlots = true,
+				blossomTreesBetweenPlots = true,
+				butterflies = 16,
+				chocolateBunnies = 4,
+			},
+			palette = {
+				bulbs = { "#FFB3D9", "#B8F2D6", "#D6C2FF", "#FFF2A6", "#BFE4FF" },
+				lampPost = "#8C7AA8",
+				lampLight = "#FFF0B8",
+				-- each shell is painted in a contrasting colour: pink with sky blue, mint with pink...
+				eggs = { "#FFC4E1", "#B8F2D6", "#D6C2FF", "#FFF2A6", "#BFE4FF", "#FFD2B0" },
+				eggStripes = { "#5AB8F5", "#FF6FAE", "#FFC93C", "#9A6BFF", "#3FC48A", "#FFFFFF" },
+				wood = "#7A5236",
+				blossoms = { "#FFC0DA", "#FFFFFF", "#FFA6C9", "#F7D6FF" },
+				butterflies = { "#FFD24A", "#7CC8FF", "#FF8FC7", "#B48CFF", "#FF9A4A" },
+				butterflyBody = "#3A2A40",
+				chocolate = "#5C3018",
+				bunnyBow = "#FF8FC7",
+			},
+		},
 	},
 
-	maxParts = 400, -- Halloween builds 220, Winter 380 (DECISIONS.md #37), Valentine's 280 (#41)
+	maxParts = 400, -- Halloween builds 220, Winter 380 (DECISIONS.md #37), Valentine's 280 (#41), Easter 330 (#44)
 	transitionSeconds = 4,
 }
 

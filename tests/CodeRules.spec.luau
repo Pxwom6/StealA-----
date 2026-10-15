@@ -60,7 +60,7 @@ T.describe("CodeRules: the real codes", function()
 				checked += 1
 			end
 		end
-		T.expect(checked).toBeAtLeast(6) -- SPOOKY26, JINGLE26 and LOVE27: a Snackling and a mutation each
+		T.expect(checked).toBeAtLeast(8) -- SPOOKY26, JINGLE26, LOVE27 and EGGHUNT27: a Snackling and a mutation each
 	end)
 end)
 
@@ -127,7 +127,7 @@ T.describe("CodeRules.check", function()
 
 	T.it("keeps the real event codes shut before their events (they all worked in October 2026)", function()
 		local october15 = 1792023721
-		for _, code in { "SPOOKY26", "JINGLE26", "HAPPY2027", "LOVE27" } do
+		for _, code in { "SPOOKY26", "JINGLE26", "HAPPY2027", "LOVE27", "EGGHUNT27" } do
 			T.expect(select(3, CodeRules.check(Codes, code, {}, october15))).toBe("unknown")
 			local starts = Codes[code].startsAt :: number
 			T.expect((CodeRules.check(Codes, code, {}, starts)) ~= nil).toBe(true)
