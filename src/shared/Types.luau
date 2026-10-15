@@ -425,6 +425,9 @@ export type SceneryPlaza = {
 	extraFlowerBeds: { { x: number, z: number, yaw: number } },
 	treeRadius: number,
 	treeAngles: { number },
+	-- The What's New board (Config/Updates' newest update), in a gap of the tree ring, facing the lobby spawn. Built by
+	-- MapBuilder outside the Scenery folder, so a map change never rebuilds it (only recolours its frame and legs).
+	newsBoard: { angle: number, radius: number },
 }
 
 export type TreeKind = "round" | "pine"
@@ -753,6 +756,88 @@ export type AchievementsConfig = { list: { AchievementDef } }
 
 -- One achievement as the Trophies tab shows it.
 export type AchievementView = { id: string, progress: number, target: number, done: boolean }
+
+-- Config: titles and base skins (Config/Titles, Config/Skins): looks players earn and show off, never bought ---------
+
+-- How a title or a base skin is earned (Logic/StyleRules.isUnlocked):
+--   free         everyone has it (the Classic base)
+--   achievement  that achievement of Config/Achievements is done: its ach_<id> flag is set, or its goal is reached
+--   rebirths     at least `count` rebirths
+--   tiers        at least `count` Snackdex tiers completed
+export type StyleUnlock =
+	{ kind: "free" }
+	| { kind: "achievement", id: string }
+	| { kind: "rebirths", count: number }
+	| { kind: "tiers", count: number }
+
+-- A title: a short line under the player's name over their head, and a tag beside their name in chat. Equipped, it
+-- is the flag title_<id> (never rename one that has shipped: whoever wears it would wear nothing).
+export type TitleDef = {
+	id: string,
+	text: string, -- short enough for a nametag on a phone (StyleRules.TITLE_LENGTH)
+	icon: string, -- emoji before the text
+	color: string, -- #RRGGBB, light enough to read over its dark outline (StyleRules.MIN_TITLE_LUMINANCE)
+	unlock: StyleUnlock,
+}
+
+-- The BillboardGui over each head (server/Services/Nametags): pixels, so it stays the same size on screen like
+-- Roblox's own names, and studs.
+export type NametagConfig = {
+	width: number, -- px
+	height: number, -- px
+	maxTextSize: number, -- px: short titles don't grow taller than this
+	offset: number, -- studs from the top of the head to the middle of the title (Roblox's name sits above it)
+	maxDistance: number, -- studs: hidden beyond this, like Roblox's names
+}
+
+export type TitlesConfig = {
+	list: { TitleDef }, -- in the Titles tab's order (easiest first)
+	nametag: NametagConfig,
+	chatTag: boolean, -- also show the title beside the name in chat (after [VIP])
+}
+
+-- A base skin's look: only the plot's cosmetic surfaces (the floor's checker tiles, the rug down the aisle, the wall
+-- tops and corner caps). Walls, sign, podiums, pads, the lock button and the upgrade pad keep their colours.
+export type SkinLook = {
+	tiles: { string }, -- the checker's colours, alternated over the floor (two make a checker)
+	tileMaterial: string, -- Enum.Material name (StyleRules.FLOOR_MATERIALS)
+	rug: string,
+	rugMaterial: string,
+	trim: string,
+	trimMaterial: string, -- StyleRules.TRIM_MATERIALS
+	rainbow: boolean?, -- the trims cycle through the rainbow on every client (off with Reduce effects)
+}
+
+-- A base skin. Equipped, it is the flag skin_<id>; with none, a base wears the default (Classic).
+export type SkinDef = {
+	id: string,
+	name: string,
+	icon: string,
+	look: SkinLook?, -- nil: the plot's own colours (Classic)
+	unlock: StyleUnlock,
+}
+
+export type SkinsConfig = {
+	list: { SkinDef }, -- in the Base tab's order
+	default: string, -- the skin every base has (free, no look of its own)
+}
+
+-- One title or skin as the Style dialog shows it (StyleSync).
+export type StyleItemView = { id: string, unlocked: boolean, progress: number, target: number }
+
+-- Server -> client StyleSync: what is worn and what is unlocked. `title` is "" for none.
+export type StyleView = { title: string, skin: string, titles: { StyleItemView }, skins: { StyleItemView } }
+
+-- Config: What's New (Config/Updates): a card for returning players and a board by the spawn plaza ------------------
+
+export type UpdateDef = {
+	number: number, -- 1, 2, 3...: a returning player sees the highest one once (the flag news_<number>)
+	date: string, -- "YYYY-MM-DD", the day it was published
+	title: string,
+	highlights: { string }, -- 3 to 5 short lines, each starting with an emoji
+}
+
+export type UpdatesConfig = { list: { UpdateDef } } -- newest first
 
 -- Config: redeem codes (server/Codes.luau, server-only so codes never reach a client) --------------------------------
 

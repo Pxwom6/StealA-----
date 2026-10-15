@@ -6,17 +6,22 @@
 	replicated attributes match it. Clients read those attributes (CreatureId, Variant, Stored, Income, BeingStolen,
 	OwnerUserId, LockedUntil, ...) to draw billboards and build their own interaction prompts. `Variant` is the
 	creature's mutation id ("" for none); `Income` already includes the mutation and the owner's multiplier.
+
+	A base's look follows its owner: their base skin (StyleService → setSkin, the plot attribute `Skin`) and VIP's
+	gold trim (setVipTrim), painted together by MapBuilder.paintPlot. Releasing a plot puts the Classic look back.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
+local Skins = require(ReplicatedStorage.Shared.Config.Skins)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local GameData = require(ReplicatedStorage.Shared.GameData)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local CreatureVisuals = require(ReplicatedStorage.Shared.CreatureVisuals)
 local PlotAssignment = require(ReplicatedStorage.Shared.Logic.PlotAssignment)
 local StealRules = require(ReplicatedStorage.Shared.Logic.StealRules)
+local StyleRules = require(ReplicatedStorage.Shared.Logic.StyleRules)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local MapBuilder = require(script.Parent.MapBuilder)
 local Sessions = require(script.Parent.Sessions)
@@ -33,12 +38,17 @@ local world: MapBuilder.World
 local owners: PlotAssignment.Owners = {}
 local placed: { [number]: { [number]: PlacedCreature } } = {}
 local busy: { [number]: { [number]: boolean } } = {}
+local skins: { [number]: string } = {} -- the base skin each plot wears (Config/Skins id)
+local vips: { [number]: boolean } = {} -- its owner has VIP: golden trim
 
 function PlotService.start(builtWorld: MapBuilder.World)
 	world = builtWorld
 	for index = 1, #world.plots do
 		placed[index] = {}
 		busy[index] = {}
+		skins[index] = Skins.default
+		vips[index] = false
+		world.plots[index].model:SetAttribute("Skin", Skins.default)
 		PlotService.applyShield(index, "None")
 	end
 end
@@ -123,6 +133,7 @@ function PlotService.release(session: Session)
 	refs.signLabel.Text = Theme.text.freePlotSign
 	refs.signIncome.Text = ""
 	MapBuilder.setSignOwner(refs, 0)
+	PlotService.setSkin(plot, Skins.default)
 	PlotService.setVipTrim(plot, false)
 	PlotService.applyShield(plot, "None")
 	session.plot = 0
@@ -214,11 +225,35 @@ function PlotService.setNextPodiumCost(plot: number, cost: number?)
 	world.plots[plot].model:SetAttribute("NextPodiumCost", cost or -1)
 end
 
+local function paintLook(plot: number)
+	local def = StyleRules.skinById(Skins, skins[plot] or Skins.default)
+	MapBuilder.paintPlot(world.plots[plot], if def then def.look else nil, vips[plot] == true)
+end
+
+-- VIP's golden trim on (or off) plot `plot`, with whatever skin it wears (StyleRules.trimSources). Runs on every
+-- podium sync, so it only repaints when it changes.
 function PlotService.setVipTrim(plot: number, isVip: boolean)
-	for _, trim in world.plots[plot].trims do
-		trim.Color = if isVip then UiTheme.world("vipTrim") else UiTheme.world("wall")
-		trim.Material = if isVip then Enum.Material.Neon else Enum.Material.SmoothPlastic
+	if vips[plot] == isVip then
+		return
 	end
+	vips[plot] = isVip
+	paintLook(plot)
+end
+
+-- Dresses plot `plot` in base skin `skinId` (Config/Skins; an unknown id is the default, Classic) and publishes it as
+-- the plot attribute `Skin`. StyleService checks the owner has it unlocked; a map change never repaints it.
+function PlotService.setSkin(plot: number, skinId: string)
+	local id = if StyleRules.skinById(Skins, skinId) then skinId else Skins.default
+	if skins[plot] == id then
+		return
+	end
+	skins[plot] = id
+	world.plots[plot].model:SetAttribute("Skin", id)
+	paintLook(plot)
+end
+
+function PlotService.skinOf(plot: number): string
+	return skins[plot] or Skins.default
 end
 
 -- Shows the force field for a lock (blue) or new-player protection (yellow), or hides it.

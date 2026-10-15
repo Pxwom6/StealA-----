@@ -587,7 +587,6 @@ local Theme = {
 
 		-- Redeem codes (server/Codes.luau): the Codes dialog (from Settings) and its answers
 		settingsCodes = "🎟️ Codes",
-		settingsCodesHint = "Got a code? Redeem it here",
 		codesTitle = "Redeem a Code",
 		codesBody = "Codes give free cash and Snacklings. Each one works once.",
 		codesPlaceholder = "Type a code",
@@ -599,6 +598,40 @@ local Theme = {
 		codeExpired = "That code has expired.",
 		codeUsed = "You've already redeemed that code.",
 		codeBaseFull = "Your base is full! Sell a Snackling, then redeem the code again.",
+
+		-- Titles and base skins (Config/Titles, Config/Skins): the Style dialog (from Settings) and the unlock toasts
+		settingsStyle = "🎨 Style",
+		styleTitle = "🎨 Style",
+		styleTabTitles = "🏷️ Titles",
+		styleTabBase = "🏠 Base",
+		styleWearing = "Wearing: {title}",
+		styleWearingNone = "Wearing: no title",
+		styleTitlesHint = "Everyone else sees it over your head and in chat",
+		styleBaseNow = "Your base: {skin}",
+		styleBaseHint = "Colours your base's floor and trim",
+		styleNoTitle = "No title",
+		styleNoTitleHint = "Just your name",
+		styleTapToWear = "Tap to wear",
+		styleWorn = "✓ Wearing",
+		styleTapToUse = "Tap to use",
+		styleUsed = "✓ On your base",
+		styleLocked = "🔒 {progress}", -- "12 / 25", "$1.2M / $1B", "3.4 / 10 h"
+		styleLockedHint = "Not yet! {hint}",
+		styleLoading = "Loading...",
+		styleEarnFree = "Every base starts with it",
+		styleEarnRebirthOnce = "Rebirth once",
+		styleEarnRebirths = "Rebirth {count} times",
+		styleEarnTierOnce = "Complete a Snackdex tier",
+		styleEarnTiers = "Complete {count} Snackdex tiers",
+		styleEarnTiersAll = "Complete every Snackdex tier",
+		titleUnlocked = "{icon} New title unlocked: {title} — equip it in Settings ▸ Style",
+		skinUnlocked = "{icon} New base skin unlocked: {skin} — equip it in Settings ▸ Style",
+
+		-- What's New (Config/Updates): the card returning players see once, and the board on the spawn plaza
+		whatsNewTitle = "📰 What's New!",
+		whatsNewMeta = "Update {number} · {date}",
+		whatsNewButton = "Let's go!",
+		newsBoardHeader = "📰 WHAT'S NEW",
 
 		-- The host panel (Settings, admins and private-server owners only; Config/Host) and what it says back
 		settingsHost = "🛠️ Host panel",

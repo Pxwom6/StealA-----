@@ -161,6 +161,11 @@ local Gameplay = {
 		UseGadget = { burst = 6, perSecond = 3 },
 		-- The host panel (HostService): admins and private-server owners only; owners also have cooldowns per action.
 		HostAction = { burst = 4, perSecond = 1 },
+		-- Titles and base skins (StyleService): the Style dialog asking for what is unlocked, and wearing one.
+		GetStyle = { burst = 3, perSecond = 0.5 },
+		EquipStyle = { burst = 4, perSecond = 1 },
+		-- What's New (NewsService): the card was shown; once per update in practice.
+		SeenNews = { burst = 2, perSecond = 0.2 },
 	} :: { [string]: RateLimit },
 }
 

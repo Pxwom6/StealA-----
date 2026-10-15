@@ -633,6 +633,28 @@ A thief is always slower than a tagger on foot (14.9 < 16), so the soda is a hea
 shield** is up at most 3 s in every 40 (7.5%; CI keeps any shield at most 5 s and recharging at least 5x as long), and
 only tags bounce off it. **A peel** is one trap per owner at a time, gone after one slip or 90 s.
 
+## Titles and base skins
+
+Titles and base skins (`Config/Titles`, `Config/Skins`, DECISIONS.md #51) are looks only: none changes income, prices,
+speed, locks or steals, and none can be bought. Their unlocks are goals spread along the curve above (a free player,
+the simulated medians):
+
+| Reached | Unlocks |
+| --- | --- |
+| First steal, 25 belt buys, 10 Snacklings discovered, a code redeemed | 🫳 Sticky Fingers, 🛒 Snack Shopper, 📖 Collector, 🔑 Insider |
+| First Epic (about 11 minutes) | 🍩 Sprinkle Pink |
+| First Legendary (about 31 minutes) | 🫐 Blueberry |
+| 1 hour played | 🥐 Golden Crust |
+| First rebirth (affordable after about an hour) | ♻️ Born Again |
+| First Snackdex tier (usually the Commons) | 🍨 Mint Chip |
+| 2 and 4 rebirths ($150M, then $5.4B) | 🖤 Licorice Night, 💎 Diamond |
+| 16 different mutations | 🌈 Rainbow Swirl |
+| The long haul: 500 steals, 50 hours, 7 rebirths, every Snackdex tier | 🥷 Phantom Thief, 🎖️ Veteran, 🌀 Seven Lives, 📚 Snackdex Master |
+
+So a new player has a skin and a few titles in their first session, and the rarest looks take many sessions. VIP's
+golden trim (a paid perk) is the Classic look for VIP players and keeps its gold corner caps under every skin, so the
+earned skins never undercut the pass.
+
 ## Other knobs
 
 **Podiums** (`Economy.podiumUpgrade`): 8 to start, then +1 at a time for

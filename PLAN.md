@@ -70,8 +70,10 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | World & scenery | `MapBuilder` (plot decor, belt chevrons, boards, lobby spawn; `restyle` for a new map theme), `SceneryBuilder` (spawn plaza, Snack Factory, chute, flora, landmarks, boundary wall, terrain), `ThemeProps` (each theme's flora and landmarks), `WorldLighting` (map lighting + seasonal overlay) | `WorldFxController` (belt chevrons, factory cog, blinking lights; Reduce effects) | `SceneryLayout` |
 | Map themes | `MapThemeService` (first map, 20-minute rotation, the vote, `/map`) | `MapThemeController` (vote strip at the bottom of the screen, new-map title card), `WeatherController` (snow / embers / leaves... around the camera) | `MapThemeRules` |
 | Server modifiers | `ModifierService` (schedule, `/mod`; belt, economy, lock, steal, movement read its effects) | `ModifierController` (HUD button among the status pills; effects for belt prices, steal hold, tag reach) | `ModifierRules` |
-| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends <n\|off>`, `/tutorial`, `/gallery [mutationId\|off]` via `DevGallery`, `/sky <clockTime>`, `/quests reset`, `/dex fill <rarity\|event>`); `/map <id\|vote\|list>` (MapThemeService); `/mod <id> [minutes]`, `/mod off`, `/mod list` (ModifierService); LiveOps `/event <id> [minutes]`, `/event off`, `/luck`, `/announce` (HostService; anyone in Studio, local only); `/hostas <owner\|none\|admin>` (try the host panel as another role) | – | – |
+| Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends <n\|off>`, `/tutorial`, `/gallery [mutationId\|off]` via `DevGallery`, `/sky <clockTime>`, `/quests reset`, `/dex fill <rarity\|event>`); `/map <id\|vote\|list>` (MapThemeService); `/mod <id> [minutes]`, `/mod off`, `/mod list` (ModifierService); LiveOps `/event <id> [minutes]`, `/event off`, `/luck`, `/announce` (HostService; anyone in Studio, local only); `/hostas <owner\|none\|admin>` (try the host panel as another role); `/style [off]` (every title and skin unlocked, this session), `/news` (the What's New card again) | – | – |
 | Settings & audio | `SettingsService` (SetSetting → `settings_<key>` flags) | `ClientSettings`, `SettingsController` (the gear, top right), `SoundPlayer`, `MusicController` (looping, crossfade) | `SettingsRules`, `ScreenLayout` |
+| Titles & base skins | `StyleService` (unlocks read from the save, toasts after each achievement check, GetStyle / EquipStyle → `title_<id>` / `skin_<id>` flags), `Nametags` (the title's BillboardGui on each character), `PlotService.setSkin` + `MapBuilder.paintPlot` (a base's floor, rug and trims) | `StyleController` (the Style dialog, from a Settings row), `ChatTagController` (the title's chat tag), `MutationFxController` (Rainbow Swirl's trims) | `StyleRules`, `StyleLayout` |
+| What's New | `NewsService` (the card for returning players once, SeenNews → `news_<number>`; the plaza board's text), `MapBuilder` (the board) | `WhatsNewController` (the card, when nothing is in the way) | `UpdateRules`, `NewsLayout` |
 
 ## 3. Module list
 
@@ -99,6 +101,9 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | `Quests` | daily quests: slots per day (2 easy + 1 hard), the quest pool (kind, target or income-sized cash target, minimum rarity, text key), rewards per difficulty, all-done bonus |
 | `Gadgets` | the four gadgets (kind, icon, colour, text keys, cash price, cooldown, effect numbers), the 1.5x speed cap with a speed modifier, the speed grace, how often peels are checked |
 | `Host` | the host panel: private-server owners' cooldowns, the admin gift cooldown, the /mod, /luck and /event limits the panel and commands share, the panel's stepper presets, gift sizing, the MessagingService topics, version, expiry, dedupe and caps, and the shout-out rule and limits |
+| `Titles` | the titles (id, text, emoji, colour, what earns it: an achievement, rebirths or Snackdex tiers), the nametag's size, height and distance, the chat tag switch |
+| `Skins` | the base skins (id, name, emoji, look: floor tile colours, rug, trim, materials, rainbow; what earns it) and the default (Classic) |
+| `Updates` | What's New: the update notes, newest first (number, date, title, 3-5 highlights) |
 
 ### `src/shared/Logic` (pure, unit-tested)
 
@@ -126,6 +131,10 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `HostRules` | who may host (admins, a private server's owner, nobody), the action whitelist, argument checks and clamping (for intents and other servers' messages alike), permissions, cooldowns, gift amounts, `Config/Host` and hostable-modifier validation |
 | `CrossServerRules` | the versioned cross-server message: strict decoding, expiry, dedupe (a bounded id list), shout-out rules and limits, display names |
 | `HostPanelLayout` | where everything goes in the host panel, held to the HUD's rules by tests (fits below the top bar, 52 UI buttons, 12 UI text) |
+| `StyleRules` | titles and base skins: unlocks and progress (achievement flags and goals, rebirths, Snackdex tiers), one worn at a time as `title_<id>` / `skin_<id>` flags, repair on join, can equip, the dialog's view and hints, a skin's trims with VIP and its tile pattern, colour checks, `Config/Titles` and `Config/Skins` validation |
+| `StyleLayout` | where everything goes in the Style dialog (tabs, cards, the grid) and the Settings last row in halves or thirds, held to the HUD's rules by tests |
+| `UpdateRules` | What's New: the newest update, show / count as seen / nothing on join (never a first session or the tutorial), the `news_<number>` flag, `Config/Updates` validation |
+| `NewsLayout` | where the What's New card's lines and button go, and the plaza board's, held to the HUD's rules (and a board readable from across the plaza) by tests |
 | `PaidRandomItems` | Roblox's Paid Random Items policy: what a PolicyService answer means (a failure counts as restricted) and the player attribute the store reads |
 | `SeasonRules` | active seasonal theme from the active event ids, decoration layout on the map (outside plots, off the belt), part count, `Config/Seasons` validation |
 | `Inventory` | podium slot operations on the save table (free slot, place, remove, find by uid) |
@@ -160,8 +169,8 @@ BeltService →
 LockService → StealService → GadgetService → RebirthService → PlayerPolicy → MonetizationService → RetentionService →
 SocialService →
 TutorialService → SnackdexService → QuestService → LeaderboardService → SettingsService → CodeService → GiftService →
-SpinService → AchievementService → HostService → ShoutoutService → CrossServer → DevCommands →
-PlayerLifecycle`, and wires cross-service join/leave steps through `PlayerLifecycle.hooks()` (keeps services free of
+SpinService → AchievementService → StyleService → NewsService → HostService → ShoutoutService → CrossServer →
+DevCommands → PlayerLifecycle`, and wires cross-service join/leave steps through `PlayerLifecycle.hooks()` (keeps services free of
 circular requires). `Sessions` holds per-player state. `Movement` (required by PositionTracker, StealService,
 PlayerLifecycle and GadgetService) gives every Humanoid its walking speed and the movement checks their allowance.
 
@@ -175,10 +184,10 @@ release plot → release profile.
 InteractionController, StealController, LockController, RebirthController, StoreController, ChatTagController,
 RewardsController, MutationFxController, SocialController, TutorialController, IdleController, SettingsController,
 MusicController, WorldFxController, SnackdexController, CashOfferController, MapThemeController, WeatherController,
-DropController, BossController, GadgetController, GadgetFxController`
+DropController, BossController, GadgetController, GadgetFxController, WhatsNewController`
 (`ModifierController` starts right after `NotificationController`)
 (UI helpers: `UI/UiKit`, `UI/Modal`; audio: `SoundPlayer`). Dialogs opened from others need no start:
-`CodesController` and `HostPanelController` (both from Settings).
+`CodesController`, `StyleController` and `HostPanelController` (all from Settings).
 
 ## 4. Remotes (all in `ReplicatedStorage.Remotes`, created by the server)
 
@@ -212,6 +221,9 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `UseGadget` | `id: string` | owned, no tutorial running, alive, recharged (server time, this session); a peel only on the floor of the player's own base at the trusted position the server sees (no client position), a magnet only with cash on the pads |
 | `HostAction` | `kind: string, scope: string, args: table` | the player may host (an admin, or this private server's owner), `kind` is one of `HostRules.ACTIONS`, `scope` "server" or "all", every arg checked and clamped (`HostRules.command`); owners: only the map, rotation and hostable modifiers, this server only, with cooldowns; a message is filtered first |
 | `RedeemCode` | `code: string` | at most 40 bytes before anything else, then letters and digits, at most 24 (`CodeRules.normalize`); the code exists, has started, has not expired and its `code_<CODE>` flag is unset; a Snackling code needs a free podium; rate limit 3 then 1 per 5 s |
+| `GetStyle` | – | rate limit only → `StyleSync` with what the player wears and has unlocked |
+| `EquipStyle` | `kind: string, id: string` | `kind` is `title` or `skin`; `id` a config key (or "" for none, Classic for skins) and unlocked from the save (`StyleRules.canEquip`) → swaps the `title_<id>` / `skin_<id>` flag, the nametag or the base's look, and a new `StyleSync` |
+| `SeenNews` | `number: int` | the number of the What's New card this session is waiting for → `news_<number>` (older `news_` flags cleared) |
 | `DevGrantProduct` | `key: string` | **Studio only** – runs the real receipt path with a fake receipt |
 
 Server → client:
@@ -229,10 +241,12 @@ Server → client:
 | `SnackdexSync` | the whole Snackdex `{dex, discovered?, completed?}` on ready and on every change (a new entry, a tier paid) |
 | `SpinResult` | `{index, text}`: the Lucky Spin segment the server picked (the reel stops there), and the prize toast |
 | `AchievementSync` | `{ {id, progress, target, done} }` for the Trophies tab |
+| `StyleSync` | `{title, skin, titles, skins}`: what is worn, and `{id, unlocked, progress, target}` for each title and skin |
+| `WhatsNew` | `{number}`: show the What's New card for that update when nothing is in the way |
 
 World state the client reads from **attributes** (replicated automatically): plot `OwnerUserId`, `LockedUntil`,
-`GraceUntil`, `PodiumCount`; podium `CreatureId`, `Variant` (mutation id, "" for none), `Stored`, `Income`
-(mutation and multipliers included), `BeingStolen`; player `Carrying`, `VIP`, `PaidRandomItemsAllowed` (PlayerPolicy; the store offers Server Luck only when it is true), and the gadgets' `GadgetSpeedUntil`, `ShieldUntil`, `SlippedUntil` (server time; banana peels are models in `workspace.Gadgets`, a shield is a `GadgetShield` part on the character). Rainbow parts carry the
+`GraceUntil`, `PodiumCount`, `Skin` (the base skin's id); podium `CreatureId`, `Variant` (mutation id, "" for none), `Stored`, `Income`
+(mutation and multipliers included), `BeingStolen`; player `Carrying`, `VIP`, `Title` (the worn title's id, "" for none; its nametag is the `TitleTag` BillboardGui on the Head), `PaidRandomItemsAllowed` (PlayerPolicy; the store offers Server Luck only when it is true), and the gadgets' `GadgetSpeedUntil`, `ShieldUntil`, `SlippedUntil` (server time; banana peels are models in `workspace.Gadgets`, a shield is a `GadgetShield` part on the character). Rainbow parts (mutations, and Rainbow Swirl's base trims) carry the
 CollectionService tag `MutationRainbow`. LiveOps state is on `workspace`: `LuckMultiplier`, `LuckEndsAt` (when the
 luck next changes), `PurchasedLuckEndsAt`, `CashMultiplier`, `ActiveEventIds`, `EventBanner`, `EventBannerId`,
 `EventTitle`, `EventEndsAt`, and `SeasonTheme` (the seasonal theme on, "" for none). The map theme is there too:
@@ -266,7 +280,8 @@ type PlayerData = {   -- exactly Types.PlayerData
                                    -- tutorial progress (`tutorial_<step>`, `tutorial_done`), settings (`settings_<key>`),
                                    -- redeemed codes (`code_<CODE>`), achievements paid (`ach_<id>`),
                                    -- maps played on (`map_<id>`), achievement milestones (`did_<id>`),
-                                   -- gadgets owned (`gadget_<id>`)
+                                   -- gadgets owned (`gadget_<id>`), the worn title and base skin
+                                   -- (`title_<id>`, `skin_<id>`), the newest What's New seen (`news_<n>`)
     firstJoin: number, lastSeen: number,
     gifts: { day: number, seconds: number, claimed: { number } },  -- playtime gifts today (v4)
     spin: { nextFreeAt: number, spins: number, total: number },     -- the Lucky Spin (v4)
@@ -420,3 +435,19 @@ Rainbow Mythic, found any way but a steal or an admin drop, shows "🌍 Bob foun
 every other server (`ShoutoutService`; at most one sent every 30 s and one shown every 20 s, never during the
 tutorial). Studio: everyone is an admin, nothing leaves the session, `/hostas owner|none|admin`. Offline:
 `lune run tools/worldsim/host.luau` (CI).
+
+## 16. Titles, base skins and What's New
+
+Ways to show off, and update notes players see (DECISIONS.md #51). **Titles** (`Config/Titles`, 22) are a line under
+a player's name over their head (one BillboardGui per character, `Nametags`; hidden beyond 70 studs, while carrying
+and from its wearer) and a chat tag after `[VIP]`. **Base skins** (`Config/Skins`, 8) recolour a base's floor tiles,
+rug, wall tops and corner caps (`MapBuilder.paintPlot`; never podiums, pads, the sign or the lock button), from the
+moment the base is its owner's until they leave, through map changes. Both are earned from achievements, rebirths and
+Snackdex tiers, never bought, and picked in Settings → 🎨 Style (`StyleController`; tabs Titles and Base, laid out by
+`StyleLayout` and checked by `tools/layoutCheck.luau`); `StyleService` checks unlocks after every achievement check and
+toasts new ones. **What's New** (`Config/Updates`): a returning player who hasn't seen the newest update gets a card
+once (`NewsService`, `WhatsNewController`: never in a first session or the tutorial, over another dialog or while
+carrying), and a board on the spawn plaza (built by `MapBuilder` outside the Scenery folder, placed by `SceneryLayout`)
+shows it to everyone. All saved as flags (`title_<id>`, `skin_<id>`, `news_<number>`). Studio: `/style [off]`,
+`/news`. Offline: `lune run tools/worldsim/cosmetics.luau` (CI); `lune run tools/worldsim/exportSkins.luau` for a 3D
+preview of every skin.

@@ -102,6 +102,38 @@ T.describe("Config/Scenery", function()
 	T.it("is deterministic", function()
 		T.expect(SceneryLayout.layout(Scenery)).toEqual(SceneryLayout.layout(Scenery))
 	end)
+	T.it("stands the What's New board by the plaza, facing the fountain, in sight of the lobby spawn", function()
+		local board = SceneryLayout.layout(Scenery).newsBoard
+		local plaza = Scenery.plaza
+		local fromCentre = math.sqrt((board.x - plaza.x) ^ 2 + (board.z - plaza.z) ^ 2)
+		T.expect(fromCentre).toBeNear(plaza.newsBoard.radius, 1e-9)
+		-- it faces the fountain...
+		local a = math.rad(board.yaw)
+		local fx, fz = math.cos(a), math.sin(a)
+		local toCentre = ((plaza.x - board.x) * fx + (plaza.z - board.z) * fz) / fromCentre
+		T.expect(toCentre).toBeNear(1, 1e-9)
+		-- ...and its face reads from the lobby spawn (less than 40 degrees off)
+		local lobby = MAP.lobby
+		local dx, dz = lobby.x - board.x, lobby.z - board.z
+		local toLobby = (dx * fx + dz * fz) / math.sqrt(dx * dx + dz * dz)
+		T.expect(toLobby).toBeGreaterThan(math.cos(math.rad(40)))
+	end)
+	T.it("refuses a What's New board on the path, the walkway or a plot", function()
+		for _, spot in
+			{
+				{ angle = 180, radius = 33 }, -- on the path from the archway
+				{ angle = 180, radius = 60 }, -- on the walkway's end
+				{ angle = 160, radius = 100 }, -- by plot 4
+				{ angle = 135, radius = 24 }, -- among the benches and lamps
+			}
+		do
+			local config = clone()
+			config.plaza.newsBoard = spot
+			if #SceneryLayout.validate(config, MAP, BELT, {}) == 0 then
+				error(`a board at {spot.angle} deg, {spot.radius} studs passed`)
+			end
+		end
+	end)
 	T.it("puts a tree line outside the wall, standing on the terrain", function()
 		local outside = 0
 		for _, tree in SceneryLayout.layout(Scenery).trees do
