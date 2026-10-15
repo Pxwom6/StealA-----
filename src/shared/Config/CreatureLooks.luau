@@ -1343,6 +1343,78 @@ local CreatureLooks: { [string]: CreatureLook } = {
 			{ kind = "balls", on = "head", colors = { "#E8265E" }, n = 1, spread = 0.2 },
 		},
 	},
+
+	-- Easter 2027 (recipe fallbacks: the polished models are in Config/CreatureParts)
+	custard_chick = {
+		size = 2.3,
+		plan = "blob",
+		body = { skin = "flan", color = "#FFE27A", color2 = "#C8761E", w = 0.86, h = 0.86, d = 0.84 },
+		face = { eyes = "big", mouth = "none", cheeks = "#FF9DB6", height = 0.55 },
+		features = {
+			{ kind = "snout", style = "beak", color = "#FF9A2E" },
+			{ kind = "wings", style = "tiny", color = "#F6C445" },
+		},
+		toppings = {
+			{ kind = "drips", on = "body", colors = { "#C8761E" }, n = 3, at = 0.85 },
+		},
+	},
+	hot_cross_bunny = {
+		size = 2.4,
+		plan = "biped",
+		arms = true,
+		body = { skin = "round", color = "#C77A35", w = 0.84, h = 0.72 },
+		head = { skin = "round", color = "#C77A35", w = 0.74, h = 0.66 },
+		face = { eyes = "big", mouth = "smile", cheeks = "#FF8FA8", nose = "#FF8FA8" },
+		limbs = "#A85F25",
+		features = {
+			{ kind = "ears", style = "long", color = "#C77A35", color2 = "#FFE7C7" },
+			{ kind = "tail", style = "puff", color = "#FFFFFF" },
+		},
+		toppings = {
+			{ kind = "band", on = "body", colors = { "#FFF8EE" } },
+			{ kind = "chips", on = "body", colors = { "#3E1E14" }, n = 5, spread = 0.7 },
+		},
+	},
+	lemon_meringue_lamb = {
+		size = 2.5,
+		plan = "quadruped",
+		legs = 0.22,
+		body = { skin = "round", color = "#FFF8EC", w = 0.8, h = 0.6, d = 1 },
+		head = { skin = "round", color = "#E3A95C", w = 0.56, h = 0.54, d = 0.6, material = "Sand" },
+		face = { eyes = "big", mouth = "smile", cheeks = "#FFB0C0" },
+		limbs = "#E3A95C",
+		features = {
+			{ kind = "ears", style = "floppy", color = "#C98A40" },
+			{ kind = "belly", color = "#FFD84A" },
+		},
+		toppings = {
+			{ kind = "balls", on = "body", colors = { "#FFF8EC", "#EDB25E" }, n = 6, spread = 0.8 },
+		},
+	},
+	jelly_bean_jackalope = {
+		size = 2.7,
+		plan = "biped",
+		arms = false,
+		body = { skin = "round", color = "#CDB8FF", w = 0.74, h = 0.82 },
+		head = { skin = "round", color = "#CDB8FF", w = 0.66, h = 0.6 },
+		face = { eyes = "big", mouth = "smile", cheeks = "#FF8FB8", nose = "#FF8FB8" },
+		limbs = "#B59CF2",
+		features = {
+			{ kind = "belly", color = "#F3ECFF" },
+			{ kind = "ears", style = "long", color = "#CDB8FF", color2 = "#FFB3D1" },
+			{ kind = "horns", style = "antlers", color = "#FF6FAE" },
+			{ kind = "tail", style = "puff", color = "#FFFFFF" },
+		},
+		toppings = {
+			{
+				kind = "sprinkles",
+				on = "body",
+				colors = { "#FF6FAE", "#FFD84A", "#5FE0A8", "#7CC8FF" },
+				n = 8,
+				spread = 0.8,
+			},
+		},
+	},
 }
 
 return CreatureLooks

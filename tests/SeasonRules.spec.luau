@@ -394,6 +394,152 @@ T.describe("SeasonRules.layout (Valentine's on the real map)", function()
 	end)
 end)
 
+T.describe("SeasonRules.layout (Easter on the real map)", function()
+	local map, rects = realMap()
+	local spring = theme("Easter2027")
+	local d = spring.decorations
+	local props = SeasonRules.layout(d, spring.palette, map)
+	local counts = countKinds(props)
+
+	T.it("is switched on by Easter2027 and drops blossom", function()
+		T.expect((SeasonRules.activeTheme(Seasons, { Easter2027 = true, EasterLuck2027 = true }))).toBe("spring")
+		T.expect(spring.weather).toBe("blossoms")
+	end)
+	T.it("stays within the part budget", function()
+		T.expect(SeasonRules.partCount(props)).toBeAtMost(Seasons.maxParts)
+		T.expect(SeasonRules.partCount(props)).toBe(330)
+	end)
+	T.it("places the configured number of each prop, and nothing from the other seasons", function()
+		T.expect(counts.easterEgg).toBe((d.eggsPerPlot :: number) * MAP.plotCount + 2 * (d.beltEggsPerSide :: number))
+		T.expect(counts.bulb).toBe((d.bulbsPerPlot :: number) * MAP.plotCount)
+		T.expect(counts.lamp).toBe(2 * (MAP.plotsPerSide - 1))
+		T.expect(counts.blossomTree).toBe(2 * (MAP.plotsPerSide - 1))
+		T.expect(counts.butterfly).toBe(d.butterflies)
+		T.expect(counts.chocolateBunny).toBe(d.chocolateBunnies)
+		for _, kind in
+			{
+				"pumpkin",
+				"present",
+				"tree",
+				"snowman",
+				"snowflake",
+				"snowPile",
+				"bat",
+				"ghost",
+				"rosePot",
+				"heartBalloon",
+				"giantHeart",
+			}
+		do
+			T.expect(counts[kind]).toBeNil()
+		end
+	end)
+	T.it("never puts anything inside a plot, on the belt or on the lobby spawn", function()
+		expectClearOfGameplay(props, rects)
+	end)
+	T.it("paints each egg in two different colours from its lists, facing about the walkway", function()
+		for _, prop in props do
+			if prop.kind == "easterEgg" then
+				T.expect(table.find(spring.palette.eggs :: { string }, prop.color :: string) ~= nil).toBe(true)
+				T.expect(table.find(spring.palette.eggStripes :: { string }, prop.color2 :: string) ~= nil).toBe(true)
+				T.expect(prop.color ~= prop.color2).toBe(true)
+				local atBelt = math.abs(prop.z) < MAP.walkwayWidth / 2
+				if atBelt then
+					T.expect(prop.faceZ * prop.z).toBeGreaterThan(0)
+					T.expect(prop.scale).toBe(0.7)
+				else
+					-- turned a little each, but still looking out at the walkway
+					T.expect(prop.faceZ * prop.z).toBeLessThan(0)
+					T.expect(math.abs(prop.faceZ)).toBeGreaterThan(0.9)
+					T.expect(prop.scale).toBe(1)
+				end
+			end
+		end
+	end)
+	T.it("stands the blossom trees in the grass between bases, in two colours each", function()
+		for _, prop in props do
+			if prop.kind == "blossomTree" then
+				T.expect(math.abs(prop.z)).toBeGreaterThan(MAP.walkwayWidth + 3)
+				for _, rect in rects do
+					if prop.z > rect.minZ and prop.z < rect.maxZ then
+						-- its blossom reaches 4.3 studs out from the trunk
+						local gap = math.min(math.abs(prop.x - rect.minX), math.abs(prop.x - rect.maxX))
+						T.expect(gap).toBeGreaterThan(4.5)
+					end
+				end
+				T.expect(table.find(spring.palette.blossoms :: { string }, prop.color :: string) ~= nil).toBe(true)
+				T.expect(prop.color ~= prop.color2).toBe(true)
+			end
+		end
+	end)
+	T.it("hovers the butterflies above head height over the walkway, below the balloons' height", function()
+		for _, prop in props do
+			if prop.kind == "butterfly" then
+				T.expect(prop.y).toBeGreaterThan(8)
+				T.expect(prop.y).toBeLessThan(12)
+				T.expect(math.abs(prop.z)).toBeLessThan(MAP.walkwayWidth - 4)
+				T.expect(math.abs(prop.z)).toBeGreaterThan(Gameplay.belt.width / 2 + 3)
+				T.expect(table.find(spring.palette.butterflies :: { string }, prop.color :: string) ~= nil).toBe(true)
+			end
+		end
+	end)
+	T.it("sits the chocolate bunnies past the belt ends, clear of the factory and the chute", function()
+		for _, prop in props do
+			if prop.kind == "chocolateBunny" then
+				T.expect(math.abs(prop.x)).toBeGreaterThan(Gameplay.belt.length / 2)
+				T.expect(prop.y).toBe(map.groundY)
+				T.expect(prop.faceX * prop.x).toBeLessThan(0) -- looking back at the belt
+				-- the bunny is 3.4 studs wide at scale 1: its near side stays clear of the factory intake and the chute
+				T.expect(math.abs(prop.z) - 1.7 * prop.scale).toBeGreaterThan(7)
+			end
+		end
+	end)
+	T.it("never stacks two props on the same spot", function()
+		for i, a in props do
+			for j = i + 1, #props do
+				local b = props[j]
+				local apart = math.sqrt((a.x - b.x) ^ 2 + (a.y - b.y) ^ 2 + (a.z - b.z) ^ 2)
+				if apart < 1.5 then
+					error(`{a.kind} and {b.kind} share the spot ({a.x}, {a.y}, {a.z})`)
+				end
+			end
+		end
+	end)
+	T.it("shares the spots with every other prop without overlapping", function()
+		local everything = table.clone(d)
+		everything.pumpkinsPerPlot = 1
+		everything.presentsPerPlot = 1
+		everything.rosesPerPlot = 1
+		everything.beltPumpkinsPerSide = 1
+		everything.beltPresentsPerSide = 1
+		everything.beltRosesPerSide = 1
+		everything.treesBetweenPlots = true
+		everything.snowmen = 4
+		everything.giantHearts = 4
+		everything.bats = 6
+		everything.snowflakes = 8
+		everything.heartBalloons = 10
+		local mixed = SeasonRules.layout(everything, spring.palette, map)
+		local mixedCounts = countKinds(mixed)
+		T.expect(mixedCounts.easterEgg).toBe(counts.easterEgg)
+		T.expect(mixedCounts.blossomTree).toBe(counts.blossomTree)
+		T.expect(mixedCounts.chocolateBunny).toBe(counts.chocolateBunny)
+		T.expect(mixedCounts.tree).toBe(counts.blossomTree)
+		for i, a in mixed do
+			for j = i + 1, #mixed do
+				local b = mixed[j]
+				T.expect(math.sqrt((a.x - b.x) ^ 2 + (a.y - b.y) ^ 2 + (a.z - b.z) ^ 2)).toBeGreaterThan(1.5)
+			end
+		end
+		-- with decorated trees there too, the blossom trees stand further back
+		for _, prop in mixed do
+			if prop.kind == "blossomTree" then
+				T.expect(math.abs(prop.z)).toBeGreaterThan(MAP.walkwayWidth + 12)
+			end
+		end
+	end)
+end)
+
 T.describe("SeasonRules.validate", function()
 	local map = realMap()
 	T.it("accepts the shipped config", function()

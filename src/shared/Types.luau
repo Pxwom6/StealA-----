@@ -291,6 +291,11 @@ export type SeasonDecorations = {
 	beltRosesPerSide: number?, -- smaller ones along both belt rails (after any pumpkins and presents)
 	heartBalloons: number?, -- heart-shaped balloons floating above the walkway
 	giantHearts: number?, -- big hearts pierced by Cupid's arrow at the belt ends (after any snowmen)
+	eggsPerPlot: number?, -- giant painted eggs beside each plot entrance (after any pumpkins, presents and roses)
+	beltEggsPerSide: number?, -- smaller ones along both belt rails (after any pumpkins, presents and roses)
+	blossomTreesBetweenPlots: boolean?, -- blossom trees in the gaps between plots (behind any decorated trees)
+	butterflies: number?, -- hovering over the walkway, lower than the balloons
+	chocolateBunnies: number?, -- big chocolate bunnies at the belt ends (after any snowmen and giant hearts)
 }
 
 -- Colours of the props a theme uses ("#RRGGBB"). Only the keys of the props a theme places are needed
@@ -324,6 +329,13 @@ export type SeasonPalette = {
 	heart: string?, -- the giant hearts
 	pedestal: string?,
 	arrow: string?, -- Cupid's arrow through each giant heart
+	eggs: { string }?, -- painted eggs' shells
+	eggStripes: { string }?, -- their painted bands and dots
+	blossoms: { string }?, -- blossom trees' clouds of flowers
+	butterflies: { string }?, -- butterfly wings
+	butterflyBody: string?,
+	chocolate: string?, -- the chocolate bunnies
+	bunnyBow: string?, -- their ribbon bows
 }
 
 export type SeasonTheme = {
@@ -537,6 +549,7 @@ export type WeatherKind =
 	| "confetti"
 	| "fizz"
 	| "heat"
+	| "blossoms"
 
 export type MapThemeDef = {
 	displayName: string,

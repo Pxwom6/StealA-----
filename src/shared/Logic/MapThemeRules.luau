@@ -178,6 +178,7 @@ MapThemeRules.WEATHER = table.freeze({
 	confetti = true,
 	fizz = true,
 	heat = true,
+	blossoms = true, -- Easter's (Config/Seasons); a map may use it too
 } :: { [string]: boolean })
 
 -- Enum.Material names a map may use for its ground, walkway and boundary wall.
