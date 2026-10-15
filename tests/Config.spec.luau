@@ -466,6 +466,7 @@ T.describe("Config integrity", function()
 				"BuyGadget",
 				"UseGadget",
 				"HostAction",
+				"RequestPurchase",
 			}
 		do
 			local limit = Gameplay.rateLimits[name]

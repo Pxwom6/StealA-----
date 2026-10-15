@@ -31,6 +31,7 @@ local DailyStreak = require(ReplicatedStorage.Shared.Logic.DailyStreak)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local QuestRules = require(ReplicatedStorage.Shared.Logic.QuestRules)
 local ScreenLayout = require(ReplicatedStorage.Shared.Logic.ScreenLayout)
+local StoreLayout = require(ReplicatedStorage.Shared.Logic.StoreLayout)
 local Modal = require(script.Parent.Parent.UI.Modal)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local AchievementsTab = require(script.Parent.AchievementsTab)
@@ -57,8 +58,9 @@ type Panel = {
 local RewardsController = {}
 
 -- Reference px. Height stays within Modal's 340 so the panel fits a landscape phone; the tabs and the Claim buttons
--- are 52 tall (44 px on the smallest phones). Each tab gets a 588 x 210 content area.
-local PANEL_SIZE = Vector2.new(620, 340)
+-- are 52 tall (44 px on the smallest phones). Each tab gets a 588 x 210 content area (Logic/StoreLayout checks the
+-- Spin tab's layout in it on every checked screen).
+local PANEL_SIZE = Vector2.new(StoreLayout.REWARDS.w, StoreLayout.REWARDS.h)
 local TAB_BAR_HEIGHT = 52
 local TAB_WIDTH = 110
 local CONTENT_TOP = 58

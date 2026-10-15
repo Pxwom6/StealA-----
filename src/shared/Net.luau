@@ -39,6 +39,7 @@ export type ClientToServer =
 	| "BuyGadget"
 	| "UseGadget"
 	| "HostAction"
+	| "RequestPurchase"
 
 export type ServerToClient =
 	"StateUpdate"
@@ -54,6 +55,7 @@ export type ServerToClient =
 	| "CashOffer"
 	| "SpinResult"
 	| "AchievementSync"
+	| "PurchaseApproved"
 
 export type RemoteName = ClientToServer | ServerToClient
 
@@ -85,6 +87,7 @@ local CLIENT_TO_SERVER: { ClientToServer } = {
 	"BuyGadget",
 	"UseGadget",
 	"HostAction",
+	"RequestPurchase",
 }
 
 local SERVER_TO_CLIENT: { ServerToClient } = {
@@ -101,6 +104,7 @@ local SERVER_TO_CLIENT: { ServerToClient } = {
 	"CashOffer",
 	"SpinResult",
 	"AchievementSync",
+	"PurchaseApproved",
 }
 
 local FOLDER_NAME = "Remotes"

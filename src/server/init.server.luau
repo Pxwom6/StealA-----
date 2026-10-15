@@ -44,6 +44,7 @@ local SnackdexService = require(Services.SnackdexService)
 local SocialService = require(Services.SocialService)
 local SpinService = require(Services.SpinService)
 local StealService = require(Services.StealService)
+local StoreService = require(Services.StoreService)
 local TutorialService = require(Services.TutorialService)
 
 Remotes.start()
@@ -69,8 +70,9 @@ StealService.start()
 GadgetService.start() -- cash-bought gear: speed, banana peels, shields, magnets (after steals: peels drop carries)
 AutoCollectService.start() -- the Auto Collect pass: every pad's cash every few seconds, through the pad path
 RebirthService.start()
-PlayerPolicy.start() -- each player's PolicyService answer: paid random items (Server Luck) only where allowed
+PlayerPolicy.start() -- each player's PolicyService answer: paid random items (Server Luck, spin packs) only where allowed
 MonetizationService.start()
+StoreService.start() -- the store's analytics, and purchases checked before the prompt (spin packs, the Starter Pack)
 RetentionService.start()
 SocialService.start()
 TutorialService.start(EconomyService.addCash) -- pays the one-time completion reward; first GameEvents listener

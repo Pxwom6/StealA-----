@@ -10,6 +10,10 @@
 
 	  * Auto Collect pays every pad from across the map, quietly, every few seconds, through the pad path; a
 	    player without it gets nothing from afar; the Snack Magnet shows "AUTO" for its owners and stays unused.
+	  * Lucky Spin packs: asked for, approved, then a 3-spin receipt banks 3 spins once, retried at once and after a
+	    rejoin; a full bank refuses before the prompt, and a receipt that lands anyway banks every spin past the caps;
+	    a player whose policy restricts paid random items (or whose lookup failed) is refused before the prompt and at
+	    the receipt.
 
 	It fails on any error, any unexpected warning, or any check.
 ]]
@@ -32,13 +36,21 @@ Sim.shared("Config/MapThemes").rotation.enabled = false
 -- Made-up Creator Hub ids, so nothing goes through Studio's test grants.
 local Monetization = Sim.shared("Config/Monetization")
 local AUTO_COLLECT_PASS = 990001
+local SPINS_3, SPINS_10 = 990101, 990102
 Monetization.passes.AutoCollect.id = AUTO_COLLECT_PASS
+Monetization.products.LuckySpins3.id = SPINS_3
+Monetization.products.LuckySpins10.id = SPINS_10
 
-local ALICE, BOB, CAROL = 6001, 6002, 6003
+local ALICE, BOB, CAROL, DAN, RITA, ED = 6001, 6002, 6003, 6004, 6005, 6006
 Sim.ownedPasses[BOB] = { [AUTO_COLLECT_PASS] = true } -- Bob bought it before: it is his from the moment he joins
+Sim.policies[RITA] = { ArePaidRandomItemsRestricted = true }
+Sim.policies[ED] = "error"
 
 local EXPECTED_WARNINGS = {
 	"MessagingService.SubscribeAsync is not available offline",
+	"Rita may not buy paid random items",
+	"Ed may not buy paid random items",
+	"could not look up Ed's policy",
 }
 
 local failures: { string } = {}
@@ -142,6 +154,49 @@ local function collectsSince(userId: number, from: number): { any }
 		if payload.kind == "collect" then
 			table.insert(list, payload)
 		end
+	end
+	return list
+end
+
+-- A receipt from Roblox through the real MarketplaceService.ProcessReceipt. Returns the decision's name.
+local function receipt(userId: number, productId: number, purchaseId: string, robux: number): string
+	local decision = Marketplace.ProcessReceipt({
+		PlayerId = userId,
+		ProductId = productId,
+		PurchaseId = purchaseId,
+		CurrencySpent = robux,
+		PlaceIdWherePurchased = 0,
+	})
+	return decision.Name
+end
+
+-- Custom analytics events logged as `name`, oldest first: their breakdown fields.
+local function logged(name: string): { { [string]: any } }
+	local list = {}
+	for _, entry in Sim.analytics do
+		if entry.method == "LogCustomEvent" and entry.args[2] == name then
+			table.insert(list, (entry.args[4] or {}) :: any)
+		end
+	end
+	return list
+end
+
+-- Store funnel steps logged as `step` ("ProductPrompted"...), oldest first: their breakdown fields.
+local function funnel(step: string): { { [string]: any } }
+	local list = {}
+	for _, entry in Sim.analytics do
+		if entry.method == "LogFunnelStepEvent" and entry.args[5] == step then
+			table.insert(list, (entry.args[6] or {}) :: any)
+		end
+	end
+	return list
+end
+
+-- The products the server approved for `userId` (PurchaseApproved), oldest first.
+local function approvals(userId: number): { string }
+	local list = {}
+	for _, args in Sim.received(userId, "PurchaseApproved") do
+		table.insert(list, args[1].key)
 	end
 	return list
 end
@@ -254,9 +309,112 @@ local function autoCollect()
 	check(Gadgets.gadgets.magnet.kind == "magnet", "(the magnet is the gadget the pass covers)")
 end
 
+local function spinPacks()
+	print("Lucky Spin packs:")
+	local dan = join(DAN, "Dan")
+	local d = sessionOf(dan)
+	task.wait(0.2)
+	check(dan:GetAttribute("PaidRandomItemsAllowed") == true, "Dan's policy allows paid random items")
+	local spins = d.data.spin.spins
+
+	-- Asking first: the server approves, and only then does the client open Roblox's prompt.
+	Sim.fireServer(dan, "RequestPurchase", "LuckySpins3", "spin")
+	task.wait(0.1)
+	local approved = approvals(DAN)
+	check(approved[#approved] == "LuckySpins3", "Dan asks to buy 3 Lucky Spins from the Spin tab: approved")
+	local prompted = funnel("ProductPrompted")
+	local last: { [string]: any } = prompted[#prompted] or {}
+	check(
+		last.CustomField01 == "LuckySpins3" and last.CustomField02 == "spin",
+		"logged as the store funnel's ProductPrompted, with where it was tapped"
+	)
+	check(d.data.spin.spins == spins, "asking gives nothing by itself")
+
+	-- The receipt: 3 spins, once, however often Roblox retries it.
+	check(receipt(DAN, SPINS_3, "spin-receipt-1", 25) == "PurchaseGranted", "the receipt is granted")
+	check(d.data.spin.spins == spins + 3, `3 spins banked ({spins} -> {d.data.spin.spins})`)
+	check(receipt(DAN, SPINS_3, "spin-receipt-1", 25) == "PurchaseGranted", "Roblox retries the same receipt")
+	check(d.data.spin.spins == spins + 3, "and it banks nothing more")
+	check(string.find(lastToast(DAN), "+3 Lucky Spins", 1, true) ~= nil, `Dan hears so ({lastToast(DAN)})`)
+	local bought = logged("product_purchased")
+	check(#bought == 1 and bought[1].CustomField01 == "LuckySpins3", "one purchase logged, with its key")
+	Sim.removePlayer(dan)
+	task.wait(0.3)
+	check(receipt(DAN, SPINS_3, "spin-receipt-1", 25) == "NotProcessedYet", "while he is away it waits")
+	dan = join(DAN, "Dan")
+	d = sessionOf(dan)
+	check(receipt(DAN, SPINS_3, "spin-receipt-1", 25) == "PurchaseGranted", "after a rejoin it is answered")
+	check(d.data.spin.spins == spins + 3, `from his save, still 3 spins once ({d.data.spin.spins})`)
+	local history = 0
+	for _, entry in d.data.purchaseHistory do
+		if entry.purchaseId == "spin-receipt-1" then
+			history += 1
+		end
+	end
+	check(history == 1, "and one entry in his purchase history")
+
+	-- A very full bank: refused before the prompt, and a receipt that lands anyway is never clipped.
+	local full = Sim.shared("Config/Spin").paidBankFull
+	d.data.spin.spins = full
+	local approvedBefore = #approvals(DAN)
+	Sim.advance(3)
+	Sim.fireServer(dan, "RequestPurchase", "LuckySpins10", "store")
+	task.wait(0.1)
+	check(#approvals(DAN) == approvedBefore, `with {full} spins banked the 10-pack isn't approved`)
+	check(
+		lastToast(DAN) == Sim.shared("Logic/Format").template(Theme.text.spinPackBankFull, { count = full }),
+		`he is told why ({lastToast(DAN)})`
+	)
+	local refused = logged("product_refused")
+	check(
+		#refused >= 1
+			and refused[#refused].CustomField01 == "LuckySpins10"
+			and refused[#refused].CustomField02 == "bankFull",
+		"logged as refused, with the reason"
+	)
+	check(receipt(DAN, SPINS_10, "spin-receipt-2", 69) == "PurchaseGranted", "a 10-pack receipt lands anyway")
+	check(d.data.spin.spins == full + 10, `every spin is banked, past both caps ({d.data.spin.spins})`)
+
+	-- Views: the Spin tab's pack buttons, once per session.
+	Sim.fireServer(dan, "ClientEvent", "store_viewed", "spin")
+	Sim.fireServer(dan, "ClientEvent", "store_viewed", "spin")
+	Sim.fireServer(dan, "ClientEvent", "store_viewed", "somewhere")
+	task.wait(0.1)
+	local views = 0
+	for _, fields in logged("product_viewed") do
+		if fields.CustomField02 == "spin" then
+			views += 1
+		end
+	end
+	check(views == 2, `each pack's view in the Spin tab is logged once ({views})`)
+
+	-- Restricted players: refused before the prompt and at the receipt.
+	local rita = join(RITA, "Rita")
+	local ed = join(ED, "Ed")
+	task.wait(1.3) -- Ed's lookup fails, waits a second and fails again
+	local r, e = sessionOf(rita), sessionOf(ed)
+	for _, entry in { { rita, r, RITA, "Rita" }, { ed, e, ED, "Ed" } } do
+		local player, session, userId, name = entry[1], entry[2], entry[3], entry[4]
+		local before = session.data.spin.spins
+		Sim.fireServer(player, "RequestPurchase", "LuckySpins3", "spin")
+		task.wait(0.1)
+		check(#approvals(userId) == 0, `{name} is refused before the prompt`)
+		check(lastToast(userId) == Theme.text.storeRandomRestricted, `and told why ({lastToast(userId)})`)
+		check(
+			receipt(userId, SPINS_3, `restricted-{userId}`, 25) == "NotProcessedYet",
+			`a receipt for {name} is not granted`
+		)
+		check(
+			session.data.spin.spins == before and #session.data.purchaseHistory == 0,
+			"and nothing is banked or recorded"
+		)
+	end
+end
+
 local function scenario()
 	print("store test:")
 	autoCollect()
+	spinPacks()
 	print(`  ({math.floor(Sim.now - OCTOBER_15_2026)} s of server time)`)
 end
 

@@ -11,8 +11,13 @@
 	  * PurchaseGranted is returned only once the PurchaseId is in the last SUCCESSFULLY SAVED data
 	  * if the player is not in this server / the session ends first → NotProcessedYet (Roblox retries later)
 
+	Paid random items (Server Luck, Lucky Spin packs: Logic/StoreRules.PAID_RANDOM_KINDS) are granted only when the
+	buyer's Roblox policy allows them (PlayerPolicy, looked up before the grant step); otherwise the receipt is never
+	granted. A Lucky Spin pack banks every spin it paid for, past any cap (SpinRules.bankPaid).
+
 	Studio: products/passes with id 0 can be tested with the "(Studio) Grant" store buttons, which run the exact
-	same receipt path with a fake receipt. The DevGrantProduct remote does not exist outside Studio.
+	same receipt path with a fake receipt. The DevGrantProduct remote does not exist outside Studio. Products checked
+	before prompting (StoreService) take the same fake receipt through MonetizationService.grantInStudio.
 ]]
 
 local HttpService = game:GetService("HttpService")
@@ -28,6 +33,8 @@ local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local Guard = require(ReplicatedStorage.Shared.Logic.Guard)
 local LiveOpsRules = require(ReplicatedStorage.Shared.Logic.LiveOpsRules)
 local ReceiptLedger = require(ReplicatedStorage.Shared.Logic.ReceiptLedger)
+local SpinRules = require(ReplicatedStorage.Shared.Logic.SpinRules)
+local StoreRules = require(ReplicatedStorage.Shared.Logic.StoreRules)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local Analytics = require(script.Parent.Analytics)
 local Announcer = require(script.Parent.Announcer)
@@ -230,6 +237,10 @@ end
 
 type AfterGrant = () -> ()
 
+-- Purchases granted on this server whose save had not landed when their call returned (Roblox retries those): their
+-- follow-up and analytics wait for the retry that finds them saved.
+local unconfirmed: { [string]: AfterGrant } = {}
+
 -- Works out everything a product grants WITHOUT changing anything (it may throw: nothing is lost, Roblox retries).
 -- Returns `apply`, which only writes the precomputed results (plain table writes: no yields, nothing that can fail;
 -- see ReceiptLedger), and a follow-up that runs once the purchase is confirmed saved (announcements, auto-lock...).
@@ -253,7 +264,7 @@ local function prepareProduct(
 		at = os.time(),
 	}
 	local historySize = Monetization.purchaseHistorySize
-	local cash, tokens = 0, 0
+	local cash, tokens, spins = 0, 0, 0
 	local newBoosts: { LiveOpsRules.Boost }? = nil
 	local after: AfterGrant
 
@@ -307,6 +318,22 @@ local function prepareProduct(
 				kind = "luck",
 			})
 		end
+	elseif product.kind == "Spins" then
+		if not paidRandomAllowed then
+			-- A paid random item too: only a client that went around the blocked buttons gets here (PlayerPolicy).
+			error("paid random items are not allowed for this player (PolicyService)")
+		end
+		spins = math.max(0, math.floor(product.spins or 0))
+		if spins < 1 then
+			error(`{key} gives no spins; check Config/Monetization`)
+		end
+		after = function()
+			Remotes.notify(
+				session.player,
+				Format.template(Theme.text.spinPackBought, { count = spins, total = session.data.spin.spins }),
+				"success"
+			)
+		end
 	else
 		error(`unknown product kind for {key}`)
 	end
@@ -317,6 +344,9 @@ local function prepareProduct(
 		data.cash += cash
 		data.stats.totalEarned += cash
 		data.lockTokens += tokens
+		-- Every spin paid for, past the bank's caps: a purchase is never clipped (buying is refused at
+		-- Config/Spin.paidBankFull, before the prompt; see StoreService).
+		SpinRules.bankPaid(data.spin, spins)
 		if newBoosts then
 			LiveOpsService.setBoosts(newBoosts) -- the only write outside the save
 		end
@@ -334,10 +364,10 @@ local function processFor(player: Player, key: string, receipt: { [string]: any 
 	local purchaseId = tostring(receipt.PurchaseId)
 	local after: AfterGrant? = nil
 	local profile = session.profile
-	-- Server Luck is a paid random item: only for players whose policy allows it (the store shows it blocked
-	-- otherwise). Looked up here, before the grant step, because it may yield.
+	-- Server Luck and Lucky Spin packs are paid random items: only for players whose policy allows them (the store
+	-- blocks or hides them otherwise). Looked up here, before the grant step, because it may yield.
 	local paidRandomAllowed = true
-	if Monetization.products[key].kind == "ServerLuck" then
+	if StoreRules.PAID_RANDOM_KINDS[Monetization.products[key].kind] then
 		paidRandomAllowed = PlayerPolicy.paidRandomItemsAllowed(player)
 		if not paidRandomAllowed then
 			warn(`[Monetization] {player.Name} may not buy paid random items: {key} is not granted`)
@@ -368,8 +398,10 @@ local function processFor(player: Player, key: string, receipt: { [string]: any 
 		end,
 		prepare = function(): () -> ()
 			local apply, followUp = prepareProduct(session, key, receipt, quotedCash, paidRandomAllowed)
-			after = followUp
-			return apply
+			return function()
+				apply()
+				after = followUp -- set only once this call's grant went through
+			end
 		end,
 		saveAndWait = function()
 			DataService.saveAndWait(profile, SAVE_TIMEOUT_SECONDS)
@@ -378,18 +410,24 @@ local function processFor(player: Player, key: string, receipt: { [string]: any 
 	})
 	Replication.markDirty(session)
 	if decision == "PurchaseGranted" then
-		local followUp = after
+		-- The call that granted it (or the first retry to find it saved, when that call's save hadn't landed) shows the
+		-- follow-up and logs the purchase; Roblox retrying a receipt already granted logs nothing more.
+		local followUp = after or unconfirmed[purchaseId]
+		unconfirmed[purchaseId] = nil
 		if followUp then
 			task.spawn(followUp)
+			Analytics.storeStep(session, "ProductPurchased", { "product", key })
+			Analytics.custom(
+				session,
+				"product_purchased",
+				if type(receipt.CurrencySpent) == "number" then receipt.CurrencySpent else 0,
+				{ key }
+			)
 		end
-		Analytics.storeStep(session, "ProductPurchased", { "product", key })
-		Analytics.custom(
-			session,
-			"product_purchased",
-			if type(receipt.CurrencySpent) == "number" then receipt.CurrencySpent else 0,
-			{ key }
-		)
 		return Enum.ProductPurchaseDecision.PurchaseGranted
+	end
+	if after then
+		unconfirmed[purchaseId] = after -- granted here, the save not confirmed yet: Roblox will retry
 	end
 	return Enum.ProductPurchaseDecision.NotProcessedYet
 end
@@ -410,6 +448,22 @@ local function processReceipt(receipt: { [string]: any }): Enum.ProductPurchaseD
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 	return processFor(player, key, receipt)
+end
+
+-- Studio only: the real receipt path with a fake receipt, so a product can be tested before its id exists. Returns
+-- the decision's name.
+function MonetizationService.grantInStudio(player: Player, key: string): string
+	assert(RunService:IsStudio(), "grantInStudio is Studio-only")
+	local product = Monetization.products[key]
+	assert(product ~= nil, `unknown product {key}`)
+	local decision = processFor(player, key, {
+		PlayerId = player.UserId,
+		ProductId = product.id,
+		PurchaseId = "studio-" .. HttpService:GenerateGUID(false),
+		CurrencySpent = 0,
+	})
+	print(`[Monetization] Studio grant {key}: {decision.Name}`)
+	return decision.Name
 end
 
 -- Studio-only: simulate a purchase so the full flow can be tested before real IDs exist.
@@ -435,36 +489,7 @@ local function onDevGrant(player: Player, keyArg: unknown)
 	if key == nil then
 		return
 	end
-	local decision = processFor(player, key, {
-		PlayerId = player.UserId,
-		ProductId = Monetization.products[key].id,
-		PurchaseId = "studio-" .. HttpService:GenerateGUID(false),
-		CurrencySpent = 0,
-	})
-	print(`[Monetization] Studio grant {key}: {decision.Name}`)
-end
-
--- Store analytics from the client. Only known keys reach a breakdown field (CustomField01): any other string from a
--- client would add a value to the analytics breakdowns, so the event is dropped instead.
-local function onClientEvent(player: Player, nameArg: unknown, keyArg: unknown)
-	local name = Guard.oneOf(nameArg, { "store_opened", "store_product_clicked", "cash_offer_clicked" })
-	local session = Sessions.get(player)
-	if name == nil or session == nil then
-		return
-	end
-	if name == "store_opened" then
-		Analytics.storeStep(session, "StoreOpened")
-	elseif name == "cash_offer_clicked" then
-		local key = Guard.keyOf(keyArg, Monetization.products)
-		if key and Monetization.products[key].kind == "Cash" then
-			Analytics.custom(session, "cash_offer_clicked", nil, { key })
-		end
-	else
-		local key = Guard.keyOf(keyArg, Monetization.products) or Guard.keyOf(keyArg, Monetization.passes)
-		if key then
-			Analytics.storeStep(session, "ProductPrompted", { key })
-		end
-	end
+	MonetizationService.grantInStudio(player, key)
 end
 
 -- A game pass bought in-game. The event's `purchased` flag is not proof of a purchase, so Roblox is asked first
@@ -494,7 +519,7 @@ function MonetizationService.start()
 			task.spawn(onPassPurchaseFinished, player, passId, purchased)
 		end
 	)
-	Remotes.onIntent("ClientEvent", onClientEvent)
+	-- The store's own intents (ClientEvent analytics, RequestPurchase) are StoreService's.
 	if RunService:IsStudio() then
 		Remotes.onIntent("DevGrantProduct", onDevGrant)
 	end

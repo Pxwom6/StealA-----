@@ -13,7 +13,8 @@
 	Fairness rules this config must keep (enforced in code, see DECISIONS.md):
 	  * nothing paid makes a base un-stealable (lock tokens never skip the open window, Logic/LockRules.windows)
 	  * paid items speed progress up; they never gate content
-	  * the only paid item with a random effect (Server Luck) shows exact before/after odds before purchase
+	  * the paid items with a random effect (Server Luck, the Lucky Spin packs) show their exact odds before purchase
+	    and are sold only to players whose Roblox policy allows paid random items (PlayerPolicy)
 ]]
 
 export type PassKey = "DoubleCash" | "VIP" | "ExtraPodiums" | "LongerLock" | "AutoCollect"
@@ -26,10 +27,15 @@ export type ProductKey =
 	| "CashLarge"
 	| "InstantLock"
 	| "ServerLuck"
-export type ProductKind = "Cash" | "LockToken" | "ServerLuck"
+	| "LuckySpins3"
+	| "LuckySpins10"
+	| "StarterPack"
+-- Spins: Lucky Spins banked for the Rewards panel's reel (a paid random item: odds shown, PolicyService respected).
+-- StarterPack: fixed contents once per account (`starterPack` below).
+export type ProductKind = "Cash" | "LockToken" | "ServerLuck" | "Spins" | "StarterPack"
 
 export type PassDef = { id: number }
-export type ProductDef = { id: number, kind: ProductKind }
+export type ProductDef = { id: number, kind: ProductKind, spins: number? } -- spins: a Spins pack's count
 
 local Monetization = {
 	passes = {
@@ -50,6 +56,9 @@ local Monetization = {
 		CashLarge = { id = 3717844684, kind = "Cash" }, -- Snack Truck, 199 R$
 		InstantLock = { id = 3717845411, kind = "LockToken" }, -- Instant Lock, 15 R$
 		ServerLuck = { id = 3717845483, kind = "ServerLuck" }, -- Server Luck, 39 R$
+		-- Not created yet (README "Before publishing"): paste the Creator Hub ids here.
+		LuckySpins3 = { id = 0, kind = "Spins", spins = 3 }, -- 3 Lucky Spins, suggested 25 R$
+		LuckySpins10 = { id = 0, kind = "Spins", spins = 10 }, -- 10 Lucky Spins, suggested 69 R$
 	} :: { [string]: ProductDef },
 
 	-- Perk values (balance knobs).
@@ -70,6 +79,8 @@ local Monetization = {
 	storePasses = { "DoubleCash", "AutoCollect", "VIP", "ExtraPodiums", "LongerLock" } :: { string },
 	storeProducts = {
 		"ServerLuck",
+		"LuckySpins3",
+		"LuckySpins10",
 		"CashBite",
 		"CashBag",
 		"CashSmall",
@@ -78,6 +89,9 @@ local Monetization = {
 		"CashLarge",
 		"InstantLock",
 	} :: { string },
+
+	-- Items whose views are logged (product_viewed: 01 key, 02 where it was seen), once per session each.
+	viewTracked = { "AutoCollect", "LuckySpins3", "LuckySpins10" } :: { string },
 
 	-- "Need $X more?": when a belt or podium purchase fails for lack of cash, offer the cheapest cash pack that covers
 	-- the gap (Logic/CashOfferRules). Never during the first-time tutorial, and at most one offer per cooldown.

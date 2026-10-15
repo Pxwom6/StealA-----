@@ -475,6 +475,15 @@ local Theme = {
 		oddsHeader = "Belt odds now -> with Server Luck",
 		oddsExtendHeader = "Server Luck is on: buying adds +{minutes} min (odds stay the same)",
 		oddsMaxedHeader = "Server Luck is on: maximum time reached",
+		-- Lucky Spin packs (Robux; Config/Monetization kind "Spins") and why a purchase can't go ahead (StoreRules)
+		spinPackName = "+{count} Spins", -- the Spin tab's pack buttons, over the price
+		spinPackBought = "🎰 +{count} Lucky Spins! Spin them in Rewards.",
+		spinPackFull = "Bank full", -- a pack button while the spin bank is full
+		storeNotYet = "That isn't in the shop yet!",
+		storeRandomRestricted = "Lucky Spin packs aren't available on your account.",
+		spinPackBankFull = "Your spin bank is full ({count} spins)! Spin some first.",
+		starterOwned = "You already have the Starter Pack!",
+		starterBaseFull = "Free a podium first: the Starter Pack's Snackling needs one!",
 
 		-- World signs (SceneryBuilder, LeaderboardService)
 		factorySign = "SNACK FACTORY",
@@ -767,6 +776,14 @@ local Theme = {
 		ServerLuck = {
 			name = "Server Luck",
 			description = "{luckMultiplier}x rare odds on the belt for EVERYONE in this server for {luckMinutes} minutes. Buying again adds time.",
+		},
+		LuckySpins3 = {
+			name = "3 Lucky Spins",
+			description = "3 more Lucky Spins. Each spin wins one prize, with these exact chances:",
+		},
+		LuckySpins10 = {
+			name = "10 Lucky Spins",
+			description = "10 more Lucky Spins. Each spin wins one prize, with these exact chances:",
 		},
 	} :: { [string]: { name: string, description: string } },
 

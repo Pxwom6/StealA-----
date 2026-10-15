@@ -5,6 +5,8 @@ local CashOfferRules = require("../src/shared/Logic/CashOfferRules")
 local StoreRules = require("../src/shared/Logic/StoreRules")
 local Economy = require("../src/shared/Config/Economy")
 local Monetization = require("../src/shared/Config/Monetization")
+local Spin = require("../src/shared/Config/Spin")
+local Theme = require("../src/shared/Config/Theme")
 
 T.describe("StoreRules: unconfigured items (id 0)", function()
 	T.it("hides an item not created on the Creator Hub outside Studio, and shows it in Studio", function()
@@ -75,6 +77,82 @@ T.describe("StoreRules: unconfigured items (id 0)", function()
 			false
 		)
 		T.expect(real ~= nil).toBe(true)
+	end)
+end)
+
+-- A context where everything is allowed; tests change one field at a time.
+local function context(changes: { [string]: any }?): StoreRules.PurchaseContext
+	local ctx: StoreRules.PurchaseContext = {
+		visible = true,
+		paidRandomAllowed = true,
+		spins = 0,
+		spinBankFull = Spin.paidBankFull,
+		starterOwned = false,
+		podiumFree = true,
+	}
+	local edits: { [string]: any } = changes or {}
+	for key, value in edits do
+		(ctx :: any)[key] = value
+	end
+	return ctx
+end
+
+T.describe("StoreRules: Lucky Spin packs before the prompt", function()
+	T.it("are paid random items, checked before Roblox's prompt opens", function()
+		T.expect(StoreRules.CHECKED_KINDS.Spins).toBe(true)
+		T.expect(StoreRules.PAID_RANDOM_KINDS.Spins).toBe(true)
+		T.expect(StoreRules.PAID_RANDOM_KINDS.ServerLuck).toBe(true)
+		T.expect(StoreRules.PAID_RANDOM_KINDS.Cash).toBeNil()
+		local packs = 0
+		for key, product in Monetization.products do
+			if product.kind == "Spins" then
+				packs += 1
+				T.expect((product.spins or 0) >= 1).toBe(true)
+				T.expect(table.find(Monetization.storeProducts, key) ~= nil).toBe(true)
+			end
+		end
+		T.expect(packs).toBe(2)
+		T.expect(Monetization.products.LuckySpins3.spins).toBe(3)
+		T.expect(Monetization.products.LuckySpins10.spins).toBe(10)
+	end)
+
+	T.it("can be bought when the policy allows it and the bank has room", function()
+		T.expect(StoreRules.purchaseRefusal("Spins", context())).toBeNil()
+		T.expect(StoreRules.purchaseRefusal("Spins", context({ spins = Spin.paidBankFull - 1 }))).toBeNil()
+	end)
+
+	T.it("are refused where Roblox's policy restricts paid random items, or while that is being looked up", function()
+		T.expect(StoreRules.purchaseRefusal("Spins", context({ paidRandomAllowed = false }))).toBe("restricted")
+	end)
+
+	T.it("are refused once the bank is very full, with a clear message", function()
+		T.expect(StoreRules.purchaseRefusal("Spins", context({ spins = Spin.paidBankFull }))).toBe("bankFull")
+		T.expect(StoreRules.purchaseRefusal("Spins", context({ spins = 999 }))).toBe("bankFull")
+		T.expect(StoreRules.purchaseRefusal("Spins", context({ spins = 0 / 0 }))).toBe("bankFull") -- never through
+		T.expect(StoreRules.messageKey("bankFull")).toBe("spinPackBankFull")
+		T.expect((string.find(Theme.text.spinPackBankFull, "{count}", 1, true)) ~= nil).toBe(true) -- says how many
+	end)
+
+	T.it("checks in this order: unknown, unavailable, restricted, bank full", function()
+		T.expect(StoreRules.purchaseRefusal("Cash", context())).toBe("unknown")
+		T.expect(StoreRules.purchaseRefusal("Spins", context({ visible = false, paidRandomAllowed = false })))
+			.toBe("unavailable")
+		T.expect(StoreRules.purchaseRefusal("Spins", context({ paidRandomAllowed = false, spins = 999 })))
+			.toBe("restricted")
+	end)
+
+	T.it("has a message for every refusal it reports, and analytics surfaces from a closed list", function()
+		for _, reason in StoreRules.REASONS do
+			local key = StoreRules.messageKey(reason)
+			if key then
+				T.expect(type((Theme.text :: any)[key])).toBe("string")
+			end
+		end
+		T.expect(StoreRules.messageKey("unknown")).toBeNil() -- a made-up key from a client: silence
+		T.expect(StoreRules.SURFACES).toEqual({ "store", "spin", "offer" })
+		for _, key in Monetization.viewTracked do
+			T.expect(Monetization.products[key] ~= nil or Monetization.passes[key] ~= nil).toBe(true)
+		end
 	end)
 end)
 

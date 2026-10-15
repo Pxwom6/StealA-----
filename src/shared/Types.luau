@@ -695,6 +695,9 @@ export type SpinConfig = {
 	freeEverySeconds: number, -- a free spin this long after the last free one
 	maxBanked: number, -- spins from gifts beyond this are paid as cash instead (Logic/SpinRules)
 	bankedOverflow: { incomeSeconds: number, minimum: number }, -- that cash, per spin
+	-- Lucky Spin packs (Robux) can't be bought while this many spins are banked; a pack's receipt still banks every
+	-- spin it paid for, past maxBanked and this (SpinRules.bankPaid)
+	paidBankFull: number,
 	segments: { SpinSegment },
 }
 

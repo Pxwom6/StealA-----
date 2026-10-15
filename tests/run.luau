@@ -54,5 +54,6 @@ require("./CrossServerRules.spec")
 require("./HostPanelLayout.spec")
 require("./StoreRules.spec")
 require("./AutoCollectRules.spec")
+require("./StoreLayout.spec")
 
 T.finish()

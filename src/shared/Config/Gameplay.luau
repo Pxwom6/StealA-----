@@ -161,6 +161,8 @@ local Gameplay = {
 		UseGadget = { burst = 6, perSecond = 3 },
 		-- The host panel (HostService): admins and private-server owners only; owners also have cooldowns per action.
 		HostAction = { burst = 4, perSecond = 1 },
+		-- Asking to buy a Lucky Spin pack or the Starter Pack (StoreService checks it, then the client prompts).
+		RequestPurchase = { burst = 3, perSecond = 0.5 },
 	} :: { [string]: RateLimit },
 }
 

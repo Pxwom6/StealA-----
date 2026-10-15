@@ -54,6 +54,8 @@ local SECONDS_PER_DAY = 86400
 
 local DataSchema = {}
 DataSchema.VERSION = SCHEMA_VERSION
+-- The most banked Lucky Spins a save keeps (sanitise clamps to it): paid spin packs stay far below it (SpinRules).
+DataSchema.MAX_BANKED_SPINS = MAX_BANKED_SPINS
 
 function DataSchema.template(startingCash: number): PlayerData
 	return {
