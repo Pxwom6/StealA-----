@@ -724,6 +724,7 @@ export type CodeReward =
 
 export type CodeDef = {
 	reward: CodeReward,
+	startsAt: number?, -- unix seconds (UTC) it starts working; nil = now. Every event code has one (CI).
 	expiresAt: number?, -- unix seconds (UTC); nil = never
 }
 
