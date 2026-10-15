@@ -311,14 +311,24 @@ local function scenario()
 	busy:Destroy()
 	check(has(table.move(output, before + 1, #output, 1, {}), "already running"), "a second paste waits for the first")
 
-	-- (ProfileStore's DataStoreState is "Access" when Studio API access is on; the mock has none, so it is added here)
+	-- ProfileStore's DataStoreState: "Access" with Studio API access on, "NotReady" while it finds out; the mock says
+	-- "NoAccess" (API access off). The test runs only on "NoAccess" or "NoInternet" (review 3), never on anything else.
 	local store: any = MockProfileStore
-	store.DataStoreState = "Access"
-	lines = runPaste()
-	store.DataStoreState = nil
-	check(has(lines, "Studio API access is on"), "with Studio API access on it refuses")
-	check(report() == "", "and writes no report")
-	check(sessionState() == quiet, `nothing changed ({sessionState()})`)
+	for _, case in
+		{
+			{ state = "Access", says = "Studio API access is on", what = "with Studio API access on" },
+			{ state = "NotReady", says = "still finding out", what = "while ProfileStore is still finding out" },
+			{ state = "Maybe", says = "can't tell whether", what = "with a state ProfileStore never reports" },
+			{ state = nil, says = "can't tell whether", what = "with no state at all" },
+		} :: { { state: string?, says: string, what: string } }
+	do
+		store.DataStoreState = case.state
+		lines = runPaste()
+		store.DataStoreState = "NoAccess"
+		check(has(lines, case.says), `{case.what} it refuses`)
+		check(report() == "", "and writes no report")
+		check(sessionState() == quiet, `nothing changed ({sessionState()})`)
+	end
 
 	-- A Command Bar that can't set a Script's Source: said in one line, nothing left behind.
 	local stubborn = {

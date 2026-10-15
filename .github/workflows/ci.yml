@@ -71,6 +71,9 @@ jobs:
       - name: Review round 2 fixes (offline server, virtual clock, one scenario per fixed finding)
         run: lune run tools/worldsim/review2.luau
 
+      - name: Review round 3 fixes (offline server, virtual clock, one scenario per fixed finding)
+        run: lune run tools/worldsim/review3.luau
+
       - name: Gadgets (offline server, virtual clock, every gadget through the real remotes)
         run: lune run tools/worldsim/gadgets.luau
 

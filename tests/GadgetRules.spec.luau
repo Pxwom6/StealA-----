@@ -130,6 +130,30 @@ T.describe("GadgetRules ownership", function()
 	end)
 end)
 
+T.describe("GadgetRules.affordableTip (finding gadgets)", function()
+	local soda, peel = Gadgets.gadgets.soda.price, Gadgets.gadgets.peel.price
+	T.it("names the cheapest gadget not owned once it is affordable with cash", function()
+		T.expect(GadgetRules.affordableTip(Gadgets, {}, soda - 1, false, false)).toBeNil()
+		T.expect(GadgetRules.affordableTip(Gadgets, {}, soda, false, false)).toBe("soda")
+		T.expect(GadgetRules.affordableTip(Gadgets, {}, 1e12, false, false)).toBe("soda") -- the cheapest of all
+		T.expect(GadgetRules.affordableTip(Gadgets, { gadget_soda = true }, peel, false, false)).toBe("peel")
+		T.expect(GadgetRules.affordableTip(Gadgets, { gadget_soda = true }, peel - 1, false, false)).toBeNil()
+	end)
+	T.it("once per account, and never while the tutorial needs the screen", function()
+		T.expect(GadgetRules.affordableTip(Gadgets, { [GadgetRules.TIP_FLAG] = true }, 1e12, false, false)).toBeNil()
+		T.expect(GadgetRules.affordableTip(Gadgets, {}, 1e12, true, false)).toBeNil()
+	end)
+	T.it("never points an Auto Collect owner at the magnet", function()
+		local flags = { gadget_soda = true, gadget_peel = true, gadget_shield = true }
+		T.expect(GadgetRules.affordableTip(Gadgets, flags, 1e12, false, false)).toBe("magnet")
+		T.expect(GadgetRules.affordableTip(Gadgets, flags, 1e12, false, true)).toBeNil()
+	end)
+	T.it("the hint's text names the gadget and where to buy it", function()
+		local text = Format.template(TEXT.gadgetTip, { icon = "🥤", name = TEXT.gadgetSodaName })
+		T.expect(text).toBe("🥤 You can buy a Fizzy Soda with cash! Shop ▸ " .. TEXT.storeTabGadgets)
+	end)
+end)
+
 T.describe("GadgetRules buying", function()
 	T.it("refuses unknown gadgets, ones you own and ones you can't afford", function()
 		local function buy(exists: boolean, owned: boolean, cash: number): string?

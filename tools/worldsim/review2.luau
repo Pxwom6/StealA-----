@@ -15,6 +15,7 @@
 	    and the random schedule's modifiers run to their end (an owner stops or replaces only their own)
 	  * a Snack Attack giant's health counts only the players playing: not idle ones, nor new players still in the
 	    first-time tutorial (who walk about but can't be expected to help)
+	  * (review 3) a fresh private server: its owner's first map switch waits a rotation turn from the server's start
 
 	It runs as a live server (not Studio): Ada is an admin (Config/LiveOps.adminUserIds), and the server is Owen's
 	private server. It fails on any error, any unexpected warning, or any check below.
@@ -189,6 +190,44 @@ local function toasts(userId: number): { string }
 end
 
 -- A private server's owner, with a guest: the maps at the rotation's pace, and the schedule's modifiers left alone.
+-- A fresh private server (review 3): the owner's first map switch waits a rotation turn from when the server started,
+-- like each one after it, so closing it and opening it again is no faster way through the maps than the rotation.
+local function freshPrivateServer()
+	print("A fresh private server:")
+	local MapThemeService = Sim.server("Services/MapThemeService")
+	local MapThemes = Sim.shared("Config/MapThemes")
+	local Host = Sim.shared("Config/Host")
+	local owen = join(OWEN, "Owen")
+	Sim.fireServer(owen, "SkipTutorial")
+	task.wait(0.1)
+	local o = Sessions.get(owen)
+	local first = MapThemeService.current()
+	local other = nil
+	for _, id in MapThemes.order do
+		if id ~= first then
+			other = id
+			break
+		end
+	end
+	local readyAt = OCTOBER_15_2026 + Host.owner.mapCooldownSeconds
+	check(
+		o.host ~= nil and o.host.role == "owner" and math.abs(o.host.mapReadyAt - readyAt) < 1,
+		`the owner's host panel: the first map switch is ready {Host.owner.mapCooldownSeconds // 60} minutes after the server started`
+	)
+	local told = #toasts(OWEN)
+	Sim.fireServer(owen, "HostAction", "mapSwitch", "server", { id = other })
+	task.wait(0.1)
+	check(MapThemeService.current() == first, "so a switch at once is refused: it waits for the rotation's turn")
+	local said = toasts(OWEN)
+	local waits = false
+	for index = told + 1, #said do
+		waits = waits or string.find(said[index], "Wait", 1, true) ~= nil
+	end
+	check(waits, "and the owner is told how long")
+	Sim.removePlayer(owen)
+	task.wait(0.3)
+end
+
 local function ownerPace()
 	print("A private server's owner:")
 	local MapThemeService = Sim.server("Services/MapThemeService")
@@ -395,6 +434,7 @@ local function scenario()
 	local ada = join(ADA, "Ada")
 	Sim.fireServer(ada, "SkipTutorial")
 	task.wait(0.1)
+	freshPrivateServer()
 	dropRestart(ada)
 	ownerPace()
 	giantHealth(ada)

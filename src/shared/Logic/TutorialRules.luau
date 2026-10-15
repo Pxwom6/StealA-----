@@ -157,6 +157,32 @@ function TutorialRules.finish(flags: Flags, reason: FinishReason, cfg: Config): 
 	return if reward == reward and reward > 0 and reward < math.huge then math.floor(reward) else 0
 end
 
+-- Whether toasts that can wait (an achievement, a title unlocked) should: while the tutorial runs, and for
+-- `quietSeconds` after it was completed at `completedAt` (-math.huge: not this session), so its own lines and its
+-- "You're ready!" are read first. A skipped tutorial holds nothing back; a clock that went back neither.
+function TutorialRules.quiet(running: boolean, completedAt: number, now: number, quietSeconds: number): boolean
+	if running then
+		return true
+	end
+	local since = now - completedAt
+	return since >= 0 and since < quietSeconds
+end
+
+-- How a client shows a world banner (Announce) of `kind`, the player being on tutorial step `tutorialStep` ("" for
+-- none): "chat" only, for a new map (MapThemeController shows its own title card) and for every banner while the
+-- tutorial runs (its own lines have the screen); otherwise "banner" (which also lands in chat).
+function TutorialRules.announceMode(kind: string?, tutorialStep: string): "banner" | "chat"
+	if kind == "map" or tutorialStep ~= "" then
+		return "chat"
+	end
+	return "banner"
+end
+
+-- Whether the HUD's Rewards button shows its red dot: something there is ready, and no tutorial runs.
+function TutorialRules.rewardsDot(ready: boolean, tutorialStep: string): boolean
+	return ready and tutorialStep == ""
+end
+
 -- Clears every tutorial flag so it starts over (Studio test command only).
 function TutorialRules.reset(flags: Flags, cfg: Config)
 	flags[TutorialRules.DONE_FLAG] = nil
@@ -274,6 +300,7 @@ function TutorialRules.validate(cfg: Config): { string }
 		check(positive(step.unavailableSeconds), `steps[{index}].unavailableSeconds`)
 	end
 	check(cfg.belt.minSecondsLeft >= 0 and cfg.belt.switchMargin >= 0, "belt")
+	check(cfg.quietSeconds >= 0 and cfg.quietSeconds <= 10, "quietSeconds: between 0 and 10")
 	return problems
 end
 

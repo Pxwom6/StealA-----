@@ -152,4 +152,67 @@ T.describe("LockRules", function()
 	end)
 end)
 
+T.describe("LockRules.pillTap (the HUD's lock button)", function()
+	-- Locked until 100, then recharging until 172 with the open window until 130.
+	local function tap(now: number, changes: { [string]: any }?): LockRules.PillTap
+		local input: { [string]: any } = {
+			now = now,
+			lockedUntil = 100,
+			cooldownUntil = 172,
+			vulnerableUntil = 130,
+			tokens = 0,
+			inTutorial = false,
+			lastHintAt = nil,
+			repeatSeconds = 4,
+		}
+		local extra: { [string]: any } = changes or {}
+		for key, value in extra do
+			input[key] = value
+		end
+		return LockRules.pillTap(input :: any)
+	end
+
+	T.it("a ready lock: go to the button at the door", function()
+		local ready = tap(200)
+		T.expect(ready.kind).toBe("walk")
+		T.expect(ready.openShop).toBe(false)
+		T.expect(tap(0, { lockedUntil = 0, cooldownUntil = 0, vulnerableUntil = 0 }).kind).toBe("walk")
+	end)
+
+	T.it("a running lock: how long it lasts, no Shop", function()
+		local locked = tap(58)
+		T.expect(locked.kind).toBe("locked")
+		T.expect(locked.seconds).toBe(42)
+		T.expect(locked.shop).toBe(false)
+	end)
+
+	T.it("recharging: the time, Instant Lock mentioned, and a second tap soon after opens the Shop", function()
+		local first = tap(100)
+		T.expect(first.kind).toBe("recharging")
+		T.expect(first.seconds).toBe(72) -- "Lock ready in 1:12"
+		T.expect(first.shop).toBe(true)
+		T.expect(first.openShop).toBe(false)
+		T.expect(tap(102, { lastHintAt = 100 }).openShop).toBe(true)
+		T.expect(tap(104, { lastHintAt = 100 }).openShop).toBe(true)
+		T.expect(tap(104.5, { lastHintAt = 100 }).openShop).toBe(false) -- too late: the toast again
+		T.expect(tap(99, { lastHintAt = 100 }).openShop).toBe(false) -- a clock that went back
+	end)
+
+	T.it("never opens the Robux Shop during the tutorial", function()
+		local first = tap(100, { inTutorial = true })
+		T.expect(first.kind).toBe("recharging")
+		T.expect(first.shop).toBe(false)
+		T.expect(tap(101, { inTutorial = true, lastHintAt = 100 }).openShop).toBe(false)
+	end)
+
+	T.it("with an Instant Lock token: the door after the open window, never the Shop", function()
+		local window = tap(110, { tokens = 1 })
+		T.expect(window.kind).toBe("recharging")
+		T.expect(window.seconds).toBe(20) -- the open window, which a token can't skip
+		T.expect(window.shop).toBe(false)
+		T.expect(tap(111, { tokens = 1, lastHintAt = 110 }).openShop).toBe(false)
+		T.expect(tap(140, { tokens = 1 }).kind).toBe("walk")
+	end)
+end)
+
 return nil

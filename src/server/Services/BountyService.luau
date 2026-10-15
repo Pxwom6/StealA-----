@@ -4,7 +4,7 @@
 	earner wears a bounty.
 
 	  * When it starts, the target is the player with the most steady income (BountyRules.pickTarget: a base, not in
-	    the first-time tutorial; ties to whoever joined first). Everyone hears who it is; the target is told to guard
+	    the first-time tutorial, no new-player shield; ties to whoever joined first). Everyone hears who it is; the target is told to guard
 	    their base. If they leave, it moves to the next top earner (announced); with nobody earning yet, the server
 	    looks again every few seconds.
 	  * The target wears it as the Player attribute Bounty ("on", or "resting" for restSeconds after a claim): Nametags
@@ -91,7 +91,8 @@ local function topEarner(leaving: Session?): number?
 				userId = session.userId,
 				income = session.packIncome,
 				joinedAt = session.joinedAt,
-				eligible = session.plot ~= 0 and session.tutorial == nil,
+				-- (a newcomer still shielded is never hunted: review 3)
+				eligible = session.plot ~= 0 and session.tutorial == nil and now() >= session.graceUntil,
 			})
 		end
 	end

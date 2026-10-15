@@ -32,6 +32,7 @@ local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local QuestRules = require(ReplicatedStorage.Shared.Logic.QuestRules)
 local ScreenLayout = require(ReplicatedStorage.Shared.Logic.ScreenLayout)
 local StoreLayout = require(ReplicatedStorage.Shared.Logic.StoreLayout)
+local TutorialRules = require(ReplicatedStorage.Shared.Logic.TutorialRules)
 local Modal = require(script.Parent.Parent.UI.Modal)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local AchievementsTab = require(script.Parent.AchievementsTab)
@@ -90,6 +91,11 @@ local eventCountdown: TextLabel
 local autoOpenedDaily = false
 local autoOpenScheduled = false
 local welcomeOpen = false
+-- The Daily tab's self-open waits this long (os.clock seconds) after the first-time tutorial ends, so its reward toast
+-- and the achievements held back until then (TutorialService.notifyWhenQuiet) are read first.
+local DAILY_AFTER_TUTORIAL_SECONDS = 6
+local tutorialEndedAt: number? = nil
+local lastTutorialStep = ""
 
 -- Seconds until the next UTC midnight (a new daily reward, new quests), on the server's clock.
 local function secondsToMidnight(): number
@@ -402,7 +408,9 @@ local function updateBadges(state: Types.ClientState)
 	local questsReady = state.quests.claimable > 0
 	local giftsReady = GiftsTab.claimable(state.gifts) > 0
 	local spinReady = state.spin.spins > 0 or workspace:GetServerTimeNow() >= state.spin.nextFreeAt
-	rewardsButton.badge.Visible = dailyReady or questsReady or giftsReady or spinReady
+	-- no red dot during the first-time tutorial (Logic/TutorialRules.rewardsDot): the loop comes first
+	rewardsButton.badge.Visible =
+		TutorialRules.rewardsDot(dailyReady or questsReady or giftsReady or spinReady, state.tutorial.step)
 	local current = panel
 	if current then
 		current.tabs.daily.badge.Visible = dailyReady
@@ -513,14 +521,18 @@ function RewardsController.open(tab: Tab?)
 end
 
 -- The Daily tab opens by itself once per session, only when it can't get in the way: not during the first-time
--- tutorial (a brand-new player's first minutes belong to the loop), not while carrying a Snackling home (the
--- backdrop would cover the touch controls mid-steal), and never over another dialog (opening it would close that one:
--- the Store, a code being typed). Otherwise it waits for a later state update.
+-- tutorial (a brand-new player's first minutes belong to the loop) nor in the 6 s after it, not while toasts are on
+-- screen or waiting (the tutorial's "You're ready!" and the achievements after it), not while carrying a Snackling home
+-- (the backdrop would cover the touch controls mid-steal), and never over another dialog (opening it would close that
+-- one: the Store, a code being typed). Otherwise it waits for a later state update.
 local function canAutoOpenDaily(state: Types.ClientState): boolean
+	local ended = tutorialEndedAt
 	return state.daily.canClaim
 		and not autoOpenedDaily
 		and not welcomeOpen
 		and state.tutorial.step == ""
+		and (ended == nil or os.clock() - ended >= DAILY_AFTER_TUTORIAL_SECONDS)
+		and not NotificationController.toastsBusy()
 		and state.carrying == ""
 		and not Modal.isAnyOpen()
 end
@@ -645,14 +657,9 @@ function RewardsController.start()
 	HudController.place("luck", luckPill)
 
 	Net.get("WelcomeBack").OnClientEvent:Connect(showWelcome)
-	StateStore.onChange(function(state)
-		updateBadges(state)
-		local current = panel
-		if current and current.refresh then
-			current.refresh(state)
-		end
-		-- The badge always shows; the panel opens by itself once, when nothing is in the way (canAutoOpenDaily), else
-		-- on a later update. Give the welcome popup a moment to arrive first.
+	-- The badge always shows; the panel opens by itself once, when nothing is in the way (canAutoOpenDaily), else on a
+	-- later update or the badge check below. Give the welcome popup a moment to arrive first.
+	local function maybeAutoOpenDaily(state: Types.ClientState)
 		if canAutoOpenDaily(state) and not autoOpenScheduled then
 			autoOpenScheduled = true
 			task.delay(2.5, function()
@@ -664,6 +671,18 @@ function RewardsController.start()
 				end
 			end)
 		end
+	end
+	StateStore.onChange(function(state)
+		if lastTutorialStep ~= "" and state.tutorial.step == "" then
+			tutorialEndedAt = os.clock()
+		end
+		lastTutorialStep = state.tutorial.step
+		updateBadges(state)
+		local current = panel
+		if current and current.refresh then
+			current.refresh(state)
+		end
+		maybeAutoOpenDaily(state)
 	end)
 	Net.get("Effect").OnClientEvent:Connect(function(payload: { kind: string, position: Vector3? })
 		local position = payload.position
@@ -682,13 +701,15 @@ function RewardsController.start()
 			task.wait(0.5)
 		end
 	end)
-	-- Gifts unlock and the free spin comes back with time alone: re-check the badges every couple of seconds.
+	-- Gifts unlock and the free spin comes back with time alone: re-check the badges every couple of seconds (and
+	-- whether the Daily tab may open by itself now that the toasts are done).
 	task.spawn(function()
 		while true do
 			task.wait(2)
 			local state = StateStore.get()
 			if state then
 				updateBadges(state)
+				maybeAutoOpenDaily(state)
 			end
 		end
 	end)

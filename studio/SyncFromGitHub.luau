@@ -20,6 +20,10 @@
 	ReplicatedStorage.CreatureModels, ServerScriptService.ServerPackages and the place's settings stay as they are.
 	Edit > Undo (Ctrl+Z / Cmd+Z) takes the whole sync back.
 
+	The game can't start without ProfileStore (the saves) in ServerScriptService.ServerPackages, which this script
+	never adds: in a place without it, it stops before asking GitHub or changing anything, and says what to do
+	(README "Updating a place in Studio straight from GitHub").
+
 	Running it twice is harmless: unchanged scripts are left alone.
 
 	A private repo (recommended before the game goes public: README "Before publishing") only serves its files with a
@@ -152,7 +156,23 @@ local function setSource(script: Instance, source: string)
 	end
 end
 
+-- The saves' ProfileStore, which DataService requires as ServerScriptService.ServerPackages.ProfileStore (a Wally
+-- package: Rojo builds put it there, this script doesn't).
+local function hasProfileStore(): boolean
+	local packages = game:GetService("ServerScriptService"):FindFirstChild("ServerPackages")
+	local module = if packages then packages:FindFirstChild("ProfileStore") else nil
+	return module ~= nil and module:IsA("ModuleScript")
+end
+
 local function sync()
+	if not hasProfileStore() then
+		error(
+			"[Sync] stopped, nothing was changed: this place has no ServerScriptService.ServerPackages.ProfileStore, "
+				.. "and the game can't start without it (it keeps everyone's saves). Add it once (README \"Updating a "
+				.. 'place in Studio straight from GitHub", ProfileStore), then paste this again.',
+			0
+		)
+	end
 	local readable, enabled = pcall(function(): boolean
 		return HttpService.HttpEnabled
 	end)

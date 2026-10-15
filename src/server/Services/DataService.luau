@@ -7,6 +7,8 @@
 	               save from a newer release is released untouched and the player asked to rejoin
 	* autosave:    ProfileStore saves every few minutes on its own
 	* on leave:    PlayerLifecycle calls `release`, which ends the session (final save)
+	* lastSeen:    stamped on every save (offline earnings count from it), except for a player this server never let
+	               play (it was full, or they left while their save loaded: `keepLastSeen`), whose saves keep it
 	* on shutdown: BindToClose ends every session; ProfileStore's own BindToClose waits for the final saves
 	* saveAndWait: used by receipts — request a save and yield until it lands (or the session ends / times out)
 
@@ -27,6 +29,9 @@ local GameData = require(ReplicatedStorage.Shared.GameData)
 local Sessions = require(script.Parent.Sessions)
 
 type Profile = Sessions.Profile
+
+-- Profiles whose lastSeen stays as it was loaded (keepLastSeen), by profile.
+local keptLastSeen: { [Profile]: number } = setmetatable({}, { __mode = "k" }) :: any
 
 -- Bump the suffix only for a deliberate wipe; schema changes go through DataSchema.migrate instead.
 local STORE_NAME = "PlayerData_v1"
@@ -122,13 +127,21 @@ function DataService.load(player: Player): (Profile?, LoadFailure?)
 
 	-- Keep lastSeen fresh in every save (used for offline earnings).
 	profile.OnSave:Connect(function()
-		profile.Data.lastSeen = os.time()
+		profile.Data.lastSeen = keptLastSeen[profile] or os.time()
 	end)
 	return profile
 end
 
+-- This server never let the player play (it was full, or they left while their save loaded): every save from now
+-- on, the final one too, keeps lastSeen at `lastSeen` (as loaded), so the offline earnings it counts are all still
+-- there when they join a server with room (review 3: a full-server kick used to wipe them).
+function DataService.keepLastSeen(profile: Profile, lastSeen: number)
+	keptLastSeen[profile] = lastSeen
+	profile.Data.lastSeen = lastSeen
+end
+
 function DataService.release(profile: Profile)
-	profile.Data.lastSeen = os.time()
+	profile.Data.lastSeen = keptLastSeen[profile] or os.time()
 	if profile:IsActive() then
 		profile:EndSession()
 	end

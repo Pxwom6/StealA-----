@@ -799,9 +799,12 @@ Prices are set on the Creator Hub, so if one changes, keep this column (and the 
 step and keep the ladder rising. A test checks that income time and floor both rise in store order.
 
 **"Need $X more?" offers** (`Monetization.cashOffer`): when a belt or podium purchase fails for lack of cash, the
-player is offered the cheapest pack above that covers the gap, at most once per 90 s and never during the
-tutorial (DECISIONS.md #25). Because the floors rise with the ladder, a brand-new player short of a few hundred is
-offered the 5 R$ Snack Bite, not a big pack.
+player may be offered the cheapest of the three small packs (Snack Bite, Bag and Pack: 5, 15 and 25 R$) that covers
+the gap (DECISIONS.md #25, #58). Never during the tutorial or the first 10 minutes of play, at most once every 3
+minutes, and never for a gap of 45 s of income or less: then the toast says "Not enough cash yet: 12s more of
+income!". A gap no small pack covers gets the plain toast: the offer never points at the Basket, Crate or Truck, so
+a player tapping a Legendary at $157/s is no longer shown the 199 R$ Snack Truck. Because the floors rise with the
+ladder, a player short of a few hundred (and of more than 45 s of income) is offered the 5 R$ Snack Bite.
 
 **Offline earnings** (`Economy.offline`): 50% of income for up to 2 h away (VIP: 3 h), only after 2+ minutes away.
 

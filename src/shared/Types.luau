@@ -1120,6 +1120,9 @@ export type TutorialConfig = {
 	reward: number, -- cash paid once per account when the tutorial is completed (not skipped)
 	steps: { TutorialStepDef },
 	belt: TutorialBeltConfig,
+	-- toasts that can wait (achievements, titles and skins unlocked) are held while the tutorial runs and this many
+	-- seconds after it is completed (TutorialService.notifyWhenQuiet, Logic/TutorialRules.quiet)
+	quietSeconds: number,
 }
 
 -- Config: Snackdex and daily quests (Config/Snackdex, Config/Quests) ---------------------------------------------

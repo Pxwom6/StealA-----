@@ -109,10 +109,15 @@ local Monetization = {
 		offer = { afterRebirths = 1, afterPlaySeconds = 30 * 60, showSeconds = 10 },
 	} :: Types.StarterPackConfig,
 
-	-- "Need $X more?": when a belt or podium purchase fails for lack of cash, offer the cheapest cash pack that covers
-	-- the gap (Logic/CashOfferRules). Never during the first-time tutorial, and at most one offer per cooldown.
+	-- "Need $X more?": when a belt or podium purchase fails for lack of cash, offer the cheapest of the small cash packs
+	-- that covers the gap (Logic/CashOfferRules; CI keeps these within its LIMITS). Gentle for a young audience: never
+	-- during the first-time tutorial or a player's first 10 minutes of play, never for a gap their income covers in
+	-- 45 s or less (the toast says how many seconds instead), and at most one offer every 3 minutes. DECISIONS.md #25.
 	cashOffer = {
-		cooldownSeconds = 90,
+		cooldownSeconds = 180,
+		minPlaySeconds = 10 * 60,
+		smallGapSeconds = 45,
+		packs = { "CashBite", "CashBag", "CashSmall" } :: { string }, -- 5, 15 and 25 R$: cheapest first (store order)
 	},
 
 	-- Receipt idempotency: how many recent PurchaseIds each player's save remembers, and purchase history length.

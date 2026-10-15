@@ -12,6 +12,9 @@ local MockProfileStore = {}
 -- Saves by profile key, read when a session starts and written when it saves or ends.
 MockProfileStore.saves = {} :: { [string]: any }
 MockProfileStore.IsClosing = false
+-- What ProfileStore says in Studio with API access off: it can't reach the DataStores (the Studio self-test runs only
+-- then; tools/selfTestOffline.luau tries the other states).
+MockProfileStore.DataStoreState = "NoAccess"
 MockProfileStore.OnError = Sim.signal()
 
 local function deepCopy(value: any): any

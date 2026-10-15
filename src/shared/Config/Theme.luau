@@ -405,6 +405,10 @@ local Theme = {
 		lockPillLocked = "Locked {time}",
 		lockPillCooldown = "Lock in {time}",
 		lockPillToken = "Instant lock x{count}",
+		-- toasts when the lock button is tapped (Logic/LockRules.pillTap): locking happens at the base's door
+		lockPillWalk = "Walk to the 🔒 button at your door",
+		lockPillWait = "Lock ready in {time}",
+		lockPillWaitShop = "Lock ready in {time} · Instant Lock is in the Shop", -- a second tap opens the Shop
 		luckBanner = "{multiplier}x LUCK {time}",
 		eventEndsIn = "{event} ends in {time}", -- under the event banner: "Halloween ends in 3d 4h"
 		eventFallbackTitle = "Event", -- {event} for an event without a `title`
@@ -431,7 +435,9 @@ local Theme = {
 
 		-- Toasts
 		notEnoughCash = "Not enough cash!",
-		-- "Need $X more?" offer (CashOfferController): the cheapest cash pack that covers the gap
+		-- a belt or podium purchase only a few seconds of income short (no offer then: Logic/CashOfferRules.waitSeconds)
+		notEnoughCashWait = "Not enough cash yet: {seconds}s more of income!",
+		-- "Need $X more?" offer (CashOfferController): the cheapest small cash pack that covers the gap
 		cashOfferTitle = "Need {amount} more?",
 		cashOfferBody = "{pack} gives you +{amount}",
 		baseFull = "Your base is full! Sell or add a podium.",
@@ -445,6 +451,7 @@ local Theme = {
 		lockVulnerable = "Can't lock again so soon ({time})",
 		cantStealLocked = "That base is locked!",
 		cantStealProtected = "New players are protected for a few minutes.",
+		shieldGone = "🛡️ Your shield is gone. Lock your base when thieves come!", -- once, when a new player's ends
 		cantStealOwn = "That's yours!",
 		stealFromInside = "Get inside their base first!",
 		stealOnFloor = "Stand on the floor to steal!",
@@ -870,6 +877,8 @@ local Theme = {
 		gadgetMagnetName = "Snack Magnet",
 		gadgetMagnetInfo = "Collect the cash on all your pads at once, from anywhere.",
 		gadgetBought = "{icon} {name} is yours! Its button is by the TAG button.",
+		-- once per account, the first time a gadget becomes affordable (GadgetService; never in the first-time tutorial)
+		gadgetTip = "{icon} You can buy a {name} with cash! Shop ▸ Gadgets",
 		gadgetAlreadyOwned = "You already have that gadget!",
 		gadgetNotOwned = "Get that gadget in the Shop first!",
 		gadgetTutorial = "Gadgets unlock after the tutorial!",

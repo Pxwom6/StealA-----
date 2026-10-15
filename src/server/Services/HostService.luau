@@ -391,6 +391,12 @@ function HostService.start()
 	for _, problem in HostRules.hostableProblems(Modifiers, unlocks) do
 		warn(`[Host] config problem: {problem}`)
 	end
+	-- A fresh private server would let its owner pick any map at once, and closing and opening it again would give
+	-- the next pick: their first switch waits a rotation turn from when the server started, like each one after it
+	-- (review 3; DECISIONS.md #55's fair rule). Reserved servers have no owner (PrivateServerOwnerId 0).
+	if game.PrivateServerId ~= "" and game.PrivateServerOwnerId ~= 0 then
+		HostRules.startCooldown(cooldownsOf(game.PrivateServerOwnerId), "map", Host.owner.mapCooldownSeconds, now())
+	end
 	Remotes.onIntent("HostAction", onHostAction)
 	CrossServer.on("host", onRemote)
 	addCommands()

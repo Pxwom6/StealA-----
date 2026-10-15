@@ -13,6 +13,9 @@
 	* Existing players (progress in their save but no tutorial flags) are marked done on join, without the reward.
 	* `record` and `onJoined` run inside gameplay code (the pad-collect loop, steal delivery, the join), so they are
 	  pcall'd: a tutorial bug can only break the tutorial.
+	* Toasts that can wait (an achievement, a title or base skin unlocked) go through `notifyWhenQuiet`: while the
+	  tutorial runs, and for Tutorial.quietSeconds after it is completed, they are held and sent by the 1 Hz pass
+	  afterwards, so the steps' lines and the "You're ready! +$500" are read first (review 3).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -49,6 +52,8 @@ local STEP_FOR_EVENT: { [string]: string } = {
 local TutorialService = {}
 
 local payCash: PayCash? = nil
+-- Toasts held back by notifyWhenQuiet, oldest first.
+local held: { [Session]: { { text: string, kind: string? } } } = setmetatable({}, { __mode = "k" }) :: any
 
 local function now(): number
 	return workspace:GetServerTimeNow()
@@ -74,6 +79,7 @@ local function finish(session: Session, reason: TutorialRules.FinishReason)
 	end
 	Replication.markDirty(session)
 	if reason == "completed" then
+		session.tutorialCompletedAt = now()
 		Remotes.notify(
 			session.player,
 			if reward > 0
@@ -163,6 +169,38 @@ end
 
 function TutorialService.onLeaving(session: Session)
 	session.tutorial = nil
+	held[session] = nil
+end
+
+-- Whether toasts that can wait should, for `session` (Logic/TutorialRules.quiet).
+function TutorialService.quiet(session: Session): boolean
+	return TutorialRules.quiet(session.tutorial ~= nil, session.tutorialCompletedAt, now(), Tutorial.quietSeconds)
+end
+
+-- A toast that can wait (an achievement, a title or base skin unlocked): sent now, or held while the tutorial runs and
+-- for Tutorial.quietSeconds after it is completed, then sent by the 1 Hz pass in the order they came.
+function TutorialService.notifyWhenQuiet(session: Session, text: string, kind: string?)
+	if not TutorialService.quiet(session) then
+		Remotes.notify(session.player, text, kind)
+		return
+	end
+	local list = held[session]
+	if list == nil then
+		list = {}
+		held[session] = list
+	end
+	table.insert(list, { text = text, kind = kind })
+end
+
+local function sendHeld(session: Session)
+	local list = held[session]
+	if list == nil or TutorialService.quiet(session) then
+		return
+	end
+	held[session] = nil
+	for _, toast in list do
+		Remotes.notify(session.player, toast.text, toast.kind)
+	end
 end
 
 -- Studio /tutorial: clears the tutorial flags and starts it again.
@@ -185,6 +223,7 @@ end
 local function tick()
 	local t = now()
 	for _, session in Sessions.all() do
+		sendHeld(session)
 		local run = session.tutorial
 		if run == nil then
 			continue

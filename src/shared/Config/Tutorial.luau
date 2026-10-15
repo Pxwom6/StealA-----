@@ -33,6 +33,10 @@ local Tutorial: Types.TutorialConfig = {
 		minSecondsLeft = 4, -- the belt moves ~8.7 studs/s: an item with less time left is gone before you get there
 		switchMargin = 12,
 	},
+
+	-- Achievement, title and base skin toasts wait while the tutorial runs and until this many seconds after it is
+	-- completed, so its steps and its "You're ready! +$500" are read first (TutorialService.notifyWhenQuiet).
+	quietSeconds = 3,
 }
 
 return Tutorial

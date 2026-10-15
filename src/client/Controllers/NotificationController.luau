@@ -5,8 +5,10 @@
 
 	Toasts have their own screen above the dialogs (DisplayOrder 11 over Modal's 10), so a dialog's answers show: a
 	redeemed code, a spin's prize, a gift's Snackling. A toast whose text would be small on one line wraps onto two
-	(Logic/ScreenLayout.toastHeight). Banners drop in under the HUD's top stack, narrowed to stay clear of the buttons
-	beside it (the TAG button, the feature buttons), and wrap onto two lines.
+	(Logic/ScreenLayout.toastHeight). As many show as the screen has room for; a toast is never pushed out before it
+	has shown for 1.5 s, and newer ones wait in a short queue meanwhile (Logic/ToastQueue). Banners drop in under the
+	HUD's top stack, narrowed to stay clear of the buttons beside it (the TAG button, the feature buttons), and wrap
+	onto two lines.
 ]]
 
 local Debris = game:GetService("Debris")
@@ -17,10 +19,13 @@ local TweenService = game:GetService("TweenService")
 local Net = require(ReplicatedStorage.Shared.Net)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local ScreenLayout = require(ReplicatedStorage.Shared.Logic.ScreenLayout)
+local ToastQueue = require(ReplicatedStorage.Shared.Logic.ToastQueue)
+local TutorialRules = require(ReplicatedStorage.Shared.Logic.TutorialRules)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local ClientSettings = require(script.Parent.ClientSettings)
 local HudController = require(script.Parent.HudController)
 local SoundPlayer = require(script.Parent.SoundPlayer)
+local StateStore = require(script.Parent.StateStore)
 
 local NotificationController = {}
 
@@ -43,6 +48,8 @@ type Banner = { text: string, rarity: string?, color: string? }
 local bannerQueue: { Banner } = {}
 local bannerBusy = false
 local toastCounter = 0
+local waitingToasts: { ToastQueue.Item } = {} -- toasts waiting for room (Logic/ToastQueue)
+local toastPumpScheduled = false
 
 local KIND_COLORS: { [string]: string } = {
 	success = "success",
@@ -51,10 +58,26 @@ local KIND_COLORS: { [string]: string } = {
 	warning = "primary",
 }
 
-function NotificationController.toast(text: string, kind: string?)
-	local colorKey = KIND_COLORS[kind or "info"] or "panelLight"
+-- The toasts on screen (not one already on its way out), oldest first.
+local function shownToasts(): { Frame }
+	local toasts: { Frame } = {}
+	for _, child in toastList:GetChildren() do
+		if child:IsA("Frame") and child.Name == "Toast" then
+			table.insert(toasts, child)
+		end
+	end
+	table.sort(toasts, function(a: Frame, b: Frame): boolean
+		return a.LayoutOrder > b.LayoutOrder -- (LayoutOrder is minus the toast's number: the newest sits on top)
+	end)
+	return toasts
+end
+
+local pumpToasts: () -> ()
+
+local function showToast(item: ToastQueue.Item)
+	local colorKey = KIND_COLORS[item.kind or "info"] or "panelLight"
 	toastCounter += 1
-	local height = ScreenLayout.toastHeight(text)
+	local height = ScreenLayout.toastHeight(item.text)
 	local toast = UiKit.panel({
 		Name = "Toast",
 		Size = UDim2.fromOffset(TOAST.w, height),
@@ -62,39 +85,65 @@ function NotificationController.toast(text: string, kind: string?)
 		LayoutOrder = -toastCounter,
 		Parent = toastList,
 	})
+	toast:SetAttribute("ShownAt", os.clock())
 	UiKit.label({
-		Text = text,
+		Text = item.text,
 		TextWrapped = height == TOAST.tall,
 		Size = UDim2.new(1, -2 * TOAST_TEXT.padX, 1, -2 * TOAST_TEXT.padY),
 		Position = UDim2.fromOffset(TOAST_TEXT.padX, TOAST_TEXT.padY),
 		Parent = toast,
 	})
 	UiKit.popIn(toast)
-	if kind == "error" then
+	if item.kind == "error" then
 		SoundPlayer.ui("error")
-	end
-	local toasts = {}
-	for _, child in toastList:GetChildren() do
-		if child:IsA("Frame") and child.Name == "Toast" then -- not one already on its way out
-			table.insert(toasts, child)
-		end
-	end
-	-- the oldest go first, past as many as the screen has room for (fewer on a short phone: ScreenLayout.toastMax)
-	local room = math.min(MAX_TOASTS, ScreenLayout.toastMax(HudController.device()))
-	if #toasts > room then
-		table.sort(toasts, function(a: Frame, b: Frame): boolean
-			return a.LayoutOrder > b.LayoutOrder
-		end)
-		for index = 1, #toasts - room do
-			toasts[index]:Destroy()
-		end
 	end
 	task.delay(TOAST_SECONDS, function()
 		if toast.Parent then
 			toast.Name = "ToastLeaving"
 			UiKit.popOut(toast) -- shrinks and fades away
+			pumpToasts() -- room for one waiting
 		end
 	end)
+end
+
+-- Shows what waits as room allows (fewer on a short phone: ScreenLayout.toastMax), pushing out only toasts that have
+-- shown for 1.5 s, and comes back when the next one may show (Logic/ToastQueue.plan).
+pumpToasts = function()
+	local shown = shownToasts()
+	local shownAt: { number } = {}
+	for index, toast in shown do
+		local at = toast:GetAttribute("ShownAt")
+		shownAt[index] = if type(at) == "number" then at else 0
+	end
+	local room = math.min(MAX_TOASTS, ScreenLayout.toastMax(HudController.device()))
+	local plan = ToastQueue.plan(shownAt, room, #waitingToasts, os.clock(), ToastQueue.SETTINGS)
+	for index = 1, plan.evict do
+		shown[index]:Destroy()
+	end
+	for _ = 1, plan.show do
+		local item = table.remove(waitingToasts, 1)
+		if item then
+			showToast(item)
+		end
+	end
+	local retryIn = plan.retryIn
+	if retryIn and not toastPumpScheduled then
+		toastPumpScheduled = true
+		task.delay(retryIn + 0.05, function()
+			toastPumpScheduled = false
+			pumpToasts()
+		end)
+	end
+end
+
+function NotificationController.toast(text: string, kind: string?)
+	ToastQueue.enqueue(waitingToasts, { text = text, kind = kind }, ToastQueue.SETTINGS)
+	pumpToasts()
+end
+
+-- Whether a toast is on screen or waiting (RewardsController opens the Daily tab by itself only once they're done).
+function NotificationController.toastsBusy(): boolean
+	return #waitingToasts > 0 or #shownToasts() > 0
 end
 
 -- Floating "+$123" (or any text) rising from a world position.
@@ -250,8 +299,11 @@ function NotificationController.start()
 		end
 	end)
 	Net.get("Announce").OnClientEvent:Connect(function(payload: Banner & { kind: string? })
-		if payload.kind == "map" then
-			systemChat(payload.text) -- a new map: MapThemeController shows its own title card
+		-- Chat only for a new map (MapThemeController shows its own title card) and for every banner during the
+		-- first-time tutorial, whose own lines have the screen (Logic/TutorialRules.announceMode).
+		local state = StateStore.get()
+		if TutorialRules.announceMode(payload.kind, if state then state.tutorial.step else "") == "chat" then
+			systemChat(payload.text)
 			return
 		end
 		local color = if type(payload.color) == "string" and string.match(payload.color, "^#%x%x%x%x%x%x$")

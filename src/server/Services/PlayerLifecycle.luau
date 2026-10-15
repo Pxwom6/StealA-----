@@ -2,9 +2,13 @@
 --[[
 	Join / leave orchestration. Order matters, so it lives in one place:
 
-	join:  load save (session-locked) → check game passes → create session → claim a plot → grace period →
-	       income/podiums → offline earnings → leaderstats → spawn at base → (client ready) send state
+	join:  a base free for them (else "server full", before anything loads) → load save (session-locked) → check game
+	       passes → create session → claim a plot → grace period → income/podiums → offline earnings → leaderstats →
+	       spawn at base → (client ready) send state
 	leave: cancel steals involving the player → release plot → end the save session (final save)
+
+	A player who never gets a base here (the server is full, or they leave while their save loads) has their save
+	released with its lastSeen untouched (DataService.keepLastSeen), so their offline earnings wait for them.
 ]]
 
 local Players = game:GetService("Players")
@@ -44,6 +48,9 @@ local PlayerLifecycle = {}
 
 local hooks: Hooks = { onJoined = {}, onReady = {}, onLeaving = {}, onCharacter = {}, checkPasses = nil }
 local pendingReady: { [Player]: boolean } = {}
+-- Players whose save is loading: each will need a base, so they count as taking one (basesTaken).
+local loading: { [Player]: boolean } = {}
+local SERVER_FULL = "This server is full. Please join another server!"
 -- Each player's CharacterAdded connection, which holds their session: disconnected when they leave, so a Player that
 -- Roblox keeps around after leaving never keeps the session (and its save data) alive.
 local characterConnections: { [Player]: RBXScriptConnection } = {}
@@ -95,9 +102,33 @@ local function markReady(session: Session)
 	end
 end
 
+-- Bases taken or promised, leaving out `player`: every session with one, and every player whose save is loading.
+local function basesTaken(player: Player): number
+	local taken = 0
+	for other in loading do
+		if other ~= player then
+			taken += 1
+		end
+	end
+	for _, session in Sessions.all() do
+		if session.plot ~= 0 and session.player ~= player then
+			taken += 1
+		end
+	end
+	return taken
+end
+
 local function onPlayerAdded(player: Player)
+	-- A full server (Max Players above the plot count) says so at once, before the save loads (that can take up to a
+	-- minute) and long before it would have found no base (review 3).
+	if basesTaken(player) >= Gameplay.map.plotCount then
+		player:Kick(SERVER_FULL)
+		return
+	end
+	loading[player] = true
 	local profile, failure = DataService.load(player)
 	if profile == nil then
+		loading[player] = nil
 		-- A load cut short by a shutdown is not a data problem: no misleading kick (the server is closing anyway).
 		if player.Parent == Players and not DataService.isClosing() then
 			player:Kick(
@@ -109,6 +140,8 @@ local function onPlayerAdded(player: Player)
 		return
 	end
 	if player.Parent ~= Players then
+		loading[player] = nil
+		DataService.keepLastSeen(profile, profile.Data.lastSeen) -- never played here
 		DataService.release(profile)
 		return
 	end
@@ -118,6 +151,8 @@ local function onPlayerAdded(player: Player)
 		then hooks.checkPasses(player)
 		else { DoubleCash = false, VIP = false, ExtraPodiums = false, LongerLock = false, AutoCollect = false }
 	if player.Parent ~= Players then
+		loading[player] = nil
+		DataService.keepLastSeen(profile, lastSeenAtJoin) -- never played here
 		DataService.release(profile)
 		return
 	end
@@ -155,6 +190,7 @@ local function onPlayerAdded(player: Player)
 		pendingWelcome = nil,
 		social = { friends = 0, groupMember = false },
 		tutorial = nil,
+		tutorialCompletedAt = -math.huge,
 		cashOfferAt = -math.huge,
 		gadgets = GadgetRules.newState(),
 		host = nil,
@@ -178,8 +214,12 @@ local function onPlayerAdded(player: Player)
 	end
 	Analytics.milestone(session, "Joined")
 
-	if PlotService.assign(session) == nil then
-		player:Kick("This server is full. Please join another server!")
+	local plot = PlotService.assign(session)
+	loading[player] = nil
+	if plot == nil then
+		-- (not expected: a full server turned them away before loading; never stamp lastSeen for a stay with no base)
+		DataService.keepLastSeen(profile, lastSeenAtJoin)
+		player:Kick(SERVER_FULL)
 		return
 	end
 	session.graceUntil = StealRules.graceUntil(now, session.data.stats.playTime, Gameplay.grace.newPlayerSeconds)
@@ -208,6 +248,7 @@ end
 
 local function onPlayerRemoving(player: Player)
 	pendingReady[player] = nil
+	loading[player] = nil
 	local connection = characterConnections[player]
 	if connection then
 		characterConnections[player] = nil

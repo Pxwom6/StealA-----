@@ -64,36 +64,147 @@ T.describe("CashOfferRules.pick", function()
 		end
 	end)
 
-	T.it("with the real config, a new player's small shortfall is offered the cheapest pack", function()
+	T.it("with the real config, a new player's small shortfall is offered the cheapest small pack", function()
 		local offer = CashOfferRules.pick(
 			100,
 			0,
-			Monetization.storeProducts,
+			Monetization.cashOffer.packs,
 			Monetization.products :: any,
 			Economy.cashPacks :: any,
 			false
 		) :: CashOfferRules.Offer
 		T.expect(offer ~= nil).toBe(true)
-		local first: string? = nil
-		for _, key in Monetization.storeProducts do
-			if Monetization.products[key].kind == "Cash" then
-				first = key
-				break
-			end
-		end
-		T.expect(offer.key).toBe(first)
+		T.expect(offer.key).toBe(Monetization.cashOffer.packs[1])
+		T.expect(offer.key).toBe("CashBite")
+	end)
+
+	T.it("offers only the small packs: a gap only a bigger pack covers gets no offer", function()
+		-- at 100/s the Snack Pack pays 90K and the Snack Basket 210K: a 100K gap is beyond every small pack
+		local packs, products, cashPacks =
+			Monetization.cashOffer.packs, Monetization.products :: any, Economy.cashPacks :: any
+		T.expect(CashOfferRules.pick(100000, 100, packs, products, cashPacks, false)).toBeNil()
+		local ladder = CashOfferRules.pick(100000, 100, Monetization.storeProducts, products, cashPacks, false)
+		T.expect((ladder :: CashOfferRules.Offer).key).toBe("CashBasket") -- what the whole ladder would have sold
 	end)
 end)
 
+local SETTINGS: CashOfferRules.Settings =
+	{ cooldownSeconds = 180, minPlaySeconds = 600, smallGapSeconds = 45, packs = {} }
+
 T.describe("CashOfferRules.allowed", function()
-	local settings = { cooldownSeconds = 90 }
 	T.it("never during the first-time tutorial", function()
-		T.expect(CashOfferRules.allowed(1000, -math.huge, true, settings)).toBe(false)
+		T.expect(CashOfferRules.allowed(1000, -math.huge, true, 5000, SETTINGS)).toBe(false)
+	end)
+	T.it("never in a player's first ten minutes of play", function()
+		T.expect(CashOfferRules.allowed(1000, -math.huge, false, 599, SETTINGS)).toBe(false)
+		T.expect(CashOfferRules.allowed(1000, -math.huge, false, 600, SETTINGS)).toBe(true)
+		T.expect(CashOfferRules.allowed(1000, -math.huge, false, 0 / 0, SETTINGS)).toBe(false)
 	end)
 	T.it("the first offer is allowed, then at most one per cooldown", function()
-		T.expect(CashOfferRules.allowed(5, -math.huge, false, settings)).toBe(true)
-		T.expect(CashOfferRules.allowed(100, 20, false, settings)).toBe(false)
-		T.expect(CashOfferRules.allowed(110, 20, false, settings)).toBe(true)
+		T.expect(CashOfferRules.allowed(5, -math.huge, false, 600, SETTINGS)).toBe(true)
+		T.expect(CashOfferRules.allowed(199, 20, false, 600, SETTINGS)).toBe(false)
+		T.expect(CashOfferRules.allowed(200, 20, false, 600, SETTINGS)).toBe(true)
+	end)
+end)
+
+T.describe("CashOfferRules.waitSeconds", function()
+	T.it("a gap the income covers within 45 s gets its seconds, not an offer", function()
+		T.expect(CashOfferRules.waitSeconds(450, 10, SETTINGS)).toBe(45)
+		T.expect(CashOfferRules.waitSeconds(451, 10, SETTINGS)).toBeNil()
+		T.expect(CashOfferRules.waitSeconds(32, 15, SETTINGS)).toBe(3) -- the reviewer's: $32 short at $15/s
+		T.expect(CashOfferRules.waitSeconds(1, 1000, SETTINGS)).toBe(1) -- never "0s"
+	end)
+	T.it("nothing to wait for without income, or with a broken number", function()
+		T.expect(CashOfferRules.waitSeconds(100, 0, SETTINGS)).toBeNil()
+		T.expect(CashOfferRules.waitSeconds(100, 0 / 0, SETTINGS)).toBeNil()
+		T.expect(CashOfferRules.waitSeconds(100, math.huge, SETTINGS)).toBeNil()
+		T.expect(CashOfferRules.waitSeconds(0 / 0, 10, SETTINGS)).toBeNil()
+		T.expect(CashOfferRules.waitSeconds(0, 10, SETTINGS)).toBeNil()
+		T.expect(CashOfferRules.waitSeconds(-5, 10, SETTINGS)).toBeNil()
+	end)
+end)
+
+T.describe("CashOfferRules.decide (real config)", function()
+	local function decide(changes: { [string]: any }): CashOfferRules.Decision
+		-- an established player: an hour of play, no offer yet, $10/s
+		local ctx: { [string]: any } = {
+			shortfall = 1000,
+			income = 10,
+			packIncome = 10,
+			now = 1000,
+			lastOfferAt = -math.huge,
+			inTutorial = false,
+			playSeconds = 3600,
+			allowUnconfigured = false,
+		}
+		for key, value in changes do
+			ctx[key] = value
+		end
+		return CashOfferRules.decide(
+			ctx :: any,
+			Monetization.cashOffer,
+			Monetization.products :: any,
+			Economy.cashPacks :: any
+		)
+	end
+
+	T.it("a gap of more than 45 s of income gets the cheapest small pack that covers it", function()
+		local decision = decide({})
+		T.expect((decision.offer :: CashOfferRules.Offer).key).toBe("CashBite")
+		T.expect(decision.waitSeconds).toBeNil()
+	end)
+
+	T.it("a gap of 45 s of income or less: the seconds, never an offer", function()
+		local decision = decide({ shortfall = 300 })
+		T.expect(decision.offer).toBeNil()
+		T.expect(decision.waitSeconds).toBe(30)
+	end)
+
+	T.it("no offer in the tutorial, the first ten minutes or within 3 minutes of the last one", function()
+		local cases: { { [string]: any } } =
+			{ { inTutorial = true }, { playSeconds = 599 }, { lastOfferAt = 1000 - 179 } }
+		for _, changes in cases do
+			local decision = decide(changes)
+			T.expect(decision.offer).toBeNil()
+			T.expect(decision.waitSeconds).toBeNil()
+		end
+		T.expect(decide({ lastOfferAt = 1000 - 180 }).offer ~= nil).toBe(true)
+	end)
+
+	T.it("the reviewer's cases", function()
+		-- a Legendary tapped 45 s after the tutorial ($2.42M short at $157/s): it was the 199 R$ Snack Truck
+		T.expect(decide({ shortfall = 2420404, income = 157, packIncome = 157, playSeconds = 180 }).offer).toBeNil()
+		T.expect(decide({ shortfall = 2420404, income = 157, packIncome = 157 }).offer).toBeNil()
+		-- $32 short at $15/s: it was a 5 R$ offer
+		local tiny = decide({ shortfall = 32, income = 15, packIncome = 15 })
+		T.expect(tiny.offer).toBeNil()
+		T.expect(tiny.waitSeconds).toBe(3)
+	end)
+end)
+
+T.describe("Config/Monetization.cashOffer", function()
+	local cfg = Monetization.cashOffer
+	local products, cashPacks = Monetization.products :: any, Economy.cashPacks :: any
+
+	T.it("is valid: small cash packs only, cheapest first, and gentle numbers", function()
+		T.expect(table.concat(CashOfferRules.validate(cfg, products, cashPacks, Monetization.storeProducts), "; "))
+			.toBe("")
+		T.expect(cfg.cooldownSeconds).toBeAtLeast(180)
+		T.expect(cfg.minPlaySeconds).toBeAtLeast(600)
+		T.expect(cfg.smallGapSeconds).toBeAtLeast(45)
+	end)
+
+	T.it("refuses a big pack, a product that isn't cash, the wrong order and bad numbers", function()
+		local bad: CashOfferRules.Settings = {
+			cooldownSeconds = 30,
+			minPlaySeconds = -1,
+			smallGapSeconds = 0 / 0,
+			packs = { "CashSmall", "CashBite", "CashLarge", "InstantLock" },
+		}
+		T.expect(#CashOfferRules.validate(bad, products, cashPacks, Monetization.storeProducts)).toBe(6)
+		local empty = table.clone(cfg)
+		empty.packs = {}
+		T.expect(#CashOfferRules.validate(empty, products, cashPacks, Monetization.storeProducts)).toBe(1)
 	end)
 end)
 

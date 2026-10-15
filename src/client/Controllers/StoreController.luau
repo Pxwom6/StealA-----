@@ -748,7 +748,13 @@ function StoreController.start()
 		StoreController.open()
 	end)
 	side.button.LayoutOrder = 1
+	-- A second tap on the recharging lock button (LockController): the Shop on Instant Lock, never during the
+	-- first-time tutorial (Logic/LockRules.pillTap already says so; this keeps it true whoever calls it).
 	LockController.onPillTappedWhileRecharging = function()
+		local state = StateStore.get()
+		if state and state.tutorial.step ~= "" then
+			return
+		end
 		StoreController.open("InstantLock")
 	end
 	-- Cash and ownership change while the Gadgets tab is open: its prices turn green, bought ones say "Owned". The Shop

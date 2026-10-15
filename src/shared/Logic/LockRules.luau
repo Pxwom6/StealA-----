@@ -159,4 +159,41 @@ function LockRules.fromSaved(saved: SavedTimers, serverNow: number, wallNow: num
 	}
 end
 
+-- A tap on the HUD's lock button (client LockController). The button only shows the lock's state: locking happens at
+-- the 🔒 button by the base's door, so a tap says where to go, or how long the lock still recharges.
+export type PillTapInput = {
+	now: number, -- server time, the clock the timers below and `lastHintAt` are on
+	lockedUntil: number,
+	cooldownUntil: number,
+	vulnerableUntil: number,
+	tokens: number, -- Instant Lock tokens the player holds
+	inTutorial: boolean,
+	lastHintAt: number?, -- when the last tap's "recharging · Instant Lock is in the Shop" toast showed (nil: none)
+	repeatSeconds: number, -- a second tap within this long of that toast opens the Shop
+}
+-- `kind`: "walk" (the lock can be used now: go to the door), "locked" (it runs for `seconds` more), "recharging"
+-- (ready in `seconds`). `shop`: the toast mentions Instant Lock (only when no token is held, the open window isn't
+-- what waits, and never during the tutorial). `openShop`: this tap opens the Shop instead (a second tap soon after).
+export type PillTap = { kind: "walk" | "locked" | "recharging", seconds: number, shop: boolean, openShop: boolean }
+
+function LockRules.pillTap(input: PillTapInput): PillTap
+	local now = input.now
+	if input.lockedUntil > now then
+		return { kind = "locked", seconds = input.lockedUntil - now, shop = false, openShop = false }
+	elseif input.cooldownUntil > now then
+		if input.tokens > 0 then
+			-- a token skips the recharge, never the open window after a lock (`tryLock`): Instant Lock can't help
+			if input.vulnerableUntil > now then
+				return { kind = "recharging", seconds = input.vulnerableUntil - now, shop = false, openShop = false }
+			end
+			return { kind = "walk", seconds = 0, shop = false, openShop = false }
+		end
+		local shop = not input.inTutorial
+		local last = input.lastHintAt
+		local again = last ~= nil and now - last >= 0 and now - last <= input.repeatSeconds
+		return { kind = "recharging", seconds = input.cooldownUntil - now, shop = shop, openShop = shop and again }
+	end
+	return { kind = "walk", seconds = 0, shop = false, openShop = false }
+end
+
 return LockRules
