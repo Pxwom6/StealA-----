@@ -1,7 +1,8 @@
 --!strict
 --[[
-	Settings: a small gear button in the HUD's top-right corner (just under Roblox's top bar; left of Roblox's player
-	list on computers, see Logic/ScreenLayout) opens a dialog with three switches: Music, Sound effects and Reduce
+	Settings: a small gear button at the right end of the HUD's top-right row, in Roblox's top bar strip (under Roblox's
+	top-left buttons when its player list fills the corner on computers; Logic/ScreenLayout) opens a dialog with three
+	switches: Music, Sound effects and Reduce
 	effects. A change applies at once and is saved per player (ClientSettings → SetSetting intent → `settings_<key>`
 	flags in the save). A last row opens the Redeem Code dialog (CodesController).
 ]]
@@ -36,26 +37,11 @@ local ROWS: { Row } = {
 	{ key = "reduceEffects", label = "settingsReduceFx", hint = "settingsReduceFxHint", onMeans = true },
 }
 
--- Shared with the Friends button left of the gear (SocialController), so the two always line up.
-local GEAR_SIZE = ScreenLayout.CORNER.size
-local GEAR_MARGIN = ScreenLayout.CORNER.margin
-local GEAR_TOP = ScreenLayout.CORNER.top
-local STACK_HALF_WIDTH = ScreenLayout.CORNER.stackHalfWidth
+local GEAR_SIZE = ScreenLayout.SIZE.corner.button
 local TRACK_SIZE = Vector2.new(84, 40)
 local KNOB_SIZE = 32
 
 local gear: TextButton
-
-local function placeGear()
-	local screen = HudController.screen()
-	local scale = UiKit.scaleFor(workspace.CurrentCamera.ViewportSize)
-	local width = screen.AbsoluteSize.X / scale
-	local x = ScreenLayout.gearX(width, HudController.playerListWidth(), GEAR_SIZE, GEAR_MARGIN, STACK_HALF_WIDTH)
-	local position = UDim2.fromOffset(x, GEAR_TOP)
-	if gear.Position ~= position then
-		gear.Position = position
-	end
-end
 
 -- One settings line: its label (and hint) on the left, an ON / OFF switch on the right; the whole row is the target.
 local function buildRow(row: Row, order: number, parent: Instance): (Types.SettingsView) -> ()
@@ -219,21 +205,10 @@ function SettingsController.start()
 	gear = UiKit.button({
 		Name = "SettingsButton",
 		Size = UDim2.fromOffset(GEAR_SIZE, GEAR_SIZE),
-		Position = UDim2.fromOffset(0, GEAR_TOP),
 		BackgroundColor3 = UiTheme.palette("panel"),
 		Text = "⚙",
-		Parent = HudController.screen(),
 	}, SettingsController.open)
-	-- Re-placed when the window changes and every second (the player list can be switched on and off).
-	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(placeGear)
-	HudController.screen():GetPropertyChangedSignal("AbsoluteSize"):Connect(placeGear)
-	placeGear()
-	task.spawn(function()
-		while true do
-			task.wait(1)
-			placeGear()
-		end
-	end)
+	HudController.place("gear", gear)
 end
 
 return SettingsController

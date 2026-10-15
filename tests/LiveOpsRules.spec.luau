@@ -33,6 +33,16 @@ T.describe("LiveOpsRules events", function()
 		}
 		T.expect(LiveOpsRules.luckMultiplier(events, many, 150, limits)).toBe(6)
 	end)
+	T.it("leaves one source's boosts out when asked (prize rolls leave out bought Server Luck)", function()
+		local boosts = {
+			{ multiplier = 2, endsAt = 500, source = "purchase" },
+			{ multiplier = 1.5, endsAt = 500, source = "modifier" },
+		}
+		T.expect(LiveOpsRules.luckMultiplier(events, boosts, 150, limits)).toBe(6) -- 2 event x 2 bought x 1.5 modifier
+		T.expect(LiveOpsRules.luckMultiplier(events, boosts, 150, limits, "purchase")).toBe(3) -- event and modifier stay
+		T.expect(LiveOpsRules.luckMultiplier({}, boosts, 150, limits, "purchase")).toBe(1.5)
+		T.expect(LiveOpsRules.luckMultiplier({}, { boosts[1] }, 150, limits, "purchase")).toBe(1)
+	end)
 	T.it("combines cash multipliers", function()
 		T.expect(LiveOpsRules.cashMultiplier(events, 250, limits)).toBe(2)
 		T.expect(LiveOpsRules.cashMultiplier(events, 50, limits)).toBe(1)
@@ -255,6 +265,40 @@ T.describe("LiveOpsRules shipped Valentine's 2027 events", function()
 		local banner = LiveOpsRules.bannerEvent(all, valentinesDay) :: LiveOpsRules.EventDef
 		T.expect(banner.id).toBe("Valentine2027")
 		T.expect(banner.title).toBe("Valentine's")
+	end)
+end)
+
+T.describe("LiveOpsRules shipped Easter 2027 events", function()
+	local easter = findShipped("Easter2027")
+	local luck = findShipped("EasterLuck2027")
+	local all = LiveOps.events
+
+	T.it("runs Fri 19 Mar 17:00 UTC to Tue 6 Apr 07:00 UTC, with 2x luck from Good Friday to Easter Monday", function()
+		T.expect(easter.startsAt).toBe(utc(2027, 3, 19, 17, 0))
+		T.expect(easter.endsAt).toBe(utc(2027, 4, 6, 7, 0))
+		T.expect(luck.startsAt).toBe(utc(2027, 3, 26, 17, 0))
+		T.expect(luck.endsAt).toBe(utc(2027, 3, 29, 23, 59))
+		T.expect(luck.luckMultiplier).toBe(2)
+		T.expect(luck.startsAt).toBeGreaterThan(easter.startsAt)
+		T.expect(luck.endsAt).toBeLessThan(easter.endsAt)
+		T.expect(easter.luckMultiplier or 1).toBe(1)
+		T.expect(easter.cashMultiplier or 1).toBe(1)
+		-- never overlaps Valentine's: one seasonal theme at a time
+		T.expect(easter.startsAt).toBeGreaterThan(findShipped("Valentine2027").endsAt)
+	end)
+
+	T.it("switches on and off by date alone, with 2x luck on Easter Sunday", function()
+		T.expect(LiveOpsRules.activeEventIds(all, easter.startsAt - 1).Easter2027).toBeNil()
+		T.expect(LiveOpsRules.activeEventIds(all, easter.startsAt).Easter2027).toBe(true)
+		T.expect(LiveOpsRules.activeEventIds(all, easter.endsAt - 1).Easter2027).toBe(true)
+		T.expect(LiveOpsRules.activeEventIds(all, easter.endsAt).Easter2027).toBeNil()
+		local easterSunday = utc(2027, 3, 28, 12, 0)
+		T.expect(LiveOpsRules.activeEventIds(all, easterSunday)).toEqual({ Easter2027 = true, EasterLuck2027 = true })
+		T.expect(LiveOpsRules.luckMultiplier(all, {}, easterSunday, LiveOps.limits)).toBe(2)
+		T.expect(LiveOpsRules.luckMultiplier(all, {}, utc(2027, 3, 30, 12, 0), LiveOps.limits)).toBe(1)
+		local banner = LiveOpsRules.bannerEvent(all, easterSunday) :: LiveOpsRules.EventDef
+		T.expect(banner.id).toBe("Easter2027")
+		T.expect(banner.title).toBe("Easter")
 	end)
 end)
 

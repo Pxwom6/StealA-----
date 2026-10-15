@@ -620,6 +620,95 @@ local Mutations: { MutationDef } = {
 		},
 		eventId = "Valentine2027",
 	},
+
+	-- Easter 2027: everything washed soft and pastel (towards a lilac white), a pale pink glow and pastel sugar
+	-- sparkles drifting up. Rolls only while LiveOps event "Easter2027" runs; like the other event mutations, rarer
+	-- than Golden and stronger (order 32: rolled after every other one, so no existing roll changes).
+	{
+		id = "pastel",
+		displayName = "Pastel",
+		color = "#C9A8FF",
+		order = 32,
+		chance = 0.02,
+		incomeMultiplier = 3,
+		priceMultiplier = 2,
+		announceOnSpawn = false,
+		announceOnBuy = false,
+		announceOnSteal = false,
+		look = {
+			material = "SmoothPlastic",
+			tint = "#F4E8FF",
+			tintStrength = 0.5,
+			reflectance = 0.08,
+			glow = "#FFD6F0",
+			particles = "pastel",
+		},
+		eventId = "Easter2027",
+	},
+
+	-- Map signatures of the three maps after the first twenty (order 33-35: rolled after every other one, so no
+	-- existing roll changes; each only rolls on its own map).
+	{
+		id = "buttered",
+		displayName = "Buttered",
+		color = "#FFD24A",
+		order = 33,
+		chance = 0.012,
+		incomeMultiplier = 3,
+		priceMultiplier = 2,
+		announceOnSpawn = false,
+		announceOnBuy = false,
+		announceOnSteal = false,
+		look = {
+			material = "SmoothPlastic",
+			tint = "#FFD86B",
+			tintStrength = 0.45,
+			reflectance = 0.3,
+			particles = "popcorn",
+		},
+		mapTheme = "drivein",
+	},
+	{
+		id = "porcelain",
+		displayName = "Porcelain",
+		color = "#7CA8E8",
+		order = 34,
+		chance = 0.012,
+		incomeMultiplier = 3,
+		priceMultiplier = 2,
+		announceOnSpawn = false,
+		announceOnBuy = false,
+		announceOnSteal = false,
+		look = {
+			material = "SmoothPlastic",
+			tint = "#F4F8FF",
+			tintStrength = 0.65,
+			reflectance = 0.35,
+			particles = "glitter",
+		},
+		mapTheme = "teaparty",
+	},
+	{
+		id = "syrupy",
+		displayName = "Syrupy",
+		color = "#C8741E",
+		order = 35,
+		chance = 0.012,
+		incomeMultiplier = 3,
+		priceMultiplier = 2,
+		announceOnSpawn = false,
+		announceOnBuy = false,
+		announceOnSteal = false,
+		look = {
+			material = "Glass",
+			tint = "#C8741E",
+			tintStrength = 0.55,
+			transparency = 0.12,
+			reflectance = 0.25,
+			particles = "drips",
+		},
+		mapTheme = "pancakes",
+	},
 }
 
 return Mutations

@@ -108,7 +108,7 @@ A carrying thief's movement is checked every tick against a distance budget (`St
 refills at 1.6× carry speed, holds at most 3 s of refill and pays for every stud moved horizontally and every stud
 of new height (jumping again to a height already paid for is free, falling is free), so a lag spike's catch-up jump
 is covered while a sustained speed hack runs it dry; the straight-line distance from the grab point is also capped
-at carry speed × elapsed + 12 studs, which stops a teleport home. Before a lock ejects a carrying visitor, their
+at the carry speed allowed at each moment, added up over the carry (#46), + 12 studs, which stops a teleport home. Before a lock ejects a carrying visitor, their
 move into that base is checked first, and they are put just outside its nearest side (not at its entrance, which
 could be a shortcut home). If they were inside when the lock started, that push is the server's, so it costs no
 budget and the grab point moves with them (`StealRules.shiftCarryTrack`); anyone found inside later got past the
@@ -132,10 +132,11 @@ inside when the owner locks drops the creature.
   `addBoost`, tested to give identical odds); while a bought boost is running another purchase only adds time, so the
   store says "+15 min (odds stay the same)" instead of showing a stronger boost. Its 60-minute stacking cap is soft: the store stops offering it once another purchase
   would pass the cap, but a receipt that still arrives (e.g. two players buying at once) always adds its full
-  15 minutes — a purchase never takes Robux without an effect.
+  15 minutes — a purchase never takes Robux without an effect. It is a paid random item, so only players whose
+  Roblox policy allows those can buy it, and prize Snacklings never roll at its luck (#46).
 * Cash packs scale with income (always "about N minutes of your income"), so they never trivialise the game. The
-  basis is the steady income (`EconomyMath.packIncome`: active podiums only, nothing mid-steal, no LiveOps cash
-  event, no friend & group bonus). A pack's amount is fixed the first time its receipt reaches the player's session (`data.cashPackQuotes`),
+  basis is the steady income (`EconomyMath.packIncome`: active podiums only (a Snackling being carried off
+  still counts, #46), no LiveOps cash event or server modifier, no friend & group bonus). A pack's amount is fixed the first time its receipt reaches the player's session (`data.cashPackQuotes`),
   so a retry after a failed grant pays that amount even if the player rebirthed meanwhile; a receipt that arrives
   while the player's save is still loading waits for the load, so it is sized before they can play.
 * Stealing ends your own new-player protection.
@@ -305,26 +306,15 @@ new-player shield instead. Completing it pays `Tutorial.reward` ($500) once per 
 * **Existing players never see it:** a save with no tutorial flags but any progress (Snacklings, quarantined
   Snacklings, rebirths, belt purchases or steals) is marked done on join, without the reward. A player who joined
   before but never bought anything gets the tutorial.
-* **Layout (mobile first):** the banner is a slot in the HUD's top stack right under the cash
-  (`HudController.TOP_ORDER`, one table for every pill), so the list layout guarantees it never covers the cash, the
-  event / luck pills, the lock pill or the social pill; they move down while it shows. Its height is fitted every
-  frame (`TutorialController.fitBanner`, `TutorialRules.bannerMode`) so the whole stack ends above the screen bottom
-  (8 px margin), and above the bottom-centre carry banner while the player carries a Snackling (4 px gap): with the
-  steal step's tip (88 px) when that fits, else one line (64 px), else, only while carrying, no banner at all (the carry
-  banner's "Run home!" is the instruction then, and the 3D guide hides too). The tip never shows while carrying.
-  Worked out in reference px: the stack starts at y 6; cash 58, cash/sec 26, event pill 48 + luck pill 32 (one
-  slot), lock 34, social 34, each plus a 4 px gap, so every pill but the banner uses at most 262. On an iPhone SE in
-  landscape (667×375, UI scale 0.85, about 785×373 under the top bar) that leaves 373 - 8 - 262 = 103 when not
-  carrying: the banner with its tip fits and the stack ends at 350. While carrying, the carry banner spans
-  y 267-313, so the stack must end by 263: with the event and luck pills (262, or 226 with the event alone) the banner
-  hides; with only the lock and social pills (174) the one-line banner fits (ends at 238). At 640×360 (about 355 high)
-  there are 85 px with every pill, so the tip is dropped and the one-line banner ends at 326. Across, the banner is
-  420 wide, centred, and narrowed so its right edge stays 6 px left of the TAG button area (`TutorialRules.bannerWidth`,
-  never below the stack's 300): at 667×375 (785 wide) it spans x 182-602, clear of the side buttons (x ≤ 90) and the
-  action area (x ≥ 611); at 640×360 (753 wide, action area x ≥ 579) it is 393 wide, x 180-573. Skip is small but a
-  full touch target (72×44). The daily reward dialog doesn't auto-open during the tutorial (it opens right after).
-  Not covered: the transient toasts and the "X is stealing your Snackling!" alert, which already overlapped the
-  pills before the tutorial.
+* **Layout (mobile first):** the banner is the band right under the cash pill (#47: `Logic/ScreenLayout` places it
+  and `tools/layoutCheck.luau` checks it on five screens), so it never covers the cash, and the status pills, the
+  map vote and the Friends button wait until the tutorial is over. It shows the steal step's tip (88 tall) unless
+  the player is carrying, else one line (64); Skip (64×52) sits in its top 64, clear of the play zone. On an iPhone SE
+  in landscape (667×375 px, UI scale 0.85: 785×441 UI from the top of the screen, which Roblox's 58 px top bar
+  overlaps; earlier notes here said "785×373 under the top bar", which was never the case) it spans x 155-512,
+  y 58-133 px. Across, it is 420 wide, centred, and narrowed so its right edge stays 6 left of the TAG button area,
+  never below 300; on computers Roblox's player list is switched off while the centred banner would run under it, so
+  Skip is always reachable. The daily reward dialog doesn't auto-open during the tutorial (it opens right after).
 * **Analytics:** the onboarding funnel follows the tutorial: 1 Joined, 2 FirstBeltPurchase, 3 FirstCollect,
   4 TutorialLock (the tutorial moved past its lock step, however it ended), 5 TutorialComplete, 6 FirstSteal,
   7 FirstRebirth (FirstSteal and FirstRebirth were 4 and 5). Roblox counts a logged step as completing every earlier
@@ -401,9 +391,10 @@ already prefers them). Creature ids, not recipes, are what saves hold.
   `StateUpdate.settings` and are adopted once per join. "Reduce effects" is client-only (particles, belt / factory
   animation, Bloom, SunRays) and readable by any client code (`ClientSettings.reduceEffects()`).
 * **Top-right corner:** on computers Roblox draws its player list there, above every game UI, and doesn't expose its
-  size. `Logic/ScreenLayout` estimates it (names plus one column per leaderstat); the settings gear sits left of it and
-  the tutorial banner narrows to stay left of it. If even the narrowest banner can't, the tutorial switches the player
-  list off while its banner shows (only then, and back on after), so Skip is always reachable. Phones are unaffected.
+  size. `Logic/ScreenLayout` estimates it (names plus one column per leaderstat); the corner row (lock, Friends, gear)
+  stays left of it, or moves under Roblox's top-left buttons when there is no room (#47), and the tutorial banner
+  narrows to stay left of it. If even the narrowest banner can't, the tutorial switches the player list off while its
+  banner shows (only then, and back on after), so Skip is always reachable. Phones are unaffected.
 
 **Why:** "polished" for a young audience is mostly the first minute: a place that looks finished, a readable base, a
 belt that visibly moves, sound on every action, and a phone that doesn't stutter. Keeping all of it out of the gameplay
@@ -454,9 +445,9 @@ The `settings_*` flag names must stay (they are in saves).
 * **The all-done bonus is cash** (5 minutes of steady income, at least $500), not a free Instant Lock: lock tokens stay
   a store item and the lock fairness rules (#9) stay untouched. A full day of quests pays about 21 minutes of steady
   income (less than the day-7 daily reward), CI keeps it under an hour.
-* **HUD:** the left column is Shop, Rebirth, Rewards, Snackdex: four 76×58 buttons with 6 px gaps (250 reference
-  px), the footprint of the three 74 px buttons before, so the layout notes in #21 still hold (x ≤ 86, badges
-  included).
+* **HUD:** the feature buttons are Shop, Rebirth, Rewards, Snackdex: since #47 a 2×2 grid of 76×52 buttons under
+  Roblox's top-left buttons and above the thumbstick area (it was a column of 76×58 buttons down the left side, whose
+  lower half sat where the thumbstick starts).
   Daily login rewards and quests share the Rewards panel (two tabs) instead of a fifth button; it still opens itself
   on Daily once per session, never during the tutorial. The top-right corner and the bottom-right action area are
   untouched.
@@ -497,15 +488,14 @@ problem, not the biggest).
 * **Problem (owner playtest):** the friends / group pill was a 260-wide slot in the top stack, under the cash, the
   cash/sec, the tutorial banner and the lock pill. During the tutorial that column reached the middle of a phone
   screen, right where the player looks at their character.
-* **Now:** a 44×44 👥 button in the HUD's top-right row, just left of the settings gear (`ScreenLayout.CORNER`,
-  `ScreenLayout.besideGearX`, same inputs as the gear so they always line up). A small green "+20%" tag hangs under
-  it while friends or the group raise income; tapping it opens the same Friends & Group panel. It is hidden during
-  the first-time tutorial (`SocialRules.buttonVisible`) and pops in when the tutorial ends.
-* **Layout:** in reference units, an iPhone SE in landscape (785 wide) puts the gear at x 733-777 and the button at
-  681-725, y 4-48: clear of the cash pill (x 267-517) and above the TAG area (from y 68). On a 1440×900 Mac
-  (1067 wide, player list about 290) both sit left of the player list. When there is no room beside the gear (a
-  1280×720 window with the player list showing, or the gear pushed back into the corner under the list) the button
-  falls back to the old pill in the top stack, still hidden during the tutorial.
+* **Now:** a 👥 button in the HUD's top-right row, between the lock button and the settings gear (52×52 UI since
+  #47: 44 px on the smallest phones; `ScreenLayout.cornerRow`). A small green "+20%" tag hangs under it while
+  friends or the group raise income; tapping it opens the same Friends & Group panel. It is hidden during the
+  first-time tutorial (`SocialRules.buttonVisible`) and pops in when the tutorial ends.
+* **Layout (#47):** on an iPhone SE in landscape (785×441 UI) the row is the lock x 553-657, Friends 665-717 and the
+  gear 725-777, y 4-56, in the free right part of Roblox's top bar, clear of the cash pill (x 267-517) and above the
+  TAG area. When Roblox's player list leaves no room there (a 1280×720 window, a tablet) the whole row moves under
+  Roblox's top-left buttons, the feature buttons below it; there is no stack pill any more.
 * **Tutorial stack:** with the social pill gone from the stack while the tutorial runs, every pill but the banner
   now uses at most 224 px instead of 262 (#21), so the banner and its tip fit more often.
 
@@ -572,8 +562,9 @@ recipe comes back.
 
 * **What:** eight map themes (`Config/MapThemes`: Sunny Meadow, Candy Kingdom, Frosty Peaks, Nacho Dunes, Hot Sauce
   Volcano, Midnight Market, Coconut Cove, Apple Pie Orchard). A server starts on a random one; every 20 minutes the
-  map changes, after a 40-second vote between three others shown in the HUD's top stack (`VoteMap` intent, one vote
-  per player, ties and empty votes settled at random, `Logic/MapThemeRules`). Studio and admins: `/map <id|vote|list>`.
+  map changes, after a 40-second vote between three others shown in the HUD (a strip at the bottom since #47;
+  `VoteMap` intent, one vote per player, ties and empty votes settled at random, `Logic/MapThemeRules`). Studio and
+  admins: `/map <id|vote|list>`.
 * **Only the look changes:** a theme recolours the scenery (a palette over `Config/Theme.world`; plots, podiums,
   pads, the lock button and the belt are on a fixed list maps can't touch), changes the ground, walkway and boundary
   materials, the lighting, what grows on the tree spots (lollipops, palms, cacti, glowing mushrooms...: each kind
@@ -613,7 +604,7 @@ the old look, and removing the map vote card is one controller.
   `/mod <id> [minutes]`, `/mod off`, `/mod list` in Studio (admins live).
 * **One source of truth:** `ModifierService` only keeps the schedule; every effect is a multiplier the system that
   decides reads at that moment (`ModifierRules.effects`): BeltService (interval, capacity, prices, mutation
-  chances), EconomyService (income, folded into the LiveOps cash multiplier and capped with it), LockService (lock
+  chances), EconomyService (live income, capped together with LiveOps cash events; never in rewards or saved values, #46), LockService (lock
   length), StealService (hold, tag reach, speeds), PlayerLifecycle (new characters' speed). Luck is a LiveOps boost
   with source "modifier", so it shows in the luck pill and is capped like the others. The client computes the same
   effects from the published id for what it shows (belt prices, the steal prompt's hold, the TAG button's reach).
@@ -692,7 +683,7 @@ keep its id in the config).
 * **Server-authoritative pickups:** coins are picked up by the server's own distance check against trusted positions
   (`PositionTracker.isTrusted`), every 0.1 s, not by client touch events, so touch spoofing and teleporting get
   nothing. A crate opens with two intents like a steal (`CrateBegin`, `CrateOpen`): landed and closed, in reach at a
-  trusted position both times, and held for the configured time less the usual network tolerance.
+  position trusted as for a steal both times (#46), and held for the configured time less the usual network tolerance.
 * **Sized like cash packs:** every payout scales with the player's steady income (`EconomyMath.cashPackAmount`), so
   drops matter to a newcomer and to a big base alike, and a full Coin Rain is about five minutes of income for the
   whole server to share.
@@ -707,8 +698,9 @@ where everyone already is, and they make the belt area busier (more steals, more
 
 * **What:** a 🎟️ Codes row in Settings opens a dialog to type a code; `CodeService` pays cash sized from steady income
   (like a cash pack) or a Snackling (optionally mutated). Codes are in `src/server/Codes.luau`.
-* **Server-only list:** the codes module sits under ServerScriptService, so clients never receive it; the client
-  sends what was typed and gets a toast back. Only `CodeRules` (normalising and checking, no codes) is shared.
+* **Server-only list:** the codes module sits under ServerScriptService, so clients never receive it (but the
+  GitHub repo is public, so the file is not secret there: #46); the client sends what was typed and gets a toast
+  back. Only `CodeRules` (normalising and checking, no codes) is shared.
 * **Once per account, in flags:** redeeming sets `code_<CODE>` before paying, so a code cannot pay twice even on
   a retry; no save-format change. A Snackling code with a full base is refused without using the code up.
 * **Guessing:** RedeemCode allows 3 tries then one every 5 s per player; codes are letters and digits only.
@@ -921,3 +913,145 @@ big in the middle of the map, which is where the steals happen.
 **Why:** a longer ladder for players who have finished the first 25, and trophies that point at the newer systems
 (the modifiers, the daily reward, codes) and soften the first steal against you.
 **Reversal cost:** none — an achievement removed stops showing; its ids stay in the shipped list.
+
+### 44. Easter 2027: the fourth seasonal event, four new kinds of decoration and a blossom weather
+
+* **What:** `Easter2027` (Fri 19 Mar 17:00 UTC → Tue 6 Apr 07:00 UTC) with `EasterLuck2027` (2× luck from Good
+  Friday to Easter Monday): Custard Chick (Rare), Hot Cross Bunny (Epic), Lemon Meringue Lamb (Legendary) and Jelly
+  Bean Jackalope (Mythic), hand-built polished models (`art/snackling-parts/batch-6.json`, prompt for a Claude
+  Design redo next to it) with recipe fallbacks; the Pastel mutation (everything washed towards a lilac white, a pale
+  pink glow, pastel sugar sparkles); code `EGGHUNT27` (a Pastel Custard Chick until the event ends).
+* **The `spring` theme:** four new prop kinds, laid out in the same spots as the others so any theme can mix them:
+  giant painted eggs (a pastel shell, two painted bands, two dots) after the roses beside each entrance and along the
+  belt, chocolate bunnies (1.3× scale, about 11 studs: landmarks by the factory) in the corner spots after the giant
+  hearts, blossom trees between the bases (behind the decorated trees when a theme has both) and butterflies over the
+  walkway, lower than the balloons and nearer the bases. Pastel string lights, lamps, a bright spring morning and a
+  new weather, `blossoms` (soft pastel petals drifting down), complete it: 330 parts, under the 400 budget.
+* **Mutation bounds:** a fourth 2% event mutation takes "every event at once" (only possible with `/event`) to
+  15.15% of spawns, so that bound moved from 15% to 20%. The per-event check now looks at what can really run
+  together, the events whose dates overlap (the luck weekend): 5.95% for Easter, and any one event with the
+  strongest map and modifier is still 9.15%, under 10%.
+* **Renders before shipping:** the chick's eyes first sat inside its head (its centre is set back) and the lamb's
+  toasted meringue read as spikes until they became golden caps on rounder puffs; the bunny's head hid the cross on
+  its bun from the podium view, so the bun moved back, its icing got thicker and a small cross went on its forehead.
+  The decorations were checked on the meadow map: eggs, butterflies and the bunnies were made bigger after the first
+  render, where they read as specks next to the plots.
+* **Tests:** the dates and the luck weekend; the layout (330 parts, the configured counts, nothing on plots, the belt
+  or the lobby, eggs facing the walkway in two different colours, blossom trees clear of the plot walls, butterflies
+  above head height, bunnies clear of the factory and the chute, every prop kind mixing with the others without
+  overlapping); the event Snacklings and mutation like the other events; the server test turns Easter on (330 parts
+  by name, the lighting, a Pastel Jackalope on the belt) and off.
+
+**Why:** spring between Valentine's and the summer, with Snacklings and a mutation players can only get then.
+**Reversal cost:** none — move the dates, or drop the `Easter2027` line from Config/Seasons to keep the Snacklings
+without the decorations. Never remove the creature or mutation ids (they are in players' saves).
+
+### 45. Three more maps: Popcorn Drive-In, Tea Party Garden, Pancake Peaks
+
+* **What:** maps 21-23, built from the same pieces as the others (DECISIONS.md #32): Popcorn Drive-In (a starry
+  night lawn of popcorn trees and corn stalks; two glowing drive-in screens, giant striped popcorn buckets and soda
+  cups; popcorn popping all around), Tea Party Garden (an afternoon lawn of clipped topiaries and cone topiaries in
+  terracotta pots; a steaming giant teapot, teacups of tea, a three-tier cake stand and tumbled sugar cubes; falling
+  petals) and Pancake Peaks (a breakfast morning: pancake-brown hills round a syrup lake, blueberry bushes and giant
+  forks; towering pancake stacks with butter and syrup drips, syrup bottles and a waffle tower; steam rising).
+* **New pieces:** six flora kinds and ten landmark kinds (ThemeProps; counted in MapThemeRules and built exactly,
+  which the world smoke test checks), two weathers (popcorn: puffs jumping up and falling; steam: soft wisps rising),
+  and a particle preset (popcorn) for Buttered. The heaviest of the three builds about 1,370 scenery parts (budget
+  1,500).
+* **Signature mutations:** Buttered (golden and glossy, popcorn popping), Porcelain (glazed white, glinting) and
+  Syrupy (amber glass, dripping), 1.2% at x3 like every map's, rolled after every other mutation so no existing roll
+  changes. Code `MOVIENIGHT`: a Buttered Popcorn Penguin.
+* **Colours:** two world colours already existed (`hedge`, `strawberry`, used by other maps), so the new maps use
+  them rather than redefining them (Tea Party Garden sets its own hedge green in its palette). Pancake Peaks first
+  rendered as one orange: its ground went creamier than its pancake-brown hills and its haze bluer, and its
+  blueberry bushes grew so they read next to the forks.
+
+**Why:** "a ton of extra maps". Three themes unlike the twenty before them: a night out, a garden party and a
+breakfast.
+**Reversal cost:** none — `weight = 0` keeps a map for `/map` only; never remove the mutation ids (they are in saves).
+
+### 46. Pre-launch fixes (server)
+
+* **What:** fourteen findings from four pre-launch reviews, each fixed with a test. `tools/worldsim/prelaunch.luau`
+  plays them on the offline server with a virtual clock (`Sim.virtualClock`: the game's `os.clock` and `os.time`
+  follow simulated time) in mid-October 2026; CI runs it.
+* **Paid random items follow Roblox's policy:** Server Luck is a paid boost to luck, which the Paid Random Items
+  policy covers. `PlayerPolicy` asks PolicyService on join (pcall; a failure counts as restricted and is retried in
+  the background) and publishes the player attribute `PaidRandomItemsAllowed` (`Logic/PaidRandomItems`, to reuse
+  for paid Lucky Spin packs). Unless it is true the store shows the card as "Not available", and the receipt is not
+  granted. Prize Snacklings (spin, gifts, crates, runaways, Snack Attack, achievements) roll without the bought
+  boost, since its card only discloses belt odds; event, admin and modifier luck still count.
+* **Codes:** an optional `startsAt`; before it a code answers like an unknown one. Every event code starts with its
+  event (CI checks each code that gives an event Snackling or mutation). Codes are not secret: `Codes.luau` never
+  reaches a client, but the repo is public (README "Before publishing"). Typed text over 40 characters is refused
+  before the trim pattern, which was quadratic: one 32 KB call froze the server for 7 s.
+* **Economy:** a server modifier's income (Cash Splash, Jackpot) is live income only, capped together with LiveOps
+  cash events. It no longer reaches the daily reward, offline earnings, the saved best cash/sec or packs (#19);
+  LiveOps cash events still count in rewards, as before. A Snackling a thief carries off counts in pack income until
+  delivery (#7), so a pack pays what its card showed.
+* **Checks:** the carry's straight-line cap adds up the speed allowed at each step (Sugar Rush ending mid-carry
+  cancelled honest steals). For 1.5 s after a modifier changes, the kinder of the old and new price, hold time and
+  tag reach applies (`ModifierRules.lenient`). Crates and runaways trust positions like a steal (10 s after a
+  teleport); coins keep 2 s. A pass is granted only when `UserOwnsGamePassAsync` confirms it. An automatic prize
+  never takes a carrying thief's last free podium (it is sold).
+* **Robustness and data:** the core server loops run their bodies in pcall; CharacterAdded is disconnected on leave
+  and `PlayerCharacterDestroyBehavior` is Enabled; analytics take only known store keys, and belt purchases log the
+  rarity as their SKU; the client state has `baseFull` for the Spin and Gifts tabs' warning.
+
+**Why:** a server freeze, a Roblox policy gap, honest players punished by checks, and temporary bonuses leaking into
+saved and paid values all had to go before the game is public.
+**Reversal cost:** low; every change is local and there is no save-format change. Keep the policy check while any
+paid random item is sold.
+
+### 47. Pre-launch fixes (UI and phone layout)
+
+* **What:** twelve UI findings from the pre-launch review fixed, and a layout check so they can't come back.
+* **One function places the HUD, and CI checks it:** `Logic/ScreenLayout.layout(device, state)` says where every HUD
+  element goes on any screen. `HudController` places the real frames with it (the other controllers hand theirs
+  over with `HudController.place`) whenever one shows or hides, or the screen, Roblox's top bar
+  (`GuiService.TopbarInset`) or its player list changes. `tests/ScreenLayout.spec.luau` and `tools/layoutCheck.luau`
+  (CI) run it on 640×360, 667×375 and 844×390 phones (the last with a notch), a 1024×768 tablet and a 1280×720 window
+  with the player list, in the busiest states (event, modifier, luck, vote, cash offer, the tutorial with its tip,
+  carrying, three toasts, a banner, a steal alert, a map title card). They fail on any overlap between HUD elements,
+  anything outside the safe area, any button in the play zone (the middle third of the width, 30-70% of the height:
+  the head is at 50% and nearby prompts at 39-55%), under Roblox's top-bar buttons, player list, jump button or
+  thumbstick area, or smaller than 44 px on a touch screen. `Logic/TextFit` (FredokaOne's real advance widths and
+  TextScaled's fitting) proves the HUD's text stays at 12 UI or more (10 px on the smallest phones) for every map,
+  mutation, event banner, modifier, lock and luck line, toast and cash pack.
+* **The layout** (667×375 px): the cash pill, with cash/sec inside it, in the top bar strip (x 227-440, y 5-54);
+  one band under it (y 58-109) holding the tutorial banner, or the cash offer, or the status pills: the event pill
+  (its banner on two lines) beside the modifier, now a 165×52 button, with luck beside them or on a second row; the
+  lock (104×52), Friends and the gear (52×52) in the free right part of the top bar (x 470-660, y 3-48), or under
+  Roblox's top-left buttons when its player list fills the corner; Shop, Rebirth, Rewards and Snackdex (76×52) in a
+  2×2 grid under Roblox's top-left buttons (x 8-143, y 61-155), above where the thumbstick starts (y 164); TAG where
+  it was (x 532-634, y 116-218); the map vote a strip between the thumbstick and the jump button (x 274-558,
+  y 290-368), names on two lines; toasts above it. With an event and a modifier, the usual state for weeks, the stack
+  ends at 109 px, above the play zone (from 112); the lock pill used to sit at y 160-189, over the character's head
+  where the Steal / Buy prompts are, and opened the Robux store when tapped while recharging.
+* **Screens:** `UiKit.screen(name, order, insets)` sets insets explicitly, IgnoreGuiInset first and ScreenInsets
+  last (whichever is set last wins; a props table had no order). All four screens use DeviceSafeInsets on purpose: the
+  HUD starts at the top of the screen, under Roblox's 58 px top bar, and keeps clear of its buttons instead of
+  starting below it (the old notes said "785×373 under the top bar"; it was 785×441 from the top). Dialogs centre in
+  the part below the top bar. Toasts have their own screen above dialogs (DisplayOrder 11 over 10). The UI scale is
+  also capped by the width (900 reference wide), so a 4:3 tablet gets 1.14 instead of 1.35.
+* **The other findings:** answers inside dialogs now show (redeemed codes, the spin's prize and "Not ready", gift
+  Snacklings); the Spin tab's Odds shows a grid of every prize's exact chance instead of a 105-character toast;
+  toasts wrap onto two lines when one would read under 16 UI; banners, the map title card and the steal alert drop
+  in under the stack, narrowed clear of TAG; the cash offer is a strip under the cash and its Robux button ignores
+  taps for 0.7 s; the daily panel no longer opens itself while carrying or over another dialog (`Modal.isAnyOpen`),
+  it waits for a later update; the vote waits for the first state (no flash for new players) and hides while
+  carrying; the Spin and Gifts tabs warn while the base is full (`baseFull`, #46); touch targets are 52 UI (44 px on
+  phones): lock, modifier, gear, Friends, the offer's buttons, the Rewards tabs, Quest and Gift Claim buttons, Odds,
+  Skip.
+* **Memory and rendering:** belt models keep one spare per Snackling and mutation pair and 32 in all, the least
+  recently parked destroyed first (`Logic/ModelPool`, `Gameplay.belt.modelPool`): a 10-hour replay with the real
+  configs stays at 32 spares (59 models at most with Rush Hour's longer belt), where the old pool kept every pair it
+  had seen (305-364 after 10 hours here, about 450 in the reviewer's measurement). Podium Snacklings' PointLights and
+  ParticleEmitters go off beyond 110 studs from the camera and back within 90 (`Logic/FxCulling`,
+  `Gameplay.podiumFx`), checked twice a second in IdleController; Reduce effects still keeps particles off.
+
+**Why:** the game is played on phones, and a tap meant for a Buy or Steal prompt must never land on a HUD button; a
+young player must be able to read every line; a dialog's answer must be seen; and a long session must not run a phone
+out of memory. Making the layout one pure function the game uses means the check proves what players see.
+**Reversal cost:** low; no saved data changed. Sizes and the busiest states are data in `Logic/ScreenLayout` (keep
+`tools/layoutCheck.luau` green when moving anything), and the pool and culling numbers are in `Config/Gameplay`.

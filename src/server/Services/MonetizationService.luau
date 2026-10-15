@@ -3,7 +3,8 @@
 	Game passes and developer products.
 
 	Passes: ownership is checked on join (UserOwnsGamePassAsync, with retries) and when bought in-game
-	(PromptGamePassPurchaseFinished). Ownership lives in the session, not the save: Roblox is the source of truth.
+	(PromptGamePassPurchaseFinished, then UserOwnsGamePassAsync: the event alone is not trusted). Ownership lives in
+	the session, not the save: Roblox is the source of truth.
 
 	Products: MarketplaceService.ProcessReceipt → Logic/ReceiptLedger.process:
 	  * the grant and the PurchaseId record happen together without yielding (no double grants on retry)
@@ -34,6 +35,7 @@ local DataService = require(script.Parent.DataService)
 local EconomyService = require(script.Parent.EconomyService)
 local LiveOpsService = require(script.Parent.LiveOpsService)
 local LockService = require(script.Parent.LockService)
+local PlayerPolicy = require(script.Parent.PlayerPolicy)
 local Remotes = require(script.Parent.Remotes)
 local Replication = require(script.Parent.Replication)
 local Sessions = require(script.Parent.Sessions)
@@ -226,11 +228,13 @@ type AfterGrant = () -> ()
 -- Works out everything a product grants WITHOUT changing anything (it may throw: nothing is lost, Roblox retries).
 -- Returns `apply`, which only writes the precomputed results (plain table writes: no yields, nothing that can fail;
 -- see ReceiptLedger), and a follow-up that runs once the purchase is confirmed saved (announcements, auto-lock...).
+-- `paidRandomAllowed`: the buyer's policy allows paid random items (PlayerPolicy, looked up before this step).
 local function prepareProduct(
 	session: Session,
 	key: string,
 	receipt: { [string]: any },
-	quotedCash: number
+	quotedCash: number,
+	paidRandomAllowed: boolean
 ): (() -> (), AfterGrant?)
 	local product = Monetization.products[key]
 	local perks = Monetization.perks
@@ -276,7 +280,16 @@ local function prepareProduct(
 			end
 		end
 	elseif product.kind == "ServerLuck" then
-		newBoosts = LiveOpsService.boostsWith(perks.serverLuckSeconds, perks.serverLuckMultiplier, "purchase", true)
+		if not paidRandomAllowed then
+			-- Only a client that went around the store's blocked card gets here: never grant it (PlayerPolicy).
+			error("paid random items are not allowed for this player (PolicyService)")
+		end
+		newBoosts = LiveOpsService.boostsWith(
+			perks.serverLuckSeconds,
+			perks.serverLuckMultiplier,
+			LiveOpsService.PURCHASE_SOURCE,
+			true
+		)
 		after = function()
 			LiveOpsService.publishAttributes()
 			Announcer.broadcast({
@@ -316,6 +329,15 @@ local function processFor(player: Player, key: string, receipt: { [string]: any 
 	local purchaseId = tostring(receipt.PurchaseId)
 	local after: AfterGrant? = nil
 	local profile = session.profile
+	-- Server Luck is a paid random item: only for players whose policy allows it (the store shows it blocked
+	-- otherwise). Looked up here, before the grant step, because it may yield.
+	local paidRandomAllowed = true
+	if Monetization.products[key].kind == "ServerLuck" then
+		paidRandomAllowed = PlayerPolicy.paidRandomItemsAllowed(player)
+		if not paidRandomAllowed then
+			warn(`[Monetization] {player.Name} may not buy paid random items: {key} is not granted`)
+		end
+	end
 	-- A cash pack's amount is fixed the first time its receipt reaches the player's session (and saved with the data),
 	-- so if that grant fails and Roblox retries after the player's income changed (e.g. they rebirthed), the retry
 	-- pays what the purchase was worth then. A receipt that finds no session yet waits for the load (see above).
@@ -340,7 +362,7 @@ local function processFor(player: Player, key: string, receipt: { [string]: any 
 			return (profile.Data :: any) :: { [string]: any }
 		end,
 		prepare = function(): () -> ()
-			local apply, followUp = prepareProduct(session, key, receipt, quotedCash)
+			local apply, followUp = prepareProduct(session, key, receipt, quotedCash, paidRandomAllowed)
 			after = followUp
 			return apply
 		end,
@@ -417,6 +439,8 @@ local function onDevGrant(player: Player, keyArg: unknown)
 	print(`[Monetization] Studio grant {key}: {decision.Name}`)
 end
 
+-- Store analytics from the client. Only known keys reach a breakdown field (CustomField01): any other string from a
+-- client would add a value to the analytics breakdowns, so the event is dropped instead.
 local function onClientEvent(player: Player, nameArg: unknown, keyArg: unknown)
 	local name = Guard.oneOf(nameArg, { "store_opened", "store_product_clicked", "cash_offer_clicked" })
 	local session = Sessions.get(player)
@@ -426,11 +450,35 @@ local function onClientEvent(player: Player, nameArg: unknown, keyArg: unknown)
 	if name == "store_opened" then
 		Analytics.storeStep(session, "StoreOpened")
 	elseif name == "cash_offer_clicked" then
-		local key = Guard.shortString(keyArg, 40)
-		Analytics.custom(session, "cash_offer_clicked", nil, { key or "" })
+		local key = Guard.keyOf(keyArg, Monetization.products)
+		if key and Monetization.products[key].kind == "Cash" then
+			Analytics.custom(session, "cash_offer_clicked", nil, { key })
+		end
 	else
-		local key = Guard.shortString(keyArg, 40)
-		Analytics.storeStep(session, "ProductPrompted", { key or "" })
+		local key = Guard.keyOf(keyArg, Monetization.products) or Guard.keyOf(keyArg, Monetization.passes)
+		if key then
+			Analytics.storeStep(session, "ProductPrompted", { key })
+		end
+	end
+end
+
+-- A game pass bought in-game. The event's `purchased` flag is not proof of a purchase, so Roblox is asked first
+-- (UserOwnsGamePassAsync, retried): granted only when it says owned; when it can't answer, the pass joins the
+-- background re-check (recheckPasses) like a failed lookup at join.
+local function onPassPurchaseFinished(player: Player, passId: number, purchased: boolean)
+	if not purchased then
+		return
+	end
+	local key = passKeyForId(passId)
+	if key == nil then
+		return
+	end
+	local owns = ownsPass(player.UserId, passId)
+	local session = Sessions.get(player)
+	if owns == true and session then
+		grantPass(session, key)
+	elseif owns == nil or (owns == true and session == nil) then
+		task.spawn(recheckPasses, player, { key }) -- unknown, or owned but the session is not ready yet
 	end
 end
 
@@ -438,14 +486,7 @@ function MonetizationService.start()
 	MarketplaceService.ProcessReceipt = processReceipt
 	MarketplaceService.PromptGamePassPurchaseFinished:Connect(
 		function(player: Player, passId: number, purchased: boolean)
-			if not purchased then
-				return
-			end
-			local key = passKeyForId(passId)
-			local session = Sessions.get(player)
-			if key and session then
-				grantPass(session, key)
-			end
+			task.spawn(onPassPurchaseFinished, player, passId, purchased)
 		end
 	)
 	Remotes.onIntent("ClientEvent", onClientEvent)

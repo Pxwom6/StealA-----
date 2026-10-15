@@ -16,6 +16,7 @@ local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local GameData = require(ReplicatedStorage.Shared.GameData)
 local Net = require(ReplicatedStorage.Shared.Net)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
+local ScreenLayout = require(ReplicatedStorage.Shared.Logic.ScreenLayout)
 local StealRules = require(ReplicatedStorage.Shared.Logic.StealRules)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local HudController = require(script.Parent.HudController)
@@ -207,6 +208,13 @@ end
 local function onStealAlert(payload: { thiefUserId: number, thiefName: string, creatureId: string, text: string })
 	alertThiefId = payload.thiefUserId
 	alertLabel.Text = payload.text
+	-- Under the top stack (and any announcement banner), narrowed to stay clear of the TAG button: the owner may well
+	-- want to tag the thief right now (Logic/ScreenLayout).
+	local size = ScreenLayout.SIZE.stealAlert
+	local top = ScreenLayout.stealAlertTop(HudController.stackBottom())
+	local x, width = HudController.overlaySpan(size.w, size.h, top)
+	alertFrame.Position = UDim2.fromOffset(x, top)
+	alertFrame.Size = UDim2.fromOffset(width, size.h)
 	alertFrame.Visible = true
 	UiKit.popIn(alertFrame)
 	SoundPlayer.world("alarm")
@@ -241,11 +249,12 @@ local function build()
 		corner.CornerRadius = UDim.new(0.5, 0)
 	end
 
+	local carry = ScreenLayout.SIZE.carry
 	carryBanner = UiKit.panel({
 		Name = "CarryBanner",
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -60),
-		Size = UDim2.fromOffset(320, 46),
+		Position = UDim2.new(0.5, 0, 1, -carry.bottom),
+		Size = UDim2.fromOffset(carry.w, carry.h),
 		BackgroundColor3 = UiTheme.palette("gold"),
 		Visible = false,
 		Parent = screen,
@@ -259,9 +268,7 @@ local function build()
 
 	alertFrame = UiKit.panel({
 		Name = "StealAlert",
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 230),
-		Size = UDim2.fromOffset(420, 52),
+		Size = UDim2.fromOffset(ScreenLayout.SIZE.stealAlert.w, ScreenLayout.SIZE.stealAlert.h),
 		BackgroundColor3 = UiTheme.palette("danger"),
 		Visible = false,
 		Parent = screen,
@@ -269,6 +276,7 @@ local function build()
 	alertLabel = UiKit.label({
 		Size = UDim2.new(1, -16, 1, -8),
 		Position = UDim2.fromOffset(8, 4),
+		TextWrapped = true,
 		Parent = alertFrame,
 	})
 	-- Flash the alert while visible.
@@ -283,12 +291,6 @@ local function build()
 			end
 		end
 	end)
-end
-
--- The bottom-centre "Run home!" banner, shown while the local player carries a Snackling (the tutorial banner keeps
--- the HUD's top stack above it).
-function StealController.carryBanner(): Frame?
-	return carryBanner
 end
 
 function StealController.start()

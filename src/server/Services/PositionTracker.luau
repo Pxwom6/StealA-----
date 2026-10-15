@@ -128,17 +128,25 @@ function PositionTracker.isTrustedForSteal(session: Session, position: Vector3):
 	}, walkLimits(session))
 end
 
+local function sampleAll()
+	for _, session in Sessions.all() do
+		local root = Sessions.rootPart(session)
+		if root then
+			PositionTracker.record(session, root.Position)
+		elseif session.walk then
+			PositionTracker.reset(session, nil) -- dead or respawning: the old history no longer applies
+		end
+	end
+end
+
 function PositionTracker.start()
 	task.spawn(function()
 		while true do
 			task.wait(CFG.sampleInterval)
-			for _, session in Sessions.all() do
-				local root = Sessions.rootPart(session)
-				if root then
-					PositionTracker.record(session, root.Position)
-				elseif session.walk then
-					PositionTracker.reset(session, nil) -- dead or respawning: the old history no longer applies
-				end
+			-- One error must not stop the samples for good (every steal and tag would then be refused).
+			local ok, err = pcall(sampleAll :: () -> ...any)
+			if not ok then
+				warn(`[PositionTracker] {err}`)
 			end
 		end
 	end)

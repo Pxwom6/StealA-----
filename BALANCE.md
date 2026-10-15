@@ -190,6 +190,9 @@ the store stay exact. Golden Hour (a server modifier) is the only thing that mul
 | Bubblegum | on Bubblegum Bayou | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
 | Aurora | during Northern Lights | 2% | 28.8 | x4 | x2.5 | x0.63 | spawn |
 | Toasted | during Heatwave | 2% | 28.8 | x4 | x2.5 | x0.63 | spawn |
+| Buttered | on Popcorn Drive-In | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Porcelain | on Tea Party Garden | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
+| Syrupy | on Pancake Peaks | 1.2% | 17.3 | x3 | x2 | x0.67 | no |
 
 "Per server-hour" is while the mutation can roll. Any mutation on an ordinary spawn (the map's signature included,
 no modifier): 5.15% of spawns (74.2 per server-hour). Expected value of one spawn: income x1.0885, price x1.0435.
@@ -207,7 +210,7 @@ no modifier): 5.15% of spawns (74.2 per server-hour). Expected value of one spaw
 * **Map signatures** (`mapTheme`): each map has exactly one, only while it is up — about 6 in a 20-minute map. At
   x3 they sit between Golden and Diamond (rarer than Golden, weaker than Diamond; CI checks both), so a map is worth
   voting for (the vote buttons and the title card name its mutation) without making the permanent ones pointless.
-  Collectors chase all twenty through the Snackdex, which shows a pip for each one owned.
+  Collectors chase all twenty-three through the Snackdex, which shows a pip for each one owned.
 * **Weather mutations** (`modifierId`): only while their weather modifier runs (5 minutes, a few times a day per
   server), about 2–3 per storm, each announced to the whole server so everyone races to the belt. x4 like Diamond.
 * **Event-only mutations** (with an `eventId`) roll only while that LiveOps event runs.
@@ -396,9 +399,68 @@ ValentineLuck2027 "Valentine's luck"`.
   Sweetheart ones) keep earning forever.
 * **The Valentine's luck** is a weekend like Halloween's (about 55 hours) and works the same (2× of 6×; the store's
   odds stay exact).
-* **Three event mutations exist now**, months apart. If an admin started every event at once with `/event`, all
-  mutations together would reach 13.15% of spawns (CI keeps that below 15%); any one event with the strongest map and
-  modifier stays at 9.15%.
+* **Three event mutations existed then**, months apart. If an admin started every event at once with `/event`, all
+  mutations together would have reached 13.15% of spawns; any one event with the strongest map and modifier stays at
+  9.15% (Easter below has the bounds now).
+
+## Easter 2027 (limited-time event)
+
+`Easter2027` runs Fri 19 Mar 17:00 UTC → Tue 6 Apr 07:00 UTC (two weekends, Easter Sunday on 28 Mar and Easter
+Monday, and the spring holidays either side); `EasterLuck2027` adds **2× luck** from Good Friday to Easter Monday,
+Fri 26 Mar 17:00 UTC → Mon 29 Mar 23:59 UTC (`Config/LiveOps.luau`). While Easter runs:
+
+| Snackling | Rarity | Price | Income | Payback | Share of its tier | Per server-hour | With 2x luck |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Custard Chick | Rare | $11.5K | $152/s | 1m 15s | 23.1% | 38.2 | 65.3 |
+| Hot Cross Bunny | Epic | $135K | $870/s | 2m 35s | 23.1% | 14 | 23.9 |
+| Lemon Meringue Lamb | Legendary | $3.05M | $5.95K/s | 8m 32s | 23.1% | 3.7 | 6.2 |
+| Jelly Bean Jackalope | Mythic | $78M | $52.5K/s | 24m 45s | 28.6% | 0.7 | 1.3 |
+
+| Mutation | Chance per spawn | Per server-hour | Income | Price | Payback vs plain | Announced |
+| --- | --- | --- | --- | --- | --- | --- |
+| Pastel (event only) | 2% | 28.8 | x3 | x2 | x0.67 | no |
+
+The same shape as the other events: four Snacklings sharing their tiers' odds (priced between the Winter and the
+Valentine's ones, inside each tier's regular price and payback range) and an event mutation exactly as rare and strong
+as Haunted, Festive and Sweetheart, so any mutation is 7.15% of spawns and one spawn's expected value is income
+x1.1285, price x1.0635 while it runs.
+
+Time to reach each rarity and income for a **new free player whose whole session is inside the event** (the last
+column has the Easter luck on for the whole session too):
+
+| Rarity | No event | Easter | Easter + 2x luck |
+| --- | --- | --- | --- |
+| Common | 7s | 7s | 7s |
+| Uncommon | 1m 52s | 1m 52s | 2m 2s |
+| Rare | 4m 52s | 4m 52s | 4m 37s |
+| Epic | 11m 5s | 10m 50s | 10m 22s |
+| Legendary | 30m 52s | 30m 45s | 26m 40s |
+| Mythic | 1h 57m | 1h 50m | 1h 28m |
+| Secret | 9h 35m | 9h 22m | 5h 41m |
+| First rebirth affordable | 1h 2m | 58m 25s | 54m 12s |
+
+| Play time | No event | Easter | Easter + 2x luck |
+| --- | --- | --- | --- |
+| 10m | $1.01K/s | $1.14K/s | $1.52K/s |
+| 30m | $8.68K/s | $10.3K/s | $15K/s |
+| 1h | $31.5K/s | $34.7K/s | $53.3K/s |
+| 3h | $173K/s | $202K/s | $320K/s |
+| 8h | $568K/s | $644K/s | $1.13M/s |
+| 24h | $2.26M/s | $2.5M/s | $3.6M/s |
+
+A free player buys a median of 31 event Snacklings in 24 hours of event play (33 with the Easter luck), the first
+after about 7½ minutes (a Custard Chick). Re-run with `lune run tools/simulate.luau Easter2027 EasterLuck2027
+"Easter luck"`.
+
+* **Everything said about Halloween holds**: no regular roll changes outside the event (CI replays the rolls for every
+  event), the tier odds and the Server Luck disclosure are the same during it, and after it the Snacklings (and
+  Pastel ones) keep earning forever.
+* **The Easter luck** runs four days (about 79 hours: Good Friday to Easter Monday, a holiday weekend in much of
+  the world), longer than the other luck weekends; it works the same (2× of 6×; the store's odds stay exact).
+* **Four event mutations exist now**, months apart: CI checks that the events whose dates overlap each one (its luck
+  weekend) keep every mutation live together below 10% (5.95% for Easter), and that any one event with the strongest
+  map and modifier stays below 10% (9.15%). If an admin started every event at once with `/event`, all mutations
+  together would reach 15.15% of spawns; CI keeps that below 20%, room for two more 2% event mutations.
 
 ## Server modifiers
 
@@ -415,13 +477,13 @@ half the time.
 | Clearance Sale | belt prices x0.7 (rounded to whole cash, at least 1) | about 1% off what an always-buying player spends |
 | Golden Hour | every mutation chance x3 (5.15% → 15.5% of spawns; 7.15% → 21.5% while Halloween runs) | about +5% mutations |
 | Lucky Breeze | 2x luck (a LiveOps boost: shows in the luck pill, capped with everything else at 6x) | rare odds doubled ~3.6% of the time (with Snack Party) |
-| Cash Splash | income x1.5 (with LiveOps cash events, capped at 3x) | about +1.2% income; cash packs and quest rewards are not inflated (they use the steady income) |
+| Cash Splash | live income x1.5 (with LiveOps cash events, capped at 3x) | about +1.2% income; cash packs, quest and daily rewards, offline earnings and the saved best cash/sec are not inflated (DECISIONS.md #46) |
 | Sugar Rush | everyone walks (and carries) 25% faster | – |
 | Quick Hands | the steal hold is 0.75 s instead of 1.5 | – |
 | Fortress | locks started while it runs last 1.5x (the open window grows with them: at least half the lock) | – |
 | Snack Patrol | tag reach 13 → 19.5 studs | – |
 | Snack Party (rare) | spawns every 1.7 s and 2x luck | – |
-| Jackpot (rare) | income x2 (with LiveOps cash events, capped at 3x) | about +0.9% income |
+| Jackpot (rare) | live income x2 (with LiveOps cash events, capped at 3x) | about +0.9% income; nothing paid or saved from income doubles |
 | Thunderstorm | rain, lightning and a dark sky; Electric Snacklings can roll (2% of spawns) | about 2–3 Electric per storm |
 | Meteor Shower | a starry midnight with shooting stars; Galaxy Snacklings can roll (2%) | about 2–3 Galaxy per shower |
 | Toxic Fog | green haze and glowing spores; Toxic Snacklings can roll (2%) | about 2–3 Toxic per fog |
@@ -511,8 +573,9 @@ Cash and Snacklings reset; podium upgrades, passes and stats stay.
 The first rebirth lands around the first-Legendary stage (~1 h free); later ones need Mythic-level income, so
 rebirths become a multi-session goal. The multiplier is saved when earned, so later tuning never lowers it.
 
-**Cash packs** (`Economy.cashPacks`) pay N seconds of the buyer's steady income (creatures on active podiums that
-are not being stolen, at the rebirth and pass multipliers, without LiveOps cash events or the friend & group bonus),
+**Cash packs** (`Economy.cashPacks`) pay N seconds of the buyer's steady income (creatures on active podiums, one a
+thief is carrying off included, at the rebirth and pass multipliers, without LiveOps cash events, server modifiers or
+the friend & group bonus),
 rounded down to 2 significant digits, with a floor so they are worth something on day one. They therefore stay
 meaningful at every stage instead of becoming worthless (fixed amounts) or game-breaking (huge fixed amounts).
 

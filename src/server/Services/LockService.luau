@@ -253,8 +253,14 @@ function LockService.start()
 	task.spawn(function()
 		while true do
 			task.wait(1)
-			for _, session in Sessions.all() do
-				syncShield(session)
+			-- One error must not stop the shields for good.
+			local ok, err = pcall(function()
+				for _, session in Sessions.all() do
+					syncShield(session)
+				end
+			end)
+			if not ok then
+				warn(`[LockService] shields: {err}`)
 			end
 		end
 	end)

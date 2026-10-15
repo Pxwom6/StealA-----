@@ -294,12 +294,19 @@ local function scenario()
 		nearestPlayer = math.min(nearestPlayer, roblox.Vector3.new(offset.X, 0, offset.Z).Magnitude)
 	end
 	check(nearestPlayer > 25, `it appears far from everyone ({math.floor(nearestPlayer)} studs)`)
+	-- (it wanders at random while nobody is near, so it may come back towards where it started: look at how far it
+	-- got on the way)
+	local farthest = 0
 	for _ = 1, 12 do
 		Sim.advance(0.5)
 		task.wait(0.12)
+		local at = DropService.runawayPosition(runner)
+		if at then
+			farthest = math.max(farthest, (at - startedAt).Magnitude)
+		end
 	end
 	local nowAt = DropService.runawayPosition(runner)
-	check(nowAt ~= nil and (nowAt - startedAt).Magnitude > 2, "it runs off")
+	check(nowAt ~= nil and farthest > 2, `it runs off ({math.floor(farthest)} studs)`)
 	check(math.abs(nowAt.X) <= Drops.area.maxX + 1e-6, "and stays along the walkways")
 	local bobRoot = (bob.Character :: any).HumanoidRootPart
 	local bobBefore = #bobSession.data.creatures
@@ -614,6 +621,36 @@ local function scenario()
 	task.wait(1.2)
 	check(workspace:FindFirstChild("SeasonDecor") == nil, "/event off takes the hearts and roses away")
 	check(BeltService.mutationConditions().Valentine2027 == nil, "and the Sweetheart mutation with them")
+
+	Sim.chat(alice, "/event Easter2027 5")
+	task.wait(1.2)
+	check(workspace:GetAttribute("SeasonTheme") == "spring", "/event Easter2027 switches the spring theme on")
+	decorParts, inTheWay, byName = decorCounts()
+	-- 16 painted eggs by the bases + 6 at the belt, 64 bulbs, 6 lamps, 6 blossom trees, 16 butterflies, 4 chocolate
+	-- bunnies: 330 parts (tests/SeasonRules.spec.luau pins the same layout)
+	check(decorParts == 330, `the spring decorations are built ({decorParts} parts)`)
+	check(
+		byName.EasterEgg == 22
+			and byName.EggBand == 44
+			and byName.EggDot == 44
+			and byName.BunnyBody == 4
+			and byName.BunnyEar == 8
+			and byName.Blossom == 24
+			and byName.ButterflyWing == 32,
+		"eggs, chocolate bunnies, blossom trees and butterflies, each built from the parts the budget counts"
+	)
+	check(inTheWay == 0, "and none of them gets in anyone's way")
+	local springLighting = Seasons.themes.spring.lighting
+	check(math.abs(Lighting.ClockTime - springLighting.clockTime) < 1e-3, "a bright spring morning lights the map")
+	Sim.chat(alice, "/spawn jelly_bean_jackalope pastel")
+	task.wait(0.1)
+	local pastel = lastBeltItem("jelly_bean_jackalope")
+	check(pastel ~= nil and pastel.variant == "pastel", "a Pastel Jelly Bean Jackalope rides the belt")
+	check(BeltService.mutationConditions().Easter2027 == true, "Pastel Snacklings can roll while it runs")
+	Sim.chat(alice, "/event off")
+	task.wait(1.2)
+	check(workspace:FindFirstChild("SeasonDecor") == nil, "/event off takes the eggs and bunnies away")
+	check(BeltService.mutationConditions().Easter2027 == nil, "and the Pastel mutation with them")
 
 	-- Leaving -------------------------------------------------------------------------------------------------------------
 	local owned = #aliceSession.data.creatures

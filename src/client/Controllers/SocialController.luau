@@ -2,10 +2,11 @@
 --[[
 	Friend & group rewards UI (server: SocialService, rules: Logic/SocialRules).
 
-	  * A small 👥 Friends button in the HUD's top-right row, just left of the settings gear (Logic/ScreenLayout,
-	    besideGearX), with a "+20%" tag under it while friends or the group raise income. It used to be a wide pill in
-	    the top stack under the cash, which reached the middle of a phone screen (DECISIONS.md #26). When the corner
-	    has no room (a narrow computer window with Roblox's player list showing) it falls back to that pill.
+	  * A small 👥 Friends button in the HUD's top-right row, between the lock button and the settings gear
+	    (Logic/ScreenLayout.cornerRow; HudController places it), with a "+20%" tag under it while friends or the group
+	    raise income. It used to be a wide pill in the top stack under the cash, which reached the middle of a phone
+	    screen (DECISIONS.md #26). When the corner has no room (Roblox's player list on computers) the whole row moves
+	    under Roblox's top-left buttons.
 	  * Hidden during the first-time tutorial (SocialRules.buttonVisible): the top of the screen belongs to the
 	    tutorial banner then. It pops in once the tutorial ends.
 	  * Tapping it opens the Friends & Group panel with big buttons: Invite friends (Roblox's own invite prompt,
@@ -36,18 +37,16 @@ local StateStore = require(script.Parent.StateStore)
 
 local SocialController = {}
 
-local CORNER = ScreenLayout.CORNER
+local CORNER = ScreenLayout.SIZE.corner
 local ICON = "👥"
-local PILL_SIZE = Vector2.new(260, 34) -- the fallback in the top stack
 local BADGE_SIZE = Vector2.new(54, 20)
 
 local localPlayer = Players.LocalPlayer
 local groupEnabled = SocialRules.groupEnabled(Social.group)
 
-local button: TextButton -- the Friends button: an icon left of the gear, or the pill in the top stack
+local button: TextButton -- the Friends button, left of the gear
 local badge: Frame -- "+20%" under the icon
 local badgeLabel: TextLabel
-local inCorner: boolean? = nil -- nil until first placed
 local wasVisible = false
 local canInvite = false
 local groupName: string? = nil
@@ -62,39 +61,14 @@ local function displayGroupName(): string
 	return groupName or Theme.text.socialGroupFallbackName
 end
 
-local function pillText(view: Types.SocialView): string
-	local parts: { string } = {}
-	if view.friendBonus > 0 then
-		table.insert(parts, Format.template(Theme.text.socialPillFriends, { percent = percent(view.friendBonus) }))
-	end
-	if view.groupBonus > 0 then
-		table.insert(parts, Format.template(Theme.text.socialPillGroup, { percent = percent(view.groupBonus) }))
-	end
-	if #parts > 0 then
-		return table.concat(parts, "  ·  ")
-	elseif canInvite or not groupEnabled then
-		return Format.template(
-			Theme.text.socialPillPlayTogether,
-			{ percent = percent(Social.friends.incomeBonusPerFriend) }
-		)
-	end
-	return Format.template(Theme.text.socialPillJoinGroup, { percent = percent(Social.group.incomeBonus) })
-end
-
 local function updateButton(state: Types.ClientState)
 	local view = state.social
 	local canJoinGroup = groupEnabled and not view.groupMember
 	-- Only shown outside the tutorial, and when it has something to say or offer (so in Studio, with no group set and
 	-- no invites, it hides).
 	local visible = SocialRules.buttonVisible(view.bonus, canInvite, canJoinGroup, state.tutorial.step ~= "")
-	if inCorner then
-		UiKit.setButtonText(button, ICON)
-		badgeLabel.Text = Format.template(Theme.text.socialBadge, { percent = percent(view.bonus) })
-		badge.Visible = view.bonus > 0
-	else
-		UiKit.setButtonText(button, ICON .. " " .. pillText(view))
-		badge.Visible = false
-	end
+	badgeLabel.Text = Format.template(Theme.text.socialBadge, { percent = percent(view.bonus) })
+	badge.Visible = view.bonus > 0
 	button.Visible = visible
 	if visible and not wasVisible then
 		UiKit.popIn(button) -- e.g. when the tutorial ends
@@ -109,36 +83,6 @@ local function redraw()
 	end
 	if refreshPanel then
 		refreshPanel()
-	end
-end
-
--- Left of the settings gear, worked out from the same inputs as the gear itself (SettingsController.placeGear), or
--- back in the top stack when the corner has no room. Re-run when the window changes and every second (the player
--- list can be switched on and off).
-local function place()
-	local screen = HudController.screen()
-	local scale = UiKit.scaleFor(workspace.CurrentCamera.ViewportSize)
-	local width = screen.AbsoluteSize.X / scale
-	local playerList = HudController.playerListWidth()
-	local gearX = ScreenLayout.gearX(width, playerList, CORNER.size, CORNER.margin, CORNER.stackHalfWidth)
-	local x = ScreenLayout.besideGearX(width, playerList, gearX, CORNER.size, CORNER.margin, CORNER.stackHalfWidth)
-	local corner = x ~= nil
-	if corner ~= inCorner then
-		inCorner = corner
-		if corner then
-			button.Size = UDim2.fromOffset(CORNER.size, CORNER.size)
-			button.Parent = screen
-		else
-			button.Size = UDim2.fromOffset(PILL_SIZE.X, PILL_SIZE.Y)
-			button.Parent = HudController.topStack() -- at its TOP_ORDER slot; Position is ignored there
-		end
-		redraw()
-	end
-	if x then
-		local position = UDim2.fromOffset(x, CORNER.top)
-		if button.Position ~= position then
-			button.Position = position
-		end
 	end
 end
 
@@ -308,9 +252,9 @@ end
 function SocialController.start()
 	button = UiKit.button({
 		Name = "SocialButton",
-		LayoutOrder = HudController.TOP_ORDER.social,
-		Size = UDim2.fromOffset(CORNER.size, CORNER.size),
+		Size = UDim2.fromOffset(CORNER.button, CORNER.button),
 		BackgroundColor3 = UiTheme.palette("social"),
+		Text = ICON,
 		Visible = false,
 	}, SocialController.open)
 	-- Overlaps the icon's bottom edge, like the red dots on the side buttons overlap their corner.
@@ -331,16 +275,7 @@ function SocialController.start()
 		Text = "",
 		Parent = badge,
 	})
-	place()
-
-	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(place)
-	HudController.screen():GetPropertyChangedSignal("AbsoluteSize"):Connect(place)
-	task.spawn(function()
-		while true do
-			task.wait(1)
-			place()
-		end
-	end)
+	HudController.place("friends", button)
 	StateStore.onChange(function()
 		redraw()
 	end)

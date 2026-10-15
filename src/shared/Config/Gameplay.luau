@@ -39,6 +39,9 @@ local Gameplay = {
 		buyRange = 16,
 		latencyTolerance = 0.75, -- seconds of belt movement forgiven when checking buy range
 		maxItems = 16,
+		-- Each client keeps spare belt models to reuse (BeltController, Logic/ModelPool): at most `perKind` per
+		-- Snackling and mutation pair and `max` in all, the least recently used going first (CI keeps max in 8-64).
+		modelPool = { perKind = 1, max = 32 },
 	},
 
 	collect = {
@@ -113,6 +116,10 @@ local Gameplay = {
 	grace = {
 		newPlayerSeconds = 240, -- total play time during which a new player's base cannot be stolen from
 	},
+
+	-- Each client switches the lights and particles of podium Snacklings off beyond `offBeyond` studs from the camera
+	-- and back on within `onWithin` (Logic/FxCulling; the gap stops flicker), checking every `checkSeconds`.
+	podiumFx = { onWithin = 90, offBeyond = 110, checkSeconds = 0.5 },
 
 	replicationHz = 5, -- player state is batched to clients this many times per second
 	incomeTickSeconds = 1,

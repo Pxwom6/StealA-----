@@ -3,8 +3,8 @@
 	Seasonal themes (Config/Seasons): while a LiveOps event mapped to a theme is active, the map gets code-built
 	decorations (Halloween: pumpkins, string lights, lamps, bats, ghosts; Winter: presents, decorated trees, string
 	lights, snowmen, snowflakes, snowdrifts; Valentine's: potted roses, heart balloons, giant hearts pierced by Cupid's
-	arrow, string lights, lamps) and a lighting mood; when it ends, they go away and the map's own lighting
-	comes back. Which theme is on is decided by Logic/SeasonRules.activeTheme from the active event ids, and
+	arrow, string lights, lamps; Easter: giant painted eggs, chocolate bunnies, blossom trees, butterflies, string
+	lights, lamps) and a lighting mood; when it ends, they go away and the map's own lighting comes back. Which theme is on is decided by Logic/SeasonRules.activeTheme from the active event ids, and
 	LiveOpsService tells this service whenever those change (events start and end by date while the server runs,
 	remote config, `/event <id>` and `/event off`).
 
@@ -66,6 +66,13 @@ local FALLBACK_COLORS: { [string]: string } = {
 	heart = "#E8204F",
 	pedestal = "#FFF4F8",
 	arrow = "#F2C14E",
+	egg = "#FFC4E1",
+	eggStripe = "#5AB8F5",
+	chocolate = "#5C3018",
+	bunnyBow = "#FF8FC7",
+	blossom = "#FFC0DA",
+	butterfly = "#FFD24A",
+	butterflyBody = "#3A2A40",
 }
 
 local world: MapBuilder.World
@@ -621,6 +628,161 @@ local builders: { [string]: Builder } = {
 					* CFrame.new(-shaftLength / 2 + 0.6 * s, side * 0.3 * s, 0)
 					* CFrame.Angles(0, 0, math.rad(side * 30)),
 				Color = Color3.new(1, 1, 1),
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- A giant painted egg standing on its end: a pastel shell, two painted bands round it and two dots between them.
+	easterEgg = function(base, prop, _palette, parent)
+		local s = prop.scale
+		local a, b = 1.5 * s, 2 * s -- the shell's half width and half height
+		local paint = UiTheme.color(prop.color2 or FALLBACK_COLORS.eggStripe)
+		local centre = base * CFrame.new(0, b, 0)
+		ellipsoid({
+			Name = "EasterEgg",
+			Size = Vector3.new(2 * a, 2 * b, 2 * a),
+			CFrame = centre,
+			Color = UiTheme.color(prop.color or FALLBACK_COLORS.egg),
+			Parent = parent,
+		})
+		-- each band is a thin disc a little wider than the shell where it crosses it
+		for _, y in { 0.42 * b, -0.3 * b } do
+			local radius = a * math.sqrt(1 - (y / b) ^ 2) + 0.06 * s
+			part({
+				Name = "EggBand",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(0.28 * s, 2 * radius, 2 * radius),
+				CFrame = centre * CFrame.new(0, y, 0) * UPRIGHT,
+				Color = paint,
+				Parent = parent,
+			})
+		end
+		local dotY = 0.06 * b
+		for _, side in { -1, 1 } do
+			local x = side * 0.42 * a
+			local z = -a * math.sqrt(1 - (x / a) ^ 2 - (dotY / b) ^ 2)
+			part({
+				Name = "EggDot",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.one * 0.42 * s,
+				CFrame = centre * CFrame.new(x, dotY, z + 0.1 * s),
+				Color = paint:Lerp(Color3.new(1, 1, 1), 0.35),
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- A big glossy chocolate bunny sitting up: tall ears with milk-chocolate linings, white icing eyes with dark
+	-- pupils, a pink nose, big feet and a ribbon bow at its neck.
+	chocolateBunny = function(base, prop, palette, parent)
+		local s = prop.scale
+		local chocolate = paletteColor(palette, "chocolate")
+		local milk = chocolate:Lerp(Color3.fromRGB(205, 150, 104), 0.55)
+		local function piece(name: string, size: Vector3, at: Vector3, color: Color3, turn: CFrame?)
+			ellipsoid({
+				Name = name,
+				Size = size * s,
+				CFrame = base * CFrame.new(at * s) * (turn or CFrame.identity),
+				Color = color,
+				Reflectance = 0.1,
+				Parent = parent,
+			})
+		end
+		piece("BunnyBody", Vector3.new(3.4, 3.8, 3.2), Vector3.new(0, 1.9, 0.3), chocolate)
+		piece("BunnyHead", Vector3.new(2.6, 2.4, 2.4), Vector3.new(0, 4.6, -0.2), chocolate)
+		local bow = paletteColor(palette, "bunnyBow")
+		for _, side in { -1, 1 } do
+			local tilt = CFrame.Angles(0, 0, math.rad(-side * 10))
+			piece("BunnyEar", Vector3.new(0.9, 3, 0.5), Vector3.new(side * 0.6, 6.9, 0), chocolate, tilt)
+			piece("EarLining", Vector3.new(0.5, 2.2, 0.2), Vector3.new(side * 0.62, 6.8, -0.24), milk, tilt)
+			piece("BunnyFoot", Vector3.new(1.1, 0.7, 1.9), Vector3.new(side * 0.95, 0.35, -0.9), chocolate)
+			piece(
+				"BunnyBow",
+				Vector3.new(1, 0.7, 0.4),
+				Vector3.new(side * 0.5, 3.25, -0.9),
+				bow,
+				CFrame.Angles(0, 0, math.rad(side * 15))
+			)
+			part({
+				Name = "BunnyEye",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.one * 0.7 * s,
+				CFrame = base * CFrame.new(side * 0.55 * s, 4.9 * s, -1.1 * s),
+				Color = Color3.fromRGB(255, 252, 245),
+				Parent = parent,
+			})
+			part({
+				Name = "BunnyPupil",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.one * 0.36 * s,
+				CFrame = base * CFrame.new(side * 0.55 * s, 4.85 * s, -1.37 * s),
+				Color = Color3.fromRGB(40, 22, 14),
+				Parent = parent,
+			})
+		end
+		part({
+			Name = "BunnyNose",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 0.4 * s,
+			CFrame = base * CFrame.new(0, 4.35 * s, -1.35 * s),
+			Color = Color3.fromRGB(255, 143, 168),
+			Parent = parent,
+		})
+	end,
+
+	-- A blossom tree: a trunk under four soft clouds of blossom in two colours.
+	blossomTree = function(base, prop, palette, parent)
+		local s = prop.scale
+		part({
+			Name = "BlossomTrunk",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(5 * s, 1 * s, 1 * s),
+			CFrame = base * CFrame.new(0, 2.5 * s, 0) * UPRIGHT,
+			Color = paletteColor(palette, "wood"),
+			Material = Enum.Material.Wood,
+			Parent = parent,
+		})
+		local first = UiTheme.color(prop.color or FALLBACK_COLORS.blossom)
+		local second = UiTheme.color(prop.color2 or prop.color or FALLBACK_COLORS.blossom)
+		for i, cloud in
+			{
+				{ size = Vector3.new(6.2, 4.4, 6.2), at = Vector3.new(0, 6.6, 0) },
+				{ size = Vector3.new(3.8, 3, 3.8), at = Vector3.new(2.4, 5.6, 0.8) },
+				{ size = Vector3.new(3.6, 3, 3.6), at = Vector3.new(-2.2, 5.8, -0.9) },
+				{ size = Vector3.new(3.4, 2.8, 3.4), at = Vector3.new(0.3, 8.4, -0.4) },
+			}
+		do
+			ellipsoid({
+				Name = "Blossom",
+				Size = cloud.size * s,
+				CFrame = base * CFrame.new(cloud.at * s),
+				Color = if i % 2 == 1 then first else second,
+				Material = Enum.Material.Grass,
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- A butterfly hovering: a slim body and two wings tilted up.
+	butterfly = function(base, prop, palette, parent)
+		local s = prop.scale
+		ellipsoid({
+			Name = "ButterflyBody",
+			Size = Vector3.new(0.45, 0.45, 1.8) * s,
+			CFrame = base,
+			Color = paletteColor(palette, "butterflyBody"),
+			Parent = parent,
+		})
+		local wings = UiTheme.color(prop.color or FALLBACK_COLORS.butterfly)
+		for _, side in { -1, 1 } do
+			ellipsoid({
+				Name = "ButterflyWing",
+				Size = Vector3.new(2.6, 0.12, 2.2) * s,
+				CFrame = base
+					* CFrame.new(side * 1.3 * s, 0.2 * s, -0.15 * s)
+					* CFrame.Angles(0, 0, math.rad(side * 25)),
+				Color = wings,
 				Parent = parent,
 			})
 		end
