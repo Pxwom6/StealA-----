@@ -81,7 +81,9 @@ a DataStore or a save, never publishes or teleports, and puts the session back a
 
 1. Sync the latest code into the place (above, or Rojo). Leave Game Settings → **Security** → *Studio Access to API
    Services* **off**: with it on the test refuses to run, so nothing it does (maps switched, modifiers run, coins
-   dropped) can reach a real save.
+   dropped) can reach a real save. It runs only once ProfileStore says it can't reach the DataStores (its
+   `DataStoreState` is `NoAccess` or `NoInternet`); right after Play it may still be finding out, and the test then
+   asks you to paste it again in a few seconds.
 2. Press **Play** (Play Solo is enough; every player in the test is checked).
 3. View → **Command Bar**. The Command Bar runs in the edit DataModel until you switch the test view: on the
    **Test** tab click **Toggle Server View** (the item's name flips each click; once it reads *Toggle Client View*,

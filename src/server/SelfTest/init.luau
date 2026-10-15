@@ -105,16 +105,22 @@ local function optionsFrom(runner: Instance?): Kit.Options
 	return options
 end
 
--- Whether ProfileStore can reach the real DataStores (Studio API access on): then anything the game saves during
--- the test would land in real data. Reads ProfileStore's own state (no DataStore call).
-local function apiAccessOn(): boolean
+-- Why what the test does could reach a real save, or nil when it can't: ProfileStore must say it has no DataStore
+-- access ("NoAccess": Studio API access off; "NoInternet"). Anything else refuses (review 3): "access" (API access on:
+-- a map played on or a coin picked up would go into a real profile), "notReady" (it is still finding out), "unknown"
+-- (no ProfileStore to ask, or a state it never reports). Reads ProfileStore's own state (no DataStore call).
+local function savesReachable(): string?
 	local packages = ServerScriptService:FindFirstChild("ServerPackages")
 	local module = if packages then packages:FindFirstChild("ProfileStore") else nil
 	if module == nil or not module:IsA("ModuleScript") then
-		return false
+		return "unknown"
 	end
 	local ok, store = pcall(require, module)
-	return ok and type(store) == "table" and (store :: any).DataStoreState == "Access"
+	local state = if ok and type(store) == "table" then (store :: any).DataStoreState else nil
+	if state == "NoAccess" or state == "NoInternet" then
+		return nil
+	end
+	return if state == "Access" then "access" elseif state == "NotReady" then "notReady" else "unknown"
 end
 
 -- Whether the services this module sees are the running game's (not fresh copies, as the Command Bar would get).
@@ -127,13 +133,20 @@ end
 
 -- Why the test can't run here, or nil.
 local function refusal(): string?
+	local saves = if RunService:IsStudio() and not running then savesReachable() else nil
 	if not RunService:IsStudio() then
 		return "Studio only: it switches maps, modifiers and events for the whole server."
 	elseif running then
 		return "already running: wait for SELFTEST DONE."
-	elseif apiAccessOn() then
+	elseif saves == "access" then
 		return "Studio API access is on, so the game would save to real data. Game Settings > Security: turn off "
 			.. "Enable Studio Access to API Services, then Play and paste studio/SelfTest.luau again."
+	elseif saves == "notReady" then
+		return "ProfileStore is still finding out whether it can reach real saves: wait a few seconds, then paste "
+			.. "studio/SelfTest.luau again."
+	elseif saves then
+		return "can't tell whether the game could save to real data (ProfileStore's DataStoreState should be NoAccess "
+			.. "or NoInternet), so it won't run. Check Game Settings > Security: Enable Studio Access to API Services off."
 	elseif not liveServices() then
 		return "these are not the running game's services. Start it by pasting studio/SelfTest.luau into the Command "
 			.. "Bar on the server view (Test > Toggle Server View) during Play, not by requiring this module."
