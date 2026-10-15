@@ -1262,7 +1262,7 @@ replacing `batch-7.json` and re-running the importer.
 * **What's New:** `Config/Updates` lists updates newest first (number, date, title, 3-5 highlights, each starting with
   an emoji and at most 64 characters; CI checks they fit the card and the board). A returning player (whose save was
   saved before) who hasn't seen the newest number is sent `WhatsNew` once their client is ready. The client opens the
-  card only when nothing is in the way: at least 6 s after the first state, no tutorial, not carrying, no other dialog
+  card only when nothing is in the way: at least 6 s after it arrives, no tutorial, not carrying, no other dialog
   (`Modal.isAnyOpen`, checked every second; the welcome-back popup and the daily reward come first). Then
   `SeenNews(number)` sets `news_<number>` (older `news_` flags go). A first session, or a player still in the
   tutorial, counts the update as seen without a card: new players get the tutorial instead. A card that was never
