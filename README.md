@@ -87,8 +87,8 @@ a DataStore or a save, never publishes or teleports, and puts the session back a
    In the edit view, on the client view, before a sync or with API access on it says so in one line (e.g.
    `SELFTEST: this ran on the client view. Click Test > Toggle Server View, then paste again.`) and does nothing
    else.
-5. Wait about two minutes (maps, modifiers and events switch meanwhile, without banners). The end of the Output then
-   reads like this; a section that found something says `FAIL` and its first problem, as a warning:
+5. Wait about two minutes (maps, modifiers and events switch meanwhile, without their start banners). The end of
+   the Output then reads like this; a section that found something says `FAIL` and its first problem, as a warning:
 
    ```
    SELFTEST ===== summary: 7 sections in 102.3 s, 3 Studio message(s) ignored; report: ServerStorage.SelfTestReport
