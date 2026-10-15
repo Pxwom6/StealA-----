@@ -155,6 +155,10 @@ local Gameplay = {
 		ClaimGift = { burst = 6, perSecond = 2 }, -- playtime gifts: each pays once a day (GiftRules.claim)
 		Spin = { burst = 2, perSecond = 0.5 }, -- the Lucky Spin (SpinService also waits for the reel)
 		GetAchievements = { burst = 3, perSecond = 0.5 }, -- the Trophies tab asking for progress
+		-- Gadgets (GadgetService): buying pays once per gadget; using one is also held back by its own cooldown, so
+		-- this only stops spam (four gadgets pressed one after another still fit the burst).
+		BuyGadget = { burst = 3, perSecond = 1 },
+		UseGadget = { burst = 6, perSecond = 3 },
 	} :: { [string]: RateLimit },
 }
 

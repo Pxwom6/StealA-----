@@ -18,7 +18,8 @@
 	  top right     the corner row in the top bar strip: lock button, 👥 Friends, ⚙ settings (under Roblox's top-left
 	                buttons instead when the player list leaves no room at the right)
 	  top left      the four feature buttons in a 2x2 grid under Roblox's top-left buttons, above the thumbstick
-	  right         the TAG! button, above the jump button and below the player list
+	  right         the TAG! button, above the jump button and below the player list; the round gadget buttons around it
+	                (under it first, then left of it, then over it: ScreenLayout.gadgetSlots)
 	  bottom        the map vote between the thumbstick and the jump button; toasts above it
 	  middle        the play zone (the character and the prompts near it): nothing tappable
 ]]
@@ -84,6 +85,9 @@ ScreenLayout.SIZE = table.freeze({
 	corner = { button = 52, lock = 104, gap = 8, top = 4 },
 	side = { w = 76, h = 52, gap = 6, columns = 2, left = 10 },
 	tag = { size = 120, pad = 15, right = 24, bottom = 185 }, -- right / bottom: from the HUD's edges
+	-- The round gadget buttons around TAG (GadgetController): `gap` between them and from TAG, at least `clear` from
+	-- anything else; `slots` = buttons the layout makes room for (one per gadget in Config/Gadgets).
+	gadget = { size = 52, gap = 6, clear = 4, slots = 4 },
 	vote = { header = 20, gap = 4, choice = 68, choiceGap = 6, maxW = 420, thumbGap = 8, jumpGap = 16 },
 	toast = { w = 340, h = 40, tall = 56, gap = 6, max = 3, bottom = 110 },
 	banner = { w = 560, h = 64 }, -- announcement banners
@@ -429,6 +433,200 @@ function ScreenLayout.toastHeight(text: string): number
 	return if oneLine >= P.oneLine then T.h else T.tall
 end
 
+-- The "Run home!" banner while carrying a Snackling: centred on the screen near its bottom (StealController).
+function ScreenLayout.carryBanner(device: Device): Rect
+	local C = ScreenLayout.SIZE.carry
+	return rect(device.width / 2 - C.w / 2, device.height - C.bottom - C.h, C.w, C.h)
+end
+
+-- The states whose elements a gadget button must never cover: the busiest status band and the cash offer, with and
+-- without the Friends button (it moves the corner row, and so maybe the cash pill), TAG showing. The tutorial is left
+-- out: gadget buttons hide while it runs.
+local GADGET_WORST_STATES: { HudState } = {
+	{ event = true, modifier = true, luck = true, friends = true, tag = true },
+	{ event = true, modifier = true, luck = true, tag = true },
+	{ cashOffer = true, friends = true, tag = true },
+	{ cashOffer = true, tag = true },
+}
+
+-- Everything a gadget button keeps clear of, whatever else the HUD shows at the time: Roblox's UI, the play zone, every
+-- button and pill of those states, three tall toasts, the vote strip and the carry banner. (Announcement banners, the
+-- map title card and the steal alert are laid out around the gadget buttons instead, as around TAG.)
+local function gadgetReserved(device: Device): { Rect }
+	local reserved: { Rect } = {}
+	for _, state in GADGET_WORST_STATES do
+		for _, e in ScreenLayout.layout(device, state).elements do
+			if e.kind ~= "overlay" then
+				table.insert(reserved, e.rect)
+			end
+		end
+	end
+	table.insert(reserved, ScreenLayout.toastList(device))
+	table.insert(reserved, ScreenLayout.voteStrip(device))
+	table.insert(reserved, ScreenLayout.carryBanner(device))
+	return reserved
+end
+
+-- True when `r` stays at least `clear` away from every rect in `others`.
+local function clearOf(r: Rect, others: { Rect }, clear: number): boolean
+	for _, o in others do
+		if ScreenLayout.overlaps(r, rect(o.x - clear, o.y - clear, o.w + 2 * clear, o.h + 2 * clear)) then
+			return false
+		end
+	end
+	return true
+end
+
+-- Distance from a point to the nearest point of `r` (0 inside it).
+local function distanceTo(px: number, py: number, r: Rect): number
+	local dx = math.max(r.x - px, 0, px - (r.x + r.w))
+	local dy = math.max(r.y - py, 0, py - (r.y + r.h))
+	return math.sqrt(dx * dx + dy * dy)
+end
+
+-- Where the gadget buttons go: up to `count` slots, slot 1 first (fewer only on a screen with no room for them all).
+-- They gather around TAG, where the thumb already is on a phone, in the first of these arrangements that has room for
+-- every gadget (SIZE.gadget.slots):
+--   1. one row under TAG, from its right edge leftwards
+--   2. that row, then a column left of TAG from its bottom upwards
+--   3. that row, then a row over TAG
+--   4. a 2x2 block left of TAG, bottom row first (beside a big jump button, as on tablets)
+--   5. a column left of TAG
+-- Every slot is a full touch target, stays `clear` away from everything the HUD can show there (gadgetReserved) and at
+-- least the vote strip's `jumpGap` from the round jump button, so a thumb on jump never lands on a gadget. The
+-- arrangement depends only on the screen and the first n slots are the same for any count from n up: a button never
+-- moves when another gadget is bought or when a pill, a toast or the vote shows up.
+function ScreenLayout.gadgetSlots(device: Device, count: number): { Rect }
+	local G = ScreenLayout.SIZE.gadget
+	local size, gap, clear, total = G.size, G.gap, G.clear, G.slots
+	count = math.min(count, total)
+	if count <= 0 then
+		return {}
+	end
+	local reserved = gadgetReserved(device)
+	local tag = ScreenLayout.tagButton(device)
+	local cx, cy = tag.x + tag.w / 2, tag.y + tag.h / 2
+	local edge = ScreenLayout.EDGE
+	local jump = ScreenLayout.jumpButton(device)
+	local function valid(r: Rect, taken: { Rect }): boolean
+		if
+			r.x < edge - 1e-6
+			or r.y < edge - 1e-6
+			or r.x + r.w > device.width - edge + 1e-6
+			or r.y + r.h > device.height - edge + 1e-6
+		then
+			return false
+		end
+		if jump then
+			local reach = jump.w / 2 + ScreenLayout.SIZE.vote.jumpGap
+			if distanceTo(jump.x + jump.w / 2, jump.y + jump.h / 2, r) < reach - 1e-6 then
+				return false
+			end
+		end
+		return clearOf(r, reserved, clear) and clearOf(r, taken, clear)
+	end
+	-- How many buttons fit in a row at height y beside TAG, and the row's right end: TAG's right edge when that leaves
+	-- room for `want` of them.
+	local function rowSpan(y: number, want: number): (number, number)
+		local left, right = ScreenLayout.lane(device, reserved, y - clear, y + size + clear, cx)
+		local n = math.max(0, math.min(want, math.floor((right - left + gap) / (size + gap))))
+		return n, math.clamp(tag.x + tag.w, left + n * (size + gap) - gap, math.max(right, left))
+	end
+	local function row(y: number, want: number, into: { Rect })
+		local n, xr = rowSpan(y, want)
+		for k = 0, n - 1 do
+			table.insert(into, rect(xr - size - k * (size + gap), y, size, size))
+		end
+	end
+	-- `want` buttons in a column at x beside TAG, bottom-aligned with TAG's bottom where there is room.
+	local function column(x: number, want: number, into: { Rect })
+		local top, bottom = edge, math.min(device.height - edge, tag.y + tag.h)
+		for _, r in reserved do
+			if r.x < x + size + clear and r.x + r.w > x - clear then
+				if r.y + r.h / 2 < cy then
+					top = math.max(top, r.y + r.h + gap)
+				else
+					bottom = math.min(bottom, r.y - gap)
+				end
+			end
+		end
+		local n = math.max(0, math.min(want, math.floor((bottom - top + gap) / (size + gap))))
+		local yb = math.clamp(tag.y + tag.h, top + n * (size + gap) - gap, math.max(bottom, top))
+		for k = 0, n - 1 do
+			table.insert(into, rect(x, yb - size - k * (size + gap), size, size))
+		end
+	end
+	local below = tag.y + tag.h + gap
+	local beside = tag.x - gap - size
+	local underRow = rowSpan(below, total)
+	local arrangements: { () -> { Rect } } = {
+		function()
+			local list = {}
+			row(below, total, list)
+			return list
+		end,
+		function()
+			local list = {}
+			row(below, underRow, list)
+			column(beside, total - #list, list)
+			return list
+		end,
+		function()
+			local list = {}
+			row(below, underRow, list)
+			row(tag.y - gap - size, total - #list, list)
+			return list
+		end,
+		function()
+			local list = {}
+			row(below, underRow, list)
+			row(tag.y - clear - size, total - #list, list) -- a little closer to TAG under a crowded corner row
+			return list
+		end,
+		function()
+			local near, far = {}, {}
+			column(beside, 2, near)
+			column(beside - gap - size, 2, far)
+			local list = {}
+			for k = 1, 2 do
+				for _, r in { near[k], far[k] } do
+					table.insert(list, r)
+				end
+			end
+			return list
+		end,
+		function()
+			local list = {}
+			column(beside, total, list)
+			return list
+		end,
+	}
+	-- The first arrangement whose every slot is valid; failing that, the one with the most valid slots.
+	local best: { Rect } = {}
+	for _, arrange in arrangements do
+		local accepted: { Rect } = {}
+		local complete = true
+		for _, r in arrange() do
+			if valid(r, accepted) then
+				table.insert(accepted, r)
+			else
+				complete = false
+			end
+		end
+		if complete and #accepted >= total then
+			best = accepted
+			break
+		elseif #accepted > #best then
+			best = accepted
+		end
+	end
+	local slots: { Rect } = {}
+	for index = 1, math.min(count, #best) do
+		slots[index] = best[index]
+	end
+	return slots
+end
+
 -- The HUD in one state ------------------------------------------------------------------------------------------------
 
 export type HudState = {
@@ -441,6 +639,7 @@ export type HudState = {
 	carrying: boolean?,
 	friends: boolean?,
 	tag: boolean?,
+	gadgets: number?, -- gadget buttons showing (the first `gadgets` slots of ScreenLayout.gadgetSlots)
 	toasts: number?,
 	announcement: boolean?,
 	titleCard: boolean?,
@@ -620,6 +819,16 @@ function ScreenLayout.layout(device: Device, state: HudState): Layout
 	end
 	local stackBottom = y - S.stackGap
 
+	-- The gadget buttons around TAG: after the band (they keep clear of its busiest state), before what drops in over
+	-- the HUD (that moves aside for them, as for TAG).
+	local gadgets = state.gadgets or 0
+	if gadgets > 0 then
+		for index, r in ScreenLayout.gadgetSlots(device, gadgets) do
+			add("gadget" .. index, "button", r)
+			table.insert(obstacles, r)
+		end
+	end
+
 	-- The bottom of the screen.
 	if state.vote then
 		local strip = ScreenLayout.voteStrip(device)
@@ -629,8 +838,7 @@ function ScreenLayout.layout(device: Device, state: HudState): Layout
 		end
 	end
 	if state.carrying then
-		local carryX = device.width / 2 - S.carry.w / 2 -- centred on the screen (StealController anchors it there)
-		add("carry", "overlay", rect(carryX, device.height - S.carry.bottom - S.carry.h, S.carry.w, S.carry.h))
+		add("carry", "overlay", ScreenLayout.carryBanner(device)) -- centred on the screen (StealController anchors it)
 	end
 
 	-- What drops in over the HUD for a few seconds: below the stack, clear of the buttons beside it.
@@ -805,6 +1013,7 @@ ScreenLayout.SCENARIOS = table.freeze({
 			vote = true,
 			friends = true,
 			tag = true,
+			gadgets = 4,
 			toasts = 3,
 			announcement = true,
 			stealAlert = true,
@@ -820,6 +1029,7 @@ ScreenLayout.SCENARIOS = table.freeze({
 			vote = true,
 			friends = true,
 			tag = true,
+			gadgets = 4,
 			toasts = 3,
 			announcement = true,
 			stealAlert = true,
@@ -834,6 +1044,7 @@ ScreenLayout.SCENARIOS = table.freeze({
 			carrying = true,
 			friends = true,
 			tag = true,
+			gadgets = 4,
 			toasts = 3,
 			announcement = true,
 			stealAlert = true,
@@ -867,9 +1078,17 @@ ScreenLayout.SCENARIOS = table.freeze({
 	},
 	{
 		name = "a new map",
-		state = { event = true, modifier = true, friends = true, tag = true, toasts = 3, titleCard = true },
+		state = {
+			event = true,
+			modifier = true,
+			friends = true,
+			tag = true,
+			gadgets = 4,
+			toasts = 3,
+			titleCard = true,
+		},
 	},
-	{ name = "a quiet moment", state = { friends = true } },
+	{ name = "a quiet moment", state = { friends = true, gadgets = 1 } },
 } :: { Scenario })
 
 -- The device a scenario runs on (the tutorial may switch the player list off).

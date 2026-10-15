@@ -553,6 +553,62 @@ last gift) Rare 30%, Epic 11%, Legendary 2.9%, Mythic 0.48%. A player who plays 
 roughly 9 minutes of extra income a day from gifts and spins, about +15% for that hour: a reason to come back and stay,
 not a new economy. Every prize scales with steady income like a cash pack, and the server decides every spin.
 
+## Gadgets
+
+Gadgets (`Config/Gadgets.luau`, DECISIONS.md #48) are bought once with in-game cash, never Robux, and kept forever.
+Their prices are fixed, so they work as goals on the way up: each one costs about two minutes of a free player's
+income at the point in the curve where it is meant to arrive. The simulation (`lune run tools/simulate.luau`, last
+tables) replays the free player saving for each in shop order as soon as it costs at most 120 s of their income,
+buying nothing else meanwhile:
+
+| Gadget | Price | Does | Recharges | Bought after (median) | Income then | Price in seconds of it |
+| --- | --- | --- | --- | --- | --- | --- |
+| 🥤 Fizzy Soda | $1.5K | +30% speed for 6 s, carrying too | 35 s | 2m 50s | $14/s | 107 |
+| 🍌 Banana Peel | $15K | a trap on your own floor for 90 s: slip 1.5 s, drop your Snackling | 45 s | 7m 2s | $132/s | 114 |
+| 🫧 Bubble Shield | $150K | no tags for 3 s | 40 s | 15m 30s | $1.43K/s | 104 |
+| 🧲 Snack Magnet | $2.5M | every pad's cash, from anywhere | 60 s | 52m 37s | $22.6K/s | 110 |
+
+So the first one comes in the first few minutes, around the first Uncommon, and the last within the first hour,
+between the first Legendary and the first rebirth. What buying all four costs the chase (same model, 60 runs):
+
+| Rarity | Free player | Free player buying every gadget |
+| --- | --- | --- |
+| Uncommon | 1m 52s | 3m 45s |
+| Rare | 4m 52s | 8m 25s |
+| Epic | 11m 5s | 14m 42s |
+| Legendary | 30m 52s | 35m 0s |
+| Mythic | 1h 57m | 1h 50m |
+| Secret | 9h 35m | 8h 31m |
+| First rebirth affordable | 1h 2m | 1h 8m |
+
+| Play time | Free player | Free player buying every gadget |
+| --- | --- | --- |
+| 10m | $1.01K/s | $448/s |
+| 30m | $8.68K/s | $6.02K/s |
+| 1h | $31.5K/s | $25.4K/s |
+| 3h | $173K/s | $180K/s |
+
+A few minutes later in the first half hour and about six minutes to the first rebirth, then nothing (the Mythic and
+Secret differences are the belt's luck); real players keep buying while they save, so the delay is smaller. None of
+the gadgets changes income: the magnet moves cash from the pads to the wallet sooner, and cash waiting on a pad is
+never stolen anyway (the owner keeps it when a Snackling is grabbed).
+
+**The speed cap.** A speed modifier and a speed gadget multiply, but never past `maxSpeedMultiplier` = **1.5x**, and
+the movement checks (PositionTracker's walking budget, the carry budget and its straight-line cap) allow exactly what
+the server gave, kept 4 s after a faster speed ends, under the same cap (CI checks the cap is at most 1.5x and never
+slows a modifier alone):
+
+| | Walking | Carrying (x0.62) |
+| --- | --- | --- |
+| Normal | 16 studs/s | 9.9 |
+| Fizzy Soda (x1.3) | 20.8 | 12.9 |
+| Sugar Rush (x1.25) | 20 | 12.4 |
+| Both (x1.625, capped at x1.5) | 24 | 14.9 |
+
+A thief is always slower than a tagger on foot (14.9 < 16), so the soda is a head start, not an escape. **The
+shield** is up at most 3 s in every 40 (7.5%; CI keeps any shield at most 5 s and recharging at least 5x as long), and
+only tags bounce off it. **A peel** is one trap per owner at a time, gone after one slip or 90 s.
+
 ## Other knobs
 
 **Podiums** (`Economy.podiumUpgrade`): 8 to start, then +1 at a time for

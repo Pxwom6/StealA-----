@@ -68,6 +68,9 @@ jobs:
       - name: Pre-launch server fixes (offline server, virtual clock, one scenario per fixed review finding)
         run: lune run tools/worldsim/prelaunch.luau
 
+      - name: Gadgets (offline server, virtual clock, every gadget through the real remotes)
+        run: lune run tools/worldsim/gadgets.luau
+
       - name: Studio sync script test (pulls this checkout into Rojo-built places offline)
         run: |
           mkdir -p build

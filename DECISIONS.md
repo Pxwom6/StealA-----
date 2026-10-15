@@ -1055,3 +1055,58 @@ young player must be able to read every line; a dialog's answer must be seen; an
 out of memory. Making the layout one pure function the game uses means the check proves what players see.
 **Reversal cost:** low; no saved data changed. Sizes and the busiest states are data in `Logic/ScreenLayout` (keep
 `tools/layoutCheck.luau` green when moving anything), and the pool and culling numbers are in `Config/Gameplay`.
+
+### 48. Gadgets: gear bought with cash, fired when the player chooses
+
+* **What:** four gadgets (`Config/Gadgets`), bought once with in-game cash in a new Gadgets tab of the Shop (the Robux
+  items stay the first tab) and kept forever, rebirths too. **Fizzy Soda** ($1.5K): 30% faster for 6 s, carrying
+  too, on top of the carry slowdown; recharges in 35 s. **Banana Peel** ($15K): dropped at your feet on your own
+  base's floor for 90 s, one at a time; the first other player to step on it slips (frozen 1.5 s), and a Snackling of
+  yours they carry runs home; 45 s. **Bubble Shield** ($150K): nobody can tag you for 3 s, with a bubble everyone
+  sees; 40 s. **Snack Magnet** ($2.5M): the cash on all your pads, from anywhere; 60 s. A free player saving for them
+  gets the first after about 3 minutes and the last after about 53 (BALANCE.md "Gadgets"). No fifth: the four cover
+  escaping, trapping, dodging and convenience, and the HUD has room for four beside TAG on every screen.
+* **Saved as flags, no schema bump:** owning gadget `id` is the flag `gadget_<id>` (sanitise keeps any true flag and a
+  rollback keeps them, #1; a rebirth keeps `flags`). Cooldowns are server time, per session.
+* **The server decides:** `BuyGadget(id)` and `UseGadget(id)` are rate-limited intents; `Logic/GadgetRules` decides
+  from server state (the id must be a config key, the config's price, the flag, no tutorial running, alive, the
+  cooldown), then the gadget's own checks, with nothing yielding before the effect. The peel goes where the server sees
+  the player, at a trusted position (the client sends no position), inside the plot rect the steal code uses, at
+  floor level. Peels are tripped by the server's own distance check every 0.1 s against trusted positions, like coin
+  pickups (no touch events); jumping over one is fine and the owner never trips. A slip on the owner's peel ends the
+  carry through `StealService.cancel("slipped")`, the tag path (podium freed, the thief's steal cooldown, toasts; the
+  owner hears "🍌 Banana Peel: Pizza Pup made it home safely."). The magnet runs `EconomyService.collectPad` for every
+  pad, the code the pad check uses (the same "+$" floats, the collect event for quests, the same analytics), and is
+  refused when nothing is waiting, so it never wastes its cooldown.
+* **Speed and the anti-cheat agree:** `Movement` gives every Humanoid its speed (a modifier × a gadget, capped at
+  1.5x; × the carry slowdown; 0 while slipped) and gives PositionTracker and the carry budget their allowance (the
+  modifier's allowance × the gadget's, each kept 4 s after a faster speed ends; under the same cap, CI). The carry's
+  straight-line cap adds up the speed allowed at each step (#46), so it widens for the thief with the soda only.
+  Offline, a thief on soda running a dead-straight line home delivers, and the same run without a soda is cancelled:
+  that cap is the only check strict enough to see a 30% speed-up (the walking and carry budgets allow 1.5x and 1.6x).
+* **Fair for a young audience:** cash only, and a shortfall says "Not enough cash!" rather than the "Need $X more?"
+  Robux offer (#25), so a gadget never leads to a Robux prompt. The shield lasts at most 5 s and recharges at least 5x
+  as long (CI; 3 s in 40 now), and stops tags only: locks, peels and everything else still work. A peel trips one
+  player once, only on its owner's floor, so no base becomes un-stealable, and an owner can always defend with a
+  lock, a tag or a peel. The tutorial and the new-player shield are unchanged: no buttons and no use during the
+  tutorial.
+* **Where the buttons go:** `ScreenLayout.gadgetSlots` keeps four 52 UI (44 px) round buttons beside TAG, in the first
+  arrangement with room for all four: one row under TAG (844×390, 1280×720), that row and one slot left of TAG
+  (667×375: px x 491-634 y 223-267, and x 483-527 y 174-218), that row and one slot over TAG (640×360), or a 2×2 block
+  left of TAG (the 1024×768 tablet, whose 120 px jump button sits right under TAG). Each slot keeps clear of
+  everything the HUD can show there in its busiest state and 16 UI from the jump button (like the vote strip). Slots
+  depend only on the screen, so a button never moves; banners, the title card and the steal alert move aside for them
+  as for TAG; the layout check runs four gadgets in every scenario but the tutorial's.
+* **Effects:** fizzy bubbles on anyone with a soda running (client-side, fewer with Reduce effects); a translucent
+  bubble the server welds to a shielded player (massless, never collides, touches or blocks a ray); the peel, a small
+  anchored model the server builds; dizzy stars over whoever slipped, who also sits down for the slip on their own
+  client; sounds from the existing assets at new pitches (no new asset ids).
+* **Analytics:** `gadget_bought` (value = price, 01 = gadget id), `gadget_used` (01 = gadget id) and `gadget_effect` (01
+  = gadget id, 02 = `peelDrop` | `peelSlip` | `shieldBlock`). The id is always a config key, so the field is bounded.
+
+**Why:** gear you own and fire when you choose is a big part of the steal-and-defend loop in the top "Steal a ___"
+games, and of the stories players tell. These give a thief an escape (soda, shield), an owner a trap (peel) and
+everyone a convenience (magnet); each is short, visible to everyone and answerable. Cash prices on the income curve
+make them early-to-mid-game goals, never a paywall.
+**Reversal cost:** low. Gadgets are data: raise a price or take one out of `order` (its flag stays harmless in saves).
+Never rename a shipped id (saves hold `gadget_<id>`). `Movement` is a local refactor of where speeds were set.

@@ -1,5 +1,6 @@
 --!strict
 local T = require("./TestKit")
+local Gadgets = require("../src/shared/Config/Gadgets")
 local LiveOps = require("../src/shared/Config/LiveOps")
 local MapThemes = require("../src/shared/Config/MapThemes")
 local Modifiers = require("../src/shared/Config/Modifiers")
@@ -171,6 +172,87 @@ T.describe("ScreenLayout", function()
 		local tag = ScreenLayout.tagButton(ScreenLayout.device(spec("667x375 phone")))
 		T.expect(tag.x).toBeNear(625.7, 0.01)
 		T.expect(tag.y).toBeNear(136.18, 0.01)
+	end)
+
+	T.it("has a gadget button for every gadget on every screen, beside TAG", function()
+		T.expect(S.gadget.slots).toBeAtLeast(#Gadgets.order)
+		for _, entry in ScreenLayout.DEVICES do
+			local device = ScreenLayout.device(entry)
+			local slots = ScreenLayout.gadgetSlots(device, #Gadgets.order)
+			T.expect(#slots).toBe(#Gadgets.order)
+			local tag = ScreenLayout.tagButton(device)
+			for _, r in slots do
+				T.expect(r.w * device.scale).toBeAtLeast(ScreenLayout.MIN_TOUCH)
+				-- near TAG: within a button and a gap of its square on every side, or two on the side away from the jump
+				local reach = 2 * (S.gadget.size + S.gadget.gap) + 1e-6
+				T.expect(r.x + r.w).toBeAtLeast(tag.x - reach)
+				T.expect(r.x).toBeAtMost(tag.x + tag.w + reach)
+				T.expect(r.y + r.h).toBeAtLeast(tag.y - reach)
+				T.expect(r.y).toBeAtMost(tag.y + tag.h + reach)
+			end
+		end
+	end)
+
+	T.it("keeps the gadget buttons where they are whatever else shows or is bought", function()
+		for _, entry in ScreenLayout.DEVICES do
+			local device = ScreenLayout.device(entry)
+			local all = ScreenLayout.gadgetSlots(device, S.gadget.slots)
+			for count = 1, S.gadget.slots do
+				local some = ScreenLayout.gadgetSlots(device, count)
+				T.expect(#some).toBe(count)
+				for index, r in some do
+					T.expect(r).toEqual(all[index]) -- buying another gadget never moves the others
+				end
+			end
+			for _, scenario in ScreenLayout.SCENARIOS do
+				if scenario.state.tutorial == nil then
+					local state = table.clone(scenario.state)
+					state.gadgets = S.gadget.slots
+					local layout = ScreenLayout.layout(device, state)
+					for index, r in all do
+						T.expect(layout.byId["gadget" .. index]).toEqual(r) -- nor a pill, a toast or the vote
+					end
+				end
+			end
+		end
+	end)
+
+	T.it("keeps the gadget buttons away from the jump button and its thumb", function()
+		for _, entry in ScreenLayout.DEVICES do
+			local device = ScreenLayout.device(entry)
+			local jump = ScreenLayout.jumpButton(device)
+			if jump then
+				local jx, jy = jump.x + jump.w / 2, jump.y + jump.h / 2
+				for _, r in ScreenLayout.gadgetSlots(device, S.gadget.slots) do
+					local dx = math.max(r.x - jx, 0, jx - (r.x + r.w))
+					local dy = math.max(r.y - jy, 0, jy - (r.y + r.h))
+					T.expect(math.sqrt(dx * dx + dy * dy)).toBeAtLeast(jump.w / 2 + S.vote.jumpGap - 1e-6)
+				end
+			end
+		end
+		-- the reference phone: under TAG, right-aligned with it, the fourth beside it (x 568-620, y 204-256)
+		local device = ScreenLayout.device(spec("667x375 phone"))
+		local tag = ScreenLayout.tagButton(device)
+		local slots = ScreenLayout.gadgetSlots(device, 4)
+		T.expect(slots[1].x + slots[1].w).toBeNear(tag.x + tag.w, 1e-6)
+		T.expect(slots[1].y).toBeNear(tag.y + tag.h + S.gadget.gap, 1e-6)
+		T.expect(slots[4].x + slots[4].w).toBeNear(tag.x - S.gadget.gap, 1e-6)
+	end)
+
+	T.it("lets announcements and the steal alert move aside for the gadget buttons", function()
+		for _, entry in ScreenLayout.DEVICES do
+			local device = ScreenLayout.device(entry)
+			local state = table.clone(ScreenLayout.SCENARIOS[1].state)
+			state.gadgets = S.gadget.slots
+			state.titleCard = true
+			local layout = ScreenLayout.layout(device, state)
+			for _, id in { "announcement", "titleCard", "stealAlert" } do
+				for index = 1, S.gadget.slots do
+					T.expect(ScreenLayout.overlaps(layout.byId[id], layout.byId["gadget" .. index])).toBe(false)
+				end
+			end
+			T.expect(table.concat(ScreenLayout.problems(device, layout.elements), "\n")).toBe("")
+		end
 	end)
 
 	T.it("switches the player list off for the tutorial only when its banner can't clear it", function()

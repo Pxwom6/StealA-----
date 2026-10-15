@@ -39,6 +39,7 @@ export type TagContext = {
 	tagVerticalAllowance: number,
 	taggerCooldownUntil: number,
 	taggerTrusted: boolean, -- see isPositionTrusted: the tagger's reported position matches what the server saw
+	thiefShielded: boolean?, -- a Bubble Shield gadget is up (Logic/GadgetRules.isShielded): checked last
 }
 
 -- A character's movement as the server observed it (see stepWalkTrack). Times are server time.
@@ -189,6 +190,10 @@ function StealRules.canTag(ctx: TagContext): (boolean, string?)
 		)
 	then
 		return false, "far"
+	end
+	-- Last, so only a tag that would have landed is refused this way (the tagger is told "Shielded!").
+	if ctx.thiefShielded == true then
+		return false, "shielded"
 	end
 	return true, nil
 end
@@ -426,9 +431,10 @@ function StealRules.graceUntil(now: number, playTimeSeconds: number, graceSecond
 end
 
 -- Why a carry ended without a delivery (see StealService.cancel). "left" / "rebirth": the thief left or rebirthed;
--- "ownerLeft" / "ownerRebirth": the owner did.
+-- "ownerLeft" / "ownerRebirth": the owner did; "slipped": on the owner's banana peel (a gadget), handled like a tag.
 export type CancelReason =
 	"tagged"
+	| "slipped"
 	| "timeout"
 	| "died"
 	| "left"
@@ -444,6 +450,7 @@ export type CancelReason =
 -- Every CancelReason, for checks over all of them.
 local CANCEL_REASONS: { CancelReason } = {
 	"tagged",
+	"slipped",
 	"timeout",
 	"died",
 	"left",
@@ -463,6 +470,7 @@ StealRules.CANCEL_REASONS = table.freeze(CANCEL_REASONS)
 function StealRules.cancelMessageKey(reason: string): string?
 	local map: { [string]: string } = {
 		tagged = "gotTagged",
+		slipped = "stealFailedSlipped",
 		timeout = "stealFailedTimeout",
 		died = "stealFailedDied",
 		ownerLeft = "ownerLeftDuringSteal",

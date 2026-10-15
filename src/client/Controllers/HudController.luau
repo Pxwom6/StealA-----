@@ -11,7 +11,8 @@
 	  top right     lock, 👥 Friends and ⚙ settings (under Roblox's top-left buttons when the player list fills the
 	                corner on computers)
 	  top left      Shop, Rebirth, Rewards and Snackdex in a 2x2 grid under Roblox's top-left buttons
-	  right         the action area (the TAG! button), above the jump button
+	  right         the action area (the TAG! button), above the jump button, and the round gadget buttons around it
+	                (GadgetController hands them over as "gadget1", "gadget2"...)
 	  bottom        the map vote, between the thumbstick and the jump button
 	  middle        nothing tappable: that is where the character and the Buy / Steal prompts are
 
@@ -108,6 +109,11 @@ local function hudState(): ScreenLayout.HudState
 		return object ~= nil and object.Visible and object.Parent ~= nil
 	end
 	local tutorial: GuiObject? = placed.tutorial
+	-- The gadget buttons fill their slots in order (GadgetController): count the ones showing.
+	local gadgets = 0
+	while shown(`gadget{gadgets + 1}`) do
+		gadgets += 1
+	end
 	return {
 		tutorial = if tutorial and tutorial.Visible
 			then (if tutorial:GetAttribute("Tip") == true then "full" else "compact")
@@ -118,6 +124,7 @@ local function hudState(): ScreenLayout.HudState
 		luck = shown("luck"),
 		vote = shown("vote"),
 		friends = shown("friends"),
+		gadgets = gadgets,
 	}
 end
 
@@ -164,7 +171,7 @@ function HudController.relayout()
 end
 
 -- Hands a HUD element to the layout under `id` (an id of Logic/ScreenLayout.layout: "lock", "friends", "gear",
--- "tutorial", "cashOffer", "event", "modifier", "luck", or "vote" for the vote strip). It is parented to the HUD and
+-- "tutorial", "cashOffer", "event", "modifier", "luck", "gadget1"... in slot order, or "vote" for the vote strip). It is parented to the HUD and
 -- placed and sized from then on; it shows and hides itself (Visible), and the tutorial banner says whether its tip
 -- shows with the attribute Tip. A newer object under the same id replaces it; destroying it frees its place.
 function HudController.place(id: string, object: GuiObject)

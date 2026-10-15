@@ -40,6 +40,8 @@ local ModifierController = require(Controllers.ModifierController)
 local WeatherController = require(Controllers.WeatherController)
 local DropController = require(Controllers.DropController)
 local BossController = require(Controllers.BossController)
+local GadgetController = require(Controllers.GadgetController)
+local GadgetFxController = require(Controllers.GadgetFxController)
 
 StateStore.start()
 ClientSettings.start() -- saved settings (music, sound effects, reduce effects) arrive with the first state
@@ -68,5 +70,7 @@ MapThemeController.start() -- the vote for the next map (top stack) and the new 
 WeatherController.start() -- the map theme's snow / embers / leaves... around the camera
 DropController.start() -- supply crates (marker, hold prompt), spinning coins and runaways on the walkways
 BossController.start() -- Snack Attack: the giant's health bar, bob and hit reactions
+GadgetController.start() -- the gadget buttons beside TAG (keys 1-4); none until a gadget is bought
+GadgetFxController.start() -- soda fizz and dizzy stars on every player, gadget sounds and bursts
 
 Net.get("ClientReady"):FireServer()
