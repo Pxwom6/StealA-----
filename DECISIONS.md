@@ -1179,3 +1179,43 @@ worth more without making them better for farming. Global shout-outs make a rare
 **Reversal cost:** low. Empty `adminUserIds` means no admins outside Studio; clearing `hostable` on every modifier
 leaves owners the map only; `shoutouts.enabled = false` ends shout-outs. Topics are versioned (`SnacklingHost1`), so
 a new message format gets a new topic and old servers simply don't hear it.
+
+### 50. Twenty more permanent Snacklings (batch 7): a roster of 80, hand-built models
+
+* **What:** 20 new permanent Snacklings, three per tier from Common to Mythic and two Secrets: Lollipop Ladybug,
+  Bumble Bun and Onion Ring Otter (Common); Watermelon Walrus, Orange Slice Orangutan and Grilled Cheese Giraffe
+  (Uncommon); Cocoa Capybara, Animal Cracker Axolotl and Shortcake Sloth (Rare); Corn Cob Crocodile, Apple Pie
+  Armadillo and Sherbet Seahorse (Epic); Caramel Camel, Fruit Tart Flamingo and Rocky Road Rhino (Legendary); Eclair
+  Eagle, White Chocolate Wolf and Mint Chip Megalodon (Mythic); Lava Cake Leviathan and Ube Unicorn (Secret). The
+  permanent roster goes from 60 to 80 (96 with the event ones). Each has a `Config/Creatures` entry, a recipe
+  fallback in `Config/CreatureLooks` and a polished model in `art/snackling-parts/batch-7.json`, and its id is on the
+  released list.
+* **Prices and odds:** each one is priced between two existing Snacklings of its tier, inside the tier's price,
+  income and payback bands (CI checks them), dearer ones paying back a little slower as before. The tier odds don't
+  move: every tier's regular weights still add up to 100, and the new ones took their share from the rest of their
+  tier, so the two cheapest of every tier keep their 40% (the three cheapest Mythics and Secrets their 62%). In the
+  simulation every time to a rarity stays within about 5% and median income within about 4% (BALANCE.md).
+* **Models:** built by hand in the Claude Design format with a scratch helper (mirrored parts, eye sets, chains for
+  necks, tails and coils, and stripes, lattices and dustings solved to hug an ellipsoid), inside the importer's
+  budgets (at most 39 / 49 / 59 / 58 parts besides the Root and the aura ring), and checked by the helper for parts
+  that touch nothing and for standing on y = 0. Every one was looked at from five angles at podium size,
+  in its tier's lineup next to two or three existing models, and with golden, rainbow, frozen, molten and honey.
+  The leviathan's chocolate puddle is a detail part, so its rarity glow and sparkles sit on the serpent rather than
+  the floor. `prompt-batch-7.md` can replace them with a Claude Design pass.
+* **No existing model changed size:** the importer sizes a tier by the upper quartile of its recipe heights, so the
+  new recipe fallbacks were sized to leave every tier's quartile exactly where it was (unlike Winter, #37, which
+  nudged the Mythics by 0.2%). The regenerated `Config/CreatureParts` only adds lines.
+* **Nothing earned is taken away:** a Snackdex tier's reward and its +3% are paid from the claimed flag (#24), so a
+  tier completed before the update stays claimed, keeps its bonus and is not paid twice when its new Snacklings are
+  found; achievements are paid once and marked by a flag, so an earned Completionist stays done (✓) while the count
+  of regular Snacklings grows. Tests now pin both.
+* **Offline preview:** `tools/preview/scene.html` crashed on a scene without lights (a lineup of Commons): Lune
+  sends an empty list as `{}`. It now treats anything that isn't an array as none.
+* **No save change.**
+
+**Why:** collecting is the core chase, and the permanent roster was still the original 60, with only 10 Commons and
+10 Uncommons in the tiers new players see most. More Snacklings mean a longer Snackdex, more surprises on the belt
+and more to steal, without moving the economy curve.
+**Reversal cost:** medium. Shipped ids can never be removed or renamed (saves, gifts and codes refer to them), but
+one can be made rarer by lowering its `beltWeight` and giving the rest to its tier; a model can be redone by
+replacing `batch-7.json` and re-running the importer.

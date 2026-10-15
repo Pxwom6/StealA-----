@@ -1,0 +1,100 @@
+# Steal a Snackling: 3D model batch 7 (20 more permanent Snacklings)
+
+You're designing 3D models for my Roblox game **Steal a Snackling**. Snacklings are collectible food-animal hybrids (a Pizza Pup is a puppy made of pizza). Players buy them off a conveyor belt and show them off on podiums in their bases, where they earn cash, and other players try to steal them. These twenty join the permanent roster: three in each tier from Common to Mythic, and two Secrets.
+
+Build **batch 7, 20 Snacklings**, as one design: a gallery page that previews every model in real 3D, with the exact parts data I'll import into the game embedded in it.
+
+(The game already has hand-built versions of these twenty in `art/snackling-parts/batch-7.json`; your design replaces that file.)
+
+## Art direction
+
+- Premium, toy-like Roblox pet style: chunky, soft and rounded, big heads, bright candy colours, a glossy finish. Original designs only: no existing characters, brands, logos or text anywhere.
+- Each one must read instantly from across a base. The food is unmistakable (crust, fillings, glaze, sprinkles), and so is the animal (ears, snout, tail, horns). Keep the food, the animal and the main colours from its brief so players still recognise their Snackling. Put the effort into shape, proportion, detail and charm.
+- Faces: big glossy eyes (a white Eye, a dark Pupil `#1E1A24`, one or two small white Highlights), a small mouth, and blush Cheeks where they suit. The face points toward -Z and must be clearly visible from the front and from above the front, because players look down at podiums.
+- Shade with colour, because Roblox lighting is simple: give big shapes a slightly darker underside piece or rim and a lighter top where it helps.
+- Pose: a calm standing or sitting idle pose, stable on a flat podium. The game adds its own bounce, so avoid extreme poses.
+- Ambition by rarity: Commons are simple and adorable (about 20-30 parts). Uncommons add a signature detail (about 26-38 parts). Rares have a stronger silhouette and an accessory or two (about 30-42 parts). Epics are dynamic and full of character, with more layered food detail (about 36-48 parts). Legendaries feel grand and special (about 40-52 parts). Mythics are majestic, with a little Neon glow (about 44-56 parts). Secrets are the rarest Snacklings in the game: the most elaborate, iconic designs, with a few glowing accents (about 48-56 parts). Each must look at home next to the others of its tier already in the game, and a step up from the tier below.
+
+## Hard rules (the importer rejects anything else)
+
+1. **Shapes.** Use only these primitives, because Roblox has no others:
+   - `sphere`: an ellipsoid; size = [diameter x, diameter y, diameter z], any three values.
+   - `box`: size = [x, y, z].
+   - `cylinder`: circular only, with its axis along its local Y; size = [diameter, height, diameter], and size[0] must equal size[2].
+   - `wedge`: a right-triangular prism filling half of its box [x, y, z]. It has a flat bottom and a full-height vertical face at the back (+Z), and its slope rises from the bottom-front edge (y = -y/2, z = -z/2) to the top-back edge (y = +y/2, z = +z/2). In three.js, build it as a BufferGeometry from those six corners.
+
+   No cones, tori, capsules, tapered cylinders, CSG, meshes, textures or text. Build those shapes from primitives instead: a donut from 10-12 overlapping spheres around a circle, a cone from stacked shrinking cylinders, a capsule from a cylinder with a sphere on each end, a curving tail from a chain of overlapping spheres.
+2. **Space.** Right-handed, +Y up, units "u". Every part must lie inside x in [-1, 1], z in [-1, 1] and y in [0, 2], measured on its rotated extent. Nothing goes below y = 0: the feet (or belly) rest exactly on y = 0. Centre the creature on x = 0, z = 0 and make it big, with its largest dimension at least 1.8 u. I rescale each model to its in-game size, so only proportions matter.
+3. **Facing.** The face looks toward -Z, and tails go toward +Z.
+4. **Placement.** Position is the part's centre. Rotation is [rx, ry, rz] in degrees, applied as in three.js Euler order "XYZ" (`object.rotation.set` with those values in radians).
+5. **Budget.** At most **38 parts** for a Common or an Uncommon, **48 parts** for a Rare or an Epic and **56 parts** for a Legendary, a Mythic or a Secret, counting everything. Spend the budget on polish, not filler. No dimension of any part is smaller than 0.03 u.
+6. **Overlap.** Overlap parts slightly rather than letting surfaces touch flush, so nothing flickers. Press details like spots and stripes partly into the surface.
+7. **Colour and material.** Give each part one `#RRGGBB` colour and one of these materials:
+   - `SmoothPlastic`: the default.
+   - `Sand`: sugar, salt, crumbs, rice, powdered coatings.
+   - `Fabric`: fluffy things like cotton candy, wool and fur.
+   - `Glass`: jelly, gummy, syrup and bubbles, with transparency 0.1-0.4.
+   - `Ice`: frosty gelato or icing.
+   - `Foil`: wrappers and gold foil.
+   - `Metal`: spoons and cups.
+   - `Wood`: sticks and chopsticks.
+   - `Cardboard`: cartons and boxes.
+   - `Neon`: glow, only for magical accents on Legendary, Mythic and Secret, a few parts at most.
+8. **Roles and names.** Give each part a role:
+   - `body`: the shapes that make the silhouette (body, head, limbs, ears, tail, the main food pieces).
+   - `face`: eyes, pupils, highlights, mouth, tongue, teeth, cheeks, brows, nose, eye patches.
+   - `detail`: small toppings and accessories (sprinkles, seeds, crumbs, chips).
+
+   Name face parts exactly one of Eye, Pupil, Highlight, Mouth, Tongue, Teeth, Cheek, Brow, Nose or Patch; names can repeat. Give other parts short PascalCase names (Body, Head, EarL, Tail, Crust).
+
+## The data (exact format)
+
+Put every model in ONE JSON object, embedded in the page as `<script type="application/json" id="snackling-parts">...</script>`. Render the previews from that same data, so the preview is exactly what I import:
+
+```json
+{"format": "snackling-parts-1", "batch": 7, "creatures": [{"id": "...", "parts": [PART, PART, ...]}, ...]}
+```
+
+`PART = [name, shape, size, position, rotation, color, material, role]`, with an optional 9th value for transparency (0-0.6). For example:
+
+```json
+["Body", "sphere", [1.2, 0.62, 1.5], [0, 0.55, 0.1], [0, 0, 0], "#FFD34E", "SmoothPlastic", "body"]
+```
+
+Round numbers to 3 decimals. Use each id exactly as given, in the order given. The preview podium is not part of the data.
+
+## The page
+
+- A grid of cards, one per Snackling, each with a 3D render, the name, a rarity tag, the part count and its checks.
+- Use ONE `THREE.WebGLRenderer` for the whole page, because browsers allow only about 16 WebGL contexts. Render each card's thumbnail with it and copy the result to a 2D canvas, or use scissor viewports. Load three.js r128 from `https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js` and write drag-to-rotate yourself (no OrbitControls).
+- Thumbnails show the podium view: the camera above and in front of the face side (-Z), for example at (1.4, 2.3, -3.4) looking at (0, 0.85, 0), with the creature on a simple grey round podium. Light it like Roblox daylight: a sun from above the front plus a soft sky-and-ground hemisphere light.
+- Clicking a card opens a large viewer with drag-to-rotate and Front / Side / Back / Top buttons.
+- Checks per card, computed in the page from the data: inside the box, lowest point at y = 0, parts within the budget, cylinders circular, a face present (an Eye, plus a Mouth or a beak), and only known shapes, materials and roles. Fix anything that fails before you finish.
+- A "Copy JSON" button at the top that copies the whole object.
+
+## How to work
+
+Design and check one Snackling at a time, in the order given. If you run out of room, finish the one you're on completely, then tell me which ids are left and I'll ask you to continue.
+
+## Batch 7: 20 permanent Snacklings, at most 38 parts (Common, Uncommon), 48 parts (Rare, Epic) or 56 parts (Legendary, Mythic, Secret)
+
+1. **Lollipop Ladybug** (`lollipop_ladybug`, Common). *"Lucky spots, licky shell."* A ladybug whose round domed shell is a cherry-red swirl lollipop (`#E8253A`) with a white candy swirl (`#FFFFFF`) spiralling out from the top and chocolate-chip spots (`#3A1C16`) between the swirl's arms. A big round dark head (`#2A2430`) at the front with huge glossy eyes and pink cheeks, two antennae that are lollipop sticks topped with pink and yellow candy balls, and six stubby dark legs peeking out from under the shell. It sits low and wide.
+2. **Bumble Bun** (`bumble_bun`, Common). *"Buzzes for brunch. Drips honey everywhere."* A round, plump bee whose body is a glazed honey bun (`#F2BE62`, a lighter top `#F6CB80`) with two chocolate stripes (`#4A2E1C`), one under the face and one round the bottom, a cinnamon swirl (`#8A4A1A`) on top and a honey drip or two (`#E8901E`) running down from it. Little see-through wings (Glass, pale blue), two chocolate antennae with honey-drop tips, a chocolate stinger at the back, small arms and dark feet, big eyes and a happy smile.
+3. **Onion Ring Otter** (`onion_ring_otter`, Common). *"Never goes swimming without its ring."* A brown otter (`#8A5A3C`, darker `#6E4428` ears, paws and tail) standing upright, wearing a big crunchy onion ring round its waist like a swim ring (golden batter `#C9832E`, Sand, lumpy all round), its paws resting on the ring. A cream belly and muzzle (`#F2DCC0`), a dark nose, short whiskers, pink cheeks, small round ears, feet showing below the ring and a thick tapering tail behind.
+4. **Watermelon Walrus** (`watermelon_walrus`, Uncommon). *"Spits seeds further than anyone."* A round, heavy walrus lying on its belly whose body is a whole watermelon: a green rind (`#3FA34D`) with dark stripes (`#1F6B2E`) running from front to back. The front is the cut side, a band of white rind (`#F4FFE8`) round a juicy red face (`#FF5A6A`, deeper `#E8435A` at the edge) dotted with dark seeds (`#2A1A14`), with big eyes, a dark nose, two white mustache pads and two long white tusks reaching down. Flat green flippers at the front and a green tail with two flippers at the back.
+5. **Orange Slice Orangutan** (`orange_slice_orangutan`, Uncommon). *"Sugar-coated and swinging."* An orangutan whose round body is a sugar-coated orange (`#F57C12` peel, Sand, darker `#D9620E` underneath) with a cut orange wheel on its belly (white pith `#FFF4E0` round juicy segments `#FF9F2E` with pale lines between them). An orange-furred head (`#D9622A`) with a big peach face (`#FFC890`), a pale muzzle, a small nose, round ears, a stem and a green leaf (`#4CAF3A`) on top, and long arms that reach right down to the ground, with hands and feet.
+6. **Grilled Cheese Giraffe** (`grilled_cheese_giraffe`, Uncommon). *"Stretches high. The cheese stretches higher."* A giraffe whose torso is a grilled cheese sandwich lying flat: two slices of golden toast (`#F4BE58` with a crust `#C9822F`, the back end rounded like a slice of bread) with melted cheese (`#FFC21F`) oozing out between them and dripping down the sides, and dark toasted spots (`#8A4618`) on top like a giraffe's patches. Four chunky legs and a long neck (`#F5C468`) with a couple of patches, a round head with a cream muzzle (`#FFE6B8`), two horns with dark knobs, small ears, big eyes and a thin tail with a dark tuft.
+7. **Cocoa Capybara** (`cocoa_capybara`, Rare). *"Chills in a hot spring of cocoa."* A capybara (`#A8763F`, darker `#7E5430` ears and paws) soaking up to its chest in a big mug of hot cocoa, as calm as can be. The mug is teal (`#4FC3C8`, a darker `#3AA3A8` base) with white polka dots, a white rim (`#F2FBFB`) and a handle on one side; the cocoa (`#6B3A22`) fills it to the brim and drips over the rim. The capybara's broad head has a big dark nose (`#3A2418`), small ears and sleepy-happy eyes, its front paws rest on the rim, marshmallows (white and pale pink `#FFD6E2`) float round it, one sits on its head, and a little steam rises.
+8. **Animal Cracker Axolotl** (`animal_cracker_axolotl`, Rare). *"Frosted, sprinkled and always smiling."* A wide, low axolotl made of a frosted animal cracker: a biscuit body and a big round head (`#E8C48A`, Sand) covered on top with pink frosting (`#FF9EC8`) and rainbow nonpareils (white, yellow, sky blue, green, orange, purple). Three frilly gills on each side of its head (`#E8559A`, the middle one paler `#FFC2DE`), a white frosting fin (`#FFF4F8`) along its tail, short biscuit legs, big eyes, pink cheeks and a very wide smile.
+9. **Shortcake Sloth** (`shortcake_sloth`, Rare). *"Takes it slow. Takes a second slice."* A sloth relaxing on top of a strawberry shortcake: two round layers of golden sponge (`#EDBA62`, Sand) with a layer of whipped cream (`#FFFBF2`) and strawberry slices (`#E8334A`) between them and cream piped on top. The sloth's furry head (`#A88A68`, Fabric) has a pale face (`#EADBC0`) with dark eye patches (`#5A3A26`), a small nose and a lazy smile, a dollop of cream and a strawberry on its head. Its long arms hug a big strawberry (`#E8334A`, darker `#C41E36`, yellow seeds `#FFE58A`, green leaves `#4CAF50`) at the front, with three cream claws on each hand.
+10. **Corn Cob Crocodile** (`corn_cob_crocodile`, Epic). *"A-maize-ingly snappy."* A long, low crocodile whose body is a buttery corn cob (`#FFD43B`, lighter `#FFE680` on top) with neat rows of kernels (grooves `#E8A81E`), green husk leaves (`#7CC35A`, darker `#5FA83E`) hugging its sides and trailing back into its tail. A green crocodile head (`#6FBF4A`, darker `#4F9A34` underneath) with a broad skull, a long snout with two nostrils, big eyes up on bumps, a cheeky grin with rounded white teeth along the snout, four short splayed legs and a pat of butter (`#FFF0A0`) melting on its back.
+11. **Apple Pie Armadillo** (`apple_pie_armadillo`, Epic). *"Rolls up warm. Smells like cinnamon."* An armadillo whose round domed shell is an apple pie: a golden lattice crust (`#F2C46A`, darker `#D9A04A`) whose strips run across the back like an armadillo's bands, over a glossy caramel-apple filling (`#D9822B`), with a crimped crust rim round the edge. A dollop of whipped cream (`#FFFBF2`) and a cinnamon stick on top and a dusting of cinnamon. A pale head (`#E8C08A`, darker `#C89A62`) with a long pointy snout, a pink nose (`#FFB0B8`), big upright ears, pink cheeks, short legs and a banded tail.
+12. **Sherbet Seahorse** (`sherbet_seahorse`, Epic). *"Rides the waves in three flavors."* A seahorse made of three sherbet scoops stacked in its S-curve: an orange head (`#FF9F4A`, lighter `#FFB874`) with a long snout, a raspberry belly (`#FF6FA0`, lighter `#FF8FB8`) and a lime tail (`#9BE07A`, lighter `#B4EC98`) that drops behind and curls forward underneath it, flavour by flavour, each scoop with a soft drippy base. A fan of wafer (`#F2D08A`, darker `#D9AE62`) for its dorsal fin, a little wafer crown with a cherry (`#E8233A`) on its head, small glassy fins, big eyes and pink cheeks.
+13. **Caramel Camel** (`caramel_camel`, Legendary). *"Keeps spare caramel in its humps."* A tall, regal camel of glossy caramel (`#D98E3A`, darker `#B8661E` underneath, lighter `#EBA850` on top) on four long legs with wide hooves. Its two humps are swirled caramel drops sprinkled with sea salt (white, Sand), with caramel dripping down its sides. A royal red blanket (`#D7263D`) between the humps with gold trim (`#FFC83D`), tassels and gems, a long neck, a head with big eyes under dark brows, a tuft on top, small ears, a soft muzzle (`#F2C27A`) wrapped in a gold bridle, and a tasselled tail. Legendary: a gold medallion on its forehead with a glowing pink gem (Neon).
+14. **Fruit Tart Flamingo** (`fruit_tart_flamingo`, Legendary). *"Stands on one leg. Shares no berries."* A flamingo whose body is a fruit tart: a fluted, crimped pastry shell (`#E8B060`, darker `#C98A3C`) full of pink custard (`#FFB8CE`), topped with fanned strawberries (`#E8233A`), blueberries (`#3A3A9F`), raspberries (`#D81B4A`), a kiwi slice (`#8BC34A`) and mint leaves (`#3FA34D`). Pink wings (`#FF8FB4`, darker `#FF6F9F`) folded over the shell, pink tail feathers, an elegant S-curved pink neck, a small head with a bent pale beak with a dark tip, and long pink legs: it stands on one, with the other tucked up.
+15. **Rocky Road Rhino** (`rocky_road_rhino`, Legendary). *"Always takes the bumpy road."* A sturdy rhino on four thick legs made of rocky road: a lumpy milk-chocolate body (`#5A3420`, darker `#43261A` underneath, lighter `#7A4A30` on top) studded with marshmallows (white and pink `#FFC2D8`), almonds (`#E8C48A`) and chocolate chunks. A big head with a lighter snout, small ears with pink insides, big eyes and pink cheeks. Its horn is a waffle cone (`#E8B060` and `#C98A3C` bands) set in a dip of dark chocolate (`#3A2014`) on its snout, with a small chocolate horn behind it; almond toes and a thin tail with a pink marshmallow tip.
+16. **Eclair Eagle** (`eclair_eagle`, Mythic). *"Soars on choux. Swoops on crumbs."* A proud bald eagle standing upright: a dark chocolate body (`#5A3420`) with a band of golden choux glaze (`#E3A857`) round the bottom, a white ruff and head (`#FFFDF6`), a big golden hooked beak (`#FFC83D`), stern golden-brown brows (`#B8762E`) and pink cheeks. Its wings are half spread, each made of three eclairs (`#E3A857` choux, Sand) with a stripe of chocolate glaze (`#4A2A16`), with three more fanned behind as its tail, and golden legs and talons. Mythic: a glowing golden sun disc (Neon) behind its head.
+17. **White Chocolate Wolf** (`white_chocolate_wolf`, Mythic). *"Howls at the cookie moon."* A wolf sitting proudly upright, made of white chocolate (`#FFF0D2`, a lighter chest `#FFFBF0`, darker `#DDBE84` shading): a long muzzle with a dark chocolate nose (`#5A3420`), big eyes, pink cheeks and tall pointed ears with pink insides (`#FFB0C0`). A ruff of white chocolate shards (`#EED4A0`) round its neck, dark chocolate drizzle and raspberry bits (`#E8335A`) on its back, and a big fluffy tail curled round its side. Mythic: a glowing crescent moon (Neon `#FFE070`) on its brow.
+18. **Mint Chip Megalodon** (`mint_chip_megalodon`, Mythic). *"The biggest scoop in the ocean."* A huge, chubby shark of mint chocolate-chip ice cream resting on its belly: a mint body (`#A8EBC8`, darker `#86D9AE` on top, a pale `#F4FFF8` belly) studded with chocolate chips (`#3A2418`), a big grin with a dark mouth, rounded white teeth and a pink tongue, big friendly eyes, a dark chocolate dorsal fin (`#43261A`), mint side fins and a crescent tail. On its head, the biggest scoop: whipped cream (`#FFFBF2`), hot fudge and a cherry (`#E8233A`). Mythic: glowing gills (Neon `#5FFFD0`).
+19. **Lava Cake Leviathan** (`lava_cake_leviathan`, Secret). *"Rises from the deep. Melts in the middle."* A sea serpent of chocolate lava cake (`#6E3424`, darker `#4C2016`) rising out of a wide puddle of molten chocolate (`#3A1C10`) with glowing pools in it: a thick neck, one arching coil behind it and a tail with a fin, all dusted with powdered sugar on top (white, Sand), the molten middle glowing through cracks in its sides. A round head with a short snout, big eyes, buck teeth and cheeks, curved gold horns (`#F2A93B`), little fins at the sides, a crest of chocolate shards down its neck, a scoop of vanilla (`#FFF6E6`) with a raspberry (`#D81B4A`) and a mint leaf (`#3FA34D`) on its head and raspberries in the puddle. Secret: the cracks and pools glow molten orange (Neon `#FF8A1F`).
+20. **Ube Unicorn** (`ube_unicorn`, Secret). *"Purple yam, pure magic."* A unicorn of purple ube (`#8E5BD0`, darker `#7A44C0`, a lighter `#A87AE6` head and belly) standing on four legs with golden hooves (`#FFC83D`). A lilac muzzle (`#D8C0FF`) with a little smile, big eyes, purple brows, pink cheeks, ears with pink insides, and a horn that is a small waffle cone (`#E8B060` and `#C98A3C` bands). A soft-serve swirl mane and tail in cream (`#FFF4E8`), ube and lilac, and sprinkles (yellow, white and pink) on its coat. Secret: the horn's tip and a few star sparkles glow (Neon `#FFF2B0`).
