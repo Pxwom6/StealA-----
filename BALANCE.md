@@ -636,14 +636,18 @@ income each).
 | --- | --- | --- |
 | Cash | 30% | 30 s of income (at least $200) |
 | Big Cash | 25% | 90 s (at least $600) |
-| Snackling | 18% | a Snackling at 2x luck |
+| Snackling | 18% | a plain Snackling at 2x luck |
 | Huge Cash | 14% | 5 min (at least $2,000) |
-| Golden! | 8% | a Golden Snackling at 2x luck |
-| Diamond! | 3.5% | a Diamond Snackling at 2x luck (announced) |
+| Golden! | 8% | a Snackling at 2x luck, always Golden |
+| Diamond! | 3.5% | a Snackling at 2x luck, always Diamond (announced) |
 | JACKPOT | 1.5% | 20 min of income (at least $10K; announced) |
 
-One spin is worth about 90 seconds of income in cash on average, plus a 30% chance of a Snackling. At 2x luck a
-Snackling is Common 48%, Uncommon 23%, Rare 20%, Epic 7.2%, Legendary 1.9%, Mythic 0.31%, Secret 0.03%; at 4x (the
+One spin is worth about 90 seconds of income in cash on average, plus a 30% chance of a Snackling. A spin's odds never
+change, because spin packs are paid random items: the 2x is the segment's own luck (never the server's, an event's
+or a boost's), the Snackling is from the permanent roster (no event, map or weather ones) and the plain one never
+rolls a mutation, so the Spin tab's 📋 Details lists exactly what the server rolls. At 2x luck a Snackling is Common
+48%, Uncommon 23%, Rare 20%, Epic 7.2%, Legendary 1.9%, Mythic 0.31%, Secret 0.03% (so any Secret is about 0.01%
+of spins, 1 in 10,000); at 4x (the
 last gift) Rare 30%, Epic 11%, Legendary 2.9%, Mythic 0.48%. A player who plays an hour a day and spins twice gets
 roughly 9 minutes of extra income a day from gifts and spins, about +15% for that hour: a reason to come back and stay,
 not a new economy. Every prize scales with steady income like a cash pack, and the server decides every spin.
@@ -797,7 +801,11 @@ biggest gift is a little under a Snack Basket (35 minutes, 49 R$) for every play
 and to a big base. It happens only when Leo runs one, so the simulation leaves it out. A 30 s cooldown keeps a double
 tap from paying twice. A private server's owner can only start Sugar Rush, Quick Hands, Fortress or Snack Patrol,
 none of which changes income, prices, luck, mutations or the belt's pace, so a private server earns exactly what a
-public one does (CI checks the hostable set).
+public one does (CI checks the hostable set). They go through the maps at the rotation's pace too (DECISIONS.md #54):
+a map switch every 20 minutes, a map counted for the map achievements after 3 minutes on it, its own mutation for its
+first 20 minutes up, and the random schedule's modifiers run to their end. Switching every minute used to give a
+server every map (Tourist, Explorer, Globetrotter and their titles) in under half an hour; at 3 minutes a map,
+hopping between public servers is the fastest way, and a private server is no faster than that.
 
 **First-time tutorial** (`Config/Tutorial`): finishing it pays a one-time **$500** (the price of the cheapest
 Uncommon), usually within the first one to two minutes. Skipping it pays nothing, and players who already had progress
