@@ -5,19 +5,23 @@
 	the prize by weight (chance = weight / total of all weights) and pays at once; the reel animation only shows it.
 
 	Prizes (Types.PrizeReward): cash sized from steady income like a cash pack, or a Snackling rolled at extra luck,
-	optionally always with a mutation (sold for its refund when the base is full). Balance notes: BALANCE.md
-	"Playtime gifts and the Lucky Spin". CI checks this file (Logic/SpinRules.validate).
+	optionally always with a mutation (sold for its refund when the base is full). Banked spins can be bought (Lucky
+	Spin packs, paid random items), so a spin's odds never change: a Snackling prize is a permanent Snackling at its
+	segment's own `luck` (never the server's, an event's or a boost's), plain or always its `mutation` (a permanent
+	one; no mutation roll). The Spin tab and the pack cards list every outcome's exact chance (Logic/SpinOdds).
+	Balance notes: BALANCE.md "Playtime gifts and the Lucky Spin". CI checks this file (Logic/SpinRules.validate).
 ]]
 
 local Types = require("../Types")
 
 local Spin: Types.SpinConfig = {
 	freeEverySeconds = 12 * 3600,
-	maxBanked = 20,
+	-- The spin bank's size, one for every spin: gifts' and achievements' spins bank up to it and the rest are paid as
+	-- `bankedOverflow` cash; Lucky Spin packs (Config/Monetization) can't be bought with this many banked ("spin some
+	-- first!"), and a pack's receipt banks every spin it paid for, past it if need be. One number, so a bought spin
+	-- never turns a later earned one into cash below it.
+	maxBanked = 40,
 	bankedOverflow = { incomeSeconds = 60, minimum = 400 },
-	-- Lucky Spin packs (Config/Monetization) can't be bought with this many spins banked ("spin some first!"); a
-	-- receipt that arrives anyway banks every spin it paid for, past any cap.
-	paidBankFull = 40,
 
 	segments = {
 		{

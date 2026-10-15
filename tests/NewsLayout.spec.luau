@@ -1,6 +1,6 @@
 --!strict
 -- The What's New card and board (Logic/NewsLayout): the card fits every checked screen below Roblox's top bar, its
--- button is big and its text reads at 12 UI or more; the board's lines stay readable from across the plaza.
+-- button is big and its text reads at 12 UI or more; the board's lines stay readable once you walk up to it.
 local T = require("./TestKit")
 local Format = require("../src/shared/Logic/Format")
 local NewsLayout = require("../src/shared/Logic/NewsLayout")
@@ -107,7 +107,7 @@ T.describe("NewsLayout board", function()
 		end
 	end)
 
-	T.it("shows every update's lines big enough to read from across the plaza", function()
+	T.it("shows every update's lines big enough to read up close", function()
 		local small: { string } = {}
 		for _, def in Updates.list do
 			local boxes = L.boardBoxes(#def.highlights)

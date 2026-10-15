@@ -88,6 +88,36 @@ function RarityRoll.odds(
 	return result
 end
 
+-- Exact probability of each creature id that can roll (others are left out): its tier's chance (RarityRoll.odds) times
+-- its belt weight's share of its tier's eligible creatures, the very weights RarityRoll.roll draws from with the same
+-- arguments. The chances add up to 1 when anything can roll. Used by the Lucky Spin's odds disclosure (SpinOdds).
+function RarityRoll.creatureOdds(
+	rarities: { RarityWeight },
+	creatures: { CreatureWeight },
+	luck: number,
+	activeEvents: { [string]: boolean }
+): { [string]: number }
+	local tierChance: { [string]: number } = {}
+	for _, entry in RarityRoll.odds(rarities, creatures, luck, activeEvents) do
+		tierChance[entry.id] = entry.chance
+	end
+	local tierWeight: { [string]: number } = {}
+	for _, creature in creatures do
+		if isEligible(creature, activeEvents) and creature.beltWeight > 0 then
+			tierWeight[creature.rarity] = (tierWeight[creature.rarity] or 0) + creature.beltWeight
+		end
+	end
+	local result: { [string]: number } = {}
+	for _, creature in creatures do
+		local total = tierWeight[creature.rarity] or 0
+		local chance = tierChance[creature.rarity] or 0
+		if isEligible(creature, activeEvents) and creature.beltWeight > 0 and total > 0 and chance > 0 then
+			result[creature.id] = chance * creature.beltWeight / total
+		end
+	end
+	return result
+end
+
 -- Rolls one creature id. `rng` returns numbers in [0, 1).
 function RarityRoll.roll(
 	rarities: { RarityWeight },

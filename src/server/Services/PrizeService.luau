@@ -3,11 +3,15 @@
 	Prizes from gifts, the Lucky Spin and supply crates (Types.PrizeReward), paid the same way everywhere:
 
 	  cash      sized from the player's steady income like a cash pack (EconomyMath.cashPackAmount)
-	  spin      banked for the Lucky Spin (SpinRules.bank); spins beyond Config/Spin.maxBanked are paid as cash
+	  spin      banked for the Lucky Spin (SpinRules.bank); spins beyond the bank's size (Config/Spin.maxBanked, bought
+	            spins in it or not) are paid as cash
 	  creature  a Snackling rolled at `luck` x the server's luck, a bought Server Luck boost left out (its store card
 	            only shows belt odds); mutation rolled as usual, or always `mutation`; on the lowest free podium. With a
 	            full base it is sold for its usual refund instead, and so it is when the player is carrying a stolen
-	            Snackling home with one free podium left (that podium is for the delivery)
+	            Snackling home with one free podium left (that podium is for the delivery). The Lucky Spin pays with
+	            fixed odds instead (`fixedOdds`, rollFixed): a permanent Snackling at exactly `luck`, plain or always
+	            `mutation`, nothing live involved, so a spin pays exactly the odds its Details list shows
+	            (Logic/SpinOdds; paid Lucky Spin packs are paid random items)
 
 	`pay` returns what happened, with a line for the toast; the caller decides when to show it (the Lucky Spin shows it
 	after its reel stops).
@@ -26,6 +30,7 @@ local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local Inventory = require(ReplicatedStorage.Shared.Logic.Inventory)
 local MutationRules = require(ReplicatedStorage.Shared.Logic.MutationRules)
 local RarityRoll = require(ReplicatedStorage.Shared.Logic.RarityRoll)
+local SpinOdds = require(ReplicatedStorage.Shared.Logic.SpinOdds)
 local SpinRules = require(ReplicatedStorage.Shared.Logic.SpinRules)
 local BeltService = require(script.Parent.BeltService)
 local EconomyService = require(script.Parent.EconomyService)
@@ -87,6 +92,20 @@ function PrizeService.rollCreature(
 	return def, variant
 end
 
+-- A Lucky Spin's Snackling, with odds that never change (Logic/SpinOdds): a permanent Snackling rolled at exactly
+-- `luck` (no server, event, admin or modifier luck), and exactly `variant` (nil: plain, no mutation roll). The odds the
+-- Spin tab and the pack cards list are these very weights (RarityRoll.creatureOdds on the same arguments). nil only
+-- when nothing can roll.
+function PrizeService.rollFixed(luck: number, variant: string?): (Types.CreatureDef?, string?)
+	local catalog = GameData.catalog
+	local creatureId = RarityRoll.roll(catalog.rarityList, catalog.creatureList, luck, SpinOdds.NO_EVENTS, nextRandom)
+	local def = if creatureId then catalog.creatures[creatureId] else nil
+	if def == nil then
+		return nil, nil
+	end
+	return def, if variant ~= nil and catalog.mutations[variant] ~= nil then variant else nil
+end
+
 -- Puts `def` (with `variant`) on a free podium, or pays its sell value when the base is full. A thief carrying a
 -- Snackling home keeps their last free podium for it: the prize is sold instead (Inventory.prizeMayTakePodium).
 -- Returns whether it was given and the cash paid instead (0 when given). Either way it was found (GameEvents "found",
@@ -108,8 +127,9 @@ function PrizeService.giveOrSell(
 	return given, value
 end
 
--- Pays `reward` to `session`. `sku` names the source for analytics ("Gift", "Spin"...).
-function PrizeService.pay(session: Session, reward: Types.PrizeReward, sku: string): Result
+-- Pays `reward` to `session`. `sku` names the source for analytics ("Gift", "Spin"...). `fixedOdds`: a Snackling is
+-- rolled with PrizeService.rollFixed (the Lucky Spin), not at the server's luck with a mutation roll.
+function PrizeService.pay(session: Session, reward: Types.PrizeReward, sku: string, fixedOdds: boolean?): Result
 	local result: Result = { text = "", cash = 0, spins = 0, given = false }
 	if reward.kind == "cash" then
 		local amount = EconomyMath.cashPackAmount(
@@ -138,7 +158,12 @@ function PrizeService.pay(session: Session, reward: Types.PrizeReward, sku: stri
 		end
 		Replication.markDirty(session)
 	else
-		local def, variant = PrizeService.rollCreature(reward.luck, 1, reward.mutation)
+		local def, variant
+		if fixedOdds then
+			def, variant = PrizeService.rollFixed(reward.luck, reward.mutation)
+		else
+			def, variant = PrizeService.rollCreature(reward.luck, 1, reward.mutation)
+		end
 		if def then
 			local name = GameData.displayName(def, variant)
 			local given, value = PrizeService.giveOrSell(session, def, variant, sku)

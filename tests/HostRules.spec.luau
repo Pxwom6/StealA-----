@@ -229,17 +229,25 @@ T.describe("HostRules.check", function()
 		T.expect(HostRules.check("owner", { kind = "mapRotation", on = false }, "server", Modifiers.modifiers, nil))
 			.toBeNil()
 	end)
-	T.it("lets an owner start and stop only hostable modifiers", function()
-		T.expect(HostRules.check("owner", { kind = "modStart", id = "sugarRush" }, "server", Modifiers.modifiers, nil))
+	T.it("lets an owner start only hostable modifiers, and stop or replace only their own", function()
+		local function owner(kind: string, id: string?, running: string?, theirs: boolean?): string?
+			return HostRules.check("owner", { kind = kind, id = id }, "server", Modifiers.modifiers, running, theirs)
+		end
+		T.expect(owner("modStart", "sugarRush", nil)).toBeNil()
+		T.expect(owner("modStart", "luckyBreeze", nil)).toBe("notHostable")
+		-- their own: stop it, or start another over it
+		T.expect(owner("modStop", nil, "fortress", true)).toBeNil()
+		T.expect(owner("modStart", "quickHands", "fortress", true)).toBeNil()
+		-- the random schedule's (or an admin's) runs to its end, hostable or not: no cutting it short to roll the
+		-- next one sooner, and no ending a Golden Hour by starting Sugar Rush over it
+		T.expect(owner("modStop", nil, "fortress", false)).toBe("notYours")
+		T.expect(owner("modStop", nil, "jackpot", false)).toBe("notYours")
+		T.expect(owner("modStart", "sugarRush", "goldenHour", false)).toBe("notYours")
+		T.expect(owner("modStart", "sugarRush", "snackAttack", nil)).toBe("notYours")
+		T.expect(owner("modStop", nil, nil)).toBeNil() -- nothing runs: nothing to refuse
+		-- admins do as they please
+		T.expect(HostRules.check("admin", { kind = "modStop" }, "server", Modifiers.modifiers, "jackpot", false))
 			.toBeNil()
-		T.expect(
-			HostRules.check("owner", { kind = "modStart", id = "luckyBreeze" }, "server", Modifiers.modifiers, nil)
-		)
-			.toBe("notHostable")
-		T.expect(HostRules.check("owner", { kind = "modStop" }, "server", Modifiers.modifiers, "fortress")).toBeNil()
-		T.expect(HostRules.check("owner", { kind = "modStop" }, "server", Modifiers.modifiers, "jackpot"))
-			.toBe("notHostable")
-		T.expect(HostRules.check("owner", { kind = "modStop" }, "server", Modifiers.modifiers, nil)).toBeNil()
 	end)
 	T.it("keeps belt drops, boosts, events, gifts, messages and votes for admins", function()
 		for _, kind in { "mapVote", "beltDrop", "luck", "eventStart", "eventStop", "gift", "broadcast" } do
@@ -270,10 +278,12 @@ T.describe("HostRules.check", function()
 end)
 
 T.describe("HostRules cooldowns", function()
-	T.it("gives owners about a minute between map switches and ten between modifiers", function()
+	T.it("gives owners a rotation's turn between map switches and ten minutes between modifiers", function()
 		local group, seconds = HostRules.cooldown("owner", "mapSwitch", Host)
 		T.expect(group).toBe("map")
-		T.expect(seconds).toBe(60)
+		-- never faster through the maps (the map achievements, their mutations) than the rotation
+		T.expect(seconds).toBeAtLeast(MapThemes.rotation.mapSeconds)
+		T.expect(seconds).toBe(20 * 60)
 		group, seconds = HostRules.cooldown("owner", "modStart", Host)
 		T.expect(group).toBe("modifier")
 		T.expect(seconds).toBe(600)

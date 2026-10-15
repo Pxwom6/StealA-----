@@ -1,8 +1,9 @@
 --!strict
 --[[
 	The gadget buttons (Config/Gadgets): one round button per owned gadget beside the TAG button, where
-	Logic/ScreenLayout.gadgetSlots puts them (HudController places them; tools/layoutCheck.luau checks them on five
-	screens). None until the player owns a gadget, none during the first-time tutorial.
+	Logic/ScreenLayout.gadgetSlots puts them (HudController places them; tools/layoutCheck.luau checks them on every
+	checked screen). None until the player owns a gadget, none during the first-time tutorial. A screen with room for
+	fewer (three on a 320 px tall phone) shows the first gadgets owned; a button with no slot stays hidden.
 
 	  * slot 1 is the first gadget owned in Config/Gadgets order, slot 2 the next...; each shows its icon in its colour
 	  * recharging: a dark disc shrinks away as the gadget recharges, with the seconds left on it (over the recharge
@@ -71,6 +72,32 @@ local slots: { Slot } = {}
 local view: Types.GadgetsView = { owned = {}, readyAt = {}, activeUntil = {}, usedAt = {} }
 local inTutorial = true -- until the first state says otherwise (no flash of buttons for a new player)
 local autoCollect = false -- the player owns the Auto Collect pass
+local room = SLOTS -- buttons this screen has a slot for (ScreenLayout.gadgetSlots)
+local roomFor = "" -- the screen that was measured on
+
+-- Whether the number of slots this screen has room for changed (worked out again only when the screen did).
+local function measureRoom(): boolean
+	local device = HudController.device()
+	local key = table.concat({
+		device.widthPx,
+		device.heightPx,
+		device.left,
+		device.insetRightPx,
+		device.insetBottomPx,
+		device.topBar,
+		device.topBarLeft,
+		device.topBarRight,
+		device.playerList,
+	}, ":")
+	if key == roomFor then
+		return false
+	end
+	roomFor = key
+	local count = #ScreenLayout.gadgetSlots(device, SLOTS)
+	local changed = count ~= room
+	room = count
+	return changed
+end
 
 -- The Auto Collect pass already does what gadget `id` does (the Snack Magnet): its button shows AUTO.
 local function covered(id: string): boolean
@@ -199,7 +226,7 @@ local function bind()
 	local keyboard = UserInputService.KeyboardEnabled
 	for index, slot in slots do
 		local id = view.owned[index]
-		local show = id ~= nil and not inTutorial
+		local show = id ~= nil and not inTutorial and index <= room
 		if id ~= slot.id then
 			slot.id = id
 			if id then
@@ -268,6 +295,13 @@ function GadgetController.start()
 	for index = 1, SLOTS do
 		slots[index] = buildSlot(index)
 	end
+	measureRoom()
+	-- the screen changed (turned, resized, Roblox's top bar grew): maybe more or fewer slots
+	HudController.onLayout(function()
+		if measureRoom() then
+			bind()
+		end
+	end)
 	StateStore.onChange(function(state)
 		view = state.gadgets
 		inTutorial = state.tutorial.step ~= ""

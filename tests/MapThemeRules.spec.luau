@@ -213,6 +213,39 @@ T.describe("MapThemeRules votes", function()
 	end)
 end)
 
+T.describe("MapThemeRules: what a map gives, at the rotation's pace", function()
+	local rotation = MapThemes.rotation
+
+	T.it("rolls a map's signature mutation for the whole of its turn, and stops after it", function()
+		T.expect(MapThemeRules.signatureLive(0, rotation)).toBe(true)
+		T.expect(MapThemeRules.signatureLive(rotation.mapSeconds - 1, rotation)).toBe(true)
+		-- the rotation's change lands a step late: still on
+		T.expect(MapThemeRules.signatureLive(rotation.mapSeconds + 1, rotation)).toBe(true)
+		-- a server kept on the map (rotation off): off, so staying is no faster a farm than the rotation
+		T.expect(MapThemeRules.signatureLive(rotation.mapSeconds + MapThemeRules.SIGNATURE_SLACK, rotation)).toBe(false)
+		T.expect(MapThemeRules.signatureLive(3 * rotation.mapSeconds, rotation)).toBe(false)
+		T.expect(MapThemeRules.signatureLive(-1, rotation)).toBe(false)
+		T.expect(MapThemeRules.SIGNATURE_SLACK).toBeLessThan(rotation.voteSeconds)
+	end)
+
+	T.it("counts a map as played on after creditSeconds on it, not for a quick switch", function()
+		T.expect(MapThemeRules.creditDue(1000, 1000 + rotation.creditSeconds - 1, rotation)).toBe(false)
+		T.expect(MapThemeRules.creditDue(1000, 1000 + rotation.creditSeconds, rotation)).toBe(true)
+		T.expect(MapThemeRules.creditDue(1000, 1060, rotation)).toBe(false) -- a minute on it
+		T.expect(rotation.creditSeconds).toBeAtLeast(60)
+		T.expect(rotation.creditSeconds).toBeAtMost(rotation.mapSeconds / 2) -- a whole turn always counts
+	end)
+
+	T.it("refuses a credit time that is too short or longer than half a turn", function()
+		for _, seconds in { 10, rotation.mapSeconds } do
+			local config = copy(MapThemes)
+			config.rotation.creditSeconds = seconds
+			T.expect(mentions(validate(config), "creditSeconds")).toBe(true)
+		end
+		T.expect(mentions(validate(MapThemes), "creditSeconds")).toBe(false)
+	end)
+end)
+
 T.describe("MapThemeRules flora and landmarks", function()
 	T.it("grows the map's kind on each tree spot", function()
 		local desert = MapThemes.themes.desert

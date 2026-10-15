@@ -122,6 +122,7 @@ local lastTreasureSpot: number? = nil
 local nextCrateId = 1
 local random = Random.new()
 local runningId: string? = nil
+local runningRun = 0 -- ModifierService.run() the drops were planned for
 local pending: { number } = {} -- server times of the running modifier's drops still to come
 
 local function now(): number
@@ -660,8 +661,10 @@ local function step()
 	local id = ModifierService.current()
 	local def = if id then Modifiers.modifiers[id] else nil
 	local drops = if def then def.drops else nil
-	if id ~= runningId then
-		runningId = id
+	-- a new modifier, or the running one started again for a new length: plan its drops from now
+	local run = ModifierService.run()
+	if id ~= runningId or run ~= runningRun then
+		runningId, runningRun = id, run
 		pending = {}
 		if drops then
 			for _, offset in DropRules.times(drops, math.max(0, ModifierService.endsAt() - t)) do

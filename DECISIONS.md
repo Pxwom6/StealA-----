@@ -1462,7 +1462,105 @@ Golden Hour check would need its bound raised or a rarer event mutation.
 misty hot spring at dawn, a barbecue at twilight), and four more mutations to collect on the vote.
 **Reversal cost:** none — `weight = 0` keeps a map for `/map` only; never remove the mutation ids (they are in saves).
 
-### 55. Four more modifiers: Eclipse, Gadget Frenzy, Treasure Hunt, Bounty Hunt
+### 55. Review round 2 fixes: the giant tappable everywhere, fixed spin odds, short phones, fair private servers
+
+* **What:** three reviewers went through everything merged after 0ac89b8. Each finding was checked again on main
+  (e09833f), fixed, and given a test that fails without the fix.
+  * **Snack Attack taps (high):** Roblox finds what a tap, a click or a gamepad's R2 (aimed at the screen's centre
+    dot) points at with a spatial query, which never hits a part with CanQuery off, and creature models are built
+    that way (`CreatureVisuals`). So no real client could hit the giant. It now has an invisible `Hitbox` (its
+    bounding box, welded to its root, CanQuery on, never colliding or touching): its only queryable part, and the
+    ClickDetector's parent. The hint under its health bar follows the last input: "Tap to hit!", "Click to hit!" or
+    "Aim at it, press R2!". `Sim.click` refuses a detector a real client couldn't reach (`Sim.clickable`), so the
+    offline tests can no longer pass a giant nobody can tap.
+  * **Lucky Spin odds (high/medium, the Paid Random Items policy):** a spin's Snackling was rolled at 2x the server's
+    luck (events, admins, modifiers), event Snacklings included, with a mutation roll, so its odds changed with live
+    luck, and the packs showed only the reel. A spin's odds now never change. Its Snackling is a permanent one at the
+    segment's own luck, plain or always the segment's mutation (`PrizeService.rollFixed`; `SpinRules.validate` refuses
+    a gated mutation there). The Odds view and each pack's Shop card open a **📋 Details** list of every outcome: the
+    reel, each cash prize, and every Snackling per creature segment with its chance per spin (`Logic/SpinOdds`,
+    `UI/OddsDetails`, `StoreLayout.oddsDetails`). Chances are rounded four decimal places below the first non-zero
+    digit, with the policy's own "Probabilities are rounded..." line. The store test spins 250 times under 6x luck,
+    an event and Golden Hour: every roll is at the segment's 2x, with no event and no mutation roll.
+  * **The giant's flinch (medium, photosensitivity):** it flashed red on every hit, 3 to 5 times a second. Now it is
+    a soft fade at most twice a second (`Boss.flinch`, CI), and none with Reduce effects.
+  * **320 px tall phones (medium):** the HUD broke on a 568x320 phone (an iPhone SE in landscape). Below 360 px the
+    HUD scale comes from the room under Roblox's top bar and the home indicator (`SCALE.shortBelow`, `shortFloor`;
+    UiKit measures the bottom inset).
+    * The status band rises into the top bar's strip.
+    * The cash pill narrows to 160 between Roblox's buttons and the corner row, on every screen.
+    * TAG starts below the band.
+    * The side grid tightens above the thumbstick.
+    * Toasts stay below the band's buttons.
+    * The 568x320 phone has three gadget slots; a button with no slot hides.
+    The layout check went from five screens to nine: 568x320, 693x320 with a home indicator, and 640x360 and 667x375
+    with Roblox's top-left buttons at 270 and 240 px (the spec sweeps them from 200 to 280).
+    Buttons on 320 px screens are 52 UI, as everywhere, which is 36-38 px there. That is under 44, because the HUD
+    can't fit otherwise on the smallest screen Roblox runs on.
+    One known gap: on a 568x320 phone whose top-left buttons are wider than about 222 px, the tutorial banner can
+    overlap TAG, during the tutorial only.
+  * **A drop modifier started again (medium)** kept its first plan: an admin's 30-minute Supply Drop over the
+    schedule's stopped dropping after five minutes. `ModifierService.run()` counts starts, and DropService and
+    BossService plan again when it changes.
+  * **Private servers (medium): the fair rule.** Nothing a private server's owner can do beats hopping between public
+    servers.
+    * The owner may switch the map once per rotation turn (`Host.owner.mapCooldownSeconds` = `mapSeconds`, 20
+      minutes; CI).
+    * In every server, a map counts as played on (`map_<id>`, the map achievements and titles) after
+      `rotation.creditSeconds` (3 minutes) on it.
+    * A map's own mutation rolls only for its first `mapSeconds` up, rotation or not (`MapThemeRules.signatureLive`).
+    * An owner may start a hostable modifier only when none runs, and stop or replace only their own (refusal
+      `notYours`; `ModifierService.startedBy`, the `ModifierByOwner` attribute). The schedule's and an admin's
+      modifiers run to their end.
+    The reviewer's farm, a switch every minute, gave every map's achievements in 23 minutes; it now credits 2 maps.
+    An owner still chooses which map comes next, but a player hopping between public servers can find any map too.
+    Letting the server close and rejoining is just hopping: a new server, a random map, and 3 minutes before it
+    counts.
+    Of the other ideas, a longer cooldown alone left instant credit, and keeping owner-picked maps out of the
+    achievements would have punished honest owners.
+  * **The spin bank (low):** earned spins stopped at 20 while packs could be bought up to 40, so 15 banked plus a
+    10-pack turned every later earned spin into cash. The bank now has one size, `Spin.maxBanked` = 40
+    (`paidBankFull` is gone): earned spins fill it, packs can't be bought while it is full, and a receipt still
+    banks every spin.
+  * **Snack Attack health (low):** it counted every player, so six idle or tutorial players gave two active ones 720
+    taps in 75 seconds. Now it counts players out of the tutorial who moved or landed a hit in the last
+    `Boss.activeSeconds` (60; `BossRules.counts`, `session.activeAt` from PositionTracker and BossService).
+  * **Host settings after a restart (low): accepted, not saved.** A private server that closes starts the next time
+    like any server: rotation on, a random map, no modifier. Saving the settings would mean a DataStore or
+    MemoryStore keyed by the private server, which can fail and needs testing, so that owners can skip two taps.
+    The rotation-off toast now says "until the server closes", and the README says so too.
+  * **Smaller nits (low):**
+    * Starting a hostable modifier no longer ends someone else's (`notYours`).
+    * A banana peel that replaces the last one keeps its button's "running" ring (`removePeel`'s `replacedBy`).
+    * The Friends button's "+20%" tag is in the layout (`ScreenLayout.friendsBadge`; 54x18, ending where the band
+      starts). Gadget 4 on 640x360 now sits past it, and a moved corner row puts the side grid below it.
+    * The What's New board reads from 12-16 studs on a phone, not from the spawn as #51 said; the card is how players
+      read an update.
+  * **Studio place settings:** the sync script never applies `default.project.json`'s properties. The README lists
+    the ones to set by hand: StreamingEnabled off, PlayerCharacterDestroyBehavior Enabled where the Properties panel
+    shows it (scripts can't set it in this Studio), ChatVersion TextChatService, and Max Players 8 (the live place is
+    at 12). The property stays in the Rojo project, which CI builds on every run.
+* **Tests:**
+  * Unit tests: 874 → 906.
+  * `tools/worldsim/review2.luau` (new, in CI): a modifier started again, the private server's pace (the owner, a
+    guest, the map credit, the signature window, the reviewer's farm) and the giant's health with idle, new and
+    active players.
+  * Other offline tests: the server test checks the hitbox; the store test checks the fixed rolls and the shared
+    bank; the gadgets test checks the peel ring; the host test lets an admin stop the schedule's modifier.
+  * `tools/layoutCheck.luau` checks the Details list on both dialogs.
+* **No save change:** the v4 spin bank, and session-only state.
+
+**Why:** Leo plays on a phone, and the giant couldn't be tapped on one; the spin packs must meet Roblox's disclosure
+rule before they are created; the flinch broke the photosensitivity rule the game already keeps; and a private server
+or a purchase must never be a faster or worse deal than playing normally.
+**Reversal cost:**
+* Low for the numbers: `creditSeconds`, the owner cooldown, `activeSeconds`, `maxBanked` and `Boss.flinch` are data
+  (CI bounds them).
+* The fixed spin odds are the one thing to keep: rolling a paid spin with live luck again would need a live,
+  per-server odds list on every pack.
+* The hitbox and `Sim.clickable` must stay as long as creature models are non-queryable.
+
+### 56. Four more modifiers: Eclipse, Gadget Frenzy, Treasure Hunt, Bounty Hunt
 
 * **What:** modifiers 21-24, twenty-four in all. **Eclipse** is a weather: the sky's sun goes, the afternoon turns to
   a violet dusk with a rosy horizon, and where the sun was hangs a black disc with a white-hot rim, a corona from gold

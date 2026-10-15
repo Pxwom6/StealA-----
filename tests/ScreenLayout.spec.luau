@@ -44,9 +44,34 @@ T.describe("ScreenLayout", function()
 		T.expect(ScreenLayout.scaleFor(0 / 0, 0 / 0)).toBe(1)
 	end)
 
-	T.it("finds nothing wrong on any of the five screens in any of the busiest states", function()
-		T.expect(#ScreenLayout.DEVICES).toBe(5)
+	T.it("finds nothing wrong on any of the checked screens in any of the busiest states", function()
+		-- five screens, two 320 px tall phones and two wider top bars
+		T.expect(#ScreenLayout.DEVICES).toBe(9)
 		T.expect(table.concat(ScreenLayout.checkAll(), "\n")).toBe("")
+	end)
+
+	T.it("scales a phone shorter than 360 px to the smallest phone's room below the top bar", function()
+		local S640 = ScreenLayout.device(spec("640x360 phone"))
+		local roomFor = function(device: ScreenLayout.Device): number
+			return device.height - device.topBar
+		end
+		for _, name in { "568x320 phone", "693x320 phone" } do
+			local device = ScreenLayout.device(spec(name))
+			T.expect(device.scale).toBeLessThan(ScreenLayout.SCALE.min)
+			T.expect(device.scale).toBeAtLeast(ScreenLayout.SCALE.shortFloor)
+			T.expect(roomFor(device)).toBeNear(roomFor(S640), 0.5) -- the same room for dialogs and the HUD
+			-- its 52 UI buttons: smaller px, which Display Zoom makes physically as big (at least 35 px)
+			T.expect(ScreenLayout.minTouchPx(device)).toBeNear(ScreenLayout.MIN_TOUCH * device.scale / 0.85, 1e-9)
+			T.expect(52 * device.scale).toBeAtLeast(ScreenLayout.minTouchPx(device) - 1e-9)
+			T.expect(ScreenLayout.minTouchPx(device)).toBeAtLeast(35)
+		end
+		T.expect(ScreenLayout.scaleFor(568, 320)).toBeNear(0.85 * 262 / 302, 1e-9)
+		T.expect(ScreenLayout.scaleFor(693, 320, 18)).toBeNear(0.85 * 244 / 302, 1e-9) -- its home indicator
+		-- from 360 px tall nothing changes: 0.85 and 44 px, a bottom inset or not
+		T.expect(ScreenLayout.scaleFor(640, 360)).toBe(0.85)
+		T.expect(ScreenLayout.scaleFor(844, 390, 21)).toBe(0.85)
+		T.expect(ScreenLayout.minTouchPx(S640)).toBe(ScreenLayout.MIN_TOUCH)
+		T.expect(ScreenLayout.scaleFor(400, 200)).toBe(ScreenLayout.SCALE.shortFloor)
 	end)
 
 	T.it("keeps the lock, the modifier and the vote out of the play zone on the reference phone", function()
@@ -145,6 +170,41 @@ T.describe("ScreenLayout", function()
 		T.expect(#ScreenLayout.problems(wide, layout.elements)).toBe(0)
 	end)
 
+	T.it("narrows the cash pill between Roblox's wider top-bar buttons and the corner row, on every phone", function()
+		-- (the 568 px wide phone has room for the pill and the corner row up to 264 px)
+		for _, name in { "640x360 phone", "667x375 phone", "568x320 phone" } do
+			for left = 200, if name == "568x320 phone" then 264 else 280, 4 do
+				local s = table.clone(spec(name))
+				s.name ..= ` @{left}`
+				s.topBarLeftPx = left
+				local device = ScreenLayout.device(s)
+				local layout =
+					ScreenLayout.layout(device, { friends = true, event = true, modifier = true, luck = true })
+				local cash, lock = layout.byId.cash, layout.byId.lock
+				T.expect(layout.cornerMoved).toBe(false)
+				T.expect(cash.x).toBeAtLeast(device.topBarLeft + ScreenLayout.EDGE - 1e-9) -- never under Roblox's buttons
+				T.expect(cash.x + cash.w).toBeAtMost(lock.x - ScreenLayout.EDGE + 1e-9)
+				T.expect(cash.w).toBeAtLeast(S.cash.minW)
+				-- and nothing else goes wrong in the busiest states (but the tutorial on the short phone: its band
+				-- can't make room for the banner beside TAG there once Roblox's buttons pass 222 px)
+				for _, scenario in ScreenLayout.SCENARIOS do
+					if not (scenario.state.tutorial and name == "568x320 phone" and left > 222) then
+						local d = ScreenLayout.scenarioDevice(s, scenario)
+						local problems = ScreenLayout.problems(d, ScreenLayout.layout(d, scenario.state).elements)
+						T.expect(table.concat(problems, "; ")).toBe("")
+					end
+				end
+			end
+		end
+		-- the pill's text at its narrowest: the biggest amounts Format writes, at 12 UI or more
+		local textW = S.cash.minW - 16
+		for _, amount in { "$999Qa", "$99.9Sx", "$9.99Dc", "$999.9K" } do
+			T.expect(TextFit.fit(amount, textW, S.cash.amount, false)).toBeAtLeast(TEXT.minSize)
+			local income = Format.template(Theme.text.perSecond, { amount = amount })
+			T.expect(TextFit.fit(income, textW, S.cash.income, false)).toBeAtLeast(TEXT.minSize)
+		end
+	end)
+
 	T.it("puts the feature buttons below Roblox's top bar and above the thumbstick on phones", function()
 		for _, name in PHONES do
 			local device, layout = layoutOn(name, {})
@@ -175,15 +235,20 @@ T.describe("ScreenLayout", function()
 		T.expect(tag.y).toBeNear(136.18, 0.01)
 	end)
 
-	T.it("has a gadget button for every gadget on every screen, beside TAG", function()
+	T.it("has a gadget button for every gadget on every screen, beside TAG (three on the shortest)", function()
 		T.expect(S.gadget.slots).toBeAtLeast(#Gadgets.order)
 		for _, entry in ScreenLayout.DEVICES do
 			local device = ScreenLayout.device(entry)
 			local slots = ScreenLayout.gadgetSlots(device, #Gadgets.order)
-			T.expect(#slots).toBe(#Gadgets.order)
+			-- a 320 px tall phone has room for three beside TAG (GadgetController hides a button with no slot)
+			if entry.heightPx >= ScreenLayout.SCALE.shortBelow then
+				T.expect(#slots).toBe(#Gadgets.order)
+			else
+				T.expect(#slots).toBeAtLeast(3)
+			end
 			local tag = ScreenLayout.tagButton(device)
 			for _, r in slots do
-				T.expect(r.w * device.scale).toBeAtLeast(ScreenLayout.MIN_TOUCH)
+				T.expect(r.w * device.scale).toBeAtLeast(ScreenLayout.minTouchPx(device))
 				-- near TAG: within a button and a gap of its square on every side, or two on the side away from the jump
 				local reach = 2 * (S.gadget.size + S.gadget.gap) + 1e-6
 				T.expect(r.x + r.w).toBeAtLeast(tag.x - reach)
@@ -200,7 +265,7 @@ T.describe("ScreenLayout", function()
 			local all = ScreenLayout.gadgetSlots(device, S.gadget.slots)
 			for count = 1, S.gadget.slots do
 				local some = ScreenLayout.gadgetSlots(device, count)
-				T.expect(#some).toBe(count)
+				T.expect(#some).toBe(math.min(count, #all))
 				for index, r in some do
 					T.expect(r).toEqual(all[index]) -- buying another gadget never moves the others
 				end
@@ -216,6 +281,31 @@ T.describe("ScreenLayout", function()
 				end
 			end
 		end
+	end)
+
+	T.it("keeps the Friends button's +20% clear of the gadgets and the band, its text readable (review 2)", function()
+		-- on the 640 x 360 phone gadget 4 sat over TAG right where the tag hangs; it now goes past it
+		local slots = ScreenLayout.gadgetSlots(ScreenLayout.device(spec("640x360 phone")), #Gadgets.order)
+		T.expect(#slots).toBe(#Gadgets.order)
+		for _, entry in ScreenLayout.DEVICES do
+			local device = ScreenLayout.device(entry)
+			local layout = ScreenLayout.layout(device, { friends = true, event = true, modifier = true, tag = true })
+			local friends, badge = layout.byId.friends, layout.byId.friendsBadge
+			T.expect(badge).toEqual(ScreenLayout.friendsBadge(friends))
+			T.expect(badge.y + badge.h).toBeGreaterThan(friends.y + friends.h) -- it hangs under the button
+			for _, r in ScreenLayout.gadgetSlots(device, #Gadgets.order) do
+				T.expect(ScreenLayout.overlaps(r, badge)).toBe(false)
+			end
+			if not layout.cornerMoved then
+				T.expect(badge.y + badge.h).toBeAtMost(ScreenLayout.bandTop(device) + 1e-9)
+			end
+			T.expect(layout.byId.friendsBadge ~= nil).toBe(true)
+		end
+		T.expect(ScreenLayout.layout(ScreenLayout.device(spec("640x360 phone")), {}).byId.friendsBadge).toBeNil()
+		-- the biggest bonus (three friends and the group: +40%) at 12 UI or more, in the label SocialController draws
+		local B = S.corner.badge
+		local widest = Format.template(Theme.text.socialBadge, { percent = 40 })
+		T.expect(TextFit.fit(widest, B.w - 6, B.h - 2, false)).toBeAtLeast(TEXT.minSize)
 	end)
 
 	T.it("keeps the gadget buttons away from the jump button and its thumb", function()
@@ -248,7 +338,7 @@ T.describe("ScreenLayout", function()
 			state.titleCard = true
 			local layout = ScreenLayout.layout(device, state)
 			for _, id in { "announcement", "titleCard", "stealAlert" } do
-				for index = 1, S.gadget.slots do
+				for index = 1, #ScreenLayout.gadgetSlots(device, S.gadget.slots) do
 					T.expect(ScreenLayout.overlaps(layout.byId[id], layout.byId["gadget" .. index])).toBe(false)
 				end
 			end

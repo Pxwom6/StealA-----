@@ -618,9 +618,11 @@ the player's steady income:
   two an hour, and only the first player to reach each one gets it. It runs slower than players (9 studs/s wandering,
   14.5 while someone is within 40 studs; players walk at 16), so it is always catchable: in offline chases with these
   numbers one player catches it in about 15 s (mostly running to it), four in about 4 s, well inside its 45 seconds.
-* **A Snack Attack giant** (`Config/Boss.luau`) has 90 health per player in the server (at least 120) and the server
-  counts at most 5 taps a second from each player, so everyone tapping flat out takes about 18-24 seconds whatever
-  the server size; it flies off after 75 seconds. Everyone who landed 5 taps or more gets their own income x (20 s +
+* **A Snack Attack giant** (`Config/Boss.luau`) has 90 health per player playing when it appears (at least 120) and
+  the server counts at most 5 taps a second from each player, so everyone tapping flat out takes about 18-24 seconds
+  whatever the server size; it flies off after 75 seconds. A player counts who moved or landed a hit in the last
+  minute and has finished the first-time tutorial (`activeSeconds`): counting everyone, six idle or new players gave
+  the two playing 720 taps to land, 72 seconds flat out before walking to it. Everyone who landed 5 taps or more gets their own income x (20 s +
   120 s x their share of the taps): four even helpers get about 50 seconds of income each, a solo takedown 140
   seconds. The top hitter also wins a Snackling rolled like a crate's (3x luck, 2x mutation chance). A server sees
   about one giant an hour.
@@ -655,20 +657,25 @@ at 4x luck. An hour of play collects all six: 90 seconds of income, three spins 
 gifts that were unlocked are paid at midnight, so nobody loses one by logging off.
 
 **The Lucky Spin** (`Config/Spin.luau`): a free spin every 12 hours (a new player's first is ready at once) plus the
-banked ones from gifts (up to 20; more are paid as a minute of income each).
+banked ones from gifts and achievements (the bank holds 40, bought spins included; more are paid as a minute of
+income each).
 
 | Prize | Chance | What it pays |
 | --- | --- | --- |
 | Cash | 30% | 30 s of income (at least $200) |
 | Big Cash | 25% | 90 s (at least $600) |
-| Snackling | 18% | a Snackling at 2x luck |
+| Snackling | 18% | a plain Snackling at 2x luck |
 | Huge Cash | 14% | 5 min (at least $2,000) |
-| Golden! | 8% | a Golden Snackling at 2x luck |
-| Diamond! | 3.5% | a Diamond Snackling at 2x luck (announced) |
+| Golden! | 8% | a Snackling at 2x luck, always Golden |
+| Diamond! | 3.5% | a Snackling at 2x luck, always Diamond (announced) |
 | JACKPOT | 1.5% | 20 min of income (at least $10K; announced) |
 
-One spin is worth about 90 seconds of income in cash on average, plus a 30% chance of a Snackling. At 2x luck a
-Snackling is Common 48%, Uncommon 23%, Rare 20%, Epic 7.2%, Legendary 1.9%, Mythic 0.31%, Secret 0.03%; at 4x (the
+One spin is worth about 90 seconds of income in cash on average, plus a 30% chance of a Snackling. A spin's odds never
+change, because spin packs are paid random items: the 2x is the segment's own luck (never the server's, an event's
+or a boost's), the Snackling is from the permanent roster (no event, map or weather ones) and the plain one never
+rolls a mutation, so the Spin tab's 📋 Details lists exactly what the server rolls. At 2x luck a Snackling is Common
+48%, Uncommon 23%, Rare 20%, Epic 7.2%, Legendary 1.9%, Mythic 0.31%, Secret 0.03% (so any Secret is about 0.01%
+of spins, 1 in 10,000); at 4x (the
 last gift) Rare 30%, Epic 11%, Legendary 2.9%, Mythic 0.48%. A player who plays an hour a day and spins twice gets
 roughly 9 minutes of extra income a day from gifts and spins, about +15% for that hour: a reason to come back and stay,
 not a new economy. Every prize scales with steady income like a cash pack, and the server decides every spin.
@@ -820,9 +827,13 @@ spams locks, whatever the lock length.
 player N minutes of their own steady income, by the cash-pack rule (at least $150 a minute), N from 1 to 30. So the
 biggest gift is a little under a Snack Basket (35 minutes, 49 R$) for every player, and it means the same to a newcomer
 and to a big base. It happens only when Leo runs one, so the simulation leaves it out. A 30 s cooldown keeps a double
-tap from paying twice. A private server's owner can only start Sugar Rush, Quick Hands, Fortress or Snack Patrol,
-none of which changes income, prices, luck, mutations or the belt's pace, so a private server earns exactly what a
-public one does (CI checks the hostable set).
+tap from paying twice. A private server's owner can only start Sugar Rush, Quick Hands, Fortress, Snack Patrol or
+Gadget Frenzy, none of which changes income, prices, luck, mutations or the belt's pace (nor pays a bounty), so a
+private server earns exactly what a public one does (CI checks the hostable set). They go through the maps at the rotation's pace too (DECISIONS.md #55):
+a map switch every 20 minutes, a map counted for the map achievements after 3 minutes on it, its own mutation for its
+first 20 minutes up, and the random schedule's modifiers run to their end. Switching every minute used to give a
+server every map (Tourist, Explorer, Globetrotter and their titles) in under half an hour; at 3 minutes a map,
+hopping between public servers is the fastest way, and a private server is no faster than that.
 
 **First-time tutorial** (`Config/Tutorial`): finishing it pays a one-time **$500** (the price of the cheapest
 Uncommon), usually within the first one to two minutes. Skipping it pays nothing, and players who already had progress
@@ -895,7 +906,8 @@ are about 5 minutes for 25 R$ (a third of the Snack Pack) and 10 spins about 15 
 the time (Epic 7.2%, Legendary 1.9%), a big step early on and pocket change at high income. To move them closer to
 the cash ladder, give more spins per pack (`Monetization.products`, the `spins` field) or lower the price; don't change
 the prize table, which the free spin shares and whose odds the store publishes. Buying is refused from 40 banked spins
-on (`Spin.paidBankFull`), so nobody stockpiles packs they haven't spun.
+on (`Spin.maxBanked`), so nobody stockpiles packs they haven't spun; it is the bank's one size, so bought spins never
+push gifts' and achievements' spins into cash below it (they once stopped at 20 while packs went on to 40).
 
 **The Starter Pack** (49 R$, once) beats the same-price Snack Basket at every income: 40 minutes of income instead of
 35, a floor of $60K (the price of the cheapest Epic) instead of $6K, plus the Snackling and the gadgets. For a new

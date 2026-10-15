@@ -4,7 +4,8 @@
 	starts again), else a banked one; the server picks the prize by weight, pays it at once (PrizeService) and tells
 	the client which segment won (SpinResult { index, text }) so its reel can stop there and then show the toast. One
 	spin at a time per player (the reel takes a few seconds). A jackpot or a Diamond Snackling is announced to the
-	server.
+	server. Snackling prizes roll with fixed odds (PrizeService.rollFixed): banked spins may have been bought (Lucky
+	Spin packs, paid random items), and every outcome's chance is listed in the Spin tab (Logic/SpinOdds).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -49,7 +50,8 @@ local function onSpin(player: Player)
 	end)
 	local segment = Spin.segments[index]
 	busyUntil[player] = os.clock() + SpinService.REEL_SECONDS
-	local result = PrizeService.pay(session, segment.reward, "Spin")
+	-- fixed odds: exactly what the Odds view's Details list shows (Logic/SpinOdds), whatever luck or event is live
+	local result = PrizeService.pay(session, segment.reward, "Spin", true)
 	Remotes.fire(player, "SpinResult", { index = index, text = result.text })
 	Analytics.custom(session, "lucky_spin", nil, { segment.id, source })
 	if ANNOUNCED[segment.id] then

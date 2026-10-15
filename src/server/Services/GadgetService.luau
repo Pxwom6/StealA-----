@@ -227,8 +227,10 @@ local function buildPeel(spot: Vector3, color: Color3): Model
 	return model
 end
 
--- Takes `ownerUserId`'s peel away (gone, stepped on, replaced, or its owner left).
-local function removePeel(ownerUserId: number)
+-- Takes `ownerUserId`'s peel away (gone, stepped on, replaced, or its owner left), and its "running" ring off their
+-- button. `replacedBy`: the gadget whose new peel takes its place; when that is the same gadget, the ring
+-- GadgetRules.use just started is the new peel's and stays.
+local function removePeel(ownerUserId: number, replacedBy: string?)
 	local peel = peels[ownerUserId]
 	if peel == nil then
 		return
@@ -236,14 +238,14 @@ local function removePeel(ownerUserId: number)
 	peels[ownerUserId] = nil
 	peel.model:Destroy()
 	local owner = Sessions.getByUserId(ownerUserId)
-	if owner then
+	if owner and peel.gadgetId ~= replacedBy then
 		owner.gadgets.activeUntil[peel.gadgetId] = nil
 		Replication.markDirty(owner)
 	end
 end
 
 local function placePeel(session: Session, id: string, def: GadgetDef, at: Vector3, t: number)
-	removePeel(session.userId) -- one each: a new peel replaces the old one
+	removePeel(session.userId, id) -- one each: a new peel replaces the old one
 	local spot = Vector3.new(at.X, PlotService.refs(session.plot).floorY, at.Z)
 	local expiresAt = t + (def.durationSeconds or 0)
 	local model = buildPeel(spot, UiTheme.color(def.color))
