@@ -111,6 +111,8 @@ local Scenery: Types.SceneryConfig = {
 		},
 		treeRadius = 33,
 		treeAngles = { 0, 36, 72, 108, 144, -36, -72, -108, -144 },
+		-- What's New: in the tree ring's gap north-west of the fountain, facing the lobby spawn.
+		newsBoard = { angle = 126, radius = 33 },
 	},
 
 	-- Trees around the bases (behind the plots and at the map ends). Default kind "round", scale 1.

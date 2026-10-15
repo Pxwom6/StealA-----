@@ -5,16 +5,24 @@
 	states (ScreenLayout.SCENARIOS), and what is wrong with it. HudController places the real frames with the same
 	functions, so this is what players see. CI runs it; it exits with an error when anything overlaps, leaves the
 	screen, sits in the play zone or is too small to tap. The unit tests (tests/ScreenLayout.spec.luau) check the same.
-	Then the store additions' dialogs on the same screens (Logic/StoreLayout: the Spin tab with and without the Lucky
-	Spin pack buttons, a pack's Shop card; tests/StoreLayout.spec.luau proves their text sizes).
+	Then the dialogs laid out by pure modules (the Style dialog, the What's New card, the host panel): each must fit
+	every screen below Roblox's top bar. What is inside them (touch targets, text sizes) is checked by their unit tests
+	(tests/StyleLayout.spec.luau, tests/NewsLayout.spec.luau, tests/HostPanelLayout.spec.luau).
+
+	Then the store additions on the same screens (Logic/StoreLayout): the Rewards panel and the Shop fit below the top
+	bar, and the Spin tab (with and without the Lucky Spin pack buttons) and a pack's Shop card keep their boxes apart,
+	inside and tappable; tests/StoreLayout.spec.luau proves their text sizes.
 
 	Usage: lune run tools/layoutCheck.luau [--all]   (--all lists every element in every scenario, in screen pixels)
 ]]
 
 local process = require("@lune/process")
 
+local HostPanelLayout = require("../src/shared/Logic/HostPanelLayout")
+local NewsLayout = require("../src/shared/Logic/NewsLayout")
 local ScreenLayout = require("../src/shared/Logic/ScreenLayout")
 local StoreLayout = require("../src/shared/Logic/StoreLayout")
+local StyleLayout = require("../src/shared/Logic/StyleLayout")
 
 local verbose = table.find(process.args, "--all") ~= nil
 
@@ -87,6 +95,23 @@ for _, spec in ScreenLayout.DEVICES do
 	end
 end
 
+type FitCheck = (width: number, height: number, topBar: number, margin: number) -> { string }
+local DIALOGS: { { name: string, fit: FitCheck } } = {
+	{ name = "Style dialog", fit = StyleLayout.fitProblems },
+	{ name = "What's New card", fit = NewsLayout.fitProblems },
+	{ name = "host panel", fit = HostPanelLayout.fitProblems },
+}
+print("Dialogs (below Roblox's top bar, 8 UI from the sides):")
+for _, spec in ScreenLayout.DEVICES do
+	local device = ScreenLayout.device(spec)
+	for _, dialog in DIALOGS do
+		local problems = dialog.fit(device.width, device.height, device.topBar, ScreenLayout.EDGE)
+		total += #problems
+		local verdict = if #problems == 0 then "ok" else table.concat(problems, "; ")
+		print(string.format("  %-16s %-16s %s", spec.name, dialog.name, verdict))
+	end
+end
+
 -- The store additions' dialogs (Logic/StoreLayout): the Rewards panel and the Shop fit below Roblox's top bar, and the
 -- Spin tab's buttons (SPIN!, Odds, the Lucky Spin pack buttons) land on screen as full touch targets, with and without
 -- the packs.
@@ -134,4 +159,4 @@ if total > 0 then
 	print(`\n{total} layout problems`)
 	process.exit(1)
 end
-print("\nHUD and store dialogs: no problems on any screen")
+print("\nHUD and dialog layout: no problems on any screen")

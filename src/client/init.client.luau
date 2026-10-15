@@ -43,6 +43,7 @@ local DropController = require(Controllers.DropController)
 local BossController = require(Controllers.BossController)
 local GadgetController = require(Controllers.GadgetController)
 local GadgetFxController = require(Controllers.GadgetFxController)
+local WhatsNewController = require(Controllers.WhatsNewController)
 
 StateStore.start()
 ClientSettings.start() -- saved settings (music, sound effects, reduce effects) arrive with the first state
@@ -74,5 +75,6 @@ DropController.start() -- supply crates (marker, hold prompt), spinning coins an
 BossController.start() -- Snack Attack: the giant's health bar, bob and hit reactions
 GadgetController.start() -- the gadget buttons beside TAG (keys 1-4); none until a gadget is bought
 GadgetFxController.start() -- soda fizz and dizzy stars on every player, gadget sounds and bursts
+WhatsNewController.start() -- the What's New card for returning players, when nothing is in the way
 
 Net.get("ClientReady"):FireServer()

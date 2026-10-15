@@ -362,7 +362,8 @@ window.renderShots = function (data, shots, opts) {
 		mesh.receiveShadow = true;
 		scene.add(mesh);
 	}
-	const lights = (data.lights || []).slice().sort((a, b) => b.brightness * b.range - a.brightness * a.range);
+	// An empty Lua list arrives as {} (a lineup of Commons has no lights), so check for an array.
+	const lights = (Array.isArray(data.lights) ? data.lights : []).slice().sort((a, b) => b.brightness * b.range - a.brightness * a.range);
 	for (const l of lights.slice(0, opts.maxLights || 12)) {
 		const pl = new THREE.PointLight(col(l.color), l.brightness * 1.2, l.range * 1.4, 1.5);
 		pl.position.set(l.position[0], l.position[1], l.position[2]);

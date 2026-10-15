@@ -8,6 +8,7 @@ local Format = require("../src/shared/Logic/Format")
 local HostPanelLayout = require("../src/shared/Logic/HostPanelLayout")
 local MutationRules = require("../src/shared/Logic/MutationRules")
 local ScreenLayout = require("../src/shared/Logic/ScreenLayout")
+local StyleLayout = require("../src/shared/Logic/StyleLayout")
 local TextFit = require("../src/shared/Logic/TextFit")
 local Creatures = require("../src/shared/Config/Creatures")
 local Host = require("../src/shared/Config/Host")
@@ -299,10 +300,10 @@ T.describe("HostPanelLayout text", function()
 			{ count = Host.limits.broadcastLength, max = Host.limits.broadcastLength }
 		)
 		check("hostBroadcastCount", TextFit.fit(counted, count.w, count.h, false))
-		-- Settings (460 wide): half of its last row, less the label's 16 a side
-		local half = (460 - 32) / 2 - 4
-		check("settingsHost", TextFit.fit(Theme.text.settingsHost, half - 32, 40, false))
-		check("settingsCodes", TextFit.fit(Theme.text.settingsCodes, half - 32, 40, false))
+		-- Settings: a third of its last row for hosts (beside Style and Codes, Logic/StyleLayout), less the label's insets
+		local label = StyleLayout.settingsLabel(StyleLayout.settingsRow(true)[3])
+		check("settingsHost", TextFit.fit(Theme.text.settingsHost, label.w, label.h, false))
+		check("settingsCodes", TextFit.fit(Theme.text.settingsCodes, label.w, label.h, false))
 		T.expect(table.concat(small, ", ")).toBe("")
 	end)
 

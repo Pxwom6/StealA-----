@@ -40,6 +40,7 @@ export type Layout = {
 	lamps: { Spot },
 	flowerBeds: { Spot },
 	trees: { TreeSpot },
+	newsBoard: Spot, -- the What's New board (MapBuilder builds it, outside the Scenery folder)
 }
 
 -- The gameplay geometry the scenery stays clear of.
@@ -75,6 +76,7 @@ SceneryLayout.RADIUS = {
 	pineTree = 5,
 	board = 9.5, -- half a leaderboard's width
 	pillar = 2,
+	newsBoard = 7, -- half the What's New board's width (Logic/NewsLayout.BOARD)
 }
 
 -- Parts each kind of prop is built from (SceneryBuilder / MapBuilder build exactly these). Used for the part budget.
@@ -89,6 +91,7 @@ SceneryLayout.PARTS = {
 	fountain = 22, -- basin, water, pedestal, four spouts, the cupcake statue (15)
 	plazaGround = 6, -- paving, border, path, spawn ring and two path edges
 	board = 5, -- per leaderboard: frame, header, two legs, plinth
+	newsBoard = 4, -- the What's New board: panel, frame, two legs
 	boundary = 12, -- four walls, four caps, four invisible barriers
 	beltRails = 2,
 	plotFixed = 20, -- per plot: floor tiles (9), posts (6), post caps (4), sign border (1)
@@ -299,7 +302,12 @@ function SceneryLayout.layout(config: SceneryConfig): Layout
 		table.insert(trees, tree)
 	end
 
-	return { benches = benches, lamps = lamps, flowerBeds = beds, trees = trees }
+	-- The What's New board faces the fountain, like the benches.
+	local news = plaza.newsBoard
+	local newsX, newsZ = polar(plaza.x, plaza.z, news.radius, news.angle)
+	local newsBoard = { x = newsX, z = newsZ, yaw = news.angle + 180 }
+
+	return { benches = benches, lamps = lamps, flowerBeds = beds, trees = trees, newsBoard = newsBoard }
 end
 
 -- How many parts the scenery adds on top of the gameplay geometry (the layout's props plus fixed structures and the
@@ -318,6 +326,7 @@ function SceneryLayout.partEstimate(config: SceneryConfig, layout: Layout, map: 
 		+ P.fountain
 		+ P.plazaGround
 		+ 2 * P.board
+		+ P.newsBoard
 		+ P.boundary
 		+ P.beltRails
 		+ chevrons
@@ -408,6 +417,8 @@ function SceneryLayout.validate(config: SceneryConfig, map: MapConfig, belt: Bel
 			table.insert(items, { what = `tree {i}`, x = tree.x, z = tree.z, radius = canopy })
 		end
 	end
+	local news = layout.newsBoard
+	table.insert(items, { what = "the What's New board", x = news.x, z = news.z, radius = R.newsBoard })
 	-- Fixed pieces other items must not overlap (not checked against each other).
 	local fixed: { Item } = {
 		{ what = "the fountain", x = plaza.x, z = plaza.z, radius = plaza.fountainRadius },
