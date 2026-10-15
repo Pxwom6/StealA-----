@@ -110,7 +110,9 @@ local function lastBeltItem(creatureId: string): any
 	return found
 end
 
--- Spawns `creatureId` on the belt (dev command), walks `player` to it and buys it. Returns the cash it cost.
+-- Spawns `creatureId` on the belt (dev command), walks `player` to it and buys it. Returns the cash it cost: cash paid
+-- in meanwhile doesn't count (an achievement the buy earns pays on AchievementService's one-second loop, which can
+-- land inside the wait; everything paid goes through EconomyService.addCash, which counts it in totalEarned).
 local function buy(player: any, creatureId: string): number
 	Sim.chat(player, `/spawn {creatureId}`)
 	task.wait(0.1)
@@ -120,10 +122,29 @@ local function buy(player: any, creatureId: string): number
 	local belt = Sim.server("Services/BeltService").belt()
 	Sim.moveCharacter(player, roblox.Vector3.new(belt.startX + 2, 3, Gameplay.belt.width / 2 + 3))
 	local session = sessionOf(player)
-	local before = session.data.cash
+	local before, earned = session.data.cash, session.data.stats.totalEarned
 	Sim.fireServer(player, "BuyBeltItem", item.id)
 	task.wait(0.1)
-	return before - session.data.cash
+	return before - session.data.cash + (session.data.stats.totalEarned - earned)
+end
+
+-- How many toasts `userId` has been sent so far.
+local function toastCount(userId: number): number
+	return #Sim.received(userId, "Notify")
+end
+
+-- Whether a toast sent to `userId` after the first `from` is `text` (or contains it, with `partial`). Checks look at
+-- every toast since their action, not only the last one: an achievement's toast (paid on its own one-second loop) or
+-- one held back during the tutorial can land after the toast a check waits for.
+local function toldSince(userId: number, from: number, text: string, partial: boolean?): boolean
+	local list = Sim.received(userId, "Notify")
+	for index = from + 1, #list do
+		local said: string = list[index][1].text
+		if said == text or (partial == true and string.find(said, text, 1, true) ~= nil) then
+			return true
+		end
+	end
+	return false
 end
 
 local function scenario()
@@ -597,14 +618,19 @@ local function scenario()
 	Sim.fireServer(bob, "RedeemCode", " welcome ")
 	task.wait(0.1)
 	check(bobSession.data.cash > cash, "a code pays (typed in lower case, with spaces)")
+	-- His first code earns Bob the Insider achievement, which its one-second loop would pay at any moment: paid now, so
+	-- it can't land inside the check below.
+	Sim.server("Services/AchievementService").check(bobSession)
 	cash = bobSession.data.cash
+	local told = toastCount(1002)
 	Sim.fireServer(bob, "RedeemCode", "WELCOME")
 	task.wait(0.1)
 	check(bobSession.data.cash == cash, "but only once per account")
-	check(string.find(lastToast(1002), "already", 1, true) ~= nil, `and says so ({lastToast(1002)})`)
+	check(toldSince(1002, told, "already", true), `and says so ({lastToast(1002)})`)
+	told = toastCount(1002)
 	Sim.fireServer(bob, "RedeemCode", "NOTACODE")
 	task.wait(0.1)
-	check(string.find(lastToast(1002), "exist", 1, true) ~= nil, "an unknown code is refused")
+	check(toldSince(1002, told, "exist", true), "an unknown code is refused")
 	-- (Alice: Bob has used up his burst of tries; the rate limit allows one more every 5 s.)
 	local aliceOwned = #aliceSession.data.creatures
 	Sim.fireServer(alice, "RedeemCode", "snacktime")
@@ -1048,18 +1074,12 @@ local function scenario()
 		"Alice earns the most, then Bob, then Dan"
 	)
 	-- a hunt nobody claims: the target got through it
+	local aliceTold = toastCount(1001)
 	Sim.chat(alice, "/mod bountyHunt")
 	task.wait(0.3)
 	check(alice:GetAttribute("Bounty") == "on", "Bounty Hunt: the top earner wears the bounty")
 	check(announced(Format.template(Theme.text.bountyOn, { player = "Alice" })), "and everyone hears who it is on")
-	local aliceToasts = Sim.received(1001, "Notify")
-	local toldToGuard = false
-	for index = math.max(1, #aliceToasts - 3), #aliceToasts do
-		if aliceToasts[index][1].text == Theme.text.bountyYou then
-			toldToGuard = true
-		end
-	end
-	check(toldToGuard, "Alice is told to guard her base")
+	check(toldSince(1001, aliceTold, Theme.text.bountyYou), "Alice is told to guard her base")
 	local aliceHead = (alice.Character :: any).Head
 	local marker = aliceHead:FindFirstChild("BountyTag")
 	check(
@@ -1098,12 +1118,13 @@ local function scenario()
 	check(saysBounty, "her THIEF! marker says BOUNTY too")
 	check(not aliceHead.BountyTag.Enabled, "and the marker over her head steps aside for it")
 	local bobBefore = bobSession.data.cash
+	local bobTold = toastCount(1002)
 	tag(bob, 1001)
 	check(aliceSession.carry == nil, "Bob tags her: the Snackling runs home")
 	local tagPay = BountyRules.payout(Bounty, "tag", bobSession.packIncome)
 	check(
 		bobSession.data.cash - bobBefore == tagPay
-			and lastToast(1002) == Format.template(Theme.text.bountyReward, { cash = UiTheme.cash(tagPay) }),
+			and toldSince(1002, bobTold, Format.template(Theme.text.bountyReward, { cash = UiTheme.cash(tagPay) })),
 		`and he claims the bounty, sized from his own income (+{tagPay})`
 	)
 	check(
@@ -1115,10 +1136,11 @@ local function scenario()
 	-- while it rests: a tag pays nothing
 	carry = grab(alice, dan, podiumIndex)
 	local danBefore = danSession.data.cash
+	local danTold = toastCount(1004)
 	tag(dan, 1001)
 	check(carry ~= nil and aliceSession.carry == nil, "Dan tags her too")
 	check(danSession.data.cash == danBefore, "but the bounty is resting: no payout")
-	check(string.find(lastToast(1004), "resting", 1, true) ~= nil, `and he is told ({lastToast(1004)})`)
+	check(toldSince(1004, danTold, "resting", true), `and he is told ({lastToast(1004)})`)
 	Sim.advance(Bounty.restSeconds)
 	task.wait(Bounty.checkSeconds + 0.3)
 	check(alice:GetAttribute("Bounty") == "on", "after its rest the bounty is back")
@@ -1126,16 +1148,18 @@ local function scenario()
 	-- a friend can't claim it, nor can a hunter twice
 	carry = grab(alice, dan, podiumIndex)
 	local caraBefore = caraSession.data.cash
+	local caraTold = toastCount(1003)
 	tag(cara, 1001)
 	check(carry ~= nil and aliceSession.carry == nil, "Cara tags her friend Alice")
 	check(caraSession.data.cash == caraBefore, "no bounty between friends (no trading tags for payouts)")
-	check(lastToast(1003) == Theme.text.bountyRefusedFriend, "and she is told why")
+	check(toldSince(1003, caraTold, Theme.text.bountyRefusedFriend), "and she is told why")
 	carry = grab(alice, dan, podiumIndex)
 	bobBefore = bobSession.data.cash
+	bobTold = toastCount(1002)
 	tag(bob, 1001)
 	check(carry ~= nil and aliceSession.carry == nil, "Bob tags her again")
 	check(bobSession.data.cash == bobBefore, "but he already claimed this bounty")
-	check(lastToast(1002) == Theme.text.bountyRefusedClaimed, "and is told so")
+	check(toldSince(1002, bobTold, Theme.text.bountyRefusedClaimed), "and is told so")
 
 	-- robbing her base claims it too
 	local aliceRecord = aliceSession.data.creatures[1]

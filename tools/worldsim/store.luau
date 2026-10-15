@@ -110,6 +110,10 @@ local EconomyService = Sim.server("Services/EconomyService")
 local Gadgets = Sim.shared("Config/Gadgets")
 local Theme = Sim.shared("Config/Theme")
 local Marketplace = Sim.service("MarketplaceService")
+-- Nothing here tests achievements, and AchievementService pays them on its own one-second real-time loop: a payout
+-- landing inside a check's window (Bob's cash around the magnet, the Starter Pack's cash, the spins' rolls) failed
+-- those checks at random under load. Achievements are off for this test.
+Sim.server("Services/AchievementService").check = function() end
 
 local function sessionOf(player: any): any
 	return Sessions.get(player)
@@ -471,9 +475,12 @@ local function spinOdds()
 		"6x luck, the Harvest Feast and Golden Hour are on"
 	)
 
-	-- (only the prizes' rolls: the belt keeps spawning meanwhile, at the live luck as it should)
+	-- (only the prizes' rolls: the belt keeps spawning meanwhile, at the live luck as it should. The gift below is paid
+	-- straight through PrizeService; the 250 spins count only rolls made for a Spin, so no other prize, an achievement
+	-- or a fork, can land among them)
+	local rollsFrom = "PrizeService"
 	local function fromPrizes(): boolean
-		return string.find(debug.traceback(), "PrizeService", 1, true) ~= nil
+		return string.find(debug.traceback(), rollsFrom, 1, true) ~= nil
 	end
 	local rolls: { { luck: number, events: { [string]: boolean } } } = {}
 	local mutationRolls = 0
@@ -506,6 +513,7 @@ local function spinOdds()
 		end
 	end)
 	rolls, mutationRolls = {}, 0
+	rollsFrom = "SpinService"
 	s.data.spin.spins = 300
 	local wins: { [string]: number } = {}
 	local wrongVariant, eventSnacklings, prizes = 0, 0, 0
