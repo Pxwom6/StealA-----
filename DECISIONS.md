@@ -1288,3 +1288,70 @@ tells them: a short card once per update, and a board everyone passes, do that w
 join) or turn `chatTag` off. What's New only ever shows the newest entry, once, so not adding one shows nothing more.
 Never rename a shipped title or skin id (saves hold `title_<id>` and `skin_<id>`; CI keeps released lists) and never
 reuse an update number.
+
+### 52. Store additions: Auto Collect, Lucky Spin packs and a Starter Pack, inside the fairness rules
+
+* **What:** a game pass and three developer products, all with id 0 until Leo creates them (README "Before
+  publishing"). **Auto Collect** (pass, suggested 149 R$): every 5 s the cash on all your active pads is collected,
+  wherever you are. **3 / 10 Lucky Spins** (25 / 69 R$): spins banked for the Rewards panel's reel. **Starter Pack**
+  (49 R$, once per account): 40 minutes of income in cash (at least $60K), a Golden Cupcake Cub and the Fizzy Soda and
+  Banana Peel. `Logic/StoreRules`, `Logic/AutoCollectRules`, `Logic/StarterPackRules`, `Logic/StoreLayout`;
+  `AutoCollectService`, `StoreService`; `PurchaseController`, `UI/OddsGrid`; the Spin tab, the Shop and the offer
+  strip.
+* **Unconfigured items are hidden:** outside Studio an item whose id is 0 is left out wherever it would be sold (Shop
+  cards and empty headers, the "Need $X more?" offer, the Spin tab's pack buttons), never shown as "Coming soon"; in
+  Studio it shows "(Studio) Grant", which runs the real receipt path (`StoreRules.visible`, for every store item).
+* **Checked before the prompt:** the spin packs and the Starter Pack can't always be bought, so their buttons ask the
+  server first (`RequestPurchase(key, surface)`): `StoreRules.purchaseRefusal` on the server's own state (the client
+  runs it too, to answer at once). Approved, the server answers `PurchaseApproved` and only then does the client open
+  Roblox's prompt (for a request it made in the last 15 s); in Studio a product with no id is granted on the spot.
+  Refused, the player is told why. The receipt path checks again, since any client can open a prompt itself.
+* **Auto Collect is the pad path:** `AutoCollectService` checks twice a second and collects a pass holder's pads every
+  `perks.autoCollectSeconds` (`AutoCollectRules.due`) through `EconomyService.collectPad`, the code the pad check and
+  the Snack Magnet use: the same "+$" over each pad, `collect` gameplay event (quests, the tutorial's step) and
+  analytics. Its Effects are `quiet`: no sound, and the "+$" only floats over pads within 70 studs of the camera; no
+  toast. **The Snack Magnet** is what the pass does, so for pass holders its button shows AUTO and a tap only says so;
+  the server never uses it (its cooldown never starts) and never sells it to them for $2.5M they'd waste
+  (`GadgetRules.coveredByAutoCollect`). Everything else stays as it was: stored cash was never stealable, so the pass
+  saves walking, not income.
+* **Spin packs are paid random items:** every prize's exact chance is on the pack's Shop card and in the Spin tab's
+  Odds view, which sits beside the pack buttons (`UI/OddsGrid`, from `SpinRules.chances`: the numbers the server rolls
+  with). They show only to players whose Roblox policy allows paid random items (the `PaidRandomItemsAllowed`
+  attribute, so not while it is looked up), the server refuses them before the prompt otherwise, and a receipt for
+  such a player is never granted, as for Server Luck (#46).
+* **A paid spin is never lost or clipped:** buying is refused while the bank holds `Spin.paidBankFull` (40) spins
+  ("Your spin bank is full (40 spins)! Spin some first."), but a receipt that lands anyway banks every spin it paid for,
+  past `maxBanked` and past 40 (`SpinRules.bankPaid`); CI keeps 50 such receipts on a full bank under the save's 1,000
+  (`SpinRules.validatePacks`). Gifts' spins still stop at `maxBanked` and pay the rest as cash.
+* **The Starter Pack is fixed:** nothing random, every line on its card before purchase. A gadget the buyer already owns
+  pays its cash price instead, and a base filled since the prompt gets the Snackling's belt price, so it is never
+  worth less. Once per account through the flag `starter_pack`, written in the same step as the grant. The server
+  refuses a second purchase (and a full base) before the prompt; a receipt that still arrives pays the whole pack's
+  worth in cash only (`StarterPackRules.cashValue`) and is logged (`starter_pack_duplicate` and a warning). Its cash is
+  quoted when the receipt is first seen, like a cash pack's. Gadgets are cash-buyable anyway, so it speeds a player up
+  and locks nobody out.
+* **Its offer, once per account:** after the first rebirth or 30 minutes of total play, whichever comes first
+  (`StarterPackRules.offerDue`, StateUpdate `store`; `StoreService` re-marks the state every 5 s because play time
+  grows without one), a gentle card in the cash offer's strip: "🎁 Starter Pack! Golden Cupcake Cub, 2 gadgets, cash"
+  and "See it", which opens the Shop at its card (no purchase from the strip). Never during the tutorial, over a dialog,
+  while carrying or over a cash offer (`StarterPackRules.canShowOffer`); once shown the flag `starter_offer` keeps it
+  away for good.
+* **Analytics, bounded:** `product_viewed` (01 key from `Monetization.viewTracked`, 02 surface: `store` | `spin` |
+  `offer`; once per item and surface a session), the store funnel's `ProductPrompted` (01 key, 02 surface) when a
+  checked purchase is approved, `product_refused` (01 key, 02 reason from `StoreRules.REASONS`), and the existing
+  `ProductPurchased` / `product_purchased`, which a retried receipt no longer logs twice. The store's `ClientEvent`
+  analytics moved from MonetizationService to StoreService.
+* **Layout:** the Spin tab and the new Shop cards are laid out by `Logic/StoreLayout` and held to the HUD's rules on
+  all five screens (`tests/StoreLayout.spec.luau`, `tools/layoutCheck.luau`): the reel narrows to make room for two
+  136×53 pack buttons at its right; every odds cell reads at 12 UI or more. The existing 340-tall dialogs fit below the
+  top bar with 7.6 UI to spare on the 640×360 phone, so this check uses a 4 UI margin instead of the HUD's 8.
+* **No save-format change:** `starter_pack`, `starter_offer` and the gadget flags are `flags`; spins are the v4 bank.
+
+**Why:** Leo wants the game to earn Robux, and these are the three earners of tycoon-style games: a convenience pass,
+a cheap repeatable product and a one-time starter offer. Each stays inside the young-audience rules (#9, #46): nothing
+paid makes a base un-stealable, paying only speeds things up, random items show exact odds and follow PolicyService,
+and nothing a player paid for can be lost to a cap, a retry or a full base. Asking the server before the prompt means a
+player is told "no" before Roblox asks for Robux, not after.
+**Reversal cost:** low. Leave an id at 0 and the item disappears from live servers; `perks.autoCollectSeconds`,
+`Spin.paidBankFull` and `starterPack` are data. Never rename the flags `starter_pack` and `starter_offer` (they are in
+saves), and keep the policy check while any paid random item is sold.
