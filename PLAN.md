@@ -53,7 +53,7 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | Base lock | `LockService` | lock pill + barrier | `LockRules` |
 | Rebirth | `RebirthService` | `RebirthController` (trade-off dialog) | `RebirthMath` |
 | Base lock UI | `LockService` | `LockController` (lock button prompt, HUD pill) | `LockRules` |
-| Monetisation | `MonetizationService` (ProcessReceipt, passes) | `StoreController` | `ReceiptLedger`, `EconomyMath.cashPackAmount` |
+| Monetisation | `MonetizationService` (ProcessReceipt, passes), `PlayerPolicy` (PolicyService: paid random items) | `StoreController` | `ReceiptLedger`, `EconomyMath.cashPackAmount`, `PaidRandomItems` |
 | Retention | `RetentionService` (daily streak, offline earnings), `LeaderboardService` | `RewardsController` (Rewards panel: Daily + Quests tabs) | `DailyStreak`, `OfflineEarnings` |
 | Snackdex | `SnackdexService` (discovery on every Snackling landing in a base, tier rewards claimed automatically, sync) | `SnackdexController` (rarity / Event tabs, 3D preview cards, silhouettes, NEW! toasts) | `SnackdexRules` |
 | Daily quests | `QuestService` (daily roll per UserId + UTC day, progress from gameplay events, ClaimQuest, day reset) | `RewardsController` (Quests tab) | `QuestRules` |
@@ -117,7 +117,8 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `DailyStreak` | UTC-day streak maths and reward lookup |
 | `DataSchema` | save template, `migrate` (versioned), `sanitise` (clamp garbage) |
 | `BeltMath` | belt item position & lifetime from spawn time |
-| `LiveOpsRules` | active events at time *t*, combined luck/cash multipliers, boost stacking, Server Luck preview, banner event, when the luck next changes, remote-config validation |
+| `LiveOpsRules` | active events at time *t*, combined luck/cash multipliers (optionally without one boost source: prize rolls leave out bought luck), boost stacking, Server Luck preview, banner event, when the luck next changes, remote-config validation |
+| `PaidRandomItems` | Roblox's Paid Random Items policy: what a PolicyService answer means (a failure counts as restricted) and the player attribute the store reads |
 | `SeasonRules` | active seasonal theme from the active event ids, decoration layout on the map (outside plots, off the belt), part count, `Config/Seasons` validation |
 | `Inventory` | podium slot operations on the save table (free slot, place, remove, find by uid) |
 | `PlotAssignment` | pick a free plot, release |
@@ -145,7 +146,7 @@ aura, then the mutation look, which skips the face; tags anchored models for the
 `Remotes → DataService → MapThemeService.firstMap → MapBuilder (+ SceneryBuilder, WorldLighting) → PlotService → Analytics →
 LiveOpsService → SeasonService → MapThemeService → ModifierService → Replication → PositionTracker → EconomyService →
 BeltService →
-LockService → StealService → RebirthService → MonetizationService → RetentionService → SocialService →
+LockService → StealService → RebirthService → PlayerPolicy → MonetizationService → RetentionService → SocialService →
 TutorialService → SnackdexService → QuestService → LeaderboardService → SettingsService → DevCommands →
 PlayerLifecycle`, and wires cross-service join/leave steps through `PlayerLifecycle.hooks()` (keeps services free of
 circular requires). `Sessions` holds per-player state.
@@ -179,7 +180,7 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `LockBase` | – | owner, near lock button, `LockRules` (cooldown, or a lock token) |
 | `Rebirth` | – | `RebirthMath.canRebirth` |
 | `ClaimDaily` | – | `DailyStreak.canClaim` |
-| `ClientEvent` | `name: string` | whitelist (`store_opened`, `store_product_clicked`) → analytics |
+| `ClientEvent` | `name: string, key: string?` | whitelist (`store_opened`, `store_product_clicked`, `cash_offer_clicked`); `key` only when it is a known product or pass key → analytics |
 | `CheckGroup` | – | group feature on, at most once per 10 s, not already checking → re-check membership (`IsInGroupAsync`, then `GetGroupsAsync`) |
 | `InvitePrompted` | – | analytics only (`invite_prompt_opened`); nothing is rewarded for inviting |
 | `SkipTutorial` | – | a tutorial is running → it ends with no reward (steps themselves only finish from gameplay the server saw) |
@@ -191,14 +192,14 @@ Client → server **intents** (each rate-limited and argument-guarded; limits li
 | `ClaimGift` | `index: int` | the gift exists, today's playtime unlocked it and it isn't claimed yet (`GiftRules.claim`) |
 | `Spin` | – | a free spin is ready or one is banked (`SpinRules.source`), and the last reel has finished |
 | `GetAchievements` | – | rate limit only → `AchievementSync` with the player's progress |
-| `RedeemCode` | `code: string` | letters and digits, at most 24 (`CodeRules.normalize`); the code exists, has not expired and its `code_<CODE>` flag is unset; a Snackling code needs a free podium; rate limit 3 then 1 per 5 s |
+| `RedeemCode` | `code: string` | at most 40 bytes before anything else, then letters and digits, at most 24 (`CodeRules.normalize`); the code exists, has started, has not expired and its `code_<CODE>` flag is unset; a Snackling code needs a free podium; rate limit 3 then 1 per 5 s |
 | `DevGrantProduct` | `key: string` | **Studio only** – runs the real receipt path with a fake receipt |
 
 Server → client:
 
 | Remote | Payload |
 | --- | --- |
-| `StateUpdate` | batched partial player state (cash, cash/sec, rebirths, multiplier, podium cap, lock, passes, carry, social bonus, tutorial step, settings, today's quests…) |
+| `StateUpdate` | batched partial player state (cash, cash/sec, rebirths, multiplier, podium cap, `baseFull`, lock, passes, carry, social bonus, tutorial step, settings, today's quests…) |
 | `BeltSnapshot` / `BeltSpawn` / `BeltRemove` | conveyor items `{id, creatureId, spawnAt, variant?}` (variant = mutation id) |
 | `Notify` | toast `{kind, text}` |
 | `Announce` | server-wide banner `{text, rarity, color?}` (color: a mutation's own banner) |
@@ -212,7 +213,7 @@ Server → client:
 
 World state the client reads from **attributes** (replicated automatically): plot `OwnerUserId`, `LockedUntil`,
 `GraceUntil`, `PodiumCount`; podium `CreatureId`, `Variant` (mutation id, "" for none), `Stored`, `Income`
-(mutation and multipliers included), `BeingStolen`; player `Carrying`, `VIP`. Rainbow parts carry the
+(mutation and multipliers included), `BeingStolen`; player `Carrying`, `VIP`, `PaidRandomItemsAllowed` (PlayerPolicy; the store offers Server Luck only when it is true). Rainbow parts carry the
 CollectionService tag `MutationRainbow`. LiveOps state is on `workspace`: `LuckMultiplier`, `LuckEndsAt` (when the
 luck next changes), `PurchasedLuckEndsAt`, `CashMultiplier`, `ActiveEventIds`, `EventBanner`, `EventBannerId`,
 `EventTitle`, `EventEndsAt`, and `SeasonTheme` (the seasonal theme on, "" for none). The map theme is there too:

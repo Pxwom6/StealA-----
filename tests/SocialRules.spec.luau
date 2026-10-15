@@ -196,8 +196,8 @@ T.describe("Social bonus in the economy", function()
 		T.expect(EconomyMath.permanentMultiplier(withFriends)).toBeNear(1.5 * 2 * 1.1) -- no event, no social
 		T.expect(EconomyMath.permanentMultiplier(withFriends)).toBe(EconomyMath.permanentMultiplier(alone))
 		local sources: { EconomyMath.PackSource } = {
-			{ baseIncome = 100, podium = 1, inTransit = false },
-			{ baseIncome = 50, podium = 2, inTransit = false },
+			{ baseIncome = 100, podium = 1 },
+			{ baseIncome = 50, podium = 2 },
 		}
 		local pack = { incomeSeconds = 3600, minimum = 15000 }
 		local packWithFriends = EconomyMath.cashPackAmount(
@@ -226,7 +226,7 @@ T.describe("Social bonus in the economy", function()
 			.toBe(OfflineEarnings.compute(1000, 5000, rewardIncomeAlone, offline).amount)
 	end)
 	T.it("sizes the group welcome reward from the steady income too", function()
-		local sources: { EconomyMath.PackSource } = { { baseIncome = 100, podium = 1, inTransit = false } }
+		local sources: { EconomyMath.PackSource } = { { baseIncome = 100, podium = 1 } }
 		local steady = EconomyMath.packIncome(sources, 8, EconomyMath.permanentMultiplier(withFriends))
 		T.expect(SocialRules.groupWelcomeAmount(steady, config(12345).group)).toBe(190000) -- 100 * 3.3 * 600
 	end)

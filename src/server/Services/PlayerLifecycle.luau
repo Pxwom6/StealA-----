@@ -41,6 +41,9 @@ local PlayerLifecycle = {}
 
 local hooks: Hooks = { onJoined = {}, onReady = {}, onLeaving = {}, checkPasses = nil }
 local pendingReady: { [Player]: boolean } = {}
+-- Each player's CharacterAdded connection, which holds their session: disconnected when they leave, so a Player that
+-- Roblox keeps around after leaving never keeps the session (and its save data) alive.
+local characterConnections: { [Player]: RBXScriptConnection } = {}
 
 function PlayerLifecycle.hooks(): Hooks
 	return hooks
@@ -181,7 +184,7 @@ local function onPlayerAdded(player: Player)
 	createLeaderstats(player)
 	Replication.flush(session)
 
-	player.CharacterAdded:Connect(function(character: Model)
+	characterConnections[player] = player.CharacterAdded:Connect(function(character: Model)
 		onCharacterAdded(session, character)
 	end)
 	if player.Character then
@@ -196,6 +199,11 @@ end
 
 local function onPlayerRemoving(player: Player)
 	pendingReady[player] = nil
+	local connection = characterConnections[player]
+	if connection then
+		characterConnections[player] = nil
+		connection:Disconnect()
+	end
 	Remotes.forget(player)
 	local session = Sessions.get(player)
 	if session == nil then

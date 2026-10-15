@@ -325,7 +325,8 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 		thiefTrusted = PositionTracker.isTrustedForSteal(thief, root.Position),
 		holdStartedAt = if sameHold then sameHold.startedAt else nil,
 		holdRefusal = if sameHold then sameHold.refusal else nil,
-		holdSeconds = CFG.holdSeconds * ModifierService.effects().stealHold, -- Quick Hands: shorter
+		-- Quick Hands: shorter (and just after it starts or ends, the shorter of the two: ModifierService.actionEffects)
+		holdSeconds = CFG.holdSeconds * ModifierService.actionEffects().stealHold,
 		holdTolerance = CFG.holdTolerance,
 	})
 	if not ok or record == nil then
@@ -411,7 +412,8 @@ local function onTag(player: Player, targetArg: unknown)
 			thiefRoot.Position.Z - taggerRoot.Position.Z
 		).Magnitude,
 		verticalDistance = thiefRoot.Position.Y - taggerRoot.Position.Y,
-		tagRange = CFG.tagRange * ModifierService.effects().tagRange, -- Snack Patrol: longer
+		-- Snack Patrol: longer (and just after it starts or ends, the longer of the two)
+		tagRange = CFG.tagRange * ModifierService.actionEffects().tagRange,
 		tagVerticalAllowance = CFG.tagVerticalAllowance,
 		taggerCooldownUntil = tagger.tagCooldownUntil,
 		taggerTrusted = PositionTracker.isTrusted(

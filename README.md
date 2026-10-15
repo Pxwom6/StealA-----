@@ -49,6 +49,11 @@ It only touches `ReplicatedStorage.Shared`, `ServerScriptService.Server` and `St
 same mapping as `default.project.json`); custom models, ProfileStore and the place's settings stay as they are. CI
 checks it against Rojo builds of every commit (`tools/syncTest.luau`).
 
+**A private repo:** GitHub only serves its files with a token. Make a fine-grained personal access token (GitHub →
+Settings → Developer settings → Personal access tokens → Fine-grained tokens) for this repository only, with
+read-only *Contents* access and a short expiry, and paste it between the quotes of `GITHUB_TOKEN` at the top of the
+copy you paste into the Command Bar. Never commit it or put it in a script in the place; it only goes to GitHub.
+
 The PR description for each round contains a step-by-step test script (2-player local server for stealing,
 Studio test purchases, etc.).
 
@@ -64,6 +69,7 @@ Studio test purchases, etc.).
 | `lune run tools/worldsim/exportCreatures.luau <out.json> <ids...>` | Dump Snacklings in a row (`pizza_pup:golden`, `rarity:Mythic`, `event:Winter2026`, `mutations:pizza_pup`) |
 | `node tools/preview/render.mjs <export.json> <outPrefix>` | Render an export to PNGs offline with three.js (see [`tools/preview`](tools/preview/README.md)) |
 | `lune run tools/worldsim/server.luau` | Boot the whole server offline and play a short two-player session (CI runs this too) |
+| `lune run tools/worldsim/prelaunch.luau` | The pre-launch server fixes on the offline server, with a virtual clock (CI runs this too) |
 | `rojo build -o build/sync.rbxl` then `lune run tools/syncTest.luau build/sync.rbxl` | Check the Studio sync script (`studio/SyncFromGitHub.luau`) offline |
 | `stylua src tests tools studio` | Format |
 | `selene src tests tools studio` | Lint |
@@ -88,16 +94,24 @@ tools               Lune scripts (balance simulation, model import, worldsim: th
 
 ### Before publishing
 
-1. **Game Settings → Places → Max Players = 8** (one base per player; see DECISIONS.md #14).
+1. **Game Settings → Places → Max Players = 8, exactly.** It is a Studio setting the code can't change: the map has
+   8 bases, one per player, and a 9th player would be kicked with "server full" (DECISIONS.md #14; the server warns in
+   the Output when it is higher).
 2. **Game Settings → Security → enable Studio Access to API Services** (to test saving/leaderboards in Studio).
 3. Game passes and developer products: done. The 4 passes and 5 products exist on the Creator Hub and their IDs
-   are in `src/shared/Config/Monetization.luau`. Change prices on the Creator Hub, not in code.
+   are in `src/shared/Config/Monetization.luau`. Change prices on the Creator Hub, not in code. Server Luck is a paid
+   random item (a boost to luck): players whose Roblox policy restricts those (PolicyService) see its card as "Not
+   available" and can't buy it, and nothing needs setting up for that (DECISIONS.md #46).
 4. Add your UserId to `adminUserIds` in `src/shared/Config/LiveOps.luau`.
 5. **Group rewards:** paste your Roblox group's ID into `groupId` in `src/shared/Config/Social.luau`
    (`TODO(owner)`; the number in the group's URL). While it is `0` the group bonus, welcome gift and Join group button
    are off and hidden; the friends bonus works either way.
 6. Optional: music and your own sounds in `src/shared/Config/Sounds.luau` (see "Sounds and music" below), models in
    `ReplicatedStorage/CreatureModels`.
+7. **Before the game goes public, make the GitHub repo private** (GitHub → the repo → Settings → General → Danger
+   Zone → Change visibility). While it is public anyone can read `src/server/Codes.luau`, so codes you haven't posted
+   yet are not secret. The Studio sync script then needs a token: see "Updating a place in Studio straight from
+   GitHub" above.
 
 **Changing the save format:** bump `DataSchema.VERSION` whenever a saved key is added, removed, renamed or changes
 meaning, and never publish a lower VERSION than before. A rollback keeps the current save code (`DataSchema`,
@@ -331,20 +345,23 @@ release that added them), so there is no save-format change.
 ### Redeem codes
 
 Players redeem codes from the Settings dialog (🎟️ Codes row). The codes live in `src/server/Codes.luau`, which never
-reaches a client, so nobody can read one you have not posted. Each works once per account (the save's `flags` map,
-`code_<CODE>`; no save-format change); typing is forgiving (any case, spaces around it), and guessing is slowed to one
-try every 5 seconds.
+reaches a game client. **They are not secret while the GitHub repo is public:** anyone can read that file there, so
+make the repo private before going public (see "Before publishing"). Each works once per account (the save's `flags`
+map, `code_<CODE>`; no save-format change); typing is forgiving (any case, spaces around it), and guessing is slowed
+to one try every 5 seconds.
 
 * **Add a code:** a new entry keyed by its text in UPPER CASE letters and digits, with a reward: cash sized from the
   player's income (`{ kind = "cash", incomeSeconds = 180, minimum = 1000 }` = 3 minutes of their income, at least
   $1,000) or a Snackling (`{ kind = "creature", creatureId = "pizza_pup", variant = "golden" }`). Optional
-  `expiresAt` (unix seconds, UTC). CI checks every code; changing them needs a publish.
+  `startsAt` and `expiresAt` (unix seconds, UTC): before `startsAt` a code answers like an unknown one. Give an event
+  code its event's start and end (`src/shared/Config/LiveOps.luau`): CI refuses a code that hands out an event
+  Snackling or mutation outside its event. CI checks every code; changing them needs a publish.
 * **Codes ready to post:** `WELCOME` (2 minutes of income), `SNACKTIME` (a Golden Pizza Pup), `FOURTEENMAPS` (3
-  minutes of income), `STORMCHASER` (an Electric Pretzel Pal), `TWENTYMAPS` (a Bubblegum Gummy Grub), `MOVIENIGHT` (a Buttered Popcorn
-  Penguin), `SPOOKY26` (a
-  Haunted Candy Corn Cat, until Halloween ends on 2 Nov), `JINGLE26` (a Festive Peppermint Puffin, until Winter ends on
-  4 Jan), `HAPPY2027` (5 minutes of income, until 8 Jan), `LOVE27` (a Sweetheart Candy Heart Hamster, until
-  Valentine's ends on 16 Feb) and `EGGHUNT27` (a Pastel Custard Chick, until Easter ends on 6 Apr).
+  minutes of income), `STORMCHASER` (an Electric Pretzel Pal), `TWENTYMAPS` (a Bubblegum Gummy Grub), `MOVIENIGHT`
+  (a Buttered Popcorn Penguin), and the event codes, which only work while their event runs: `SPOOKY26` (a Haunted
+  Candy Corn Cat, 23 Oct-2 Nov), `JINGLE26` (a Festive Peppermint Puffin, 18 Dec-4 Jan), `HAPPY2027` (5 minutes of
+  income, 31 Dec-8 Jan), `LOVE27` (a Sweetheart Candy Heart Hamster, 5-16 Feb) and `EGGHUNT27` (a Pastel Custard
+  Chick, 19 Mar-6 Apr).
 
 ### Studio test commands
 

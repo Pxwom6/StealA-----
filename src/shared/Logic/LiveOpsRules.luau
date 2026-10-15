@@ -66,14 +66,22 @@ function LiveOpsRules.distinctActiveEvents(events: { EventDef }, now: number): {
 	return distinct
 end
 
--- Product of every active event's luck (each event id once) and every unexpired boost, clamped to [1, max].
-function LiveOpsRules.luckMultiplier(events: { EventDef }, boosts: { Boost }, now: number, limits: Limits): number
+-- Product of every active event's luck (each event id once) and every unexpired boost, clamped to [1, max]. Boosts
+-- from `withoutSource` are left out (prize rolls leave out the bought Server Luck: its store card discloses belt odds
+-- only).
+function LiveOpsRules.luckMultiplier(
+	events: { EventDef },
+	boosts: { Boost },
+	now: number,
+	limits: Limits,
+	withoutSource: string?
+): number
 	local m = 1
 	for _, event in LiveOpsRules.distinctActiveEvents(events, now) do
 		m *= math.max(1, event.luckMultiplier or 1)
 	end
 	for _, boost in boosts do
-		if now < boost.endsAt then
+		if now < boost.endsAt and boost.source ~= withoutSource then
 			m *= math.max(1, boost.multiplier)
 		end
 	end

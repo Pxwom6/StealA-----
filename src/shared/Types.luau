@@ -644,6 +644,8 @@ export type ModifierSchedule = {
 	gapMinSeconds: number, -- a random break between two modifiers
 	gapMaxSeconds: number,
 	firstDelaySeconds: number, -- a new server waits this long before the first one
+	-- after a change, actions are checked against the kinder of the old and new effects for this long (ModifierRules.lenient)
+	changeGraceSeconds: number,
 }
 
 export type ModifiersConfig = {
@@ -755,6 +757,7 @@ export type CodeReward =
 
 export type CodeDef = {
 	reward: CodeReward,
+	startsAt: number?, -- unix seconds (UTC) it starts working; nil = now. Every event code has one (CI).
 	expiresAt: number?, -- unix seconds (UTC); nil = never
 }
 
@@ -1134,6 +1137,9 @@ export type ClientState = {
 	rebirthCost: number,
 	creatureCount: number,
 	capacity: number,
+	-- No free podium: a Snackling from a gift, the Lucky Spin, an achievement or a drop would be sold for its refund
+	-- (PrizeService), so the Spin and Gifts tabs can warn first.
+	baseFull: boolean,
 	packIncome: number, -- steady income cash packs are sized from (EconomyMath.packIncome)
 	podiumUpgrades: number,
 	nextPodiumCost: number,
