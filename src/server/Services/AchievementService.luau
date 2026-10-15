@@ -3,7 +3,8 @@
 	Achievements (Config/Achievements; rules: Logic/AchievementRules). Each player's counts are checked every few
 	seconds, and within a second of anything a goal counts (GameEvents: purchases, steals, new Snackdex entries...).
 	An achievement reached for the first time sets its flag ach_<id> before paying, so it pays once per account; its
-	prize goes through PrizeService, a toast says what it was, and its Roblox badge (if it has one) is awarded. A map
+	prize goes through PrizeService, a toast says what it was (held during the first-time tutorial and for a few
+	seconds after it: TutorialService.notifyWhenQuiet), and its Roblox badge (if it has one) is awarded. A map
 	a player has been on for Config/MapThemes.rotation.creditSeconds is recorded as the flag map_<id> for the map goals
 	(MapThemeRules.creditDue: a quick switch through the maps counts for none), and each GameEvents "milestone" as the
 	flag did_<milestone> for the milestone goals. The Trophies tab asks for the progress list (GetAchievements →
@@ -26,6 +27,7 @@ local MapThemeService = require(script.Parent.MapThemeService)
 local PrizeService = require(script.Parent.PrizeService)
 local Remotes = require(script.Parent.Remotes)
 local Sessions = require(script.Parent.Sessions)
+local TutorialService = require(script.Parent.TutorialService)
 
 type Session = Sessions.Session
 
@@ -74,8 +76,8 @@ function AchievementService.check(session: Session)
 	for _, def in AchievementRules.newlyDone(Achievements, ctx, data.flags, catalog.rarities) do
 		data.flags[AchievementRules.flagKey(def.id)] = true
 		local result = PrizeService.pay(session, def.reward, "Achievement")
-		Remotes.notify(
-			session.player,
+		TutorialService.notifyWhenQuiet(
+			session,
 			Format.template(Theme.text.achievementDone, { icon = def.icon, title = def.title, prize = result.text }),
 			"success"
 		)

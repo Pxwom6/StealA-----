@@ -17,6 +17,7 @@ local function config(): Types.TutorialConfig
 			{ id = "steal", timeoutSeconds = 90 },
 		},
 		belt = { minSecondsLeft = 4, switchMargin = 12 },
+		quietSeconds = 3,
 	}
 end
 
@@ -299,6 +300,23 @@ T.describe("TutorialRules banner fit", function()
 	end)
 end)
 
+T.describe("TutorialRules.quiet (toasts that can wait)", function()
+	T.it("holds them while the tutorial runs and for 3 s after it is completed", function()
+		T.expect(TutorialRules.quiet(true, -math.huge, 100, 3)).toBe(true)
+		T.expect(TutorialRules.quiet(false, 100, 100, 3)).toBe(true) -- "You're ready! +$500" reads alone
+		T.expect(TutorialRules.quiet(false, 100, 102.9, 3)).toBe(true)
+		T.expect(TutorialRules.quiet(false, 100, 103, 3)).toBe(false)
+	end)
+	T.it("holds nothing after a skip, for a returning player or with a clock that went back", function()
+		T.expect(TutorialRules.quiet(false, -math.huge, 100, 3)).toBe(false)
+		T.expect(TutorialRules.quiet(false, 105, 100, 3)).toBe(false)
+		T.expect(TutorialRules.quiet(false, 0 / 0, 100, 3)).toBe(false)
+	end)
+	T.it("the shipped wait is the reviewer's 3 s", function()
+		T.expect(Tutorial.quietSeconds).toBe(3)
+	end)
+end)
+
 T.describe("Config/Tutorial", function()
 	T.it("passes validation", function()
 		local problems = TutorialRules.validate(Tutorial)
@@ -314,8 +332,9 @@ T.describe("Config/Tutorial", function()
 			{ id = "buy", unavailableSeconds = 0 / 0 },
 			{ id = "dance" :: any },
 		}
-		-- reward, timeout, duplicate, unavailableSeconds, unknown id
-		T.expect(#TutorialRules.validate(bad)).toBe(5)
+		bad.quietSeconds = 0 / 0
+		-- reward, timeout, duplicate, unavailableSeconds, unknown id, quietSeconds
+		T.expect(#TutorialRules.validate(bad)).toBe(6)
 	end)
 	T.it("every step has a short banner line in Theme.text", function()
 		local text = (Theme.text :: any) :: { [string]: string }

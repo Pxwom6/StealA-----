@@ -35,6 +35,7 @@ local Nametags = require(script.Parent.Nametags)
 local PlotService = require(script.Parent.PlotService)
 local Remotes = require(script.Parent.Remotes)
 local Sessions = require(script.Parent.Sessions)
+local TutorialService = require(script.Parent.TutorialService)
 
 type Session = Sessions.Session
 
@@ -112,7 +113,8 @@ function StyleService.onCharacter(session: Session, character: Model)
 	end
 end
 
--- After an achievement check (AchievementService.onChecked): a toast for every title or skin unlocked since the last.
+-- After an achievement check (AchievementService.onChecked): a toast for every title or skin unlocked since the last
+-- (held during the first-time tutorial and a few seconds after it, like the achievements': TutorialService).
 function StyleService.check(session: Session)
 	local state = states[session]
 	if state == nil or not session.ready then
@@ -123,8 +125,8 @@ function StyleService.check(session: Session)
 		local key = "title:" .. def.id
 		if titles[def.id] and not state.known[key] then
 			state.known[key] = true
-			Remotes.notify(
-				session.player,
+			TutorialService.notifyWhenQuiet(
+				session,
 				Format.template(Theme.text.titleUnlocked, { icon = def.icon, title = def.text }),
 				"success"
 			)
@@ -134,8 +136,8 @@ function StyleService.check(session: Session)
 		local key = "skin:" .. def.id
 		if skins[def.id] and not state.known[key] then
 			state.known[key] = true
-			Remotes.notify(
-				session.player,
+			TutorialService.notifyWhenQuiet(
+				session,
 				Format.template(Theme.text.skinUnlocked, { icon = def.icon, skin = def.name }),
 				"success"
 			)

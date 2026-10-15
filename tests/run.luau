@@ -62,5 +62,6 @@ require("./StoreRules.spec")
 require("./AutoCollectRules.spec")
 require("./StoreLayout.spec")
 require("./StarterPackRules.spec")
+require("./ToastQueue.spec")
 
 T.finish()

@@ -97,6 +97,9 @@ export type Session = {
 	pendingWelcome: { amount: number, seconds: number }?,
 	social: Social, -- written by SocialService, read by EconomyService and Replication
 	tutorial: TutorialRun?, -- written by TutorialService, read by Replication
+	-- server time the first-time tutorial was completed this session (TutorialService; -inf: not): toasts that can wait
+	-- are held until a few seconds after it (TutorialService.notifyWhenQuiet)
+	tutorialCompletedAt: number,
 	cashOfferAt: number, -- os.clock() of the last "Need $X more?" offer (CashOfferService), -inf: never
 	-- Gadget cooldowns and effects (GadgetService; Logic/GadgetRules), read by Movement and StealService. Ownership
 	-- is saved in data.flags (`gadget_<id>`); this is runtime only.

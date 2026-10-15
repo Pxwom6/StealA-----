@@ -10,6 +10,8 @@
 	  * "Need $X more?" (CashOfferService): nothing in a player's first 10 minutes of play; then only a small pack, at
 	    most one offer per 3 minutes; a gap of 45 s of income or less is told in seconds; one no small pack covers
 	    gets the plain toast
+	  * toasts that can wait (TutorialService.notifyWhenQuiet): an achievement reached in the first-time tutorial is
+	    paid at once, but its toast comes 3 s after the tutorial's "You're ready!"; after a skip, at once
 
 	It fails on any error, any unexpected warning, or any check below.
 ]]
@@ -23,7 +25,7 @@ local MockProfileStore = require("./MockProfileStore")
 local Vector3 = roblox.Vector3
 local OCTOBER_15_2026 = 1792023721
 
-local KIM = 9301
+local KIM, NIA, PIA = 9301, 9302, 9303
 
 Sim.mock("ServerPackages/ProfileStore.lua", MockProfileStore)
 Sim.virtualClock = true
@@ -119,6 +121,30 @@ local function lastBeltItem(creatureId: string): any
 		end
 	end
 	return found
+end
+
+-- Spawns `creatureId` on the belt (dev command), puts `player` beside it and buys it (with cash for it).
+local function buyFromBelt(player: any, creatureId: string)
+	chat(player, `/spawn {creatureId}`)
+	local item = lastBeltItem(creatureId)
+	assert(item, `no {creatureId} on the belt`)
+	local belt = Sim.server("Services/BeltService").belt()
+	Sim.moveCharacter(player, Vector3.new(belt.startX + 2, 3, Gameplay.belt.width / 2 + 3))
+	local session = Sessions.get(player)
+	session.data.cash = math.max(session.data.cash, GameData.price(GameData.catalog.creatures[creatureId], nil))
+	Sim.fireServer(player, "BuyBeltItem", item.id)
+	task.wait(0.1)
+end
+
+-- Whether a toast sent to `userId` after the first `from` contains `text`; and at which index (0: none).
+local function toldAt(userId: number, from: number, text: string): number
+	local list = toasts(userId)
+	for index = from + 1, #list do
+		if string.find(list[index], text, 1, true) then
+			return index
+		end
+	end
+	return 0
 end
 
 -- "Need $X more?" -------------------------------------------------------------------------------------------------
@@ -231,9 +257,61 @@ local function cashOffer()
 	task.wait(0.3)
 end
 
+-- Toasts that can wait ------------------------------------------------------------------------------------------------
+
+local function toastsWait()
+	print("Toasts that can wait:")
+	local TutorialService = Sim.server("Services/TutorialService")
+	local AchievementService = Sim.server("Services/AchievementService")
+	local Tutorial = Sim.shared("Config/Tutorial")
+	local UiTheme = Sim.shared("UiTheme")
+	local firstBite = "Achievement: First Bite!"
+	local nia = join(NIA, "Nia") -- brand new: in the first-time tutorial
+	local n = Sessions.get(nia)
+	check(n.tutorial ~= nil and n.tutorial.stepId == "buy", "Nia starts the first-time tutorial")
+	buyFromBelt(nia, "pizza_pup")
+	AchievementService.check(n) -- (what its one-second loop does for her)
+	local cash = n.data.cash
+	check(n.data.flags.ach_firstBite == true, "her first Snackling earns First Bite, paid at once")
+	check(toldAt(NIA, 0, firstBite) == 0, "but its toast waits: the tutorial has the screen")
+	-- the rest of the tutorial, as the services report it
+	for _, step in { "collect", "lock", "steal" } do
+		TutorialService.record(n, step)
+	end
+	local ready = Format.template(Theme.text.tutorialComplete, { amount = UiTheme.cash(Tutorial.reward) })
+	local readyAt = toldAt(NIA, 0, ready)
+	check(n.tutorial == nil and readyAt > 0, `she completes it: "{ready}"`)
+	check(n.data.cash == cash + Tutorial.reward, "and its reward is paid")
+	Sim.advance(Tutorial.quietSeconds - 0.5)
+	task.wait(1.2) -- the tutorial's 1 Hz pass runs
+	check(toldAt(NIA, 0, firstBite) == 0, `{Tutorial.quietSeconds - 0.5} s later the achievement's toast still waits`)
+	Sim.advance(1)
+	task.wait(1.2)
+	local biteAt = toldAt(NIA, 0, firstBite)
+	check(biteAt > readyAt, `{Tutorial.quietSeconds} s after "You're ready!", the achievement's toast comes`)
+	check(toldAt(NIA, biteAt, firstBite) == 0, "once")
+
+	-- A skipped tutorial holds nothing back after the skip
+	local pia = join(PIA, "Pia")
+	local p = Sessions.get(pia)
+	buyFromBelt(pia, "pizza_pup")
+	AchievementService.check(p)
+	check(p.data.flags.ach_firstBite == true and toldAt(PIA, 0, firstBite) == 0, "Pia's First Bite waits too")
+	Sim.fireServer(pia, "SkipTutorial")
+	task.wait(1.2)
+	check(toldAt(PIA, 0, firstBite) > 0, "she skips the tutorial: it comes at the next pass")
+	AchievementService.check(p)
+	check(toldAt(PIA, toldAt(PIA, 0, firstBite), firstBite) == 0, "once")
+	for _, player in { nia, pia } do
+		Sim.removePlayer(player)
+	end
+	task.wait(0.3)
+end
+
 local function scenario()
 	print("review 3 test:")
 	cashOffer()
+	toastsWait()
 	print(`  ({math.floor(Sim.now - OCTOBER_15_2026)} s of server time)`)
 end
 

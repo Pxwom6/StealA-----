@@ -155,6 +155,7 @@ local function onPlayerAdded(player: Player)
 		pendingWelcome = nil,
 		social = { friends = 0, groupMember = false },
 		tutorial = nil,
+		tutorialCompletedAt = -math.huge,
 		cashOfferAt = -math.huge,
 		gadgets = GadgetRules.newState(),
 		host = nil,
