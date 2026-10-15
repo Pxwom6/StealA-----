@@ -161,8 +161,8 @@ end
 -- Problems with Config/Modifiers (an empty list means valid). `liveMutationChance(id)` is the most mutation chance per
 -- spawn that can be live at once while modifier `id` runs (MutationRules.worstCaseTotal(mutations, id)): multiplied by
 -- that modifier's own mutation multiplier it must stay well below 1. `unlocks`: the modifiers a mutation is gated on
--- (Config/Mutations modifierId); such a modifier may have no other effect. So may one that drops things or puts a bounty
--- on the top earner.
+-- (Config/Mutations modifierId); such a modifier may have no other effect. So may one that drops things or puts a
+-- bounty on the top earner.
 function ModifierRules.validate(
 	config: ModifiersConfig,
 	liveMutationChance: (modifierId: string) -> number,
