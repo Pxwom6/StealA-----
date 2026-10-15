@@ -727,9 +727,9 @@ local Mutations: { MutationDef } = {
 		announceOnSteal = false,
 		look = {
 			material = "SmoothPlastic",
-			tint = "#B8561A",
-			tintStrength = 0.55,
-			reflectance = 0.3,
+			tint = "#D9741C",
+			tintStrength = 0.76,
+			reflectance = 0.34,
 			glow = "#FFB347",
 			particles = "maple",
 		},
