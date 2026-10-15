@@ -2,9 +2,11 @@
 --[[
 	Tiny UI toolkit: declarative instance creation, the game's chunky visual style, and phone-first scaling.
 
-	Layouts are authored in offsets for a ~540px-tall reference screen. A UIScale on every ScreenGui scales
-	them to the device (clamped so touch targets never drop below ~48px on small phones), and ScreenInsets
-	keeps everything inside notches / home indicators.
+	Layouts are authored in offsets for a 540-tall, 900-wide reference screen (Logic/ScreenLayout.scaleFor). A UIScale
+	on every ScreenGui scales them to the device, never below 0.85, so a 52-unit button is a full 44 px touch target on
+	the smallest phones. Every screen says which safe-area insets it uses (UiKit.screen); the game's screens use
+	DeviceSafeInsets: inside notches and home indicators, from the top of the screen under Roblox's top bar, whose
+	buttons ScreenLayout keeps clear of.
 
 	One look everywhere: corners and strokes come from UiKit.RADIUS / UiKit.STROKE, every button shrinks a little
 	when pressed, springs back and clicks (Config/Sounds ui.click), and has a soft top-to-bottom shade; floating
@@ -12,11 +14,13 @@
 	fade (UiKit.popOut / UiKit.fadeOut) instead of vanishing.
 ]]
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
+local ScreenLayout = require(ReplicatedStorage.Shared.Logic.ScreenLayout)
 local SoundPlayer = require(script.Parent.Parent.Controllers.SoundPlayer)
 
 local UiKit = {}
@@ -24,10 +28,6 @@ local UiKit = {}
 -- Shared corner radii and stroke widths (reference px).
 UiKit.RADIUS = table.freeze({ small = 10, medium = 14, large = 18 })
 UiKit.STROKE = table.freeze({ thin = 2, normal = 3, thick = 4 })
-
-local REFERENCE_HEIGHT = 540
-local MIN_SCALE = 0.85
-local MAX_SCALE = 1.35
 
 export type Props = { [string]: any }
 
@@ -81,20 +81,28 @@ function UiKit.padding(pixels: number): UIPadding
 end
 
 function UiKit.scaleFor(viewport: Vector2): number
-	return math.clamp(viewport.Y / REFERENCE_HEIGHT, MIN_SCALE, MAX_SCALE)
+	return ScreenLayout.scaleFor(viewport.X, viewport.Y)
 end
 
--- A ScreenGui in PlayerGui with safe-area insets and automatic device scaling.
-function UiKit.screen(name: string, displayOrder: number?): ScreenGui
+-- Height of Roblox's top bar in pixels (58 with the current experience controls; 0 if a game hides it).
+function UiKit.topBarPixels(): number
+	local topLeft = GuiService:GetGuiInset()
+	return topLeft.Y
+end
+
+-- A ScreenGui in PlayerGui with automatic device scaling and the given safe-area insets. Set one at a time, insets
+-- last: IgnoreGuiInset and ScreenInsets are two views of the same setting and whichever is set last wins, so a
+-- table of props (no order) could leave a screen under Roblox's top bar when it was meant to be below it, or the
+-- other way round (DECISIONS.md #47).
+function UiKit.screen(name: string, displayOrder: number, insets: Enum.ScreenInsets): ScreenGui
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
-	local gui = UiKit.new("ScreenGui", {
-		Name = name,
-		ResetOnSpawn = false,
-		IgnoreGuiInset = false,
-		ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
-		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-		DisplayOrder = displayOrder or 0,
-	}) :: ScreenGui
+	local gui = Instance.new("ScreenGui")
+	gui.Name = name
+	gui.ResetOnSpawn = false
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	gui.DisplayOrder = displayOrder
+	gui.IgnoreGuiInset = insets ~= Enum.ScreenInsets.CoreUISafeInsets
+	gui.ScreenInsets = insets
 	local scale = UiKit.new("UIScale", { Parent = gui }) :: UIScale
 	local camera = workspace.CurrentCamera
 	local function update()

@@ -6,6 +6,10 @@
 	Opening fades the backdrop in and pops the panel (with its drop shadow) in with a page-turn sound; closing fades
 	the backdrop out and shrinks the panel away. A closing dialog stops taking input at once, so the next dialog (or
 	the game) gets every tap.
+
+	The backdrop covers the whole screen (the HUD included); the panel is centred in the part below Roblox's top bar,
+	so its title and corners are never under Roblox's buttons. Toasts draw above dialogs (NotificationController), so
+	a dialog's answers (a redeemed code, a spin's prize) are always seen.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -33,7 +37,7 @@ local current: ModalHandle? = nil
 
 local function getScreen(): ScreenGui
 	if screen == nil then
-		screen = UiKit.screen("Modals", 10)
+		screen = UiKit.screen("Modals", 10, Enum.ScreenInsets.DeviceSafeInsets)
 	end
 	return screen :: ScreenGui
 end
@@ -42,6 +46,12 @@ function Modal.closeCurrent()
 	if current then
 		current.close()
 	end
+end
+
+-- True while any dialog is open (things that would open one by themselves wait for it to close).
+function Modal.isAnyOpen(): boolean
+	local open = current
+	return open ~= nil and open.isOpen()
 end
 
 -- Opens a modal of `size` (reference pixels) with a title. `onClose` runs once when it closes.
@@ -67,11 +77,12 @@ function Modal.open(title: string, size: Vector2, onClose: (() -> ())?): ModalHa
 		Parent = root,
 	}) :: TextButton
 
-	-- Panel and shadow share a container, so they pop in and out together.
+	-- Panel and shadow share a container, so they pop in and out together. Centred below Roblox's top bar.
+	local topBar = UiKit.topBarPixels() / UiKit.scaleFor(workspace.CurrentCamera.ViewportSize)
 	local container = UiKit.new("Frame", {
 		Name = "PanelContainer",
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0.5, topBar / 2),
 		Size = UDim2.fromOffset(size.X, size.Y),
 		BackgroundTransparency = 1,
 		ZIndex = 2,

@@ -46,13 +46,13 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | Data / persistence | `DataService` (ProfileStore, session-locked, autosave, BindToClose) | – | `DataSchema` (template, migrate, sanitise) |
 | Plots | `PlotService` (assign / release / reset, podium attributes) | `PlotController` (billboards, owner barrier pass-through) | `PlotAssignment`, `Inventory` |
 | Map | `MapBuilder` | – | – |
-| Conveyor | `BeltService` (weighted spawns, mutation rolls, buy validation) | `BeltController` (models pooled per creature + mutation, local prompts) | `BeltMath`, `RarityRoll`, `MutationRules`, `Catalog` |
+| Conveyor | `BeltService` (weighted spawns, mutation rolls, buy validation) | `BeltController` (models reused per creature + mutation, at most 32 spares, local prompts) | `BeltMath`, `RarityRoll`, `MutationRules`, `Catalog` |
 | Mutations | `BeltService` rolls, `EconomyService` / `PlotService` / `StealService` price, pay and show them | `MutationFxController` (rainbow hue cycling), labels in the belt / plot / interaction controllers | `MutationRules` |
 | Economy | `EconomyService` (1 s income tick, collect pads checked server-side from the owner's position, podium upgrades, sell) | `HudController` | `EconomyMath` |
 | Stealing | `StealService` (grab, carry, deliver, tag, timeout, speed sanity) | `StealController` (TAG button, alerts) | `StealRules` |
-| Base lock | `LockService` | lock pill + barrier | `LockRules` |
+| Base lock | `LockService` | lock button + barrier | `LockRules` |
 | Rebirth | `RebirthService` | `RebirthController` (trade-off dialog) | `RebirthMath` |
-| Base lock UI | `LockService` | `LockController` (lock button prompt, HUD pill) | `LockRules` |
+| Base lock UI | `LockService` | `LockController` (lock button prompt, HUD button in the top-right row) | `LockRules` |
 | Monetisation | `MonetizationService` (ProcessReceipt, passes), `PlayerPolicy` (PolicyService: paid random items) | `StoreController` | `ReceiptLedger`, `EconomyMath.cashPackAmount`, `PaidRandomItems` |
 | Retention | `RetentionService` (daily streak, offline earnings), `LeaderboardService` | `RewardsController` (Rewards panel: Daily + Quests tabs) | `DailyStreak`, `OfflineEarnings` |
 | Snackdex | `SnackdexService` (discovery on every Snackling landing in a base, tier rewards claimed automatically, sync) | `SnackdexController` (rarity / Event tabs, 3D preview cards, silhouettes, NEW! toasts) | `SnackdexRules` |
@@ -66,10 +66,10 @@ separately in [`DECISIONS.md`](DECISIONS.md); the economy curve is explained in 
 | State sync | `Replication` (dirty-flag batching, 5 Hz) | `StateStore` | – |
 | Snackling models | podium models built by `PlotService` through `CreatureVisuals` | belt models (`BeltController`), idle bob / squash / sway (`IdleController`) | `CreatureRecipe` (recipe → parts), `IdleMotion` |
 | World & scenery | `MapBuilder` (plot decor, belt chevrons, boards, lobby spawn; `restyle` for a new map theme), `SceneryBuilder` (spawn plaza, Snack Factory, chute, flora, landmarks, boundary wall, terrain), `ThemeProps` (each theme's flora and landmarks), `WorldLighting` (map lighting + seasonal overlay) | `WorldFxController` (belt chevrons, factory cog, blinking lights; Reduce effects) | `SceneryLayout` |
-| Map themes | `MapThemeService` (first map, 20-minute rotation, the vote, `/map`) | `MapThemeController` (vote card in the top stack, new-map title card), `WeatherController` (snow / embers / leaves... around the camera) | `MapThemeRules` |
-| Server modifiers | `ModifierService` (schedule, `/mod`; belt, economy, lock, steal, movement read its effects) | `ModifierController` (HUD chip beside the luck chip; effects for belt prices, steal hold, tag reach) | `ModifierRules` |
+| Map themes | `MapThemeService` (first map, 20-minute rotation, the vote, `/map`) | `MapThemeController` (vote strip at the bottom of the screen, new-map title card), `WeatherController` (snow / embers / leaves... around the camera) | `MapThemeRules` |
+| Server modifiers | `ModifierService` (schedule, `/mod`; belt, economy, lock, steal, movement read its effects) | `ModifierController` (HUD button among the status pills; effects for belt prices, steal hold, tag reach) | `ModifierRules` |
 | Playtesting | `DevCommands` (Studio only: `/cash`, `/spawn <creatureId> [mutationId]`, `/noshield`, `/friends <n\|off>`, `/tutorial`, `/gallery [mutationId\|off]` via `DevGallery`, `/sky <clockTime>`, `/quests reset`, `/dex fill <rarity\|event>`); `/map <id\|vote\|list>` (MapThemeService); `/mod <id> [minutes]`, `/mod off`, `/mod list` (ModifierService); LiveOps `/event <id> [minutes]`, `/event off`, `/luck`, `/announce` (anyone in Studio, local only) | – | – |
-| Settings & audio | `SettingsService` (SetSetting → `settings_<key>` flags) | `ClientSettings`, `SettingsController` (top-right gear), `SoundPlayer`, `MusicController` (looping, crossfade) | `SettingsRules`, `ScreenLayout` |
+| Settings & audio | `SettingsService` (SetSetting → `settings_<key>` flags) | `ClientSettings`, `SettingsController` (the gear, top right), `SoundPlayer`, `MusicController` (looping, crossfade) | `SettingsRules`, `ScreenLayout` |
 
 ## 3. Module list
 
@@ -131,7 +131,10 @@ Shared types (config defs, save data) live in `src/shared/Types.luau`.
 | `MapThemeRules` | first map, vote candidates, vote counting and the winner, flora / landmark part counts and footprints, which colours maps may change, `Config/MapThemes` validation |
 | `ModifierRules` | a modifier's effects (all 1 when none), belt price and capacity under them, the next pick and gap, the fastest walking speed allowed, `Config/Modifiers` validation |
 | `SettingsRules` | player settings as `settings_<key>` flags: keys, read, apply |
-| `ScreenLayout` | HUD placement around Roblox's player list (top-right gear, tutorial banner limit) |
+| `ScreenLayout` | where every HUD element goes on any screen (around Roblox's top bar, player list and touch controls, out of the play zone) and the check of it at five screens in the busiest states (`tools/layoutCheck.luau`, DECISIONS.md #47) |
+| `TextFit` | TextScaled's text size from FredokaOne's real metrics: proves HUD text stays readable on phones |
+| `ModelPool` | bounded reuse pool keyed by look (belt Snackling models: one spare per kind, 32 in all, least recently used out first) |
+| `FxCulling` | lights and particles of far-away podium Snacklings off and back on, with a gap so they don't flicker |
 | `SnackdexRules` | discovery of Snacklings and (Snackling, mutation) pairs, tier progress over regular Snacklings (Event section apart), claim-once tier rewards, capped collection bonus, client view, config validation |
 | `QuestRules` | deterministic daily roll (UserId + UTC day hash), targets, day reset, progress from events, claim-once with the all-done bonus, rewards, client view, config validation |
 
@@ -348,7 +351,8 @@ Rock Candy Caverns, Lemonade Lagoon, Bubblegum Bayou, Popcorn Drive-In, Tea Part
 (`Config/MapThemes`). Each changes the scenery's colours,
 the ground / walkway / wall materials, the lighting, what grows on the tree spots, ten big landmarks outside the wall
 and the weather around each player; plots, the belt and every gameplay position never move. A server starts on a
-random map and changes it every 20 minutes after a 40-second vote between three others (HUD top stack, `VoteMap`).
+random map and changes it every 20 minutes after a 40-second vote between three others (a strip at the bottom of the
+HUD, `VoteMap`).
 `MapBuilder.restyle` swaps the scenery in about 30 ms; `WorldLighting` keeps a seasonal mood (Halloween) on top of
 whatever map is on. Studio: `/map <id>`, `/map vote`, `/map list`. Offline: `lune run tools/worldsim/smoke.luau`
 (CI) builds and restyles every map; `lune run tools/worldsim/export.luau <id>` writes one as JSON for a 3D preview.
@@ -360,7 +364,7 @@ Hour, Clearance Sale, Golden Hour, Lucky Breeze, Cash Splash, Sugar Rush, Quick 
 Snack Party and Jackpot, five weathers (Thunderstorm, Meteor Shower, Toxic Fog, Northern Lights, Heatwave) that change
 the sky and unlock a mutation (DECISIONS.md #31, #40), three drops (Supply Drop, Coin Rain, Great Escape;
 DropService, `Config/Drops`, DECISIONS.md #33, #40) and Snack Attack (giant Snacklings over the belt that everyone taps
-together; BossService, `Config/Boss`, DECISIONS.md #42). A banner announces it, a chip beside the luck chip counts it down (tap it for the description), and
+together; BossService, `Config/Boss`, DECISIONS.md #42). A banner announces it, a button among the HUD's status pills counts it down (tap it for the description), and
 each system applies the effect where it decides (belt, economy, locks, steals, movement), the client showing the same
 prices, hold time and tag reach. Studio: `/mod <id> [minutes]`, `/mod off`, `/mod list`. Offline:
 `lune run tools/worldsim/server.luau` (CI) boots the server and plays a session that checks them.

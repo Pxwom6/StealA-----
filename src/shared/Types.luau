@@ -638,6 +638,10 @@ export type ModifierDef = {
 	drops: ModifierDrops?, -- crates, coins or runaways on the walkways (Config/Drops)
 }
 
+-- Lights and particles on far-away Snacklings (Config/Gameplay.podiumFx, Logic/FxCulling): off beyond `offBeyond`
+-- studs from the camera, back on within `onWithin`, checked every `checkSeconds`.
+export type PodiumFxConfig = { onWithin: number, offBeyond: number, checkSeconds: number }
+
 export type ModifierSchedule = {
 	enabled: boolean,
 	durationSeconds: number, -- how long each modifier runs

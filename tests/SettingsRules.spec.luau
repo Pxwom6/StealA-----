@@ -1,7 +1,6 @@
 --!strict
 local T = require("./TestKit")
 local SettingsRules = require("../src/shared/Logic/SettingsRules")
-local ScreenLayout = require("../src/shared/Logic/ScreenLayout")
 local DataSchema = require("../src/shared/Logic/DataSchema")
 local Sounds = require("../src/shared/Config/Sounds")
 local Seasons = require("../src/shared/Config/Seasons")
@@ -63,62 +62,6 @@ T.describe("SettingsRules", function()
 		local text = (Theme.text :: any) :: { [string]: string }
 		T.expect(text.settingsMusic ~= nil and text.settingsSfx ~= nil and text.settingsReduceFx ~= nil).toBe(true)
 		T.expect(#SettingsRules.KEYS).toBe(3)
-	end)
-end)
-
-T.describe("ScreenLayout", function()
-	T.it("reserves no corner on phones or when the player list is off", function()
-		T.expect(ScreenLayout.playerListWidth(true, true, 667, 375, 2)).toBe(0) -- iPhone SE landscape
-		T.expect(ScreenLayout.playerListWidth(false, false, 1920, 1080, 2)).toBe(0)
-	end)
-	T.it("reserves the player list's width on computers, wider with more leaderstats", function()
-		local two = ScreenLayout.playerListWidth(true, false, 1920, 1080, 2)
-		local four = ScreenLayout.playerListWidth(true, false, 1920, 1080, 4)
-		T.expect(two).toBeGreaterThan(300)
-		T.expect(four).toBeGreaterThan(two)
-		T.expect(ScreenLayout.playerListWidth(true, false, 1920, 1080, 50)).toBeAtMost(500)
-		-- tablets keep the reserve (touch, but a big screen)
-		T.expect(ScreenLayout.playerListWidth(true, true, 1024, 768, 2)).toBe(two)
-	end)
-	T.it("puts the gear in the corner, or left of the player list when there is room", function()
-		T.expect(ScreenLayout.gearX(785, 0, 44, 8, 125)).toBe(733)
-		-- 1280 px wide at UI scale 1.33: 962 units, player list about 255 units
-		local x = ScreenLayout.gearX(962, 255, 44, 8, 125)
-		T.expect(x + 44).toBeAtMost(962 - 255)
-		T.expect(x).toBeGreaterThan(962 / 2 + 125)
-		-- too narrow to fit beside it without covering the cash: back in the corner
-		T.expect(ScreenLayout.gearX(593, 245, 44, 8, 125)).toBe(593 - 8 - 44)
-	end)
-	T.it("puts the Friends button just left of the gear, clear of the cash and the player list", function()
-		local c = ScreenLayout.CORNER
-		local function besideGear(width: number, list: number): number?
-			local gear = ScreenLayout.gearX(width, list, c.size, c.margin, c.stackHalfWidth)
-			return ScreenLayout.besideGearX(width, list, gear, c.size, c.margin, c.stackHalfWidth)
-		end
-		-- iPhone SE landscape (785 units): gear at 733, button at 681-725, top row only (the TAG area starts lower)
-		T.expect(besideGear(785, 0)).toBe(733 - 8 - 44)
-		-- a 640x360 phone (753 units) and a wider one (852 units): in the corner too
-		T.expect(besideGear(753, 0)).toBe(701 - 8 - 44)
-		T.expect(besideGear(852, 0)).toBe(852 - 8 - 44 - 8 - 44)
-		-- 1440x900 Mac at scale 1.35 (1067 units, player list about 290): left of the gear, left of the list
-		local mac = besideGear(1067, 290) :: number
-		T.expect(mac).toBeGreaterThan(1067 / 2 + 125)
-		T.expect(mac + 44).toBeAtMost(1067 - 290)
-		-- 1280x720 window (962 units, list 255): no room beside the gear, so it goes back to the top stack
-		T.expect(besideGear(962, 255)).toBeNil()
-		-- the gear back in the corner under the player list (narrow window): the button must not follow it there
-		T.expect(besideGear(593, 245)).toBeNil()
-		-- the player list switched off on that same window: room again
-		T.expect(besideGear(962, 0)).toBe(962 - 8 - 44 - 8 - 44)
-	end)
-	T.it("keeps the tutorial banner left of the player list and hides the list when even that cannot work", function()
-		-- 1100 px Studio window at scale 1.35: 815 units wide, player list 252 units
-		T.expect(ScreenLayout.bannerRightLimit(700, 815, 252)).toBe(563)
-		T.expect(ScreenLayout.bannerRightLimit(611, 785, 0)).toBe(611)
-		T.expect(ScreenLayout.bannerNeedsPlayerListHidden(400, 300, 815, 252, 6)).toBe(false)
-		T.expect(ScreenLayout.bannerNeedsPlayerListHidden(407.5, 300, 815, 252, 6)).toBe(true) -- 0.5 too far
-		T.expect(ScreenLayout.bannerNeedsPlayerListHidden(296, 300, 593, 245, 6)).toBe(true)
-		T.expect(ScreenLayout.bannerNeedsPlayerListHidden(296, 300, 593, 0, 6)).toBe(false)
 	end)
 end)
 

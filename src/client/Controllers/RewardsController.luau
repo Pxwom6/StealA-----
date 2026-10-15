@@ -4,7 +4,8 @@
 	  * "Welcome back — you earned X" popup after offline earnings
 	  * Rewards panel (side button with a badge) with five tabs:
 	      Daily   the login streak: a 7-day track and one-tap claim; the panel opens itself on this tab once per
-	              session when a reward is waiting (after the welcome popup, never during the first-time tutorial)
+	              session when a reward is waiting: after the welcome popup, never during the first-time tutorial,
+	              while carrying a Snackling or over another dialog (it waits for a later update)
 	      Quests  today's three quests (QuestService → StateUpdate `quests`): progress bars, rewards, Claim buttons, the
 	              all-done bonus and when new quests arrive
 	      Gifts   playtime gifts that unlock with time in game today (GiftsTab)
@@ -12,8 +13,9 @@
 	      Trophies  achievements and how far you are with each (AchievementsTab)
 	    Each tab has its own red dot when something is claimable (a gift unlocked, a spin ready...); the side button
 	    shows one when any does. The open panel updates live (progress, countdowns) without being rebuilt.
-	  * HUD pills for live events (banner + "Halloween ends in 3d 4h", in the event's theme colour) and server luck
-	    (multiplier + time until it next changes), from LiveOpsService's workspace attributes
+	  * HUD status pills for live events (the banner on two lines over "Halloween ends in 3d 4h", in the event's theme
+	    colour) and server luck (multiplier + time until it next changes), from LiveOpsService's workspace attributes;
+	    HudController places them (Logic/ScreenLayout)
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -28,6 +30,7 @@ local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local DailyStreak = require(ReplicatedStorage.Shared.Logic.DailyStreak)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local QuestRules = require(ReplicatedStorage.Shared.Logic.QuestRules)
+local ScreenLayout = require(ReplicatedStorage.Shared.Logic.ScreenLayout)
 local Modal = require(script.Parent.Parent.UI.Modal)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local AchievementsTab = require(script.Parent.AchievementsTab)
@@ -53,14 +56,16 @@ type Panel = {
 
 local RewardsController = {}
 
--- Reference px. Height stays within Modal's 340 so the panel fits a landscape phone.
-local PANEL_SIZE = Vector2.new(620, 336)
-local TAB_BAR_HEIGHT = 40
+-- Reference px. Height stays within Modal's 340 so the panel fits a landscape phone; the tabs and the Claim buttons
+-- are 52 tall (44 px on the smallest phones). Each tab gets a 588 x 210 content area.
+local PANEL_SIZE = Vector2.new(620, 340)
+local TAB_BAR_HEIGHT = 52
 local TAB_WIDTH = 110
-local CONTENT_TOP = 48
+local CONTENT_TOP = 58
 local QUEST_ROW_HEIGHT = 56
-local QUEST_ROW_GAP = 6
+local QUEST_ROW_GAP = 4
 local CLAIM_WIDTH = 140
+local CLAIM_HEIGHT = 52
 local SECONDS_PER_DAY = 86400
 
 local TABS: { TabDef } = {
@@ -75,13 +80,13 @@ local questDefs = QuestRules.index(Quests.pool)
 
 local rewardsButton: HudController.SideButton
 local panel: Panel? = nil
-local pillStack: Frame
 local luckPill: Frame
 local luckLabel: TextLabel
 local eventPill: Frame
 local eventLabel: TextLabel
 local eventCountdown: TextLabel
 local autoOpenedDaily = false
+local autoOpenScheduled = false
 local welcomeOpen = false
 
 -- Seconds until the next UTC midnight (a new daily reward, new quests), on the server's clock.
@@ -293,8 +298,8 @@ local function buildQuests(content: Frame): (state: Types.ClientState) -> ()
 		local claim = UiKit.button({
 			Name = "Claim",
 			AnchorPoint = Vector2.new(1, 0.5),
-			Position = UDim2.new(1, -6, 0.5, 0),
-			Size = UDim2.fromOffset(CLAIM_WIDTH, 44),
+			Position = UDim2.new(1, -2, 0.5, 0),
+			Size = UDim2.fromOffset(CLAIM_WIDTH, CLAIM_HEIGHT),
 			BackgroundColor3 = UiTheme.palette("panel"),
 			Text = "",
 			Parent = frame,
@@ -505,12 +510,26 @@ function RewardsController.open(tab: Tab?)
 	end)
 end
 
+-- The Daily tab opens by itself once per session, only when it can't get in the way: not during the first-time
+-- tutorial (a brand-new player's first minutes belong to the loop), not while carrying a Snackling home (the
+-- backdrop would cover the touch controls mid-steal), and never over another dialog (opening it would close that one:
+-- the Store, a code being typed). Otherwise it waits for a later state update.
+local function canAutoOpenDaily(state: Types.ClientState): boolean
+	return state.daily.canClaim
+		and not autoOpenedDaily
+		and not welcomeOpen
+		and state.tutorial.step == ""
+		and state.carrying == ""
+		and not Modal.isAnyOpen()
+end
+
 local function showWelcome(payload: { amount: number, seconds: number })
 	welcomeOpen = true
 	local modal = Modal.open(Theme.text.welcomeBackTitle, Vector2.new(480, 260), function()
 		welcomeOpen = false
 		local state = StateStore.get()
-		if state and state.daily.canClaim and not autoOpenedDaily and state.tutorial.step == "" then
+		-- Right after the popup closes (Modal.isAnyOpen is already false), when nothing else stands in the way.
+		if state and canAutoOpenDaily(state) then
 			autoOpenedDaily = true
 			RewardsController.open("daily")
 		end
@@ -578,7 +597,6 @@ local function updateLiveOpsPills()
 			time = Format.duration(remaining),
 		})
 	end
-	pillStack.Visible = hasBanner
 end
 
 function RewardsController.start()
@@ -587,55 +605,42 @@ function RewardsController.start()
 		RewardsController.open()
 	end)
 
-	-- The event banner with its countdown has its own slot in the HUD's top stack.
-	pillStack = UiKit.new("Frame", {
-		Name = "LiveOpsPills",
-		LayoutOrder = HudController.TOP_ORDER.liveOps,
-		Size = UDim2.fromOffset(300, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundTransparency = 1,
-		Visible = false,
-		Parent = HudController.topStack(),
-	}) :: Frame
-	UiKit.new("UIListLayout", {
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		HorizontalAlignment = Enum.HorizontalAlignment.Center,
-		Padding = UDim.new(0, 4),
-		Parent = pillStack,
-	})
+	-- The event pill and the luck chip are status pills: HudController places them beside the running modifier.
+	local size, text = ScreenLayout.SIZE, ScreenLayout.TEXT
 	eventPill = UiKit.panel({
 		Name = "EventPill",
-		LayoutOrder = 1,
-		Size = UDim2.fromOffset(290, 48),
+		Size = UDim2.fromOffset(size.event.w, size.event.h),
 		BackgroundColor3 = UiTheme.palette("event"),
 		Visible = false,
-		Parent = pillStack,
 	})
-	-- Same 48 px pill (the HUD's layout maths depend on it), but the countdown line is a readable 20 px (it was 17,
-	-- about 14 real pixels on a small phone).
+	-- The banner wraps onto two lines (one line made "Valentine's: sweet Snacklings & ..." 9 px on a phone).
 	eventLabel = UiKit.label({
 		Name = "Banner",
-		Size = UDim2.new(1, -16, 0, 22),
-		Position = UDim2.fromOffset(8, 3),
+		TextWrapped = true,
+		Size = UDim2.new(1, -2 * text.event.padX, 0, text.event.banner),
+		Position = UDim2.fromOffset(text.event.padX, text.event.top),
 		Parent = eventPill,
 	})
 	eventCountdown = UiKit.label({
 		Name = "Countdown",
 		FontFace = UiTheme.bodyFont,
-		Size = UDim2.new(1, -16, 0, 20),
-		Position = UDim2.fromOffset(8, 25),
+		Size = UDim2.new(1, -2 * text.event.padX, 0, text.event.countdown),
+		Position = UDim2.fromOffset(text.event.padX, text.event.top + text.event.banner + 2),
 		Parent = eventPill,
 	})
-	-- Server luck is a chip in the HUD's chip row, beside the running server modifier.
+	HudController.place("event", eventPill)
 	luckPill = UiKit.panel({
 		Name = "LuckPill",
-		LayoutOrder = 1,
-		Size = UDim2.fromOffset(142, 32),
+		Size = UDim2.fromOffset(size.luck.w, size.luck.h),
 		BackgroundColor3 = UiTheme.palette("luck"),
 		Visible = false,
-		Parent = HudController.chipRow(),
 	})
-	luckLabel = UiKit.label({ Size = UDim2.new(1, -12, 1, -6), Position = UDim2.fromOffset(6, 3), Parent = luckPill })
+	luckLabel = UiKit.label({
+		Size = UDim2.new(1, -2 * text.luck.padX, 1, -2 * text.luck.padY),
+		Position = UDim2.fromOffset(text.luck.padX, text.luck.padY),
+		Parent = luckPill,
+	})
+	HudController.place("luck", luckPill)
 
 	Net.get("WelcomeBack").OnClientEvent:Connect(showWelcome)
 	StateStore.onChange(function(state)
@@ -644,19 +649,14 @@ function RewardsController.start()
 		if current and current.refresh then
 			current.refresh(state)
 		end
-		-- Not during the first-time tutorial: a brand-new player's first seconds belong to the loop. The badge still
-		-- shows, and the panel opens on the first update after the tutorial ends.
-		if state.daily.canClaim and not autoOpenedDaily and not welcomeOpen and state.tutorial.step == "" then
-			-- Give the welcome popup a moment to arrive first.
+		-- The badge always shows; the panel opens by itself once, when nothing is in the way (canAutoOpenDaily), else
+		-- on a later update. Give the welcome popup a moment to arrive first.
+		if canAutoOpenDaily(state) and not autoOpenScheduled then
+			autoOpenScheduled = true
 			task.delay(2.5, function()
+				autoOpenScheduled = false
 				local latest = StateStore.get()
-				if
-					latest
-					and latest.daily.canClaim
-					and not autoOpenedDaily
-					and not welcomeOpen
-					and latest.tutorial.step == ""
-				then
+				if latest and canAutoOpenDaily(latest) then
 					autoOpenedDaily = true
 					RewardsController.open("daily")
 				end

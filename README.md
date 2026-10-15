@@ -62,6 +62,7 @@ Studio test purchases, etc.).
 | Command | What it does |
 | --- | --- |
 | `lune run tests/run.luau` | Unit tests for all pure game logic (no Studio needed) |
+| `lune run tools/layoutCheck.luau [--all]` | Where every HUD element lands on five phone, tablet and computer screens, and any overlap, play-zone button or small touch target (CI runs this too) |
 | `lune run tools/simulate.luau` | Economy simulation used to write `BALANCE.md` |
 | `lune run tools/importParts.luau` | Import the polished Snackling models from `art/snackling-parts/` |
 | `lune run tools/worldsim/smoke.luau` | Build the map offline in every map theme and check it (CI runs this too) |
@@ -313,11 +314,29 @@ Command Bar: `local s = Instance.new("Sound") s.SoundId = "rbxassetid://15675032
 
 ### Settings
 
-The gear button in the top-right corner (left of Roblox's player list on computers) opens Music, Sound effects and
-Reduce effects switches. They apply at once and are saved per player in the save's `flags` map
-(`settings_musicOff`, `settings_sfxOff`, `settings_reduceEffects`; no save-format change). Reduce effects switches off
-particles, the belt / factory animations, Bloom and SunRays on that device; client code can read it with
-`ClientSettings.reduceEffects()` (or the LocalPlayer attribute `ReduceEffects`).
+The gear button at the right end of the top-right row (lock, 👥 Friends, ⚙; under Roblox's own top-left buttons when
+its player list fills that corner on computers) opens Music, Sound effects and Reduce effects switches. They apply at
+once and are saved per player in the save's `flags` map (`settings_musicOff`, `settings_sfxOff`,
+`settings_reduceEffects`; no save-format change). Reduce effects switches off particles, the belt / factory
+animations, Bloom and SunRays on that device; client code can read it with `ClientSettings.reduceEffects()` (or the
+LocalPlayer attribute `ReduceEffects`). Whatever the setting, lights and particles on podium Snacklings far from the
+camera are switched off to save phones the work (`podiumFx` in `src/shared/Config/Gameplay.luau`).
+
+### HUD layout (phones first)
+
+The HUD is laid out for a landscape phone (667×375 is the reference) by `src/shared/Logic/ScreenLayout.luau`, and
+the game places every HUD element with it (DECISIONS.md #47): the cash pill in Roblox's top bar strip with one band
+under it (the tutorial banner, a "Need $X more?" offer, or the event / modifier / luck pills), the lock, Friends and
+gear buttons top right, the four feature buttons in a 2×2 grid top left, TAG on the right, the map vote at the
+bottom. Nothing tappable goes in the middle of the screen, where the character and the Buy / Steal prompts are.
+
+* **Moving or adding a HUD element:** give it a size in `ScreenLayout.SIZE` and a place in `ScreenLayout.layout`,
+  hand its frame to `HudController.place`, and keep `lune run tools/layoutCheck.luau` green: it checks 640×360,
+  667×375 and 844×390 phones, a tablet and a computer window in the busiest states (no overlaps, nothing off screen,
+  no button in the play zone or under Roblox's buttons, 44 px touch targets).
+* **Text:** HUD text is measured with the game font's real metrics (`src/shared/Logic/TextFit.luau`); the tests keep
+  every map name, banner, chip, toast and offer at 12 UI (10 px) or more, so a longer name or banner that would be
+  too small fails CI.
 
 ### Playtime gifts and the Lucky Spin
 

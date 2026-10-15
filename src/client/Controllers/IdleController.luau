@@ -11,14 +11,21 @@
 	  * a model that leaves the range goes back exactly where the server put it
 	Belt models aren't tagged: BeltController moves them every frame and folds the hop into that.
 	Rainbow mutations keep working (MutationFxController only changes colours).
+
+	It also switches off the lights and particles of tagged Snacklings far from the camera (Logic/FxCulling,
+	Config/Gameplay.podiumFx: off beyond 110 studs, back within 90), checked twice a second whatever Reduce effects
+	says (that setting only covers particles). It turns back on only what it switched off, and leaves particles off
+	while Reduce effects is on (WorldFxController owns those then).
 ]]
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
 local CreatureVisuals = require(ReplicatedStorage.Shared.CreatureVisuals)
 local ClientSettings = require(script.Parent.ClientSettings)
+local FxCulling = require(ReplicatedStorage.Shared.Logic.FxCulling)
 local IdleMotion = require(ReplicatedStorage.Shared.Logic.IdleMotion)
 
 local IdleController = {}
@@ -37,6 +44,9 @@ type Entry = {
 	phase: number,
 	squash: { CreatureVisuals.SquashPart },
 	active: boolean,
+	fx: { Instance }, -- its PointLights and ParticleEmitters
+	fxShown: boolean, -- FxCulling's last decision
+	fxOff: { [Instance]: boolean }, -- what this controller switched off (and turns back on)
 }
 
 local entries: { [Model]: Entry } = {}
@@ -49,6 +59,55 @@ local function rest(entry: Entry)
 		entry.written = nil
 	end
 	CreatureVisuals.applySquash(entry.squash, 0)
+end
+
+local function effectsOf(model: Model): { Instance }
+	local list: { Instance } = {}
+	for _, descendant in model:GetDescendants() do
+		if descendant:IsA("PointLight") or descendant:IsA("ParticleEmitter") then
+			table.insert(list, descendant)
+		end
+	end
+	return list
+end
+
+-- Far from the camera: everything off (again, if something switched one back on). Near: back on what this switched
+-- off; particles wait while Reduce effects is on.
+local function applyFx(entry: Entry, shown: boolean, reduced: boolean)
+	if not shown then
+		for _, instance in entry.fx do
+			local effect = instance :: any
+			if effect.Enabled then
+				effect.Enabled = false
+				entry.fxOff[instance] = true
+			end
+		end
+		return
+	end
+	for instance in entry.fxOff do
+		if instance:IsA("ParticleEmitter") and reduced then
+			continue
+		end
+		(instance :: any).Enabled = true
+		entry.fxOff[instance] = nil
+	end
+end
+
+local function cullFx()
+	local camera = workspace.CurrentCamera
+	if camera == nil then
+		return
+	end
+	local eye = camera.CFrame.Position
+	local reduced = ClientSettings.reduceEffects()
+	for model, entry in entries do
+		if model.Parent == nil then
+			continue
+		end
+		local shown = FxCulling.shown(entry.fxShown, (entry.base.Position - eye).Magnitude, Gameplay.podiumFx)
+		entry.fxShown = shown
+		applyFx(entry, shown, reduced)
+	end
 end
 
 local function track(model: Model)
@@ -65,6 +124,9 @@ local function track(model: Model)
 		phase = random:NextNumber(),
 		squash = CreatureVisuals.squashParts(model),
 		active = false,
+		fx = effectsOf(model),
+		fxShown = true,
+		fxOff = {},
 	}
 end
 
@@ -169,8 +231,13 @@ function IdleController.start()
 	end)
 	CollectionService:GetInstanceRemovedSignal(CreatureVisuals.IDLE_TAG):Connect(forget)
 
-	local sinceStep, sincePick = 0, PICK_SECONDS
+	local sinceStep, sincePick, sinceCull = 0, PICK_SECONDS, 0
 	RunService.Heartbeat:Connect(function(dt: number)
+		sinceCull += dt
+		if sinceCull >= Gameplay.podiumFx.checkSeconds then
+			sinceCull = 0
+			cullFx()
+		end
 		-- Settings > Reduce effects: put every model back at rest and stop animating until it's switched off.
 		if ClientSettings.reduceEffects() then
 			if #activeList > 0 then
