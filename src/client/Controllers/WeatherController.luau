@@ -959,12 +959,12 @@ local function setSkyEffect(effect: Types.SkyEffect?, animate: boolean)
 	end)
 end
 
-local started = false -- the first refresh (this client joining) shows a running sky effect as it already is
+local refreshedOnce = false -- the first refresh (this client joining) shows a running sky effect as it already is
 
 local function refresh()
 	clear()
 	local modifier = runningModifier()
-	setSkyEffect(if modifier then modifier.skyEffect else nil, started)
+	setSkyEffect(if modifier then modifier.skyEffect else nil, refreshedOnce)
 	if ClientSettings.reduceEffects() then
 		return
 	end
@@ -1006,7 +1006,7 @@ function WeatherController.start()
 		end
 	end)
 	refresh()
-	started = true
+	refreshedOnce = true
 	RunService.RenderStepped:Connect(function()
 		local part, chosen = box, recipe
 		if part == nil or chosen == nil then
