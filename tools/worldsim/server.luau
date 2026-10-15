@@ -519,13 +519,15 @@ local function scenario()
 		DropService.treasureModel() == fork,
 		"nor standing there after (trusted for a steal again, but he teleported since it was hidden)"
 	)
-	-- the next fork, at the nearest other hiding place: Bob walks into it and finds it
+	-- the next fork, at the nearest other hiding place: Bob walks into it and finds it (not hiding place LATER_FORK,
+	-- where /fork puts one below: Bob would stand on it and find that one at once)
+	local LATER_FORK = 6
 	local bobRoot = (bob.Character :: any).HumanoidRootPart
 	local from = bobRoot.Position
 	local nextIndex, nextDistance = nil, math.huge
 	for index, spot in Drops.treasure.spots do
 		local distance = roblox.Vector3.new(spot.x - from.X, 0, spot.z - from.Z).Magnitude
-		if spot ~= hidingPlace and distance >= 10 and distance < nextDistance then
+		if index ~= LATER_FORK and spot ~= hidingPlace and distance >= 10 and distance < nextDistance then
 			nextIndex, nextDistance = index, distance
 		end
 	end
@@ -557,7 +559,7 @@ local function scenario()
 		announced(Sim.shared("Logic/Format").template(Theme.text.treasureFound, { player = "Bob" })),
 		"announced to everyone"
 	)
-	Sim.chat(alice, "/fork 6")
+	Sim.chat(alice, `/fork {LATER_FORK}`)
 	task.wait(0.2)
 	local second = DropService.treasureModel()
 	check(second ~= nil and second ~= fork, "/fork hides another one at a chosen hiding place")
