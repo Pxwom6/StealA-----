@@ -193,7 +193,9 @@ function QuestService.start()
 				if not ok then
 					warn(`[QuestService] day check failed for {session.player.Name}: {rolled}`)
 				elseif rolled and session.ready then
-					Remotes.notify(session.player, Theme.text.questsNew, "info")
+					pcall(function()
+						Remotes.notify(session.player, Theme.text.questsNew, "info")
+					end)
 				end
 			end
 		end

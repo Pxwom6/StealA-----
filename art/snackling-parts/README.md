@@ -8,6 +8,7 @@ The polished Snackling models, designed in Claude Design (DECISIONS.md #28).
 - `batch-4.json`: the four Winter 2026 Snacklings, built by hand in the same format (checked from every side in an
   offline 3D preview). `prompt-batch-4.md` asks Claude Design for its own take; a design's JSON replaces this file.
 - `batch-5.json`: the four Valentine's 2027 Snacklings, hand-built the same way; `prompt-batch-5.md` is its prompt.
+- `batch-6.json`: the four Easter 2027 Snacklings, hand-built the same way; `prompt-batch-6.md` is its prompt.
 
 After changing a batch file, run `lune run tools/importParts.luau` from the repo root. It checks every model and
 rewrites `src/shared/Config/CreatureParts.luau`, the generated file the game uses. Then run the tests.

@@ -780,6 +780,54 @@ local Creatures: { CreatureDef } = {
 		flavor = "Flies on rose petals. Lands in your heart.",
 		eventId = "Valentine2027",
 	},
+
+	-- Event: Easter 2027 -------------------------------------------------------------------------------------------
+	-- Only spawn while LiveOps event "Easter2027" runs, sharing their tier's odds like the other event ones
+	-- (BALANCE.md "Easter"). Appended after everything else, so no earlier roll changes.
+	{
+		id = "custard_chick",
+		displayName = "Custard Chick",
+		rarity = "Rare",
+		price = 11500,
+		income = 152,
+		beltWeight = 30,
+		modelName = "CustardChick",
+		flavor = "Fresh out of the egg. Still a little runny.",
+		eventId = "Easter2027",
+	},
+	{
+		id = "hot_cross_bunny",
+		displayName = "Hot Cross Bunny",
+		rarity = "Epic",
+		price = 135000,
+		income = 870,
+		beltWeight = 30,
+		modelName = "HotCrossBunny",
+		flavor = "Glazed, spiced and very hoppy about it.",
+		eventId = "Easter2027",
+	},
+	{
+		id = "lemon_meringue_lamb",
+		displayName = "Lemon Meringue Lamb",
+		rarity = "Legendary",
+		price = 3050000,
+		income = 5950,
+		beltWeight = 30,
+		modelName = "LemonMeringueLamb",
+		flavor = "Toasted on top, zesty underneath.",
+		eventId = "Easter2027",
+	},
+	{
+		id = "jelly_bean_jackalope",
+		displayName = "Jelly Bean Jackalope",
+		rarity = "Mythic",
+		price = 78000000,
+		income = 52500,
+		beltWeight = 40,
+		modelName = "JellyBeanJackalope",
+		flavor = "Hides the eggs. Keeps the jelly beans.",
+		eventId = "Easter2027",
+	},
 }
 
 return Creatures

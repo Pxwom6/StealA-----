@@ -24,6 +24,25 @@ function Inventory.findFreePodium(creatures: { CreatureRecord }, capacity: numbe
 	return nil
 end
 
+-- How many of podiums 1..capacity are empty.
+function Inventory.freePodiumCount(creatures: { CreatureRecord }, capacity: number): number
+	local used: { [number]: boolean } = {}
+	local count = 0
+	for _, record in creatures do
+		if record.podium >= 1 and record.podium <= capacity and not used[record.podium] then
+			used[record.podium] = true
+			count += 1
+		end
+	end
+	return math.max(0, capacity - count)
+end
+
+-- Whether an automatic prize (a gift, a spin, a crate, a runaway...) may take a free podium: not the last one while
+-- its owner is carrying a stolen Snackling home, which needs it on delivery (the prize is sold instead).
+function Inventory.prizeMayTakePodium(creatures: { CreatureRecord }, capacity: number, carrying: boolean): boolean
+	return Inventory.freePodiumCount(creatures, capacity) > (if carrying then 1 else 0)
+end
+
 function Inventory.findByPodium(creatures: { CreatureRecord }, podium: number): (CreatureRecord?, number?)
 	for index, record in creatures do
 		if record.podium == podium then

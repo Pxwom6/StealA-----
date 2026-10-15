@@ -6,8 +6,9 @@
 	    and wait there for lifetimeSeconds. The first player to hold one open gets a Snackling rolled with extra luck
 	    and mutation chance in their base (its sell value when the base is full) plus cash, and everyone hears what
 	    it was. Opening is two intents, like a steal: CrateBegin when the hold starts and CrateOpen when it completes.
-	    The server checks that the crate has landed and is still closed, that the player's trusted position is within
-	    reach both times, and that the hold lasted long enough (DropRules.holdLongEnough).
+	    The server checks that the crate has landed and is still closed, that the player is within reach both times at
+	    a position trusted as for a steal (no teleport in the last 10 s), and that the hold lasted long enough
+	    (DropRules.holdLongEnough).
 	  * Coins: a scatter over both walkways every so often. The server itself picks a coin up for whoever walks
 	    through it (a quick distance check against trusted positions, not client touch events), paying a few seconds
 	    of that player's income.
@@ -15,7 +16,7 @@
 	    can (announced, rarity and all), and runs along it in short legs, each planned away from the players near it
 	    (DropRules.runawayTarget). The leg is published as one attribute and the client draws the Snackling on it, so
 	    nothing is sent while it runs; the server checks catches against the same position (DropRules.legPosition) and
-	    trusted player positions, like coins. The first player to reach it gets it (its sell value with a full base);
+	    player positions trusted as for a steal, like crates. The first player to reach it gets it (its sell value with a full base);
 	    uncaught, it gets away after its lifetime.
 
 	The schedule follows server time from the moment the modifier starts (DropRules.times). Crates and coins live in
@@ -212,7 +213,9 @@ local function removeCrate(crate: Crate)
 	crate.model:Destroy()
 end
 
--- Whether `session` stands within reach of `crate`, at a position the server trusts.
+-- Whether `session` stands within reach of `crate`, at a position the server trusts as much as for a steal: a crate's
+-- landing spot is known for the seconds it falls, so the 2 s a teleport costs elsewhere would let a teleporter win
+-- it; a steal's 10 s does not (PositionTracker.isTrustedForSteal).
 local function inReach(session: Session, crate: Crate): boolean
 	local root = Sessions.rootPart(session)
 	if root == nil then
@@ -222,7 +225,7 @@ local function inReach(session: Session, crate: Crate): boolean
 	local horizontal = Vector3.new(offset.X, 0, offset.Z).Magnitude
 	return horizontal <= Drops.crate.openRange + REACH_SLACK
 		and math.abs(offset.Y) <= 10
-		and PositionTracker.isTrusted(session, root.Position)
+		and PositionTracker.isTrustedForSteal(session, root.Position)
 end
 
 local function crateFor(idArg: unknown): Crate?
@@ -472,7 +475,9 @@ local function runRunaways(t: number)
 	end
 end
 
--- Moves the runaways on, then whoever reaches one first catches it (trusted positions only, like coins).
+-- Moves the runaways on, then whoever reaches one first catches it (positions trusted as for a steal, like crates: a
+-- teleport next to one only pays off after the 10 s a steal would wait). Coins keep the lighter check: each is worth
+-- a few seconds of income, and a hop to one still costs its 2 s.
 local function stepRunaways()
 	if next(runaways) == nil then
 		return
@@ -491,7 +496,7 @@ local function stepRunaways()
 			local horizontal = Vector3.new(offset.X, 0, offset.Z).Magnitude
 			if
 				DropRules.catches(Drops, horizontal, offset.Y, REACH_SLACK)
-				and PositionTracker.isTrusted(session, root.Position)
+				and PositionTracker.isTrustedForSteal(session, root.Position)
 			then
 				catch(session, runaway, position)
 				break

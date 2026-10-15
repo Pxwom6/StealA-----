@@ -108,7 +108,7 @@ A carrying thief's movement is checked every tick against a distance budget (`St
 refills at 1.6× carry speed, holds at most 3 s of refill and pays for every stud moved horizontally and every stud
 of new height (jumping again to a height already paid for is free, falling is free), so a lag spike's catch-up jump
 is covered while a sustained speed hack runs it dry; the straight-line distance from the grab point is also capped
-at carry speed × elapsed + 12 studs, which stops a teleport home. Before a lock ejects a carrying visitor, their
+at the carry speed allowed at each moment, added up over the carry (#46), + 12 studs, which stops a teleport home. Before a lock ejects a carrying visitor, their
 move into that base is checked first, and they are put just outside its nearest side (not at its entrance, which
 could be a shortcut home). If they were inside when the lock started, that push is the server's, so it costs no
 budget and the grab point moves with them (`StealRules.shiftCarryTrack`); anyone found inside later got past the
@@ -132,10 +132,11 @@ inside when the owner locks drops the creature.
   `addBoost`, tested to give identical odds); while a bought boost is running another purchase only adds time, so the
   store says "+15 min (odds stay the same)" instead of showing a stronger boost. Its 60-minute stacking cap is soft: the store stops offering it once another purchase
   would pass the cap, but a receipt that still arrives (e.g. two players buying at once) always adds its full
-  15 minutes — a purchase never takes Robux without an effect.
+  15 minutes — a purchase never takes Robux without an effect. It is a paid random item, so only players whose
+  Roblox policy allows those can buy it, and prize Snacklings never roll at its luck (#46).
 * Cash packs scale with income (always "about N minutes of your income"), so they never trivialise the game. The
-  basis is the steady income (`EconomyMath.packIncome`: active podiums only, nothing mid-steal, no LiveOps cash
-  event, no friend & group bonus). A pack's amount is fixed the first time its receipt reaches the player's session (`data.cashPackQuotes`),
+  basis is the steady income (`EconomyMath.packIncome`: active podiums only (a Snackling being carried off
+  still counts, #46), no LiveOps cash event or server modifier, no friend & group bonus). A pack's amount is fixed the first time its receipt reaches the player's session (`data.cashPackQuotes`),
   so a retry after a failed grant pays that amount even if the player rebirthed meanwhile; a receipt that arrives
   while the player's save is still loading waits for the load, so it is sized before they can play.
 * Stealing ends your own new-player protection.
@@ -613,7 +614,7 @@ the old look, and removing the map vote card is one controller.
   `/mod <id> [minutes]`, `/mod off`, `/mod list` in Studio (admins live).
 * **One source of truth:** `ModifierService` only keeps the schedule; every effect is a multiplier the system that
   decides reads at that moment (`ModifierRules.effects`): BeltService (interval, capacity, prices, mutation
-  chances), EconomyService (income, folded into the LiveOps cash multiplier and capped with it), LockService (lock
+  chances), EconomyService (live income, capped together with LiveOps cash events; never in rewards or saved values, #46), LockService (lock
   length), StealService (hold, tag reach, speeds), PlayerLifecycle (new characters' speed). Luck is a LiveOps boost
   with source "modifier", so it shows in the luck pill and is capped like the others. The client computes the same
   effects from the published id for what it shows (belt prices, the steal prompt's hold, the TAG button's reach).
@@ -692,7 +693,7 @@ keep its id in the config).
 * **Server-authoritative pickups:** coins are picked up by the server's own distance check against trusted positions
   (`PositionTracker.isTrusted`), every 0.1 s, not by client touch events, so touch spoofing and teleporting get
   nothing. A crate opens with two intents like a steal (`CrateBegin`, `CrateOpen`): landed and closed, in reach at a
-  trusted position both times, and held for the configured time less the usual network tolerance.
+  position trusted as for a steal both times (#46), and held for the configured time less the usual network tolerance.
 * **Sized like cash packs:** every payout scales with the player's steady income (`EconomyMath.cashPackAmount`), so
   drops matter to a newcomer and to a big base alike, and a full Coin Rain is about five minutes of income for the
   whole server to share.
@@ -707,8 +708,9 @@ where everyone already is, and they make the belt area busier (more steals, more
 
 * **What:** a 🎟️ Codes row in Settings opens a dialog to type a code; `CodeService` pays cash sized from steady income
   (like a cash pack) or a Snackling (optionally mutated). Codes are in `src/server/Codes.luau`.
-* **Server-only list:** the codes module sits under ServerScriptService, so clients never receive it; the client
-  sends what was typed and gets a toast back. Only `CodeRules` (normalising and checking, no codes) is shared.
+* **Server-only list:** the codes module sits under ServerScriptService, so clients never receive it (but the
+  GitHub repo is public, so the file is not secret there: #46); the client sends what was typed and gets a toast
+  back. Only `CodeRules` (normalising and checking, no codes) is shared.
 * **Once per account, in flags:** redeeming sets `code_<CODE>` before paying, so a code cannot pay twice even on
   a retry; no save-format change. A Snackling code with a full base is refused without using the code up.
 * **Guessing:** RedeemCode allows 3 tries then one every 5 s per player; codes are letters and digits only.
@@ -921,3 +923,92 @@ big in the middle of the map, which is where the steals happen.
 **Why:** a longer ladder for players who have finished the first 25, and trophies that point at the newer systems
 (the modifiers, the daily reward, codes) and soften the first steal against you.
 **Reversal cost:** none — an achievement removed stops showing; its ids stay in the shipped list.
+
+### 44. Easter 2027: the fourth seasonal event, four new kinds of decoration and a blossom weather
+
+* **What:** `Easter2027` (Fri 19 Mar 17:00 UTC → Tue 6 Apr 07:00 UTC) with `EasterLuck2027` (2× luck from Good
+  Friday to Easter Monday): Custard Chick (Rare), Hot Cross Bunny (Epic), Lemon Meringue Lamb (Legendary) and Jelly
+  Bean Jackalope (Mythic), hand-built polished models (`art/snackling-parts/batch-6.json`, prompt for a Claude
+  Design redo next to it) with recipe fallbacks; the Pastel mutation (everything washed towards a lilac white, a pale
+  pink glow, pastel sugar sparkles); code `EGGHUNT27` (a Pastel Custard Chick until the event ends).
+* **The `spring` theme:** four new prop kinds, laid out in the same spots as the others so any theme can mix them:
+  giant painted eggs (a pastel shell, two painted bands, two dots) after the roses beside each entrance and along the
+  belt, chocolate bunnies (1.3× scale, about 11 studs: landmarks by the factory) in the corner spots after the giant
+  hearts, blossom trees between the bases (behind the decorated trees when a theme has both) and butterflies over the
+  walkway, lower than the balloons and nearer the bases. Pastel string lights, lamps, a bright spring morning and a
+  new weather, `blossoms` (soft pastel petals drifting down), complete it: 330 parts, under the 400 budget.
+* **Mutation bounds:** a fourth 2% event mutation takes "every event at once" (only possible with `/event`) to
+  15.15% of spawns, so that bound moved from 15% to 20%. The per-event check now looks at what can really run
+  together, the events whose dates overlap (the luck weekend): 5.95% for Easter, and any one event with the
+  strongest map and modifier is still 9.15%, under 10%.
+* **Renders before shipping:** the chick's eyes first sat inside its head (its centre is set back) and the lamb's
+  toasted meringue read as spikes until they became golden caps on rounder puffs; the bunny's head hid the cross on
+  its bun from the podium view, so the bun moved back, its icing got thicker and a small cross went on its forehead.
+  The decorations were checked on the meadow map: eggs, butterflies and the bunnies were made bigger after the first
+  render, where they read as specks next to the plots.
+* **Tests:** the dates and the luck weekend; the layout (330 parts, the configured counts, nothing on plots, the belt
+  or the lobby, eggs facing the walkway in two different colours, blossom trees clear of the plot walls, butterflies
+  above head height, bunnies clear of the factory and the chute, every prop kind mixing with the others without
+  overlapping); the event Snacklings and mutation like the other events; the server test turns Easter on (330 parts
+  by name, the lighting, a Pastel Jackalope on the belt) and off.
+
+**Why:** spring between Valentine's and the summer, with Snacklings and a mutation players can only get then.
+**Reversal cost:** none — move the dates, or drop the `Easter2027` line from Config/Seasons to keep the Snacklings
+without the decorations. Never remove the creature or mutation ids (they are in players' saves).
+
+### 45. Three more maps: Popcorn Drive-In, Tea Party Garden, Pancake Peaks
+
+* **What:** maps 21-23, built from the same pieces as the others (DECISIONS.md #32): Popcorn Drive-In (a starry
+  night lawn of popcorn trees and corn stalks; two glowing drive-in screens, giant striped popcorn buckets and soda
+  cups; popcorn popping all around), Tea Party Garden (an afternoon lawn of clipped topiaries and cone topiaries in
+  terracotta pots; a steaming giant teapot, teacups of tea, a three-tier cake stand and tumbled sugar cubes; falling
+  petals) and Pancake Peaks (a breakfast morning: pancake-brown hills round a syrup lake, blueberry bushes and giant
+  forks; towering pancake stacks with butter and syrup drips, syrup bottles and a waffle tower; steam rising).
+* **New pieces:** six flora kinds and ten landmark kinds (ThemeProps; counted in MapThemeRules and built exactly,
+  which the world smoke test checks), two weathers (popcorn: puffs jumping up and falling; steam: soft wisps rising),
+  and a particle preset (popcorn) for Buttered. The heaviest of the three builds about 1,370 scenery parts (budget
+  1,500).
+* **Signature mutations:** Buttered (golden and glossy, popcorn popping), Porcelain (glazed white, glinting) and
+  Syrupy (amber glass, dripping), 1.2% at x3 like every map's, rolled after every other mutation so no existing roll
+  changes. Code `MOVIENIGHT`: a Buttered Popcorn Penguin.
+* **Colours:** two world colours already existed (`hedge`, `strawberry`, used by other maps), so the new maps use
+  them rather than redefining them (Tea Party Garden sets its own hedge green in its palette). Pancake Peaks first
+  rendered as one orange: its ground went creamier than its pancake-brown hills and its haze bluer, and its
+  blueberry bushes grew so they read next to the forks.
+
+**Why:** "a ton of extra maps". Three themes unlike the twenty before them: a night out, a garden party and a
+breakfast.
+**Reversal cost:** none — `weight = 0` keeps a map for `/map` only; never remove the mutation ids (they are in saves).
+
+### 46. Pre-launch fixes (server)
+
+* **What:** fourteen findings from four pre-launch reviews, each fixed with a test. `tools/worldsim/prelaunch.luau`
+  plays them on the offline server with a virtual clock (`Sim.virtualClock`: the game's `os.clock` and `os.time`
+  follow simulated time) in mid-October 2026; CI runs it.
+* **Paid random items follow Roblox's policy:** Server Luck is a paid boost to luck, which the Paid Random Items
+  policy covers. `PlayerPolicy` asks PolicyService on join (pcall; a failure counts as restricted and is retried in
+  the background) and publishes the player attribute `PaidRandomItemsAllowed` (`Logic/PaidRandomItems`, to reuse
+  for paid Lucky Spin packs). Unless it is true the store shows the card as "Not available", and the receipt is not
+  granted. Prize Snacklings (spin, gifts, crates, runaways, Snack Attack, achievements) roll without the bought
+  boost, since its card only discloses belt odds; event, admin and modifier luck still count.
+* **Codes:** an optional `startsAt`; before it a code answers like an unknown one. Every event code starts with its
+  event (CI checks each code that gives an event Snackling or mutation). Codes are not secret: `Codes.luau` never
+  reaches a client, but the repo is public (README "Before publishing"). Typed text over 40 characters is refused
+  before the trim pattern, which was quadratic: one 32 KB call froze the server for 7 s.
+* **Economy:** a server modifier's income (Cash Splash, Jackpot) is live income only, capped together with LiveOps
+  cash events. It no longer reaches the daily reward, offline earnings, the saved best cash/sec or packs (#19);
+  LiveOps cash events still count in rewards, as before. A Snackling a thief carries off counts in pack income until
+  delivery (#7), so a pack pays what its card showed.
+* **Checks:** the carry's straight-line cap adds up the speed allowed at each step (Sugar Rush ending mid-carry
+  cancelled honest steals). For 1.5 s after a modifier changes, the kinder of the old and new price, hold time and
+  tag reach applies (`ModifierRules.lenient`). Crates and runaways trust positions like a steal (10 s after a
+  teleport); coins keep 2 s. A pass is granted only when `UserOwnsGamePassAsync` confirms it. An automatic prize
+  never takes a carrying thief's last free podium (it is sold).
+* **Robustness and data:** the core server loops run their bodies in pcall; CharacterAdded is disconnected on leave
+  and `PlayerCharacterDestroyBehavior` is Enabled; analytics take only known store keys, and belt purchases log the
+  rarity as their SKU; the client state has `baseFull` for the Spin and Gifts tabs' warning.
+
+**Why:** a server freeze, a Roblox policy gap, honest players punished by checks, and temporary bonuses leaking into
+saved and paid values all had to go before the game is public.
+**Reversal cost:** low; every change is local and there is no save-format change. Keep the policy check while any
+paid random item is sold.

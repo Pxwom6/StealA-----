@@ -27,6 +27,9 @@ local Announcer = require(script.Parent.Announcer)
 
 local LiveOpsService = {}
 
+-- The source of luck boosts bought with Robux (Server Luck).
+LiveOpsService.PURCHASE_SOURCE = "purchase"
+
 local configEvents: { Types.EventDef } = table.clone(LiveOps.events)
 local remoteEvents: { Types.EventDef } = {}
 local adminEvents: { Types.EventDef } = {}
@@ -50,8 +53,21 @@ function LiveOpsService.events(): { Types.EventDef }
 	return all
 end
 
+-- The luck belt rolls use: events and every boost (the bought one included; the store card shows these odds).
 function LiveOpsService.luckMultiplier(): number
 	return LiveOpsRules.luckMultiplier(LiveOpsService.events(), boosts, LiveOpsService.now(), LiveOps.limits)
+end
+
+-- The luck prize Snacklings roll at (Lucky Spin, gifts, crates, runaways, Snack Attack, achievements): the same, but
+-- without a bought Server Luck boost, whose card never disclosed these odds. Event, admin and modifier luck count.
+function LiveOpsService.prizeLuckMultiplier(): number
+	return LiveOpsRules.luckMultiplier(
+		LiveOpsService.events(),
+		boosts,
+		LiveOpsService.now(),
+		LiveOps.limits,
+		LiveOpsService.PURCHASE_SOURCE
+	)
 end
 
 function LiveOpsService.cashMultiplier(): number
@@ -180,7 +196,7 @@ function LiveOpsService.publishAttributes()
 	boosts = LiveOpsRules.pruneBoosts(boosts, now)
 	local events = LiveOpsService.events()
 	local luck = LiveOpsService.luckMultiplier()
-	workspace:SetAttribute("PurchasedLuckEndsAt", LiveOpsRules.boostEndsAt(boosts, "purchase", now))
+	workspace:SetAttribute("PurchasedLuckEndsAt", LiveOpsRules.boostEndsAt(boosts, LiveOpsService.PURCHASE_SOURCE, now))
 	workspace:SetAttribute("LuckMultiplier", luck)
 	-- When the luck shown next changes (a boost or luck event ends), not when the last one ends.
 	workspace:SetAttribute(
@@ -393,16 +409,23 @@ end
 
 function LiveOpsService.start()
 	LiveOpsService.publishAttributes()
+	-- One error must not stop events starting and ending (or remote config) for good: each body runs protected.
 	task.spawn(function()
 		while true do
 			task.wait(1)
-			LiveOpsService.publishAttributes()
+			local ok, err = pcall(LiveOpsService.publishAttributes :: () -> ...any)
+			if not ok then
+				warn(`[LiveOps] {err}`)
+			end
 		end
 	end)
 	if LiveOps.remoteConfig.enabled then
 		task.spawn(function()
 			while true do
-				loadRemoteConfig()
+				local ok, err = pcall(loadRemoteConfig :: () -> ...any)
+				if not ok then
+					warn(`[LiveOps] remote config: {err}`)
+				end
 				task.wait(LiveOps.remoteConfig.refreshSeconds)
 			end
 		end)

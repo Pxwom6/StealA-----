@@ -85,6 +85,28 @@ function ModifierRules.beltPrice(price: number, effects: Effects): number
 	return math.max(1, math.floor(price * effects.beltPrice + 0.5))
 end
 
+-- The effects to check a player's action against at `now`, when the running effects changed from `previous` to
+-- `current` at `changedAt`: for `graceSeconds` after a change, what a client shows (belt prices, the steal hold, tag
+-- reach) takes whichever of the old and new values is kinder to the player acting (the lower price, the shorter
+-- hold, the longer reach), since clients still show the old ones for a moment. Like the walking-speed allowance
+-- (ModifierService.walkSpeedAllowance). Everything else is `current`.
+function ModifierRules.lenient(
+	current: Effects,
+	previous: Effects,
+	changedAt: number,
+	now: number,
+	graceSeconds: number
+): Effects
+	if not (now < changedAt + graceSeconds) then
+		return current
+	end
+	local result = table.clone(current)
+	result.beltPrice = math.min(current.beltPrice, previous.beltPrice)
+	result.stealHold = math.min(current.stealHold, previous.stealHold)
+	result.tagRange = math.max(current.tagRange, previous.tagRange)
+	return result
+end
+
 -- How many items the belt may hold: more when it spawns faster, so a faster belt really carries more.
 function ModifierRules.beltCapacity(maxItems: number, effects: Effects): number
 	return math.ceil(maxItems / math.min(1, effects.spawnInterval))
@@ -227,6 +249,9 @@ function ModifierRules.validate(
 	end
 	if not (schedule.firstDelaySeconds >= 0) then
 		problem("schedule.firstDelaySeconds must be 0 or more")
+	end
+	if not (schedule.changeGraceSeconds >= 0 and schedule.changeGraceSeconds <= 5) then
+		problem("schedule.changeGraceSeconds must be between 0 and 5")
 	end
 	for _, key in ModifierRules.EFFECT_KEYS do
 		local limit = config.limits[key]

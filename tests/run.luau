@@ -43,5 +43,6 @@ require("./CodeRules.spec")
 require("./GiftRules.spec")
 require("./SpinRules.spec")
 require("./AchievementRules.spec")
+require("./PaidRandomItems.spec")
 
 T.finish()

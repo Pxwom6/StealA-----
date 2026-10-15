@@ -21,12 +21,21 @@
 	Edit > Undo (Ctrl+Z / Cmd+Z) takes the whole sync back.
 
 	Running it twice is harmless: unchanged scripts are left alone.
+
+	A private repo (recommended before the game goes public: README "Before publishing") only serves its files with a
+	GitHub token. Make a fine-grained personal access token (GitHub > Settings > Developer settings > Personal access
+	tokens > Fine-grained tokens) for this one repository, with read-only "Contents" access and a short expiry. Paste
+	it between the quotes of GITHUB_TOKEN below in the copy you paste into the Command Bar, never in this file in the
+	repo or in a script in the place. It is sent only to GitHub (an Authorization header) and the place keeps no copy,
+	but Studio's Command Bar history does on that computer: that is why it should be read-only and expire soon. With
+	GITHUB_TOKEN empty (a public repo) no token is sent.
 ]]
 
 local REPO = "Pxwom6/StealA-----"
 local BRANCH = "main"
 local REMOVE_STALE = false
 local PARALLEL = 8 -- downloads at once
+local GITHUB_TOKEN = "" -- only for a private repo: see the header (paste it in the Command Bar copy only)
 
 local ChangeHistoryService = game:GetService("ChangeHistoryService")
 local HttpService = game:GetService("HttpService")
@@ -48,9 +57,11 @@ local ROOTS: { Root } = {
 -- is its Source (scripts only).
 type Node = { path: string, name: string, class: string, file: string? }
 
+local HEADERS = if GITHUB_TOKEN ~= "" then { Authorization = `token {GITHUB_TOKEN}` } else nil
+
 local function get(url: string): string
 	local ok, result = pcall(function(): string
-		return HttpService:GetAsync(url, true)
+		return HttpService:GetAsync(url, true, HEADERS)
 	end)
 	if not ok then
 		error(`could not download {url}\n  {result}`, 0)

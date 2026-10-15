@@ -55,11 +55,11 @@ local function multiplierInputs(session: Session): EconomyMath.MultiplierInputs
 		doubleCashMultiplier = perks.doubleCashMultiplier,
 		isVip = session.passes.VIP,
 		vipIncomeBonus = perks.vipIncomeBonus,
-		-- LiveOps cash events and a server modifier (Cash Splash) together, under the same cap.
-		eventCashMultiplier = math.min(
-			LiveOps.limits.maxCashMultiplier,
-			LiveOpsService.cashMultiplier() * ModifierService.effects().income
-		),
+		-- LiveOps cash events and a server modifier (Cash Splash, Jackpot) together under the same cap in live income;
+		-- the modifier is left out of everything paid or saved from income (EconomyMath.rewardMultiplier).
+		eventCashMultiplier = LiveOpsService.cashMultiplier(),
+		modifierIncomeMultiplier = ModifierService.effects().income,
+		maxCashMultiplier = LiveOps.limits.maxCashMultiplier,
 		socialBonus = SocialRules.totalBonus(session.social.friends, session.social.groupMember, Social),
 		-- Earned for good (completed Snackdex tiers): part of the steady income packs and rewards are sized from.
 		collectionBonus = SnackdexRules.incomeBonus(session.data.snackdex, Snackdex),
@@ -84,8 +84,8 @@ end
 -- Recomputes cached income / multiplier / capacity and pushes them to the world and the HUD.
 function EconomyService.refresh(session: Session)
 	local inputs = multiplierInputs(session)
-	-- The live multiplier includes temporary bonuses (LiveOps events, friends & group): it drives income ticks and the
-	-- HUD only. Anything paid out or saved uses rewardIncome or packIncome below.
+	-- The live multiplier includes temporary bonuses (LiveOps events, server modifiers, friends & group): it drives
+	-- income ticks and the HUD only. Anything paid out or saved uses rewardIncome or packIncome below.
 	session.multiplier = EconomyMath.incomeMultiplier(inputs)
 	session.capacity = EconomyService.capacity(session)
 	local incomes: { number } = {}
@@ -95,18 +95,14 @@ function EconomyService.refresh(session: Session)
 		if def then
 			local baseIncome = GameData.income(def, record.variant)
 			table.insert(incomes, baseIncome)
-			table.insert(packSources, {
-				baseIncome = baseIncome,
-				podium = record.podium,
-				inTransit = session.plot ~= 0 and PlotService.isBusy(session.plot, record.podium),
-			})
+			table.insert(packSources, { baseIncome = baseIncome, podium = record.podium })
 		end
 	end
 	session.incomePerSecond = EconomyMath.totalIncome(incomes, session.multiplier)
 	session.rewardIncome = EconomyMath.totalIncome(incomes, EconomyMath.rewardMultiplier(inputs))
 	session.packIncome = EconomyMath.packIncome(packSources, session.capacity, EconomyMath.permanentMultiplier(inputs))
 	local stats = session.data.stats
-	-- Saved (and on the global leaderboard): never inflated by the temporary social bonus.
+	-- Saved (and on the global leaderboard): never inflated by the social bonus or a server modifier.
 	stats.bestCashPerSecond = math.max(stats.bestCashPerSecond, session.rewardIncome)
 	if session.plot ~= 0 then
 		PlotService.syncPodiums(session)
@@ -314,12 +310,16 @@ function EconomyService.start()
 	LiveOpsService.onCashMultiplierChanged(refreshAll)
 	ModifierService.onChanged(refreshAll)
 
+	-- One error must not stop income or collecting for good: each loop's body runs protected.
 	task.spawn(function()
 		local last = os.clock()
 		while true do
 			task.wait(Gameplay.incomeTickSeconds)
 			local now = os.clock()
-			incomeTick(now - last)
+			local ok, err = pcall(incomeTick :: (number) -> ...any, now - last)
+			if not ok then
+				warn(`[EconomyService] income tick: {err}`)
+			end
 			last = now
 		end
 	end)
@@ -327,7 +327,10 @@ function EconomyService.start()
 	task.spawn(function()
 		while true do
 			task.wait(PAD_CHECK_INTERVAL)
-			padCheck()
+			local ok, err = pcall(padCheck :: () -> ...any)
+			if not ok then
+				warn(`[EconomyService] pad check: {err}`)
+			end
 		end
 	end)
 end

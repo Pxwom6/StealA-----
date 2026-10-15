@@ -11,6 +11,11 @@ export type MultiplierInputs = {
 	isVip: boolean,
 	vipIncomeBonus: number, -- e.g. 0.1 for +10%
 	eventCashMultiplier: number, -- LiveOps (1 = no event)
+	-- A server modifier's income effect (Cash Splash, Jackpot), e.g. 2 for double. Live income only: never part of
+	-- what is paid or saved from income (DECISIONS #19: temporary bonuses never inflate them). nil = none.
+	modifierIncomeMultiplier: number?,
+	-- Cap on the LiveOps event and the modifier together (LiveOps.limits.maxCashMultiplier). nil = no cap.
+	maxCashMultiplier: number?,
 	socialBonus: number, -- friends in the server + group membership (Logic/SocialRules), e.g. 0.3 for +30%
 	-- Snackdex collection bonus (Logic/SnackdexRules.incomeBonus), e.g. 0.06 for +6%. Earned for good, so it is part of
 	-- the permanent multiplier. nil = none.
@@ -21,7 +26,7 @@ export type PodiumUpgradeConfig = { basePrice: number, growth: number, maxPurcha
 export type CashPack = { incomeSeconds: number, minimum: number }
 
 -- One creature as a cash pack sees it (see packIncome).
-export type PackSource = { baseIncome: number, podium: number, inTransit: boolean }
+export type PackSource = { baseIncome: number, podium: number }
 
 local EconomyMath = {}
 
@@ -41,30 +46,38 @@ function EconomyMath.incomeMultiplier(inputs: MultiplierInputs): number
 	if inputs.isVip then
 		m *= 1 + math.max(0, inputs.vipIncomeBonus)
 	end
-	m *= math.max(0, sane(inputs.eventCashMultiplier, 1))
+	-- The LiveOps event and the server modifier together, under one cap.
+	local cash = math.max(0, sane(inputs.eventCashMultiplier, 1))
+		* math.max(0, sane(inputs.modifierIncomeMultiplier or 1, 1))
+	if inputs.maxCashMultiplier ~= nil then
+		cash = math.min(cash, sane(inputs.maxCashMultiplier, 1))
+	end
+	m *= cash
 	m *= 1 + math.max(0, sane(inputs.socialBonus, 0))
 	m *= 1 + math.max(0, sane(inputs.collectionBonus or 0, 0))
 	return m
 end
 
 -- The multiplier without temporary boosts: what the player earned or bought for good (rebirths, passes, the Snackdex
--- collection bonus); LiveOps cash events and the social bonus are left out. Cash packs, quest and Snackdex rewards are
--- sized from it (packIncome).
+-- collection bonus); LiveOps cash events, server modifiers and the social bonus are left out. Cash packs, quest and
+-- Snackdex rewards are sized from it (packIncome).
 function EconomyMath.permanentMultiplier(inputs: MultiplierInputs): number
 	local steady = table.clone(inputs)
 	steady.eventCashMultiplier = 1
+	steady.modifierIncomeMultiplier = 1
 	steady.socialBonus = 0
 	return EconomyMath.incomeMultiplier(steady)
 end
 
 -- The multiplier time-based rewards and saved stats use (daily streak, offline earnings, best cash/sec): everything
--- but the social bonus (the Snackdex collection bonus counts, like rebirths). That bonus depends on who is in the server at that moment (and is still being looked up for
--- a moment after joining), so it never inflates a payout or a saved value. A LiveOps cash event still counts here,
--- as before.
+-- but the social bonus and a server modifier (the Snackdex collection bonus counts, like rebirths). Both depend on
+-- this one server at this moment (who is here; a 5-minute Jackpot), so they never inflate a payout or a saved value.
+-- A LiveOps cash event, which every server runs at once on a published date, still counts here, as before (#19).
 function EconomyMath.rewardMultiplier(inputs: MultiplierInputs): number
-	local withoutSocial = table.clone(inputs)
-	withoutSocial.socialBonus = 0
-	return EconomyMath.incomeMultiplier(withoutSocial)
+	local steady = table.clone(inputs)
+	steady.socialBonus = 0
+	steady.modifierIncomeMultiplier = 1
+	return EconomyMath.incomeMultiplier(steady)
 end
 
 -- Cash per second for one creature (kept fractional; accumulation is fractional and collection floors it).
@@ -111,12 +124,13 @@ function EconomyMath.roundNice(amount: number): number
 end
 
 -- The steady income cash packs are sized from ("about N minutes of your income"): creatures on an active podium
--- (podium <= capacity) that are not being carried off by a thief, at the permanent multiplier. A running event or
--- creatures parked on podiums beyond capacity never count; a creature being stolen counts again once it is home.
+-- (podium <= capacity), at the permanent multiplier. A running event or creatures parked on podiums beyond capacity
+-- never count. A creature a thief is carrying off still counts: the owner owns it until delivery (DECISIONS #7), and
+-- a pack bought while a thief grabs it pays what its card showed.
 function EconomyMath.packIncome(sources: { PackSource }, capacity: number, permanentMultiplier: number): number
 	local total = 0
 	for _, source in sources do
-		if source.podium <= capacity and not source.inTransit then
+		if source.podium <= capacity then
 			total += EconomyMath.creatureIncome(source.baseIncome, permanentMultiplier)
 		end
 	end

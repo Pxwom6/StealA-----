@@ -4,8 +4,10 @@
 
 	  cash      sized from the player's steady income like a cash pack (EconomyMath.cashPackAmount)
 	  spin      banked for the Lucky Spin (SpinRules.bank); spins beyond Config/Spin.maxBanked are paid as cash
-	  creature  a Snackling rolled at `luck` x the server's luck (mutation rolled as usual, or always `mutation`), on
-	            the lowest free podium; with a full base it is sold for its usual refund instead
+	  creature  a Snackling rolled at `luck` x the server's luck, a bought Server Luck boost left out (its store card
+	            only shows belt odds); mutation rolled as usual, or always `mutation`; on the lowest free podium. With a
+	            full base it is sold for its usual refund instead, and so it is when the player is carrying a stolen
+	            Snackling home with one free podium left (that podium is for the delivery)
 
 	`pay` returns what happened, with a line for the toast; the caller decides when to show it (the Lucky Spin shows it
 	after its reel stops).
@@ -21,6 +23,7 @@ local Types = require(ReplicatedStorage.Shared.Types)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local EconomyMath = require(ReplicatedStorage.Shared.Logic.EconomyMath)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
+local Inventory = require(ReplicatedStorage.Shared.Logic.Inventory)
 local MutationRules = require(ReplicatedStorage.Shared.Logic.MutationRules)
 local RarityRoll = require(ReplicatedStorage.Shared.Logic.RarityRoll)
 local SpinRules = require(ReplicatedStorage.Shared.Logic.SpinRules)
@@ -51,8 +54,9 @@ local function nextRandom(): number
 	return random:NextNumber()
 end
 
--- Rolls a Snackling at `luck` x the server's luck, its mutation as the belt would (times `mutationChance`) unless
--- `forcedVariant` is given. nil only when nothing can roll.
+-- Rolls a Snackling at `luck` x the server's luck (without a bought Server Luck boost, see
+-- LiveOpsService.prizeLuckMultiplier), its mutation as the belt would (times `mutationChance`) unless `forcedVariant`
+-- is given. nil only when nothing can roll.
 function PrizeService.rollCreature(
 	luck: number,
 	mutationChance: number,
@@ -62,7 +66,7 @@ function PrizeService.rollCreature(
 	local creatureId = RarityRoll.roll(
 		catalog.rarityList,
 		catalog.creatureList,
-		LiveOpsService.luckMultiplier() * luck,
+		LiveOpsService.prizeLuckMultiplier() * luck,
 		LiveOpsService.activeEventIds(),
 		nextRandom
 	)
@@ -82,15 +86,17 @@ function PrizeService.rollCreature(
 	return def, variant
 end
 
--- Puts `def` (with `variant`) on a free podium, or pays its sell value when the base is full. Returns whether it was
--- given and the cash paid instead (0 when given).
+-- Puts `def` (with `variant`) on a free podium, or pays its sell value when the base is full. A thief carrying a
+-- Snackling home keeps their last free podium for it: the prize is sold instead (Inventory.prizeMayTakePodium).
+-- Returns whether it was given and the cash paid instead (0 when given).
 function PrizeService.giveOrSell(
 	session: Session,
 	def: Types.CreatureDef,
 	variant: string?,
 	sku: string
 ): (boolean, number)
-	if EconomyService.giveCreature(session, def.id, variant) then
+	local mayTake = Inventory.prizeMayTakePodium(session.data.creatures, session.capacity, session.carry ~= nil)
+	if mayTake and EconomyService.giveCreature(session, def.id, variant) then
 		return true, 0
 	end
 	local value = EconomyMath.sellValue(GameData.price(def, variant), Economy.sellRefund)
