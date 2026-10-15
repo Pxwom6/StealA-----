@@ -168,6 +168,21 @@ function TutorialRules.quiet(running: boolean, completedAt: number, now: number,
 	return since >= 0 and since < quietSeconds
 end
 
+-- How a client shows a world banner (Announce) of `kind`, the player being on tutorial step `tutorialStep` ("" for
+-- none): "chat" only, for a new map (MapThemeController shows its own title card) and for every banner while the
+-- tutorial runs (its own lines have the screen); otherwise "banner" (which also lands in chat).
+function TutorialRules.announceMode(kind: string?, tutorialStep: string): "banner" | "chat"
+	if kind == "map" or tutorialStep ~= "" then
+		return "chat"
+	end
+	return "banner"
+end
+
+-- Whether the HUD's Rewards button shows its red dot: something there is ready, and no tutorial runs.
+function TutorialRules.rewardsDot(ready: boolean, tutorialStep: string): boolean
+	return ready and tutorialStep == ""
+end
+
 -- Clears every tutorial flag so it starts over (Studio test command only).
 function TutorialRules.reset(flags: Flags, cfg: Config)
 	flags[TutorialRules.DONE_FLAG] = nil

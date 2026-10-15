@@ -20,10 +20,12 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local ScreenLayout = require(ReplicatedStorage.Shared.Logic.ScreenLayout)
 local ToastQueue = require(ReplicatedStorage.Shared.Logic.ToastQueue)
+local TutorialRules = require(ReplicatedStorage.Shared.Logic.TutorialRules)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local ClientSettings = require(script.Parent.ClientSettings)
 local HudController = require(script.Parent.HudController)
 local SoundPlayer = require(script.Parent.SoundPlayer)
+local StateStore = require(script.Parent.StateStore)
 
 local NotificationController = {}
 
@@ -297,8 +299,11 @@ function NotificationController.start()
 		end
 	end)
 	Net.get("Announce").OnClientEvent:Connect(function(payload: Banner & { kind: string? })
-		if payload.kind == "map" then
-			systemChat(payload.text) -- a new map: MapThemeController shows its own title card
+		-- Chat only for a new map (MapThemeController shows its own title card) and for every banner during the
+		-- first-time tutorial, whose own lines have the screen (Logic/TutorialRules.announceMode).
+		local state = StateStore.get()
+		if TutorialRules.announceMode(payload.kind, if state then state.tutorial.step else "") == "chat" then
+			systemChat(payload.text)
 			return
 		end
 		local color = if type(payload.color) == "string" and string.match(payload.color, "^#%x%x%x%x%x%x$")

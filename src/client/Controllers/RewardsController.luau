@@ -32,6 +32,7 @@ local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local QuestRules = require(ReplicatedStorage.Shared.Logic.QuestRules)
 local ScreenLayout = require(ReplicatedStorage.Shared.Logic.ScreenLayout)
 local StoreLayout = require(ReplicatedStorage.Shared.Logic.StoreLayout)
+local TutorialRules = require(ReplicatedStorage.Shared.Logic.TutorialRules)
 local Modal = require(script.Parent.Parent.UI.Modal)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local AchievementsTab = require(script.Parent.AchievementsTab)
@@ -407,7 +408,9 @@ local function updateBadges(state: Types.ClientState)
 	local questsReady = state.quests.claimable > 0
 	local giftsReady = GiftsTab.claimable(state.gifts) > 0
 	local spinReady = state.spin.spins > 0 or workspace:GetServerTimeNow() >= state.spin.nextFreeAt
-	rewardsButton.badge.Visible = dailyReady or questsReady or giftsReady or spinReady
+	-- no red dot during the first-time tutorial (Logic/TutorialRules.rewardsDot): the loop comes first
+	rewardsButton.badge.Visible =
+		TutorialRules.rewardsDot(dailyReady or questsReady or giftsReady or spinReady, state.tutorial.step)
 	local current = panel
 	if current then
 		current.tabs.daily.badge.Visible = dailyReady
