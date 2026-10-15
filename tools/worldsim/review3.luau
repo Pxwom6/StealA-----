@@ -12,6 +12,8 @@
 	    gets the plain toast
 	  * toasts that can wait (TutorialService.notifyWhenQuiet): an achievement reached in the first-time tutorial is
 	    paid at once, but its toast comes 3 s after the tutorial's "You're ready!"; after a skip, at once
+	  * the new-player shield ending (LockService): one toast when its time is up, or at once when it is ended early;
+	    never for a returning player who had none
 
 	It fails on any error, any unexpected warning, or any check below.
 ]]
@@ -26,6 +28,7 @@ local Vector3 = roblox.Vector3
 local OCTOBER_15_2026 = 1792023721
 
 local KIM, NIA, PIA = 9301, 9302, 9303
+local OLA, UMA, VAL = 9304, 9305, 9306
 
 Sim.mock("ServerPackages/ProfileStore.lua", MockProfileStore)
 Sim.virtualClock = true
@@ -308,10 +311,62 @@ local function toastsWait()
 	task.wait(0.3)
 end
 
+-- The new-player shield ending -------------------------------------------------------------------------------------
+
+local function shieldEnds()
+	print("The new-player shield ending:")
+	local DataSchema = Sim.shared("Logic/DataSchema")
+	local Economy = Sim.shared("Config/Economy")
+	local gone = Theme.text.shieldGone
+	local ola = join(OLA, "Ola") -- brand new: shielded for her first minutes of play
+	local o = Sessions.get(ola)
+	Sim.fireServer(ola, "SkipTutorial")
+	task.wait(0.1)
+	check(o.graceUntil > Sim.now, `Ola joins with the new-player shield ({math.floor(o.graceUntil - Sim.now)} s)`)
+	Sim.advance(o.graceUntil - Sim.now - 1)
+	task.wait(1.2) -- LockService's 1 Hz pass
+	check(toldAt(OLA, 0, gone) == 0 and o.graceUntil > 0, "a second before it ends: nothing yet")
+	Sim.advance(1.5)
+	task.wait(1.2)
+	local at = toldAt(OLA, 0, gone)
+	check(at > 0 and o.graceUntil == 0, `when it ends she is told: "{gone}"`)
+	check(PlotService.world().plots[o.plot].model:GetAttribute("GraceUntil") == 0, "and her base's shield is off")
+	Sim.advance(30)
+	task.wait(1.2)
+	check(toldAt(OLA, at, gone) == 0, "only once")
+
+	-- Ended early (a steal, or /noshield in Studio): told at once
+	local uma = join(UMA, "Uma")
+	Sim.fireServer(uma, "SkipTutorial")
+	chat(uma, "/noshield")
+	at = toldAt(UMA, 0, gone)
+	check(at > 0 and Sessions.get(uma).graceUntil == 0, "a shield ended early is told at once")
+	Sim.advance(300)
+	task.wait(1.2)
+	check(toldAt(UMA, at, gone) == 0, "and only then")
+
+	-- A returning player with no shield left never hears it
+	local save = DataSchema.template(Economy.startingCash)
+	save.stats.playTime = 3600
+	save.flags.tutorial_done = true
+	save.firstJoin = OCTOBER_15_2026 - 86400
+	MockProfileStore.saves[`Player_{VAL}`] = save
+	local val = join(VAL, "Val")
+	check(Sessions.get(val).graceUntil == 0, "Val, back after an hour of play, has no shield")
+	Sim.advance(300)
+	task.wait(1.2)
+	check(toldAt(VAL, 0, gone) == 0, "and never hears that it is gone")
+	for _, player in { ola, uma, val } do
+		Sim.removePlayer(player)
+	end
+	task.wait(0.3)
+end
+
 local function scenario()
 	print("review 3 test:")
 	cashOffer()
 	toastsWait()
+	shieldEnds()
 	print(`  ({math.floor(Sim.now - OCTOBER_15_2026)} s of server time)`)
 end
 

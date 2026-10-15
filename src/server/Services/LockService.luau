@@ -8,6 +8,8 @@
 	  just outside the nearest side). Character physics is client-owned, so the visible barrier alone would not
 	  stop an exploiter — this does.
 	* A 1 Hz pass keeps each plot's force field (blue = locked, yellow = new-player shield) and attributes in sync.
+	  When a new player's shield ends (its time is up, or stealing ended it early) they are told once to lock their
+	  base from now on (Theme.text.shieldGone).
 	* The cooldown and open window are saved (`data.lockTimers`, wall-clock seconds) when a lock starts and on every
 	  save (on the final save a lock still running counts as ending then), and restored on join, so leaving and
 	  rejoining any server never resets them.
@@ -218,12 +220,19 @@ function LockService.preview(session: Session): LockRules.LockAttempt
 	return LockRules.tryLock(session.lock, now(), session.lockDuration, Gameplay.lock, session.data.lockTokens > 0)
 end
 
+-- The new-player shield is over: graceUntil goes to 0 (so this runs once) and the player hears that their base is
+-- open now, and what to do about it.
+local function shieldGone(session: Session)
+	session.graceUntil = 0
+	syncShield(session)
+	Replication.markDirty(session)
+	Remotes.notify(session.player, Theme.text.shieldGone, "warning")
+end
+
 -- Ends a session's new-player protection early (e.g. they started stealing).
 function LockService.endGrace(session: Session)
 	if session.graceUntil > 0 then
-		session.graceUntil = 0
-		syncShield(session)
-		Replication.markDirty(session)
+		shieldGone(session)
 	end
 end
 
@@ -255,8 +264,14 @@ function LockService.start()
 			task.wait(1)
 			-- One error must not stop the shields for good.
 			local ok, err = pcall(function()
+				local t = now()
 				for _, session in Sessions.all() do
-					syncShield(session)
+					-- (a shield already over when the client is ready is told then: nothing is lost while it loads)
+					if session.graceUntil > 0 and t >= session.graceUntil and session.ready then
+						shieldGone(session)
+					else
+						syncShield(session)
+					end
 				end
 			end)
 			if not ok then

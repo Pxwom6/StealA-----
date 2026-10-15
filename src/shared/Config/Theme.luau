@@ -451,6 +451,7 @@ local Theme = {
 		lockVulnerable = "Can't lock again so soon ({time})",
 		cantStealLocked = "That base is locked!",
 		cantStealProtected = "New players are protected for a few minutes.",
+		shieldGone = "🛡️ Your shield is gone. Lock your base when thieves come!", -- once, when a new player's ends
 		cantStealOwn = "That's yours!",
 		stealFromInside = "Get inside their base first!",
 		stealOnFloor = "Stand on the floor to steal!",
