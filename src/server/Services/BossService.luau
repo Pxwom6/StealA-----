@@ -68,6 +68,7 @@ local walkwayY = 0.2
 local random = Random.new()
 local limiter = RateLimiter.new(Boss.burst, Boss.hitsPerSecond)
 local runningId: string? = nil
+local runningRun = 0 -- ModifierService.run() the giants were planned for
 local pending: { number } = {}
 
 local function now(): number
@@ -264,8 +265,10 @@ local function step()
 	local id = ModifierService.current()
 	local def = if id then Modifiers.modifiers[id] else nil
 	local drops = if def and def.drops and def.drops.kind == "boss" then def.drops else nil
-	if id ~= runningId then
-		runningId = id
+	-- a new modifier, or Snack Attack started again for a new length: plan its giants from now
+	local run = ModifierService.run()
+	if id ~= runningId or run ~= runningRun then
+		runningId, runningRun = id, run
 		pending = {}
 		if drops then
 			for _, offset in DropRules.times(drops, math.max(0, ModifierService.endsAt() - t)) do

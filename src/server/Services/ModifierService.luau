@@ -59,6 +59,7 @@ local LIGHTING_SECONDS = 4
 local random = Random.new()
 local current: string? = nil
 local last: string? = nil
+local run = 0 -- bumped by every start, a restart of the running modifier included
 local endsAt = 0
 local nextAt = 0
 local effects = ModifierRules.none()
@@ -88,6 +89,13 @@ end
 -- When the running modifier ends (server time; 0 when none runs).
 function ModifierService.endsAt(): number
 	return if current then endsAt else 0
+end
+
+-- A number that changes every time a modifier starts, also when the one running is started again (an admin's longer
+-- Supply Drop over the schedule's own): the drop services plan their drops again from then (DropService,
+-- BossService).
+function ModifierService.run(): number
+	return run
 end
 
 -- What a player's action is checked against right now (belt prices, the steal hold, tag reach): the current effects,
@@ -139,6 +147,7 @@ function ModifierService.startModifier(id: string, seconds: number, announce: bo
 	LiveOpsService.endBoosts(LUCK_SOURCE)
 	current = id
 	last = id
+	run += 1
 	endsAt = now() + seconds
 	setEffects(id)
 	if effects.luck > 1 then
