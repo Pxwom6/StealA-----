@@ -2,9 +2,11 @@
 --[[
 	Tiny UI toolkit: declarative instance creation, the game's chunky visual style, and phone-first scaling.
 
-	Layouts are authored in offsets for a ~540px-tall reference screen. A UIScale on every ScreenGui scales
-	them to the device (clamped so touch targets never drop below ~48px on small phones), and ScreenInsets
-	keeps everything inside notches / home indicators.
+	Layouts are authored in offsets for a 540-tall, 900-wide reference screen (Logic/ScreenLayout.scaleFor). A UIScale
+	on every ScreenGui scales them to the device, never below 0.85, so a 52-unit button is a full 44 px touch target on
+	the smallest phones. Every screen says which safe-area insets it uses (UiKit.screen); the game's screens use
+	DeviceSafeInsets: inside notches and home indicators, from the top of the screen under Roblox's top bar, whose
+	buttons ScreenLayout keeps clear of.
 
 	One look everywhere: corners and strokes come from UiKit.RADIUS / UiKit.STROKE, every button shrinks a little
 	when pressed, springs back and clicks (Config/Sounds ui.click), and has a soft top-to-bottom shade; floating
