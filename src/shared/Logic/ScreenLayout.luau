@@ -23,6 +23,8 @@
 	  middle        the play zone (the character and the prompts near it): nothing tappable
 ]]
 
+local TextFit = require("./TextFit")
+
 local ScreenLayout = {}
 
 export type Rect = { x: number, y: number, w: number, h: number }
@@ -76,7 +78,7 @@ ScreenLayout.SIZE = table.freeze({
 	skip = { w = 64, h = 52, inset = 8 }, -- the tutorial's Skip: in the banner's top 64, inset from its right edge
 	-- "Need $X more?": text, the Robux button and ✕ (52 tall), inset from the strip's edges
 	cashOffer = { w = 400, minW = 330, h = 60, inset = 4, buy = 116, close = 52, text = 12 },
-	event = { w = 220, h = 60 }, -- event pill: the banner (two lines) over its countdown
+	event = { w = 220, h = 58 }, -- event pill: the banner (two lines) over its countdown
 	modifier = { w = 165, h = 52 }, -- the running modifier: a button (tap for its description)
 	luck = { w = 165, h = 30 }, -- server luck
 	corner = { button = 52, lock = 104, gap = 8, top = 4 },
@@ -88,6 +90,20 @@ ScreenLayout.SIZE = table.freeze({
 	titleCard = { w = 400, h = 120 }, -- the new map's title card
 	stealAlert = { w = 420, h = 52, y = 230 },
 	carry = { w = 320, h = 46, bottom = 60 },
+})
+
+-- The text boxes inside those elements (UI units), so tests can prove the text stays readable (Logic/TextFit): no HUD
+-- text below TEXT.minSize, 12 UI = 10 px on the smallest phones. `pad`: from the element's edges (UiKit.button pads
+-- 8 x 6).
+ScreenLayout.TEXT = table.freeze({
+	minSize = 12,
+	button = { padX = 8, padY = 6 }, -- every UiKit.button (lock, modifier, ...)
+	vote = { padX = 4, padY = 2, icon = 16, name = 32, mutation = 16 }, -- top to bottom inside a vote button
+	event = { padX = 8, top = 4, banner = 32, countdown = 18 }, -- the banner wraps onto two lines
+	luck = { padX = 6, padY = 3 },
+	toast = { padX = 8, padY = 4, oneLine = 16 }, -- a toast whose one line would be smaller wraps (the tall toast)
+	cashOffer = { top = 4, title = 24, body = 30 }, -- left of the Robux button, from `cashOffer.text`
+	banner = { padX = 12, padY = 6 }, -- announcement banners wrap onto two lines
 })
 
 export type DeviceSpec = {
@@ -284,11 +300,18 @@ function ScreenLayout.lane(device: Device, obstacles: { Rect }, y0: number, y1: 
 end
 
 -- x and width of something `w` wide (at least `minW`) centred on `cx` in [left, right]: narrowed evenly while it
--- stays at least `minW`, else shifted to fit.
-function ScreenLayout.fitSpan(cx: number, w: number, minW: number, left: number, right: number): (number, number)
+-- stays at least `minW`, else shifted to fit (or, `centred`, kept centred at `minW`: the caller makes room).
+function ScreenLayout.fitSpan(
+	cx: number,
+	w: number,
+	minW: number,
+	left: number,
+	right: number,
+	centred: boolean?
+): (number, number)
 	local even = 2 * math.min(cx - left, right - cx)
-	if even >= math.min(w, minW) then
-		local width = math.min(w, even)
+	if even >= math.min(w, minW) or centred then
+		local width = math.max(math.min(w, minW), math.min(w, even))
 		return cx - width / 2, width
 	end
 	local width = math.max(math.min(minW, w), math.min(w, right - left))
@@ -394,6 +417,14 @@ function ScreenLayout.toastList(device: Device): Rect
 	local T = ScreenLayout.SIZE.toast
 	local h = T.max * T.tall + (T.max - 1) * T.gap
 	return rect(device.width / 2 - T.w / 2, device.height - T.bottom - h, T.w, h)
+end
+
+-- How tall a toast showing `text` is: one line when that line is big enough to read (TEXT.toast.oneLine), else two
+-- wrapped lines (the tall toast).
+function ScreenLayout.toastHeight(text: string): number
+	local T, P = ScreenLayout.SIZE.toast, ScreenLayout.TEXT.toast
+	local oneLine = TextFit.fit(text, T.w - 2 * P.padX, T.h - 2 * P.padY, false)
+	return if oneLine >= P.oneLine then T.h else T.tall
 end
 
 -- The HUD in one state ------------------------------------------------------------------------------------------------
@@ -544,8 +575,9 @@ function ScreenLayout.layout(device: Device, state: HudState): Layout
 	local statusShown = false
 	if state.tutorial then
 		local h = S.tutorial.h + (if state.tutorial == "full" then S.tutorial.tip else 0)
+		-- Centred under the cash; ScreenLayout.tutorialDevice switches the player list off when it needs the room.
 		local left, right = ScreenLayout.lane(device, obstacles, y, y + h, cx)
-		local x, w = ScreenLayout.fitSpan(cx, S.tutorial.w, S.tutorial.minW, left, right)
+		local x, w = ScreenLayout.fitSpan(cx, S.tutorial.w, S.tutorial.minW, left, right, true)
 		add("tutorial", "info", rect(x, y, w, h))
 		add(
 			"skip",
@@ -590,7 +622,11 @@ function ScreenLayout.layout(device: Device, state: HudState): Layout
 		end
 	end
 	if state.carrying then
-		add("carry", "overlay", rect(cx - S.carry.w / 2, device.height - S.carry.bottom - S.carry.h, S.carry.w, S.carry.h))
+		add(
+			"carry",
+			"overlay",
+			rect(cx - S.carry.w / 2, device.height - S.carry.bottom - S.carry.h, S.carry.w, S.carry.h)
+		)
 	end
 
 	-- What drops in over the HUD for a few seconds: below the stack, clear of the buttons beside it.
@@ -640,8 +676,8 @@ function ScreenLayout.overlaySpan(device: Device, layout: Layout, w: number, h: 
 	return ScreenLayout.fitSpan(layout.centerX, w, 0, left, right)
 end
 
--- The device as the tutorial leaves it: the player list switched off while its banner can't clear it at its minimum
--- width.
+-- The device as the tutorial leaves it: the player list switched off while the banner, centred under the cash and
+-- at least `tutorial.minW` wide, would run under it (TutorialController does the same).
 function ScreenLayout.tutorialDevice(device: Device): Device
 	if device.playerList <= 0 then
 		return device
@@ -650,7 +686,7 @@ function ScreenLayout.tutorialDevice(device: Device): Device
 	local probe = ScreenLayout.layout(device, { tutorial = "full" })
 	local banner = probe.byId.tutorial
 	local list = ScreenLayout.playerListRect(device)
-	if banner and list and (banner.w < S.tutorial.minW - 0.01 or ScreenLayout.overlaps(banner, list)) then
+	if banner and list and ScreenLayout.overlaps(banner, list) then
 		return ScreenLayout.withoutPlayerList(device)
 	end
 	return device
