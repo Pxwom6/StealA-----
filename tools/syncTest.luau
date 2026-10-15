@@ -10,7 +10,9 @@
 	  2. a place with an obsolete script and a folder that became a script: the obsolete one is reported and kept, the
 	     wrong class is fixed with its children kept;
 	  3. the same with REMOVE_STALE on: the result matches the build exactly.
-	Then a run with GITHUB_TOKEN set (a private repo): every request carries the token, and only then.
+	Then a run with GITHUB_TOKEN set (a private repo): every request carries the token, and only then; and a place
+	without ServerScriptService.ServerPackages.ProfileStore, which the sync refuses before asking GitHub anything.
+	(A build made without `wally install` gets a stand-in ProfileStore module, so the other runs don't need one.)
 ]]
 
 local fs = require("@lune/fs")
@@ -179,7 +181,17 @@ local function differences(game: any, expected: { [string]: string }): { string 
 end
 
 local function fresh(): any
-	return roblox.deserializePlace(fs.readFile(placePath))
+	local game = roblox.deserializePlace(fs.readFile(placePath))
+	local serverScripts = game:GetService("ServerScriptService")
+	if serverScripts:FindFirstChild("ServerPackages") == nil then
+		local packages = roblox.Instance.new("Folder")
+		packages.Name = "ServerPackages"
+		local module = roblox.Instance.new("ModuleScript")
+		module.Name = "ProfileStore"
+		module.Parent = packages
+		packages.Parent = serverScripts
+	end
+	return game
 end
 
 local function contains(output: { string }, text: string): boolean
@@ -248,6 +260,21 @@ local withToken = runSync(private, false, "github_pat_test")
 check(
 	withToken.requests == fileCount + 2 and withToken.authorized == withToken.requests,
 	`with GITHUB_TOKEN set, every request carries it ({withToken.authorized} of {withToken.requests})`
+)
+
+-- 5. A place without ProfileStore: the game couldn't start there, so the sync stops before asking GitHub anything.
+local bare = fresh()
+bare:GetService("ServerScriptService").ServerPackages:Destroy()
+bare:GetService("ReplicatedStorage").Shared.Logic.Format:Destroy() -- something a sync would fix
+local before = snapshot(bare)
+local refused = runSync(bare, false)
+check(refused.requests == 0 and refused.waypoints == 0, "a place without ProfileStore: GitHub isn't even asked")
+check(#differences(bare, before) == 0, "and nothing changes")
+check(
+	contains(refused.output, "WARN [Sync] stopped, nothing was changed")
+		and contains(refused.output, "ServerPackages.ProfileStore")
+		and contains(refused.output, "README"),
+	"the Output says what is missing and where the README says how to add it"
 )
 
 if #failures > 0 then

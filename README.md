@@ -49,6 +49,15 @@ It only touches `ReplicatedStorage.Shared`, `ServerScriptService.Server` and `St
 same mapping as `default.project.json`); custom models, ProfileStore and the place's settings stay as they are. CI
 checks it against Rojo builds of every commit (`tools/syncTest.luau`).
 
+**ProfileStore.** The game keeps everyone's saves with ProfileStore and can't start without it, and the sync never
+adds it: in a place without `ServerScriptService.ServerPackages.ProfileStore` it stops before changing anything and
+says so in the Output (`[Sync] stopped, nothing was changed: ...`). A place first made with Rojo (Setup above) already
+has it. To add it once by hand: in ServerScriptService make a **Folder** named `ServerPackages`, and in it a
+**ModuleScript** named `ProfileStore` whose source is the whole of
+`ServerPackages/_Index/lm-loleris_profilestore@1.0.3/profilestore/ProfileStore.luau` from a checkout after
+`wally install` (ProfileStore 1.0.3, the version `wally.toml` pins); or copy `ServerPackages` across from a place
+built with `rojo build -o place.rbxl`. Then paste the sync again.
+
 **Place settings the sync never sets.** `default.project.json` gives a Rojo-built place these, but a synced place
 keeps its own, so set them once by hand (and check them before publishing):
 
