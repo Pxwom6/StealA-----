@@ -587,6 +587,37 @@ local Theme = {
 		bossPrize = "👾 Top hitter! {creature} is yours!",
 		bossPrizeFull = "👾 Top hitter! Base full: {creature} sold for you. +{cash}",
 
+		-- Gadgets (Config/Gadgets): the Shop's Gadgets tab, the buttons by TAG and what they say. Descriptions are
+		-- filled from the config: {percent} faster, lasts {seconds}, slip {slip}, recharges {cooldown} (seconds).
+		storeTabShop = "Shop",
+		storeTabGadgets = "Gadgets",
+		gadgetsHeader = "Gadgets: buy once with cash, keep forever",
+		gadgetsHint = "Owned gadgets get a button by the TAG button (keys 1-4 on a keyboard).",
+		gadgetRechargeLine = "Recharges in {cooldown}s",
+		gadgetSodaName = "Fizzy Soda",
+		gadgetSodaInfo = "Run {percent}% faster for {seconds}s, even while carrying a Snackling.",
+		gadgetPeelName = "Banana Peel",
+		gadgetPeelInfo = "Drop it in your base: the first visitor to step on it slips for {slip}s and drops your Snackling! Stays {seconds}s.",
+		gadgetShieldName = "Bubble Shield",
+		gadgetShieldInfo = "A bubble that stops tags for {seconds}s: get home with your loot!",
+		gadgetMagnetName = "Snack Magnet",
+		gadgetMagnetInfo = "Collect the cash on all your pads at once, from anywhere.",
+		gadgetBought = "{icon} {name} is yours! Its button is by the TAG button.",
+		gadgetAlreadyOwned = "You already have that gadget!",
+		gadgetNotOwned = "Get that gadget in the Shop first!",
+		gadgetTutorial = "Gadgets unlock after the tutorial!",
+		gadgetRecharging = "{name} recharges in {time}",
+		peelOutsideBase = "Stand inside your own base to drop a Banana Peel!",
+		peelOnFloor = "Stand on your base's floor to drop it!",
+		peelPlaced = "🍌 Banana Peel down! Thieves, watch your step...",
+		peelSlipped = "🍌 Whoa! You slipped on {owner}'s banana peel!",
+		peelSlippedOwner = "🍌 {player} slipped on your banana peel!",
+		peelTagger = "🍌 Banana Peel", -- who saved the Snackling, in "...: {creature} made it home safely."
+		stealFailedSlipped = "🍌 You slipped! {creature} ran home.",
+		shieldBlocked = "Shielded! 🫧 Wait for the bubble to pop.",
+		magnetEmpty = "Nothing to collect yet!",
+		magnetCollected = "🧲 +{amount} from your pads!",
+
 		-- Map themes (Config/MapThemes): the vote for the next map and the change itself
 		mapVoteTitle = "Vote for the next map! {time}",
 		mapVoteCount = "{votes}", -- votes under each choice on the vote card

@@ -11,6 +11,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
+local GadgetRules = require(ReplicatedStorage.Shared.Logic.GadgetRules)
 local LockRules = require(ReplicatedStorage.Shared.Logic.LockRules)
 local StealRules = require(ReplicatedStorage.Shared.Logic.StealRules)
 local Analytics = require(script.Parent.Analytics)
@@ -146,6 +147,7 @@ local function onPlayerAdded(player: Player)
 		social = { friends = 0, groupMember = false },
 		tutorial = nil,
 		cashOfferAt = -math.huge,
+		gadgets = GadgetRules.newState(),
 	}
 	Sessions.add(session)
 

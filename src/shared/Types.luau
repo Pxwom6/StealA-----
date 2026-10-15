@@ -792,6 +792,44 @@ export type DropsConfig = {
 	},
 }
 
+-- Config: gadgets (Config/Gadgets): gear bought once with in-game cash, used whenever the player chooses -----------
+
+-- What a gadget does when it is used (Logic/GadgetRules decides, GadgetService applies it):
+--   speed   walk (and carry) faster for durationSeconds, x speedMultiplier (with a speed modifier, capped at
+--           GadgetsConfig.maxSpeedMultiplier)
+--   peel    drop a banana peel at your feet inside your own base; it stays durationSeconds, and the first other
+--           player to step within triggerRadius slips: frozen slipSeconds, and a Snackling of yours they carry runs home
+--   shield  nobody can tag you for durationSeconds (locks, peels and everything else still work)
+--   magnet  collect the cash waiting on every pad of your base, from anywhere
+export type GadgetKind = "speed" | "peel" | "shield" | "magnet"
+
+export type GadgetDef = {
+	kind: GadgetKind,
+	icon: string, -- emoji on its button and shop card
+	color: string, -- button and card colour (#RRGGBB)
+	nameKey: string, -- Config/Theme.text key of its name
+	descriptionKey: string, -- Theme.text key of its shop description: {percent} {seconds} {slip} {cooldown} are filled
+	price: number, -- in-game cash, paid once (gadgets are never sold for Robux)
+	cooldownSeconds: number, -- from one use to the next (server time, kept per session)
+	durationSeconds: number?, -- speed, shield: how long it lasts; peel: how long a peel stays down
+	speedMultiplier: number?, -- speed
+	slipSeconds: number?, -- peel: how long whoever steps on it can't move
+	triggerRadius: number?, -- peel: horizontal studs from its middle to a root that count as stepping on it
+}
+
+export type GadgetsConfig = {
+	order: { string }, -- every gadget id once: shop order, button slots and keys 1, 2, 3...
+	gadgets: { [string]: GadgetDef },
+	-- The fastest anyone may walk: a speed modifier times a speed gadget never goes past it, and neither do the
+	-- movement checks (which keep the faster speed allowed for speedGraceSeconds after it ends, like a modifier's).
+	maxSpeedMultiplier: number,
+	speedGraceSeconds: number,
+	peel: {
+		checkSeconds: number, -- how often the server checks who stands on a peel
+		triggerHeight: number, -- a root at most this high above the floor is standing on it (jumping over is fine)
+	},
+}
+
 export type MapThemesConfig = {
 	themes: { [string]: MapThemeDef },
 	order: { string }, -- every theme id once: display order, and ties in picks resolve by it
@@ -1063,6 +1101,13 @@ export type SpinView = {
 	rewards: { number }, -- what each cash segment pays right now (0 for other kinds)
 }
 
+-- The player's gadgets (Logic/GadgetRules.view). Times are server time (workspace:GetServerTimeNow()).
+export type GadgetsView = {
+	owned: { string }, -- gadget ids owned, in Config/Gadgets order
+	readyAt: { [string]: number }, -- when each owned gadget can be used again (missing or past: ready)
+	activeUntil: { [string]: number }, -- when a running effect ends (speed, shield) or a peel goes (missing: none)
+}
+
 export type QuestsView = {
 	list: { QuestSlotView },
 	bonus: number, -- the all-done bonus right now
@@ -1124,6 +1169,7 @@ export type ClientState = {
 	quests: QuestsView,
 	gifts: GiftsView,
 	spin: SpinView,
+	gadgets: GadgetsView,
 }
 
 export type BeltItem = { id: number, creatureId: string, spawnAt: number, variant: string? }

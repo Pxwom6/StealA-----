@@ -36,6 +36,8 @@ export type ClientToServer =
 	| "ClaimGift"
 	| "Spin"
 	| "GetAchievements"
+	| "BuyGadget"
+	| "UseGadget"
 
 export type ServerToClient =
 	"StateUpdate"
@@ -79,6 +81,8 @@ local CLIENT_TO_SERVER: { ClientToServer } = {
 	"ClaimGift",
 	"Spin",
 	"GetAchievements",
+	"BuyGadget",
+	"UseGadget",
 }
 
 local SERVER_TO_CLIENT: { ServerToClient } = {

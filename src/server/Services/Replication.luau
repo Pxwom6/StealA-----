@@ -22,6 +22,8 @@ local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local Types = require(ReplicatedStorage.Shared.Types)
 local Quests = require(ReplicatedStorage.Shared.Config.Quests)
 local QuestRules = require(ReplicatedStorage.Shared.Logic.QuestRules)
+local Gadgets = require(ReplicatedStorage.Shared.Config.Gadgets)
+local GadgetRules = require(ReplicatedStorage.Shared.Logic.GadgetRules)
 local Gifts = require(ReplicatedStorage.Shared.Config.Gifts)
 local Spin = require(ReplicatedStorage.Shared.Config.Spin)
 local GiftRules = require(ReplicatedStorage.Shared.Logic.GiftRules)
@@ -134,6 +136,7 @@ function Replication.snapshot(session: Session): Types.ClientState
 			ready = SpinRules.source(data.spin, now) ~= nil,
 			rewards = spinRewards(session.packIncome),
 		},
+		gadgets = GadgetRules.view(data.flags, session.gadgets, Gadgets), -- owned, cooldowns, running effects
 	}
 end
 
