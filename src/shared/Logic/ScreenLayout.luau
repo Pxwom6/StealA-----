@@ -1,24 +1,25 @@
 --!strict
 --[[
-	Where every HUD element goes, and the check that keeps them out of each other's way (DECISIONS.md #23, #26, #44).
-	Pure: no Roblox APIs. The client passes in the device facts and places its frames with these functions; tests and
-	tools/layoutCheck.luau run the same functions for the phones, tablets and windows the game targets, in the busiest
-	states, and fail on any overlap.
+	Where every HUD element goes, and the check that keeps them out of each other's way (DECISIONS.md #23, #26, #47).
+	Pure: no Roblox APIs. HudController builds a Device from the real screen (ScreenLayout.device) and places every HUD
+	frame where ScreenLayout.hud says; tests/ScreenLayout.spec.luau and tools/layoutCheck.luau run the same functions on
+	the phones, tablets and windows the game targets, in the busiest states, and fail on any problem.
 
 	Units: UI units (reference px; UiKit scales them by ScreenLayout.scaleFor) in HUD coordinates, whose origin is the
-	top-left of the device's safe area (the HUD ScreenGui uses DeviceSafeInsets, so it starts at the top of the screen,
-	under Roblox's 58 px top bar, not below it). Rects are { x, y, w, h }.
+	top-left corner of the device's safe area. Every game screen uses DeviceSafeInsets (UiKit.screen), so the HUD starts
+	at the top of the screen, under Roblox's top bar (58 px), whose buttons sit at its left: the HUD uses the rest of
+	that strip and keeps clear of them. Rects are { x, y, w, h }.
 
-	The HUD, laid out for thumbs on a landscape phone (667x375 at UI scale 0.85 = 785x441 UI):
+	The HUD on a landscape phone (667x375 px at UI scale 0.85 = 785x441 UI):
 
-	  top centre    the top stack: cash, then the tutorial banner or the "Need $X more?" strip, cash/sec, and the
-	                status row (event pill beside a column of luck / modifier chips, wrapping onto two rows when the
-	                screen is narrow). Only Skip and the offer's buttons are tappable, and they end above the play zone.
-	  top right     the corner row: lock button, 👥 Friends, ⚙ settings, in Roblox's top bar strip (its free part), or
-	                under Roblox's own top-left buttons when the player list leaves no room right of the cash
-	  top left      four feature buttons in a 2x2 grid under Roblox's top-left buttons, clear of the thumbstick
-	  right         the TAG! button (action area), above the jump button and below the player list
-	  bottom centre the map vote, between the thumbstick area and the jump button; toasts above it
+	  top centre    the cash pill (cash and cash/sec) in Roblox's top bar strip, then one band above the play zone: the
+	                tutorial banner, or the "Need $X more?" strip, or the status pills (event, the running modifier,
+	                server luck; side by side, more rows when the screen is narrow)
+	  top right     the corner row in the top bar strip: lock button, 👥 Friends, ⚙ settings (under Roblox's top-left
+	                buttons instead when the player list leaves no room at the right)
+	  top left      the four feature buttons in a 2x2 grid under Roblox's top-left buttons, above the thumbstick
+	  right         the TAG! button, above the jump button and below the player list
+	  bottom        the map vote between the thumbstick and the jump button; toasts above it
 	  middle        the play zone (the character and the prompts near it): nothing tappable
 ]]
 
@@ -39,13 +40,13 @@ function ScreenLayout.scaleFor(widthPx: number, heightPx: number): number
 	return math.clamp(s, ScreenLayout.SCALE.min, ScreenLayout.SCALE.max)
 end
 
--- Roblox's own UI, in screen pixels (the PlayerModule touch controls are copied from its TouchJump and
--- DynamicThumbstick code; the player list's size is an estimate, Roblox does not expose it).
+-- Roblox's own UI, in screen pixels: the top bar's height and where its left buttons end (the client reads both from
+-- GuiService), and the touch controls (copied from the PlayerModule's TouchJump and DynamicThumbstick code).
 ScreenLayout.ROBLOX = table.freeze({
-	topBar = 58, -- the top bar (GuiService:GetGuiInset): the touch controls and the player list start below it
-	topBarLeft = 210, -- its buttons on the left (menu, chat, more) end about here (GuiService.TopbarInset.Min.X)
-	-- Touch controls (TouchGui, below the top bar): the dynamic thumbstick starts from the left 40% of the screen
-	-- in its lower two thirds; the jump button is 70 px (120 when the short side is over 500) in the bottom right.
+	topBar = 58,
+	topBarLeft = 210, -- an estimate on the large side; the client uses GuiService.TopbarInset.Min.X
+	-- TouchGui sits below the top bar: the dynamic thumbstick starts from the left 40% of it in its lower two thirds;
+	-- the jump button is 70 px (120 when the short side is over 500) in the bottom right.
 	thumbstickWidthShare = 0.4,
 	thumbstickTopShare = 1 / 3,
 	jumpSmall = 70,
@@ -53,42 +54,40 @@ ScreenLayout.ROBLOX = table.freeze({
 	jumpSmallBelow = 500,
 })
 
--- Estimated width of Roblox's player list in pixels: the names column plus one column per leaderstat, and the gap to
--- the screen edge; its height is a header and one row per player (a full server of 8). It errs on the large side.
+-- Estimated size of Roblox's player list in pixels (Roblox does not expose it): the names column plus one column per
+-- leaderstat, the gap to the screen edge, a header and a row per player (a full server of 8). It errs on the large side.
 ScreenLayout.PLAYER_LIST = table.freeze({ base = 190, perStat = 80, max = 480, margin = 8, header = 40, row = 36 })
 
--- The player-facing play zone: the middle third of the screen, from 30% to 70% of its height. With Roblox's default
--- camera the character's head is at 50% and prompts near it are centred at 39-55% (147-207 of 375 px), each 72 px
--- tall, so their tops reach 30%; the feet are at 70-73%. Nothing tappable goes there.
+-- The play zone: the middle third of the screen, from 30% to 70% of its height. With Roblox's default camera the
+-- character's head is at 50% and the Buy / Steal / Open prompts near it are centred at 39-55% (147-207 of 375 px),
+-- so their tops reach 30%; the feet are at 70-73%. Nothing tappable goes there.
 ScreenLayout.PLAY_ZONE = table.freeze({ left = 1 / 3, right = 2 / 3, top = 0.3, bottom = 0.7 })
 
-ScreenLayout.MIN_TOUCH = 44 -- px, on touch screens
-ScreenLayout.EDGE = 8 -- UI units between an element and the screen edge or Roblox's UI
+ScreenLayout.MIN_TOUCH = 44 -- px, every button on a touch screen
+ScreenLayout.EDGE = 8 -- UI units from the screen edge
+ScreenLayout.GAP = 6 -- UI units between neighbours that are not in one list
 
--- Sizes and gaps in UI units, shared by the controllers that build these elements and by the check below.
+-- Sizes in UI units, shared by the controllers that build these elements and by the check.
 ScreenLayout.SIZE = table.freeze({
 	stackTop = 6,
 	stackGap = 4,
-	cash = { w = 250, h = 58 },
-	income = { w = 250, h = 26 },
-	stackHalfWidth = 125, -- the widest thing in the top strip (the cash pill) is 250
-	tutorial = { w = 420, h = 64, tip = 24, minW = 300, gap = 6 }, -- gap: from the TAG area / player list
-	skip = { w = 60, h = 52, inset = 8 }, -- the tutorial's Skip, in the banner's top 64 (inset from its right edge)
-	-- buttons 52 tall, inset from the strip's edges; narrowed down to minW where Roblox's player list leaves less room
-	cashOffer = { w = 400, minW = 330, h = 60, inset = 4, buy = 116, close = 52 },
-	eventPill = { w = 220, h = 64 },
-	chip = { w = 165, h = 30, gap = 4 },
-	statusGap = 6, -- between the event pill and the chips, and between the two rows when they wrap
+	cash = { w = 250, h = 58, amount = 36, income = 18 }, -- the amount over cash/sec, inside one pill
+	tutorial = { w = 420, h = 64, tip = 24, minW = 300 },
+	skip = { w = 64, h = 52, inset = 8 }, -- the tutorial's Skip: in the banner's top 64, inset from its right edge
+	-- "Need $X more?": text, the Robux button and ✕ (52 tall), inset from the strip's edges
+	cashOffer = { w = 400, minW = 330, h = 60, inset = 4, buy = 116, close = 52, text = 12 },
+	event = { w = 220, h = 60 }, -- event pill: the banner (two lines) over its countdown
+	modifier = { w = 165, h = 52 }, -- the running modifier: a button (tap for its description)
+	luck = { w = 165, h = 30 }, -- server luck
 	corner = { button = 52, lock = 104, gap = 8, top = 4 },
 	side = { w = 76, h = 52, gap = 6, columns = 2, left = 10 },
-	tag = { size = 120, pad = 15, right = 24, bottom = 185, gap = 6 }, -- right / bottom: from the HUD's edges
+	tag = { size = 120, pad = 15, right = 24, bottom = 185 }, -- right / bottom: from the HUD's edges
 	vote = { header = 20, gap = 4, choice = 68, choiceGap = 6, maxW = 420, thumbGap = 8, jumpGap = 16 },
 	toast = { w = 340, h = 40, tall = 56, gap = 6, max = 3, bottom = 110 },
-	banner = { w = 560, h = 64 }, -- announcement banner (narrowed by overlayWidth)
+	banner = { w = 560, h = 64 }, -- announcement banners
 	titleCard = { w = 400, h = 120 }, -- the new map's title card
 	stealAlert = { w = 420, h = 52, y = 230 },
 	carry = { w = 320, h = 46, bottom = 60 },
-	overlayGap = 6, -- banners and title cards drop in this far under the top stack
 })
 
 export type DeviceSpec = {
@@ -96,13 +95,15 @@ export type DeviceSpec = {
 	widthPx: number,
 	heightPx: number,
 	touch: boolean, -- Roblox's touch controls show (thumbstick + jump)
-	insetLeftPx: number?, -- device safe-area insets (notch, home indicator)
+	insetLeftPx: number?, -- the device's safe-area insets (notch, home indicator)
 	insetRightPx: number?,
+	insetTopPx: number?,
 	insetBottomPx: number?,
 	playerListPx: number?, -- width the player list takes from the right edge (ScreenLayout.playerListWidth), 0 = none
 	players: number?, -- rows in the player list (default 8)
 	topBarPx: number?, -- Roblox's top bar height (default ROBLOX.topBar)
-	topBarLeftPx: number?, -- where its left buttons end (default ROBLOX.topBarLeft)
+	topBarLeftPx: number?, -- where its left buttons end, from the screen's left edge (default ROBLOX.topBarLeft)
+	topBarRightPx: number?, -- where its free part ends on the right (default: the screen's right edge)
 }
 
 export type Device = {
@@ -112,27 +113,27 @@ export type Device = {
 	touch: boolean,
 	scale: number,
 	left: number, -- px from the screen's left edge to the HUD's
+	top: number, -- px from the screen's top edge to the HUD's
 	insetRightPx: number,
 	insetBottomPx: number,
 	width: number, -- the HUD area (the safe area), UI units
 	height: number,
 	topBar: number, -- UI y where Roblox's top bar ends
 	topBarLeft: number, -- UI x where its left buttons end
+	topBarRight: number, -- UI x where its free part ends
 	playerList: number, -- UI width the player list takes from the right (0 = none)
-	playerListBottom: number, -- UI y of its bottom (0 = none)
+	playerListBottom: number, -- UI y of its bottom
 }
 
 function ScreenLayout.device(spec: DeviceSpec): Device
 	local scale = ScreenLayout.scaleFor(spec.widthPx, spec.heightPx)
 	local left = spec.insetLeftPx or 0
 	local right = spec.insetRightPx or 0
+	local top = spec.insetTopPx or 0
 	local bottom = spec.insetBottomPx or 0
 	local topBarPx = spec.topBarPx or ScreenLayout.ROBLOX.topBar
 	local listPx = spec.playerListPx or 0
-	local rows = spec.players or 8
-	local listBottomPx = if listPx > 0
-		then topBarPx + ScreenLayout.PLAYER_LIST.header + rows * ScreenLayout.PLAYER_LIST.row
-		else 0
+	local listBottomPx = topBarPx + ScreenLayout.PLAYER_LIST.header + (spec.players or 8) * ScreenLayout.PLAYER_LIST.row
 	return {
 		name = spec.name,
 		widthPx = spec.widthPx,
@@ -140,14 +141,16 @@ function ScreenLayout.device(spec: DeviceSpec): Device
 		touch = spec.touch,
 		scale = scale,
 		left = left,
+		top = top,
 		insetRightPx = right,
 		insetBottomPx = bottom,
 		width = (spec.widthPx - left - right) / scale,
-		height = (spec.heightPx - bottom) / scale,
-		topBar = topBarPx / scale,
-		topBarLeft = (spec.topBarLeftPx or ScreenLayout.ROBLOX.topBarLeft) / scale,
+		height = (spec.heightPx - top - bottom) / scale,
+		topBar = (topBarPx - top) / scale,
+		topBarLeft = ((spec.topBarLeftPx or ScreenLayout.ROBLOX.topBarLeft) - left) / scale,
+		topBarRight = ((spec.topBarRightPx or spec.widthPx) - left) / scale,
 		playerList = listPx / scale,
-		playerListBottom = listBottomPx / scale,
+		playerListBottom = if listPx > 0 then (listBottomPx - top) / scale else 0,
 	}
 end
 
@@ -190,31 +193,45 @@ end
 
 -- Screen pixels → HUD UI units, and back.
 local function fromPx(device: Device, xPx: number, yPx: number): (number, number)
-	return (xPx - device.left) / device.scale, yPx / device.scale
+	return (xPx - device.left) / device.scale, (yPx - device.top) / device.scale
 end
 
 function ScreenLayout.toPx(device: Device, r: Rect): Rect
-	return rect(device.left + r.x * device.scale, r.y * device.scale, r.w * device.scale, r.h * device.scale)
+	return rect(
+		device.left + r.x * device.scale,
+		device.top + r.y * device.scale,
+		r.w * device.scale,
+		r.h * device.scale
+	)
 end
 
--- Roblox's UI --------------------------------------------------------------------------------------------------------
+-- Roblox's UI ----------------------------------------------------------------------------------------------------------
 
--- Roblox's buttons at the top left of the top bar.
+-- Roblox's buttons at the left of its top bar.
 function ScreenLayout.topBarButtons(device: Device): Rect
-	return rect(-device.left / device.scale, 0, device.topBarLeft + device.left / device.scale, device.topBar)
+	local x0 = -device.left / device.scale
+	return rect(x0, -device.top / device.scale, device.topBarLeft - x0, device.topBar + device.top / device.scale)
 end
 
 function ScreenLayout.playerListRect(device: Device): Rect?
 	if device.playerList <= 0 then
 		return nil
 	end
-	return rect(device.width - device.playerList, device.topBar, device.playerList, device.playerListBottom - device.topBar)
+	return rect(
+		device.width - device.playerList,
+		device.topBar,
+		device.playerList,
+		device.playerListBottom - device.topBar
+	)
 end
 
 -- The touch controls' screen (TouchGui): the safe area below the top bar, in px.
 local function touchArea(device: Device): (number, number, number, number)
-	local topPx = device.topBar * device.scale
-	return device.left, topPx, device.widthPx - device.left - device.insetRightPx, device.heightPx - device.insetBottomPx - topPx
+	local topPx = math.max(device.top, device.top + device.topBar * device.scale)
+	return device.left,
+		topPx,
+		device.widthPx - device.left - device.insetRightPx,
+		device.heightPx - device.insetBottomPx - topPx
 end
 
 -- Where a touch starts the dynamic thumbstick (touch screens only).
@@ -234,15 +251,13 @@ function ScreenLayout.jumpButton(device: Device): Rect?
 	end
 	local R = ScreenLayout.ROBLOX
 	local ax, ay, aw, ah = touchArea(device)
-	local small = math.min(aw, ah) <= R.jumpSmallBelow
-	local size = if small then R.jumpSmall else R.jumpBig
+	local size = if math.min(aw, ah) <= R.jumpSmallBelow then R.jumpSmall else R.jumpBig
 	local xPx = ax + aw - (size * 1.5 - 10)
-	local yPx = if small then ay + ah - size - 20 else ay + ah - size * 1.75
+	local yPx = if size == R.jumpSmall then ay + ah - size - 20 else ay + ah - size * 1.75
 	local x, y = fromPx(device, xPx, yPx)
 	return rect(x, y, size / device.scale, size / device.scale)
 end
 
--- The play zone in HUD units.
 function ScreenLayout.playZone(device: Device): Rect
 	local Z = ScreenLayout.PLAY_ZONE
 	local x0, y0 = fromPx(device, device.widthPx * Z.left, device.heightPx * Z.top)
@@ -250,28 +265,56 @@ function ScreenLayout.playZone(device: Device): Rect
 	return rect(x0, y0, x1 - x0, y1 - y0)
 end
 
--- Placement ---------------------------------------------------------------------------------------------------------
+-- Placement helpers ------------------------------------------------------------------------------------------------------
 
--- The corner row's buttons (widths left to right; the lock, Friends and the gear), as rects in the same order, and
--- whether they had to leave the top-right corner: right-aligned in the top bar strip, left of the player list and
--- clear of the cash pill; when that leaves no room, in a row under Roblox's top-left buttons instead.
+-- The span [left, right] across the HUD between heights y0 and y1 that stays GAP clear of `obstacles`: an obstacle
+-- whose centre is left of `cx` bounds it on the left, one right of `cx` on the right.
+function ScreenLayout.lane(device: Device, obstacles: { Rect }, y0: number, y1: number, cx: number): (number, number)
+	local left, right = ScreenLayout.EDGE, device.width - ScreenLayout.EDGE
+	for _, r in obstacles do
+		if r.y < y1 and r.y + r.h > y0 then
+			if r.x + r.w / 2 < cx then
+				left = math.max(left, r.x + r.w + ScreenLayout.GAP)
+			else
+				right = math.min(right, r.x - ScreenLayout.GAP)
+			end
+		end
+	end
+	return left, right
+end
+
+-- x and width of something `w` wide (at least `minW`) centred on `cx` in [left, right]: narrowed evenly while it
+-- stays at least `minW`, else shifted to fit.
+function ScreenLayout.fitSpan(cx: number, w: number, minW: number, left: number, right: number): (number, number)
+	local even = 2 * math.min(cx - left, right - cx)
+	if even >= math.min(w, minW) then
+		local width = math.min(w, even)
+		return cx - width / 2, width
+	end
+	local width = math.max(math.min(minW, w), math.min(w, right - left))
+	return math.clamp(cx - width / 2, left, math.max(left, right - width)), width
+end
+
+-- The corner row (widths left to right: lock, Friends, gear) and whether it had to leave the top-right corner. It sits
+-- right-aligned in the top bar strip, clear of the player list and of the cash pill; when there is no room there, in a
+-- row under Roblox's top-left buttons instead.
 function ScreenLayout.cornerRow(device: Device, widths: { number }): ({ Rect }, boolean)
 	local C = ScreenLayout.SIZE.corner
 	local total = 0
 	for index, w in widths do
 		total += w + (if index > 1 then C.gap else 0)
 	end
-	local rightLimit = device.width - ScreenLayout.EDGE - device.playerList
-	local leftLimit = device.width / 2 + ScreenLayout.SIZE.stackHalfWidth + ScreenLayout.EDGE
-	local overflow = rightLimit - total < leftLimit
+	local right = math.min(device.width - device.playerList, device.topBarRight) - ScreenLayout.EDGE
+	local cashRight = device.width / 2 + ScreenLayout.SIZE.cash.w / 2 + ScreenLayout.EDGE
+	local moved = right - total < math.max(cashRight, device.topBarLeft + ScreenLayout.EDGE)
 	local rects: { Rect } = {}
-	local x = if overflow then ScreenLayout.SIZE.side.left else rightLimit - total
-	local y = if overflow then device.topBar + C.top else C.top
+	local x = if moved then ScreenLayout.SIZE.side.left else right - total
+	local y = if moved then device.topBar + C.top else C.top
 	for _, w in widths do
 		table.insert(rects, rect(x, y, w, C.button))
 		x += w + C.gap
 	end
-	return rects, overflow and #widths > 0
+	return rects, moved and #widths > 0
 end
 
 -- The 2x2 grid of feature buttons (Shop, Rebirth, Rewards, Snackdex): under Roblox's top-left buttons (and under the
@@ -287,6 +330,7 @@ function ScreenLayout.sideGrid(device: Device, count: number, cornerMoved: boole
 	return rect(S.left, top, columns * S.w + (columns - 1) * S.gap, rows * S.h + (rows - 1) * S.gap)
 end
 
+-- Button `index` (1 Shop, 2 Rebirth, 3 Rewards, 4 Snackdex) in the grid.
 function ScreenLayout.sideCell(grid: Rect, index: number): Rect
 	local S = ScreenLayout.SIZE.side
 	local column = (index - 1) % S.columns
@@ -294,70 +338,36 @@ function ScreenLayout.sideCell(grid: Rect, index: number): Rect
 	return rect(grid.x + column * (S.w + S.gap), grid.y + row * (S.h + S.gap), S.w, S.h)
 end
 
--- The TAG! button: where it always was on phones (above the jump button, right side), lower when Roblox's player list
--- would cover it, and never on the jump button. Returns the button's rect; the action area frame is `pad` bigger.
+-- The TAG! button: where it always was (right side, above the jump button), lower when Roblox's player list would
+-- cover it, and never on the jump button.
 function ScreenLayout.tagButton(device: Device): Rect
 	local T = ScreenLayout.SIZE.tag
 	local x = device.width - T.right - T.pad - T.size
-	local bottom = device.height - T.bottom
-	local lowest = device.height - T.right - T.pad -- non-touch: down to the bottom-right corner
+	local lowest = device.height - T.right - T.pad
 	local jump = ScreenLayout.jumpButton(device)
 	if jump then
-		lowest = jump.y - T.gap
-		bottom = math.min(bottom, lowest)
+		lowest = jump.y - ScreenLayout.GAP
 	end
+	local bottom = math.min(device.height - T.bottom, lowest)
 	local list = ScreenLayout.playerListRect(device)
-	if list and x + T.size > list.x and bottom - T.size < list.y + list.h + T.gap then
-		bottom = math.min(lowest, list.y + list.h + T.gap + T.size)
+	if list and x + T.size > list.x and bottom - T.size < list.y + list.h + ScreenLayout.GAP then
+		bottom = math.min(lowest, list.y + list.h + ScreenLayout.GAP + T.size)
 	end
 	return rect(x, bottom - T.size, T.size, T.size)
 end
 
+-- The frame around the TAG button (the action area other controllers may add to).
 function ScreenLayout.actionArea(device: Device): Rect
 	local tag = ScreenLayout.tagButton(device)
 	local pad = ScreenLayout.SIZE.tag.pad
 	return rect(tag.x - pad, tag.y - pad, tag.w + 2 * pad, tag.h + 2 * pad)
 end
 
--- The "Need $X more?" strip under the cash: centred, or shifted and narrowed (never below `cashOffer.minW`) to stay
--- clear of the corner row and feature buttons on the left and of the TAG area and the player list on the right.
--- Returns its x and width.
-function ScreenLayout.cashOfferPlacement(device: Device, cornerMoved: boolean, cornerRight: number): (number, number)
-	local O = ScreenLayout.SIZE.cashOffer
-	local grid = ScreenLayout.sideGrid(device, 4, cornerMoved)
-	local gap = ScreenLayout.SIZE.overlayGap
-	local leftLimit = grid.x + grid.w + gap
-	if cornerMoved then
-		leftLimit = math.max(leftLimit, cornerRight + gap)
-	end
-	local rightLimit = math.min(ScreenLayout.actionArea(device).x, device.width - device.playerList) - gap
-	local w = math.max(O.minW, math.min(O.w, rightLimit - leftLimit))
-	local x = math.clamp(device.width / 2 - w / 2, leftLimit, math.max(leftLimit, rightLimit - w))
-	return x, w
-end
-
--- How wide something centred on `centerX` may be to stay clear of the feature buttons on the left, and of the TAG
--- area and the player list on the right: `preferred`, or less.
-function ScreenLayout.centredWidth(device: Device, centerX: number, preferred: number, cornerMoved: boolean): number
-	local grid = ScreenLayout.sideGrid(device, 4, cornerMoved)
-	local leftLimit = grid.x + grid.w + ScreenLayout.SIZE.overlayGap
-	local rightLimit = math.min(ScreenLayout.actionArea(device).x, device.width - device.playerList)
-		- ScreenLayout.SIZE.overlayGap
-	local half = math.min(centerX - leftLimit, rightLimit - centerX)
-	return math.max(0, math.min(preferred, 2 * half))
-end
-
--- Whether the status row's event pill and chips fit side by side, else they wrap onto two rows (UIListLayout.Wraps).
-function ScreenLayout.statusRowWidth(device: Device, cornerMoved: boolean): number
-	return ScreenLayout.centredWidth(device, device.width / 2, math.huge, cornerMoved)
-end
-
 -- The map vote strip at the bottom: between the thumbstick's area and the jump button on touch screens, centred
--- otherwise; header line, then one button per map.
+-- otherwise: a header line over one button per map.
 function ScreenLayout.voteStrip(device: Device): Rect
 	local V = ScreenLayout.SIZE.vote
 	local h = V.header + V.gap + V.choice
-	local y = device.height - ScreenLayout.EDGE - h
 	local thumb = ScreenLayout.thumbstickArea(device)
 	local jump = ScreenLayout.jumpButton(device)
 	local x0, x1 = ScreenLayout.EDGE, device.width - ScreenLayout.EDGE
@@ -369,17 +379,17 @@ function ScreenLayout.voteStrip(device: Device): Rect
 	end
 	local centre = if thumb or jump then (x0 + x1) / 2 else device.width / 2
 	local w = math.min(V.maxW, x1 - x0)
-	return rect(centre - w / 2, y, w, h)
+	return rect(centre - w / 2, device.height - ScreenLayout.EDGE - h, w, h)
 end
 
--- One of `count` vote buttons in the strip.
+-- One of `count` vote buttons in the strip (the client splits the strip the same way, with scale sizes).
 function ScreenLayout.voteChoice(strip: Rect, index: number, count: number): Rect
 	local V = ScreenLayout.SIZE.vote
 	local w = (strip.w - V.choiceGap * (count - 1)) / math.max(1, count)
 	return rect(strip.x + (index - 1) * (w + V.choiceGap), strip.y + V.header + V.gap, w, V.choice)
 end
 
--- The toast list: centred, its bottom `toast.bottom` above the screen's (over the vote strip); newest at the bottom.
+-- The toast list: centred, its bottom `toast.bottom` above the screen's (over the vote strip); the newest at the bottom.
 function ScreenLayout.toastList(device: Device): Rect
 	local T = ScreenLayout.SIZE.toast
 	local h = T.max * T.tall + (T.max - 1) * T.gap
@@ -389,40 +399,106 @@ end
 -- The HUD in one state ------------------------------------------------------------------------------------------------
 
 export type HudState = {
-	tutorial: string?, -- "full" (with its tip), "compact", or nil
+	tutorial: string?, -- "full" (with its tip) or "compact" while the banner shows
 	cashOffer: boolean?,
 	event: boolean?,
-	luck: boolean?,
 	modifier: boolean?,
+	luck: boolean?,
 	vote: boolean?,
 	carrying: boolean?,
+	friends: boolean?,
+	tag: boolean?,
 	toasts: number?,
 	announcement: boolean?,
 	titleCard: boolean?,
 	stealAlert: boolean?,
-	tag: boolean?,
-	friends: boolean?,
 }
 
--- kind: "button" (tappable), "info" (a HUD pill), "overlay" (drawn above the HUD for a few seconds), "core" (Roblox's
--- own UI), "zone" (the play zone). `parent`: the element this one sits inside (its own pill).
+-- kind: "button" (tappable), "info" (a HUD pill), "overlay" (above the HUD for a few seconds, never tappable), "core"
+-- (Roblox's own UI), "zone" (the play zone). `parent`: the element this one sits inside.
 export type Element = { id: string, kind: string, rect: Rect, parent: string? }
 
--- Everything on screen in `state` on `device` (UI units, HUD coordinates). The tutorial banner switches the player
--- list off when it can't clear it (TutorialController), so `device` should already reflect that
--- (ScreenLayout.tutorialDevice).
-function ScreenLayout.hud(device: Device, state: HudState): { Element }
+export type Layout = {
+	elements: { Element },
+	byId: { [string]: Rect },
+	stackBottom: number, -- UI y where the top stack ends
+	cornerMoved: boolean,
+	statusShown: boolean, -- the status pills show (the band isn't the tutorial's or a cash offer's)
+	obstacles: { Rect }, -- what centred overlays stay clear of (buttons and Roblox's UI)
+	centerX: number,
+}
+
+-- The stack's centre: the screen's, moved right if the cash pill would reach Roblox's top-left buttons, and never into
+-- the corner row.
+function ScreenLayout.stackCenter(device: Device, cornerLeft: number?): number
+	local half = ScreenLayout.SIZE.cash.w / 2 + ScreenLayout.EDGE
+	local cx = math.max(device.width / 2, device.topBarLeft + half)
+	if cornerLeft then
+		cx = math.min(cx, cornerLeft - half)
+	end
+	return cx
+end
+
+-- Status pills in rows: each row as wide as fits the lane, centred, items vertically centred in their row.
+local function flow(
+	device: Device,
+	items: { { id: string, kind: string, w: number, h: number } },
+	top: number,
+	cx: number,
+	obstacles: { Rect },
+	add: (id: string, kind: string, r: Rect) -> ()
+): number
+	local y = top
+	local index = 1
+	while index <= #items do
+		-- The lane for a row as tall as the tallest item.
+		local rowH = 0
+		for i = index, #items do
+			rowH = math.max(rowH, items[i].h)
+		end
+		local left, right = ScreenLayout.lane(device, obstacles, y, y + rowH, cx)
+		local width = items[index].w
+		local last = index
+		while last < #items and width + ScreenLayout.GAP + items[last + 1].w <= right - left do
+			last += 1
+			width += ScreenLayout.GAP + items[last].w
+		end
+		local height = 0
+		for i = index, last do
+			height = math.max(height, items[i].h)
+		end
+		local x = ScreenLayout.fitSpan(cx, width, width, left, right)
+		for i = index, last do
+			local item = items[i]
+			add(item.id, item.kind, rect(x, y + (height - item.h) / 2, item.w, item.h))
+			x += item.w + ScreenLayout.GAP
+		end
+		y += height + ScreenLayout.SIZE.stackGap
+		index = last + 1
+	end
+	return y
+end
+
+-- Everything on screen in `state` on `device` (UI units, HUD coordinates). Run it on ScreenLayout.tutorialDevice(device)
+-- while the tutorial runs: its banner switches the player list off when it can't clear it.
+function ScreenLayout.layout(device: Device, state: HudState): Layout
 	local S = ScreenLayout.SIZE
-	local list: { Element } = {}
+	local elements: { Element } = {}
+	local byId: { [string]: Rect } = {}
 	local function add(id: string, kind: string, r: Rect, parent: string?)
-		table.insert(list, { id = id, kind = kind, rect = r, parent = parent })
+		table.insert(elements, { id = id, kind = kind, rect = r, parent = parent })
+		byId[id] = r
 	end
 
 	-- Roblox's UI and the play zone.
-	add("robloxTopBar", "core", ScreenLayout.topBarButtons(device))
+	local obstacles: { Rect } = {}
+	local robloxButtons = ScreenLayout.topBarButtons(device)
+	add("robloxTopBar", "core", robloxButtons)
+	table.insert(obstacles, robloxButtons)
 	local playerList = ScreenLayout.playerListRect(device)
 	if playerList then
 		add("playerList", "core", playerList)
+		table.insert(obstacles, playerList)
 	end
 	local thumb = ScreenLayout.thumbstickArea(device)
 	if thumb then
@@ -431,10 +507,11 @@ function ScreenLayout.hud(device: Device, state: HudState): { Element }
 	local jump = ScreenLayout.jumpButton(device)
 	if jump then
 		add("jump", "core", jump)
+		table.insert(obstacles, jump)
 	end
 	add("playZone", "zone", ScreenLayout.playZone(device))
 
-	-- Corner row and feature buttons.
+	-- The corner row and the feature buttons.
 	local widths = { S.corner.lock }
 	local ids = { "lock" }
 	if state.friends then
@@ -444,97 +521,67 @@ function ScreenLayout.hud(device: Device, state: HudState): { Element }
 	table.insert(widths, S.corner.button)
 	table.insert(ids, "gear")
 	local corner, moved = ScreenLayout.cornerRow(device, widths)
-	local cornerRight = 0
 	for index, r in corner do
 		add(ids[index], "button", r)
-		cornerRight = math.max(cornerRight, r.x + r.w)
+		table.insert(obstacles, r)
 	end
 	local grid = ScreenLayout.sideGrid(device, 4, moved)
+	table.insert(obstacles, grid)
 	for index, id in { "shop", "rebirth", "rewards", "snackdex" } do
 		add(id, "button", ScreenLayout.sideCell(grid, index))
 	end
-
-	-- Top stack (a centred UIListLayout).
-	local cx = device.width / 2
-	local y = S.stackTop
-	local function pill(id: string, w: number, h: number): Rect
-		local r = rect(cx - w / 2, y, w, h)
-		add(id, "info", r)
-		y += h + S.stackGap
-		return r
+	local action = ScreenLayout.actionArea(device)
+	table.insert(obstacles, action)
+	if state.tag then
+		add("tag", "button", ScreenLayout.tagButton(device))
 	end
-	pill("cash", S.cash.w, S.cash.h)
-	local tagRect = ScreenLayout.tagButton(device)
+
+	-- The top stack: the cash pill, then the band.
+	local cx = ScreenLayout.stackCenter(device, if moved then nil else corner[1].x)
+	add("cash", "info", rect(cx - S.cash.w / 2, S.stackTop, S.cash.w, S.cash.h))
+	-- The band starts under the cash pill, and below Roblox's top bar (its buttons are in the strip at the left).
+	local y = math.max(S.stackTop + S.cash.h + S.stackGap, device.topBar)
+	local statusShown = false
 	if state.tutorial then
-		local rightLimit = math.min(ScreenLayout.actionArea(device).x, device.width - device.playerList)
-		local fits = 2 * (rightLimit - S.tutorial.gap - cx)
-		local w = math.max(S.tutorial.minW, math.min(S.tutorial.w, fits))
-		local banner = pill("tutorial", w, S.tutorial.h + (if state.tutorial == "full" then S.tutorial.tip else 0))
+		local h = S.tutorial.h + (if state.tutorial == "full" then S.tutorial.tip else 0)
+		local left, right = ScreenLayout.lane(device, obstacles, y, y + h, cx)
+		local x, w = ScreenLayout.fitSpan(cx, S.tutorial.w, S.tutorial.minW, left, right)
+		add("tutorial", "info", rect(x, y, w, h))
 		add(
 			"skip",
 			"button",
-			rect(
-				banner.x + banner.w - S.skip.inset - S.skip.w,
-				banner.y + (S.tutorial.h - S.skip.h) / 2,
-				S.skip.w,
-				S.skip.h
-			),
+			rect(x + w - S.skip.inset - S.skip.w, y + (S.tutorial.h - S.skip.h) / 2, S.skip.w, S.skip.h),
 			"tutorial"
 		)
+		y += h + S.stackGap
 	elseif state.cashOffer then
 		local O = S.cashOffer
-		local x, w = ScreenLayout.cashOfferPlacement(device, moved, cornerRight)
-		local strip = rect(x, y, w, O.h)
-		add("cashOffer", "info", strip)
+		local left, right = ScreenLayout.lane(device, obstacles, y, y + O.h, cx)
+		local x, w = ScreenLayout.fitSpan(cx, O.w, O.minW, left, right)
+		add("cashOffer", "info", rect(x, y, w, O.h))
+		local closeX = x + w - O.inset - O.close
+		local buttonH = O.h - 2 * O.inset
+		add("cashOfferClose", "button", rect(closeX, y + O.inset, O.close, buttonH), "cashOffer")
+		add("cashOfferBuy", "button", rect(closeX - ScreenLayout.GAP - O.buy, y + O.inset, O.buy, buttonH), "cashOffer")
 		y += O.h + S.stackGap
-		local closeX = strip.x + strip.w - O.inset - O.close
-		add("cashOfferClose", "button", rect(closeX, strip.y + O.inset, O.close, O.h - 2 * O.inset), "cashOffer")
-		add(
-			"cashOfferBuy",
-			"button",
-			rect(closeX - 6 - O.buy, strip.y + O.inset, O.buy, O.h - 2 * O.inset),
-			"cashOffer"
-		)
-	end
-	pill("income", S.income.w, S.income.h)
-	local chips = (if state.luck then 1 else 0) + (if state.modifier then 1 else 0)
-	if state.event or chips > 0 then
-		local columnH = chips * S.chip.h + math.max(0, chips - 1) * S.chip.gap
-		local available = ScreenLayout.statusRowWidth(device, moved)
-		local both = state.event and chips > 0
-		local function chipColumn(top: number, x: number)
-			local chipY = top
-			for _, id in { "luck", "modifier" } do
-				if (id == "luck" and state.luck) or (id == "modifier" and state.modifier) then
-					add(id, "info", rect(x, chipY, S.chip.w, S.chip.h))
-					chipY += S.chip.h + S.chip.gap
-				end
-			end
+	else
+		-- The status pills, most lasting first: the event, the modifier (a button), luck.
+		local items = {}
+		if state.event then
+			table.insert(items, { id = "event", kind = "info", w = S.event.w, h = S.event.h })
 		end
-		if both and S.eventPill.w + S.statusGap + S.chip.w <= available then
-			local w = S.eventPill.w + S.statusGap + S.chip.w
-			local h = math.max(S.eventPill.h, columnH)
-			local x = cx - w / 2
-			add("event", "info", rect(x, y + (h - S.eventPill.h) / 2, S.eventPill.w, S.eventPill.h))
-			chipColumn(y + (h - columnH) / 2, x + S.eventPill.w + S.statusGap)
-			y += h + S.stackGap
-		else
-			if state.event then
-				add("event", "info", rect(cx - S.eventPill.w / 2, y, S.eventPill.w, S.eventPill.h))
-				y += S.eventPill.h + (if chips > 0 then S.statusGap else S.stackGap)
-			end
-			if chips > 0 then
-				chipColumn(y, cx - S.chip.w / 2)
-				y += columnH + S.stackGap
-			end
+		if state.modifier then
+			table.insert(items, { id = "modifier", kind = "button", w = S.modifier.w, h = S.modifier.h })
 		end
+		if state.luck then
+			table.insert(items, { id = "luck", kind = "info", w = S.luck.w, h = S.luck.h })
+		end
+		statusShown = true
+		y = flow(device, items, y, cx, obstacles, add)
 	end
 	local stackBottom = y - S.stackGap
 
-	-- The TAG button, the vote strip and what floats above the HUD.
-	if state.tag then
-		add("tag", "button", tagRect)
-	end
+	-- The bottom of the screen.
 	if state.vote then
 		local strip = ScreenLayout.voteStrip(device)
 		add("voteHeader", "info", rect(strip.x, strip.y, strip.w, S.vote.header))
@@ -545,18 +592,22 @@ function ScreenLayout.hud(device: Device, state: HudState): { Element }
 	if state.carrying then
 		add("carry", "overlay", rect(cx - S.carry.w / 2, device.height - S.carry.bottom - S.carry.h, S.carry.w, S.carry.h))
 	end
-	local overlayY = stackBottom + S.overlayGap
+
+	-- What drops in over the HUD for a few seconds: below the stack, clear of the buttons beside it.
+	local function overlay(id: string, w: number, h: number, top: number)
+		local left, right = ScreenLayout.lane(device, obstacles, top, top + h, cx)
+		local x, width = ScreenLayout.fitSpan(cx, w, 0, left, right)
+		add(id, "overlay", rect(x, top, width, h))
+	end
+	local overlayTop = stackBottom + ScreenLayout.GAP
 	if state.announcement then
-		local w = ScreenLayout.centredWidth(device, cx, S.banner.w, moved)
-		add("announcement", "overlay", rect(cx - w / 2, overlayY, w, S.banner.h))
+		overlay("announcement", S.banner.w, S.banner.h, overlayTop)
 	end
 	if state.titleCard then
-		local w = ScreenLayout.centredWidth(device, cx, S.titleCard.w, moved)
-		add("titleCard", "overlay", rect(cx - w / 2, overlayY, w, S.titleCard.h))
+		overlay("titleCard", S.titleCard.w, S.titleCard.h, overlayTop)
 	end
 	if state.stealAlert then
-		local w = ScreenLayout.centredWidth(device, cx, S.stealAlert.w, moved)
-		add("stealAlert", "overlay", rect(cx - w / 2, S.stealAlert.y, w, S.stealAlert.h))
+		overlay("stealAlert", S.stealAlert.w, S.stealAlert.h, ScreenLayout.stealAlertTop(stackBottom))
 	end
 	local toasts = state.toasts or 0
 	if toasts > 0 then
@@ -567,37 +618,56 @@ function ScreenLayout.hud(device: Device, state: HudState): { Element }
 			bottom -= S.toast.tall + S.toast.gap
 		end
 	end
-	return list
+	return {
+		elements = elements,
+		byId = byId,
+		stackBottom = stackBottom,
+		cornerMoved = moved,
+		statusShown = statusShown,
+		obstacles = obstacles,
+		centerX = cx,
+	}
 end
 
--- The device as the tutorial leaves it: the player list switched off while its banner can't clear it.
+-- The steal alert's top: its usual height, or under an announcement banner below a tall stack.
+function ScreenLayout.stealAlertTop(stackBottom: number): number
+	return math.max(ScreenLayout.SIZE.stealAlert.y, stackBottom + 2 * ScreenLayout.GAP + ScreenLayout.SIZE.banner.h)
+end
+
+-- Where a centred overlay `w` x `h` goes at `top` (announcement banners, the map title card...): x and width.
+function ScreenLayout.overlaySpan(device: Device, layout: Layout, w: number, h: number, top: number): (number, number)
+	local left, right = ScreenLayout.lane(device, layout.obstacles, top, top + h, layout.centerX)
+	return ScreenLayout.fitSpan(layout.centerX, w, 0, left, right)
+end
+
+-- The device as the tutorial leaves it: the player list switched off while its banner can't clear it at its minimum
+-- width.
 function ScreenLayout.tutorialDevice(device: Device): Device
 	if device.playerList <= 0 then
 		return device
 	end
-	local S = ScreenLayout.SIZE.tutorial
-	local cx = device.width / 2
-	local rightLimit = math.min(ScreenLayout.actionArea(device).x, device.width - device.playerList)
-	local w = math.max(S.minW, math.min(S.w, 2 * (rightLimit - S.gap - cx)))
-	if ScreenLayout.bannerNeedsPlayerListHidden(cx, w, device.width, device.playerList, S.gap) then
+	local S = ScreenLayout.SIZE
+	local probe = ScreenLayout.layout(device, { tutorial = "full" })
+	local banner = probe.byId.tutorial
+	local list = ScreenLayout.playerListRect(device)
+	if banner and list and (banner.w < S.tutorial.minW - 0.01 or ScreenLayout.overlaps(banner, list)) then
 		return ScreenLayout.withoutPlayerList(device)
 	end
 	return device
 end
 
--- The check -----------------------------------------------------------------------------------------------------------
+-- The check -------------------------------------------------------------------------------------------------------------
 
 local function describe(e: Element): string
 	local r = e.rect
 	return string.format("%s (x %.0f-%.0f, y %.0f-%.0f)", e.id, r.x, r.x + r.w, r.y, r.y + r.h)
 end
 
--- What is wrong with a layout (empty when it is fine):
---   * everything of the HUD inside the screen's safe area
---   * no two buttons overlap, and no HUD pill overlaps another pill or a button (except its own pill)
---   * nothing that floats above the HUD (toasts, banners, alerts, cards) covers a button
---   * no button in the play zone, on Roblox's top-bar buttons, the player list, the jump button or where the
---     thumbstick starts; no HUD pill under Roblox's buttons or the player list
+-- What is wrong with a layout (empty when nothing):
+--   * every HUD element inside the safe area
+--   * no two HUD elements overlap (a button may sit inside its own pill); overlays may cover pills but no button
+--   * no button in the play zone, on Roblox's top-bar buttons, the player list, the jump button or where the thumbstick
+--     starts; no HUD pill under Roblox's top-bar buttons or the player list
 --   * on touch screens every button is at least MIN_TOUCH px both ways
 function ScreenLayout.problems(device: Device, elements: { Element }): { string }
 	local problems: { string } = {}
@@ -619,7 +689,12 @@ function ScreenLayout.problems(device: Device, elements: { Element }): { string 
 	local tolerance = 0.5
 	for _, e in hud do
 		local r = e.rect
-		if r.x < -tolerance or r.y < -tolerance or r.x + r.w > device.width + tolerance or r.y + r.h > device.height + tolerance then
+		if
+			r.x < -tolerance
+			or r.y < -tolerance
+			or r.x + r.w > device.width + tolerance
+			or r.y + r.h > device.height + tolerance
+		then
 			report(`{describe(e)} is off screen ({string.format("%.0f x %.0f", device.width, device.height)})`)
 		end
 		if e.kind == "button" then
@@ -649,7 +724,7 @@ function ScreenLayout.problems(device: Device, elements: { Element }): { string 
 			end
 			local overlay = a.kind == "overlay" or b.kind == "overlay"
 			local button = a.kind == "button" or b.kind == "button"
-			if (not overlay) or button then
+			if not overlay or button then
 				report(`{describe(a)} overlaps {describe(b)}`)
 			end
 		end
@@ -657,89 +732,103 @@ function ScreenLayout.problems(device: Device, elements: { Element }): { string 
 	return problems
 end
 
--- The devices and the busiest states the HUD is checked in (tests/ScreenLayout.spec.luau, tools/layoutCheck.luau).
+-- The screens and the busiest states the HUD is checked in (tests/ScreenLayout.spec.luau, tools/layoutCheck.luau).
 ScreenLayout.DEVICES = table.freeze({
 	{ name = "640x360 phone", widthPx = 640, heightPx = 360, touch = true },
 	{ name = "667x375 phone", widthPx = 667, heightPx = 375, touch = true },
 	-- iPhone 12-15 in landscape: the notch and the home indicator take 47 px each side and 21 at the bottom
-	{ name = "844x390 phone", widthPx = 844, heightPx = 390, touch = true, insetLeftPx = 47, insetRightPx = 47, insetBottomPx = 21 },
-	-- a tablet keeps Roblox's player list on screen (leaderstats: Cash, Steals)
+	{
+		name = "844x390 phone",
+		widthPx = 844,
+		heightPx = 390,
+		touch = true,
+		insetLeftPx = 47,
+		insetRightPx = 47,
+		insetBottomPx = 21,
+	},
+	-- a tablet keeps Roblox's player list on screen (two leaderstats)
 	{ name = "1024x768 tablet", widthPx = 1024, heightPx = 768, touch = true, playerListPx = 358 },
 	{ name = "1280x720 window", widthPx = 1280, heightPx = 720, touch = false, playerListPx = 358 },
 } :: { DeviceSpec })
 
 export type Scenario = { name: string, state: HudState }
 
+-- Toasts, banners and alerts are transient, so the worst cases put them all on screen together. Never at once (by the
+-- game's own rules): the vote and a cash offer during the tutorial, the vote while carrying (it hides), a cash offer
+-- while carrying (buying is refused), the Friends button during the tutorial.
 ScreenLayout.SCENARIOS = table.freeze({
 	{
-		name = "everything at once (no tutorial)",
+		name = "everything at once",
+		state = {
+			event = true,
+			modifier = true,
+			luck = true,
+			vote = true,
+			friends = true,
+			tag = true,
+			toasts = 3,
+			announcement = true,
+			stealAlert = true,
+		},
+	},
+	{
+		name = "a cash offer during a vote",
 		state = {
 			cashOffer = true,
 			event = true,
-			luck = true,
 			modifier = true,
+			luck = true,
 			vote = true,
+			friends = true,
+			tag = true,
 			toasts = 3,
 			announcement = true,
 			stealAlert = true,
-			tag = true,
-			friends = true,
 		},
 	},
 	{
-		-- the vote hides while carrying, and nothing offers cash then (buying is refused while carrying)
 		name = "carrying a Snackling home",
 		state = {
 			event = true,
-			luck = true,
 			modifier = true,
+			luck = true,
 			carrying = true,
+			friends = true,
+			tag = true,
 			toasts = 3,
 			announcement = true,
 			stealAlert = true,
-			tag = true,
-			friends = true,
 		},
 	},
 	{
-		-- the vote and cash offers wait for the tutorial; the Friends button hides during it
-		name = "tutorial with its tip",
+		name = "the tutorial with its tip",
 		state = {
 			tutorial = "full",
 			event = true,
-			luck = true,
 			modifier = true,
+			luck = true,
+			tag = true,
 			toasts = 3,
 			announcement = true,
 			stealAlert = true,
-			tag = true,
 		},
 	},
 	{
-		name = "tutorial while carrying",
+		name = "the tutorial while carrying",
 		state = {
 			tutorial = "compact",
 			event = true,
-			luck = true,
 			modifier = true,
+			luck = true,
 			carrying = true,
+			tag = true,
 			toasts = 3,
 			announcement = true,
-			tag = true,
 		},
 	},
 	{
-		-- right after a vote: the new map's title card (the vote strip is gone)
 		name = "a new map",
-		state = {
-			event = true,
-			modifier = true,
-			titleCard = true,
-			toasts = 3,
-			announcement = true,
-			tag = true,
-			friends = true,
-		},
+		state = { event = true, modifier = true, friends = true, tag = true, toasts = 3, titleCard = true },
 	},
 	{ name = "a quiet moment", state = { friends = true } },
 } :: { Scenario })
@@ -750,40 +839,18 @@ function ScreenLayout.scenarioDevice(spec: DeviceSpec, scenario: Scenario): Devi
 	return if scenario.state.tutorial then ScreenLayout.tutorialDevice(device) else device
 end
 
--- Every problem on every device in every scenario.
+-- Every problem on every screen in every scenario.
 function ScreenLayout.checkAll(): { string }
 	local all: { string } = {}
 	for _, spec in ScreenLayout.DEVICES do
 		for _, scenario in ScreenLayout.SCENARIOS do
 			local device = ScreenLayout.scenarioDevice(spec, scenario)
-			for _, problem in ScreenLayout.problems(device, ScreenLayout.hud(device, scenario.state)) do
+			for _, problem in ScreenLayout.problems(device, ScreenLayout.layout(device, scenario.state).elements) do
 				table.insert(all, `{problem} [{scenario.name}]`)
 			end
 		end
 	end
 	return all
-end
-
--- Tutorial banner helpers (TutorialController) -------------------------------------------------------------------------
-
--- The x the tutorial banner's right edge must stay left of: the TAG button area, or the player list's left edge.
-function ScreenLayout.bannerRightLimit(actionAreaX: number, screenWidth: number, playerList: number): number
-	return math.min(actionAreaX, screenWidth - playerList)
-end
-
--- True when even the narrowest banner (centred on centerX) would run under the player list: the tutorial then hides
--- the player list while its banner shows, so Skip is always reachable.
-function ScreenLayout.bannerNeedsPlayerListHidden(
-	centerX: number,
-	minWidth: number,
-	screenWidth: number,
-	playerList: number,
-	gap: number
-): boolean
-	if playerList <= 0 then
-		return false
-	end
-	return centerX + minWidth / 2 > screenWidth - playerList - gap
 end
 
 return ScreenLayout
