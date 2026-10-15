@@ -16,6 +16,7 @@
 	    never for a returning player who had none
 	  * finding gadgets (GadgetService): one toast when the first gadget becomes affordable, never during the
 	    tutorial, once per account (a rejoin too)
+	  * Bounty Hunt (BountyService) never targets a newcomer still shielded, even the top earner
 
 	It fails on any error, any unexpected warning, or any check below.
 ]]
@@ -32,6 +33,7 @@ local OCTOBER_15_2026 = 1792023721
 local KIM, NIA, PIA = 9301, 9302, 9303
 local OLA, UMA, VAL = 9304, 9305, 9306
 local WES = 9307
+local XIA, YAN = 9308, 9309
 
 Sim.mock("ServerPackages/ProfileStore.lua", MockProfileStore)
 Sim.virtualClock = true
@@ -400,12 +402,68 @@ local function gadgetTip()
 	task.wait(0.3)
 end
 
+-- A save for a player who has played before: an hour of play, the tutorial done, last seen `away` seconds ago, with
+-- two Pizza Pups earning.
+local function returningSave(away: number): any
+	local save = Sim.shared("Logic/DataSchema").template(Sim.shared("Config/Economy").startingCash)
+	save.stats.playTime = 3600
+	save.flags.tutorial_done = true
+	save.firstJoin = math.floor(Sim.now) - 30 * 86400
+	save.lastSeen = math.floor(Sim.now) - away
+	for index = 1, 2 do
+		table.insert(save.creatures, {
+			uid = tostring(index),
+			id = "pizza_pup",
+			podium = index,
+			acquiredAt = math.floor(Sim.now) - 86400,
+			stored = 0,
+		})
+	end
+	save.nextUid = 3
+	return save
+end
+
+-- Bounty Hunt and the new-player shield ---------------------------------------------------------------------------------
+
+local function bountyShield()
+	print("Bounty Hunt and the new-player shield:")
+	local best = nil
+	for _, def in GameData.catalog.creatureList do
+		if def.eventId == nil and (best == nil or def.income > best.income) then
+			best = def
+		end
+	end
+	assert(best, "a best Snackling")
+	local xia = join(XIA, "Xia") -- brand new: shielded
+	Sim.fireServer(xia, "SkipTutorial")
+	MockProfileStore.saves[`Player_{YAN}`] = returningSave(3600)
+	local yan = join(YAN, "Yan")
+	local x, y = Sessions.get(xia), Sessions.get(yan)
+	EconomyService.giveCreature(x, best.id, nil)
+	task.wait(0.1)
+	check(
+		x.packIncome > y.packIncome and x.graceUntil > Sim.now and y.graceUntil == 0,
+		"Xia, new, earns the most and is still shielded; Yan earns less, with no shield"
+	)
+	chat(yan, "/mod bountyHunt")
+	task.wait(0.3)
+	check(xia:GetAttribute("Bounty") == nil, "Bounty Hunt never puts a bounty on a shielded newcomer")
+	check(yan:GetAttribute("Bounty") == "on", "it goes on the top earner without a shield")
+	chat(yan, "/mod off")
+	task.wait(0.3)
+	for _, player in { xia, yan } do
+		Sim.removePlayer(player)
+	end
+	task.wait(0.3)
+end
+
 local function scenario()
 	print("review 3 test:")
 	cashOffer()
 	toastsWait()
 	shieldEnds()
 	gadgetTip()
+	bountyShield()
 	print(`  ({math.floor(Sim.now - OCTOBER_15_2026)} s of server time)`)
 end
 
