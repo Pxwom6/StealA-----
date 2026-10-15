@@ -940,9 +940,10 @@ big in the middle of the map, which is where the steals happen.
   together, the events whose dates overlap (the luck weekend): 5.95% for Easter, and any one event with the
   strongest map and modifier is still 9.15%, under 10%.
 * **Renders before shipping:** the chick's eyes first sat inside its head (its centre is set back) and the lamb's
-  toasted meringue read as spikes until they became golden caps on rounder puffs; the hot cross bun's icing was
-  thickened and stopped above the tail. The decorations were checked on the meadow map: eggs, butterflies and the
-  bunnies were made bigger after the first render, where they read as specks next to the plots.
+  toasted meringue read as spikes until they became golden caps on rounder puffs; the bunny's head hid the cross on
+  its bun from the podium view, so the bun moved back, its icing got thicker and a small cross went on its forehead.
+  The decorations were checked on the meadow map: eggs, butterflies and the bunnies were made bigger after the first
+  render, where they read as specks next to the plots.
 * **Tests:** the dates and the luck weekend; the layout (330 parts, the configured counts, nothing on plots, the belt
   or the lobby, eggs facing the walkway in two different colours, blossom trees clear of the plot walls, butterflies
   above head height, bunnies clear of the factory and the chute, every prop kind mixing with the others without
