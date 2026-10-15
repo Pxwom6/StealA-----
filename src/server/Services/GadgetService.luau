@@ -18,9 +18,11 @@
 	    magnet  every active pad of their base is collected through the pad path (EconomyService.collectPad: same
 	            floating "+$X", same collect event, same analytics); refused when there is nothing to collect
 
-	What players see: Player attributes GadgetSpeedUntil, ShieldUntil and SlippedUntil (server time) drive the soda fizz,
-	the bubble and the dizzy stars on every client (GadgetFxController); peels are anchored, non-colliding models in
-	workspace.Gadgets; Effect "gadget" (to the user) and "slip" (to everyone) cue sounds and bursts.
+	What players see: the Player attributes GadgetSpeedUntil and SlippedUntil (server time) drive the soda fizz and the
+	dizzy stars on every client (GadgetFxController); a shielded player wears a translucent bubble the server makes
+	(welded to them, massless, never collides, touches or blocks a ray; ShieldUntil says until when); peels are
+	anchored, non-colliding models in workspace.Gadgets; Effect "gadget" (to the user), "slip" (to everyone) and
+	"shieldBlock" (to the tagger) cue sounds and bursts.
 
 	Analytics: gadget_bought (value = price, 01 = gadget id), gadget_used (01 = gadget id), gadget_effect (01 = gadget
 	id, 02 = "peelDrop" | "peelSlip" | "shieldBlock"; the shield one is logged by StealService).
@@ -66,6 +68,7 @@ local GadgetService = {}
 local folder: Folder
 local random = Random.new()
 local peels: { [number]: Peel } = {} -- by owner UserId: one each
+local bubbles: { [Session]: { part: BasePart, untilT: number } } = {} -- Bubble Shields up right now
 -- Players with a speed gadget or a slip running, and the speed state last given to their Humanoid: when either ends,
 -- Movement gives them their normal speed back (server time, so it ends when the effect does).
 local watching: { [Session]: string } = {}
@@ -102,6 +105,56 @@ local function stepSpeeds(t: number)
 		end
 		if not GadgetRules.isFrozen(session.gadgets, t) and GadgetRules.speedMultiplier(session.gadgets, t) == 1 then
 			watching[session] = nil
+		end
+	end
+end
+
+-- Bubble Shields ------------------------------------------------------------------------------------------------------
+
+local BUBBLE_SIZE = 7.5
+
+local function removeBubble(session: Session)
+	local bubble = bubbles[session]
+	if bubble then
+		bubbles[session] = nil
+		bubble.part:Destroy()
+	end
+end
+
+-- A translucent bubble around `session`'s character until `untilT`, for everyone to see who can't be tagged.
+local function addBubble(session: Session, def: GadgetDef, untilT: number)
+	removeBubble(session)
+	local root = Sessions.rootPart(session)
+	local character = session.player.Character
+	if root == nil or character == nil then
+		return
+	end
+	local part = Instance.new("Part")
+	part.Name = "GadgetShield"
+	part.Shape = Enum.PartType.Ball
+	part.Size = Vector3.one * BUBBLE_SIZE
+	part.Material = Enum.Material.ForceField
+	part.Color = UiTheme.color(def.color)
+	part.Transparency = 0.2
+	part.CastShadow = false
+	part.CanCollide = false
+	part.CanTouch = false
+	part.CanQuery = false
+	part.Massless = true
+	part.Anchored = false
+	part.CFrame = root.CFrame
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = root
+	weld.Part1 = part
+	weld.Parent = part
+	part.Parent = character
+	bubbles[session] = { part = part, untilT = untilT }
+end
+
+local function stepBubbles(t: number)
+	for session, bubble in bubbles do
+		if t >= bubble.untilT or bubble.part.Parent == nil or Sessions.get(session.player) ~= session then
+			removeBubble(session)
 		end
 	end
 end
@@ -370,6 +423,7 @@ local function onUse(player: Player, idArg: unknown)
 		player:SetAttribute("GadgetSpeedUntil", session.gadgets.speedUntil)
 	elseif def.kind == "shield" then
 		player:SetAttribute("ShieldUntil", session.gadgets.shieldUntil)
+		addBubble(session, def, session.gadgets.shieldUntil)
 	elseif def.kind == "peel" then
 		placePeel(session, id, def, root.Position, t)
 	elseif def.kind == "magnet" then
@@ -405,6 +459,7 @@ end
 -- A player is leaving: their peel goes with them.
 function GadgetService.onLeaving(session: Session)
 	removePeel(session.userId)
+	removeBubble(session)
 	watching[session] = nil
 end
 
@@ -432,6 +487,10 @@ function GadgetService.start()
 				warn(`[Gadgets] {err}`)
 			end
 			ok, err = pcall(stepSpeeds :: (number) -> ...any, t)
+			if not ok then
+				warn(`[Gadgets] {err}`)
+			end
+			ok, err = pcall(stepBubbles :: (number) -> ...any, t)
 			if not ok then
 				warn(`[Gadgets] {err}`)
 			end

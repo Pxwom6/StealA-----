@@ -67,6 +67,13 @@ local Sounds = {
 		crateOpen = { id = STINGER, volume = 0.55, pitch = 1.2 }, -- you opened a supply crate
 		bossHit = { id = POP, volume = 0.3, pitch = 0.75 }, -- you tapped the Snack Attack giant
 		bossDown = { id = TOY_RACE_STING, volume = 0.55 }, -- the giant is taken down
+		-- Gadgets (Config/Gadgets), from the sounds above at other pitches
+		gadgetFizz = { id = POP, volume = 0.45, pitch = 1.6 }, -- a Fizzy Soda, opened
+		gadgetPeel = { id = PAPER, volume = 0.5, pitch = 1.4 }, -- a banana peel slapped down
+		gadgetShield = { id = SWEEP, volume = 0.45, pitch = 1.4 }, -- the bubble pops up
+		gadgetMagnet = { id = COINS, volume = 0.5, pitch = 0.9 }, -- every pad's cash flies over
+		slip = { id = WHOOSH, volume = 0.6, pitch = 1.5 }, -- someone slipped on a banana peel
+		shieldBlock = { id = INDICATOR, volume = 0.5, pitch = 1.4 }, -- your tag bounced off a bubble
 	} :: { [string]: SoundSlot },
 	-- Played when a creature of this rarity appears on the belt near you / lands in your base.
 	rarity = {
