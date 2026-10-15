@@ -1203,6 +1203,260 @@ local flora: { [string]: FloraBuilder } = {
 			part.Reflectance = 0.2
 		end
 	end,
+
+	-- A tree of popcorn: a trunk under a heap of popped kernels, butter melting on top.
+	popcornTree = function(base: CFrame, s: number, random: Random, spot: Spot, parent: Instance, kit: Kit)
+		core(spot, kit)({
+			Name = "Trunk",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(5.2 * s, 1.2 * s),
+			CFrame = base * CFrame.new(0, 2.6 * s, 0) * UPRIGHT,
+			Color = world("treeTrunk"),
+			Material = Enum.Material.Wood,
+			Parent = parent,
+		})
+		for _, puff in
+			{
+				{ at = Vector3.new(0, 7.6, 0), d = 4.6 },
+				{ at = Vector3.new(2.1, 6.6, 0.6), d = 3.4 },
+				{ at = Vector3.new(-1.9, 6.8, 1.1), d = 3.3 },
+				{ at = Vector3.new(0.4, 6.4, -2.1), d = 3.2 },
+				{ at = Vector3.new(-0.6, 9.8, -0.4), d = 3 },
+			}
+		do
+			kit.decor({
+				Name = "Popcorn",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.one * puff.d * s,
+				CFrame = base * CFrame.new(puff.at * s) * tilt(random),
+				Color = world("popcorn"),
+				Parent = parent,
+			})
+		end
+		kit.decor({
+			Name = "Butter",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 1.7 * s,
+			CFrame = base * CFrame.new(0.4 * s, 11 * s, -0.7 * s),
+			Color = world("butter"),
+			Parent = parent,
+		})
+	end,
+
+	-- A tall corn stalk: two stalk sections, three long leaves arching out, and a cob in its husk.
+	cornStalk = function(base: CFrame, s: number, random: Random, spot: Spot, parent: Instance, kit: Kit)
+		core(spot, kit)({
+			Name = "Stalk",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(5.4 * s, 0.8 * s),
+			CFrame = base * CFrame.new(0, 2.7 * s, 0) * UPRIGHT,
+			Color = world("cornStalk"),
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Stalk",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(6.4 * s, 0.6 * s),
+			CFrame = base * CFrame.new(0, 8.3 * s, 0) * UPRIGHT,
+			Color = world("cornStalk"),
+			Parent = parent,
+		})
+		for i = 0, 2 do
+			local yaw = i * 2.1 + random:NextNumber(-0.3, 0.3)
+			kit.decor({
+				Name = "Leaf",
+				Size = Vector3.new(0.3, 5.5, 1.1) * s,
+				CFrame = base
+					* CFrame.Angles(0, yaw, 0)
+					* CFrame.new(1.6 * s, (4.6 + i * 2.2) * s, 0)
+					* CFrame.Angles(0, 0, math.rad(-50)),
+				Color = world("cornLeaf"),
+				Parent = parent,
+			})
+		end
+		local cobAt = base
+			* CFrame.Angles(0, random:NextNumber(0, math.pi * 2), 0)
+			* CFrame.new(0.9 * s, 7.4 * s, 0)
+			* CFrame.Angles(0, 0, math.rad(-20))
+		local cob = kit.decor({
+			Name = "Cob",
+			Size = Vector3.new(1.1, 2.6, 1.1) * s,
+			CFrame = cobAt,
+			Color = world("cornCob"),
+			Parent = parent,
+		})
+		sphereMesh(cob)
+		local husk = kit.decor({
+			Name = "Husk",
+			Size = Vector3.new(1.3, 1.6, 1.3) * s,
+			CFrame = cobAt * CFrame.new(0, -0.9 * s, 0),
+			Color = world("cornLeaf"),
+			Parent = parent,
+		})
+		sphereMesh(husk)
+	end,
+
+	-- A clipped topiary: two hedge balls on a stem, a ribbon round where they meet, and a rose on top.
+	topiary = function(base: CFrame, s: number, _random: Random, spot: Spot, parent: Instance, kit: Kit)
+		core(spot, kit)({
+			Name = "Stem",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(5 * s, 0.7 * s),
+			CFrame = base * CFrame.new(0, 2.5 * s, 0) * UPRIGHT,
+			Color = world("treeTrunk"),
+			Material = Enum.Material.Wood,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Hedge",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 5.2 * s,
+			CFrame = base * CFrame.new(0, 6.6 * s, 0),
+			Color = world("hedge"),
+			Material = Enum.Material.Grass,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Hedge",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 3.6 * s,
+			CFrame = base * CFrame.new(0, 10.3 * s, 0),
+			Color = world("hedgeLight"),
+			Material = Enum.Material.Grass,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Ribbon",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(0.5 * s, 3.2 * s),
+			CFrame = base * CFrame.new(0, 8.75 * s, 0) * UPRIGHT,
+			Color = world("flower1"),
+			Material = Enum.Material.Fabric,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Rose",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 1.2 * s,
+			CFrame = base * CFrame.new(0, 12.2 * s, 0),
+			Color = world("flower2"),
+			Parent = parent,
+		})
+	end,
+
+	-- A cone topiary in a terracotta pot: three hedge tiers shrinking to a round tip.
+	coneTopiary = function(base: CFrame, s: number, _random: Random, spot: Spot, parent: Instance, kit: Kit)
+		core(spot, kit)({
+			Name = "Pot",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(2.6 * s, 3 * s),
+			CFrame = base * CFrame.new(0, 1.3 * s, 0) * UPRIGHT,
+			Color = world("terracotta"),
+			Material = Enum.Material.Sandstone,
+			Parent = parent,
+		})
+		for i, tier in { { d = 4.4, h = 3, y = 4 }, { d = 3.4, h = 2.8, y = 6.7 }, { d = 2.2, h = 2.6, y = 9.2 } } do
+			kit.decor({
+				Name = "Hedge",
+				Shape = Enum.PartType.Cylinder,
+				Size = cylinderSize(tier.h * s, tier.d * s),
+				CFrame = base * CFrame.new(0, tier.y * s, 0) * UPRIGHT,
+				Color = if i % 2 == 1 then world("hedge") else world("hedgeLight"),
+				Material = Enum.Material.Grass,
+				Parent = parent,
+			})
+		end
+		kit.decor({
+			Name = "Hedge",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 1.5 * s,
+			CFrame = base * CFrame.new(0, 11 * s, 0),
+			Color = world("hedgeLight"),
+			Material = Enum.Material.Grass,
+			Parent = parent,
+		})
+	end,
+
+	-- A blueberry bush: two leafy mounds dotted with fat blueberries.
+	blueberryBush = function(base: CFrame, s: number, random: Random, _spot: Spot, parent: Instance, kit: Kit)
+		local turn = CFrame.Angles(0, random:NextNumber(0, math.pi * 2), 0)
+		kit.decor({
+			Name = "Bush",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 5.2 * s,
+			CFrame = base * turn * CFrame.new(0, 2.3 * s, 0),
+			Color = world("berryBush"),
+			Material = Enum.Material.Grass,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Bush",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 3.6 * s,
+			CFrame = base * turn * CFrame.new(2 * s, 1.6 * s, 0.4 * s),
+			Color = world("berryBush"):Lerp(Color3.new(0, 0, 0), 0.12),
+			Material = Enum.Material.Grass,
+			Parent = parent,
+		})
+		for i = 0, 3 do
+			local yaw = i * 1.6 + random:NextNumber(-0.2, 0.2)
+			local up = 0.35 + (i % 2) * 0.35
+			kit.decor({
+				Name = "Blueberry",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.one * 1.2 * s,
+				-- on the big mound's surface
+				CFrame = base
+					* turn
+					* CFrame.new(0, 2.3 * s, 0)
+					* CFrame.Angles(0, yaw, 0)
+					* CFrame.Angles(up, 0, 0)
+					* CFrame.new(0, 0, -2.55 * s),
+				Color = world("blueberry"),
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- A giant fork stuck in the ground, tines up, leaning a little.
+	giantFork = function(base: CFrame, s: number, random: Random, spot: Spot, parent: Instance, kit: Kit)
+		local lean = base * CFrame.Angles(random:NextNumber(-0.12, 0.12), 0, random:NextNumber(-0.12, 0.12))
+		local metal = world("fork")
+		core(spot, kit)({
+			Name = "Handle",
+			Size = Vector3.new(1, 6, 0.5) * s,
+			CFrame = lean * CFrame.new(0, 3 * s, 0),
+			Color = metal,
+			Material = Enum.Material.Metal,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Neck",
+			Size = Vector3.new(0.8, 2.4, 0.4) * s,
+			CFrame = lean * CFrame.new(0, 7.1 * s, 0),
+			Color = metal,
+			Material = Enum.Material.Metal,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Head",
+			Size = Vector3.new(2.4, 1.4, 0.5) * s,
+			CFrame = lean * CFrame.new(0, 8.9 * s, 0),
+			Color = metal,
+			Material = Enum.Material.Metal,
+			Parent = parent,
+		})
+		for i = 0, 3 do
+			kit.decor({
+				Name = "Tine",
+				Size = Vector3.new(0.36, 3.2, 0.4) * s,
+				CFrame = lean * CFrame.new((-0.9 + i * 0.6) * s, 11.1 * s, 0),
+				Color = metal,
+				Material = Enum.Material.Metal,
+				Parent = parent,
+			})
+		end
+	end,
 }
 
 -- Builds one flora prop on a tree spot. `kind` must be a FloraKind.
@@ -3001,6 +3255,516 @@ local landmarks: { [string]: LandmarkBuilder } = {
 			CastShadow = false,
 			Parent = parent,
 		})
+	end,
+
+	-- A drive-in movie screen on two legs, a marquee on top, showing a sunny hill (it glows at night).
+	cinemaScreen = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad(spot.index * 7 - 10), 0)
+		for _, side in { -1, 1 } do
+			kit.decor({
+				Name = "Leg",
+				Size = Vector3.new(2.4, 22, 2.4) * s,
+				CFrame = frame * CFrame.new(side * 20 * s, 11 * s, 1.5 * s),
+				Color = world("screenFrame"),
+				Parent = parent,
+			})
+		end
+		kit.decor({
+			Name = "ScreenFrame",
+			Size = Vector3.new(50, 28, 1.6) * s,
+			CFrame = frame * CFrame.new(0, 34 * s, 0),
+			Color = world("screenFrame"),
+			Parent = parent,
+		})
+		local screen = kit.decor({
+			Name = "Screen",
+			Size = Vector3.new(46, 24, 0.6) * s,
+			CFrame = frame * CFrame.new(0, 34 * s, -0.9 * s),
+			Color = world("screen"),
+			Material = Enum.Material.Neon,
+			CastShadow = false,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "PictureHill",
+			Size = Vector3.new(46, 6, 0.4) * s,
+			CFrame = frame * CFrame.new(0, 25 * s, -1.25 * s),
+			Color = world("cornLeaf"),
+			Material = Enum.Material.Neon,
+			CastShadow = false,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "PictureSun",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 6 * s,
+			CFrame = frame * CFrame.new(13 * s, 39 * s, -1.4 * s),
+			Color = world("butter"),
+			Material = Enum.Material.Neon,
+			CastShadow = false,
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Marquee",
+			Size = Vector3.new(30, 4, 2) * s,
+			CFrame = frame * CFrame.new(0, 50 * s, 0),
+			Color = world("bucketRed"),
+			Parent = parent,
+		})
+		light(screen, world("screen"), 50, 1)
+	end,
+
+	-- A giant striped popcorn bucket, popcorn heaped over its rim.
+	popcornBucket = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad(spot.index * 29), 0)
+		local h, d = 22 * s, 16 * s
+		kit.decor({
+			Name = "Bucket",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(h, d),
+			CFrame = frame * CFrame.new(0, h / 2, 0) * UPRIGHT,
+			Color = world("bucketWhite"),
+			Parent = parent,
+		})
+		for i = 0, 3 do
+			kit.decor({
+				Name = "Stripe",
+				Size = Vector3.new(3.6 * s, h - 0.4 * s, 0.8 * s),
+				CFrame = frame
+					* CFrame.Angles(0, i * math.pi / 2 + math.pi / 4, 0)
+					* CFrame.new(0, h / 2, -(d / 2 - 0.2 * s)),
+				Color = world("bucketRed"),
+				Parent = parent,
+			})
+		end
+		kit.decor({
+			Name = "Rim",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(1.6 * s, d + 1.2 * s),
+			CFrame = frame * CFrame.new(0, h, 0) * UPRIGHT,
+			Color = world("bucketRed"),
+			Parent = parent,
+		})
+		for i, puff in
+			{
+				{ at = Vector3.new(0, 3.5, 0), d = 10 },
+				{ at = Vector3.new(4.6, 1.6, 1.2), d = 6.5 },
+				{ at = Vector3.new(-4.4, 1.8, 1.8), d = 6.5 },
+				{ at = Vector3.new(1.4, 1.5, -4.6), d = 6 },
+				{ at = Vector3.new(-2.2, 1.4, 4.4), d = 6 },
+				{ at = Vector3.new(-1.2, 7.4, -0.8), d = 5 },
+			}
+		do
+			kit.decor({
+				Name = "Popcorn",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.one * puff.d * s,
+				CFrame = frame * CFrame.new(0, h, 0) * CFrame.new(puff.at * s),
+				Color = if i == 6 then world("butter") else world("popcorn"),
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- A giant soda cup with a white band, a domed lid and a straw.
+	sodaCup = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad(spot.index * 41), 0)
+		local h, d = 24 * s, 13 * s
+		kit.decor({
+			Name = "Cup",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(h, d),
+			CFrame = frame * CFrame.new(0, h / 2, 0) * UPRIGHT,
+			Color = world("soda"),
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Band",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(5 * s, d + 0.4 * s),
+			CFrame = frame * CFrame.new(0, h * 0.55, 0) * UPRIGHT,
+			Color = world("bucketWhite"),
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Lid",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(1.4 * s, d + 1 * s),
+			CFrame = frame * CFrame.new(0, h + 0.5 * s, 0) * UPRIGHT,
+			Color = world("sodaLid"),
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "LidDome",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(1.6 * s, d * 0.6),
+			CFrame = frame * CFrame.new(0, h + 1.8 * s, 0) * UPRIGHT,
+			Color = world("sodaLid"),
+			Parent = parent,
+		})
+		local from = (frame * CFrame.new(0.8 * s, h + 1 * s, 0)).Position
+		local to = (frame * CFrame.new(3.6 * s, h + 14 * s, 0.6 * s)).Position
+		kit.decor({
+			Name = "Straw",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new((to - from).Magnitude, 1.3 * s, 1.3 * s),
+			CFrame = along(from, to),
+			Color = world("straw"),
+			Parent = parent,
+		})
+	end,
+
+	-- A giant porcelain teapot, side-on to the map: a painted band, a lid and knob, a spout puffing steam and a
+	-- handle.
+	giantTeapot = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad(spot.index * 13 + 70), 0)
+		local porcelain = world("porcelain")
+		local pot = kit.decor({
+			Name = "Pot",
+			Size = Vector3.new(24, 18, 24) * s,
+			CFrame = frame * CFrame.new(0, 9 * s, 0),
+			Color = porcelain,
+			Parent = parent,
+		})
+		sphereMesh(pot)
+		kit.decor({
+			Name = "Band",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(2.4 * s, 24.4 * s),
+			CFrame = frame * CFrame.new(0, 9 * s, 0) * UPRIGHT,
+			Color = world("porcelainBlue"),
+			Parent = parent,
+		})
+		local lid = kit.decor({
+			Name = "Lid",
+			Size = Vector3.new(14, 5, 14) * s,
+			CFrame = frame * CFrame.new(0, 17.3 * s, 0),
+			Color = porcelain,
+			Parent = parent,
+		})
+		sphereMesh(lid)
+		kit.decor({
+			Name = "Knob",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 3 * s,
+			CFrame = frame * CFrame.new(0, 20.4 * s, 0),
+			Color = world("gold"),
+			Parent = parent,
+		})
+		local spout = {
+			frame * CFrame.new(10 * s, 7 * s, 0),
+			frame * CFrame.new(15.5 * s, 12 * s, 0),
+			frame * CFrame.new(18.5 * s, 16.5 * s, 0),
+		}
+		for i = 1, 2 do
+			local a, b = spout[i].Position, spout[i + 1].Position
+			kit.decor({
+				Name = "Spout",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new((b - a).Magnitude + 1 * s, (3.6 - i) * s, (3.6 - i) * s),
+				CFrame = along(a, b),
+				Color = porcelain,
+				Parent = parent,
+			})
+		end
+		for _, bar in
+			{
+				{ Vector3.new(-10, 14, 0), Vector3.new(-15.5, 13, 0) },
+				{ Vector3.new(-15.5, 13.5, 0), Vector3.new(-15.5, 5, 0) },
+				{ Vector3.new(-15.5, 5.5, 0), Vector3.new(-10.5, 4.2, 0) },
+			}
+		do
+			local a, b = (frame * CFrame.new(bar[1] * s)).Position, (frame * CFrame.new(bar[2] * s)).Position
+			kit.decor({
+				Name = "Handle",
+				Size = Vector3.new((b - a).Magnitude + 1.6 * s, 1.8 * s, 1.8 * s),
+				CFrame = along(a, b),
+				Color = porcelain,
+				Parent = parent,
+			})
+		end
+		local steam = Instance.new("Attachment")
+		steam.Name = "Steam"
+		steam.Parent = pot
+		steam.WorldCFrame = CFrame.new(spout[3].Position + Vector3.new(0, 1 * s, 0))
+		kit.emitter(steam, {
+			Name = "Steam",
+			Texture = SMOKE_TEXTURE,
+			Color = ColorSequence.new(Color3.fromRGB(255, 255, 255)),
+			Size = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 2),
+				NumberSequenceKeypoint.new(1, 7),
+			}),
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0.4),
+				NumberSequenceKeypoint.new(1, 1),
+			}),
+			Speed = NumberRange.new(4, 6),
+			SpreadAngle = Vector2.new(12, 12),
+			Acceleration = Vector3.new(0.5, 1, 0),
+			Lifetime = NumberRange.new(2.5, 4),
+			Rate = 3,
+			Rotation = NumberRange.new(0, 360),
+			RotSpeed = NumberRange.new(-20, 20),
+			EmissionDirection = Enum.NormalId.Top,
+		})
+	end,
+
+	-- A giant teacup on its saucer, full of tea, with a painted band, a gold rim and a handle.
+	teacup = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad(spot.index * 31 + 90), 0)
+		local porcelain = world("porcelain")
+		for _, disc in
+			{
+				{ name = "Saucer", h = 1.6, d = 30, y = 0.8, color = porcelain },
+				{ name = "SaucerRim", h = 0.6, d = 30.6, y = 1.3, color = world("porcelainBlue") },
+				{ name = "Cup", h = 13, d = 20, y = 8.1, color = porcelain },
+				{ name = "CupBand", h = 2, d = 20.4, y = 11.5, color = world("porcelainBlue") },
+				{ name = "Rim", h = 0.6, d = 20.6, y = 14.4, color = world("gold") },
+				{ name = "Tea", h = 0.3, d = 19, y = 14.7, color = world("tea") },
+			}
+		do
+			kit.decor({
+				Name = disc.name,
+				Shape = Enum.PartType.Cylinder,
+				Size = cylinderSize(disc.h * s, disc.d * s),
+				CFrame = frame * CFrame.new(0, disc.y * s, 0) * UPRIGHT,
+				Color = disc.color,
+				Parent = parent,
+			})
+		end
+		for _, bar in
+			{
+				{ Vector3.new(9.5, 12, 0), Vector3.new(14, 10.5, 0) },
+				{ Vector3.new(14, 11, 0), Vector3.new(10.5, 5, 0) },
+			}
+		do
+			local a, b = (frame * CFrame.new(bar[1] * s)).Position, (frame * CFrame.new(bar[2] * s)).Position
+			kit.decor({
+				Name = "Handle",
+				Size = Vector3.new((b - a).Magnitude + 1.4 * s, 1.6 * s, 1.6 * s),
+				CFrame = along(a, b),
+				Color = porcelain,
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- A three-tier cake stand: a gold pole through three porcelain plates, cakes and macarons on them.
+	cakeStand = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad(spot.index * 19), 0)
+		local gold = world("gold")
+		kit.decor({
+			Name = "Pole",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(30 * s, 1.6 * s),
+			CFrame = frame * CFrame.new(0, 15 * s, 0) * UPRIGHT,
+			Color = gold,
+			Material = Enum.Material.Metal,
+			Parent = parent,
+		})
+		for _, plate in { { d = 26, y = 4 }, { d = 19, y = 13 }, { d = 12, y = 22 } } do
+			kit.decor({
+				Name = "Plate",
+				Shape = Enum.PartType.Cylinder,
+				Size = cylinderSize(0.8 * s, plate.d * s),
+				CFrame = frame * CFrame.new(0, plate.y * s, 0) * UPRIGHT,
+				Color = world("porcelain"),
+				Parent = parent,
+			})
+		end
+		for _, cake in
+			{
+				{ at = Vector3.new(7, 6.2, 0), size = Vector3.new(3.6, 6, 6), color = "cake1" },
+				{ at = Vector3.new(-7, 6.2, 0), size = Vector3.new(3.6, 6, 6), color = "cake2" },
+			}
+		do
+			kit.decor({
+				Name = "Cake",
+				Shape = Enum.PartType.Cylinder,
+				Size = cake.size * s,
+				CFrame = frame * CFrame.new(cake.at * s) * UPRIGHT,
+				Color = world(cake.color),
+				Parent = parent,
+			})
+		end
+		for _, macaron in { { x = 5, color = "cake2" }, { x = -5, color = "cake1" } } do
+			local part = kit.decor({
+				Name = "Macaron",
+				Size = Vector3.new(4.4, 2.8, 4.4) * s,
+				CFrame = frame * CFrame.new(macaron.x * s, 14.8 * s, 0),
+				Color = world(macaron.color),
+				Parent = parent,
+			})
+			sphereMesh(part)
+		end
+		kit.decor({
+			Name = "Cake",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(4 * s, 7 * s),
+			CFrame = frame * CFrame.new(0, 24.4 * s, 0) * UPRIGHT,
+			Color = world("cake1"),
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Cherry",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 1.8 * s,
+			CFrame = frame * CFrame.new(0, 27.2 * s, 0),
+			Color = world("strawberry"),
+			Parent = parent,
+		})
+		kit.decor({
+			Name = "Finial",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 2.4 * s,
+			CFrame = frame * CFrame.new(0, 30.4 * s, 0),
+			Color = gold,
+			Material = Enum.Material.Metal,
+			Parent = parent,
+		})
+	end,
+
+	-- A tumble of giant sugar cubes.
+	sugarCubes = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad(spot.index * 23), 0)
+		for _, cube in
+			{
+				{ at = Vector3.new(-5, 4.5, 0), turn = 8 },
+				{ at = Vector3.new(5, 4.5, 1), turn = -14 },
+				{ at = Vector3.new(0.5, 4.5, 9), turn = 26 },
+				{ at = Vector3.new(0, 13.4, 1.5), turn = 21 },
+				{ at = Vector3.new(9.5, 3.4, -8), turn = 40, tip = true },
+			}
+		do
+			kit.decor({
+				Name = "SugarCube",
+				Size = Vector3.one * 9 * s,
+				CFrame = frame
+					* CFrame.new(cube.at * s)
+					* CFrame.Angles(if cube.tip then math.rad(25) else 0, math.rad(cube.turn), 0),
+				Color = world("sugar"),
+				Material = Enum.Material.Sand,
+				Parent = parent,
+			})
+		end
+	end,
+
+	-- A towering stack of pancakes, butter melting on top and syrup running down the sides.
+	pancakeStack = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad(spot.index * 37), 0)
+		local top = 0
+		for i = 0, 5 do
+			local d = (30 - i * 0.7) * s
+			local wobble = Vector3.new(math.sin(i * 1.9) * 0.8, 0, math.cos(i * 2.3) * 0.8) * s
+			top = (1.8 + i * 3.5) * s
+			kit.decor({
+				Name = "Pancake",
+				Shape = Enum.PartType.Cylinder,
+				Size = cylinderSize(3.6 * s, d),
+				CFrame = frame * CFrame.new(wobble + Vector3.new(0, top, 0)) * UPRIGHT,
+				Color = if i % 2 == 0 then world("pancake") else world("pancakeEdge"),
+				Parent = parent,
+			})
+		end
+		local syrupTop = top + 1.9 * s
+		local syrup = world("syrup")
+		local pool = kit.decor({
+			Name = "Syrup",
+			Shape = Enum.PartType.Cylinder,
+			Size = cylinderSize(0.6 * s, 24 * s),
+			CFrame = frame * CFrame.new(0, syrupTop, 0) * UPRIGHT,
+			Color = syrup,
+			Parent = parent,
+		})
+		pool.Reflectance = 0.2
+		kit.decor({
+			Name = "Butter",
+			Size = Vector3.new(7, 3, 7) * s,
+			CFrame = frame * CFrame.new(0, syrupTop + 1.6 * s, 0) * CFrame.Angles(0, math.rad(20), 0),
+			Color = world("butter"),
+			Parent = parent,
+		})
+		for i = 0, 2 do
+			local yaw = i * 2.2 + 0.4
+			local drip = kit.decor({
+				Name = "Drip",
+				Size = Vector3.new(3, 9, 2) * s,
+				CFrame = frame
+					* CFrame.Angles(0, yaw, 0)
+					* CFrame.new(0, syrupTop - (4 + i * 1.5) * s, -(14.3 - i * 0.3) * s),
+				Color = syrup,
+				Parent = parent,
+			})
+			sphereMesh(drip)
+			drip.Reflectance = 0.2
+		end
+	end,
+
+	-- A giant syrup bottle: an amber glass body with a label, a shoulder, a neck and a red cap.
+	syrupBottle = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad(spot.index * 43), 0)
+		local syrup = world("syrup")
+		for _, piece in
+			{
+				{ name = "Bottle", h = 20, d = 12, y = 10, color = syrup, glass = true },
+				{ name = "Label", h = 8, d = 12.4, y = 9, color = world("cream"), glass = false },
+				{ name = "Neck", h = 5, d = 5, y = 26, color = syrup, glass = true },
+				{ name = "Cap", h = 3, d = 6, y = 29.5, color = world("bucketRed"), glass = false },
+			}
+		do
+			kit.decor({
+				Name = piece.name,
+				Shape = Enum.PartType.Cylinder,
+				Size = cylinderSize(piece.h * s, piece.d * s),
+				CFrame = frame * CFrame.new(0, piece.y * s, 0) * UPRIGHT,
+				Color = piece.color,
+				Material = if piece.glass then Enum.Material.Glass else Enum.Material.SmoothPlastic,
+				Transparency = if piece.glass then 0.15 else 0,
+				Parent = parent,
+			})
+		end
+		kit.decor({
+			Name = "Shoulder",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 12 * s,
+			CFrame = frame * CFrame.new(0, 20 * s, 0),
+			Color = syrup,
+			Material = Enum.Material.Glass,
+			Transparency = 0.15,
+			Parent = parent,
+		})
+	end,
+
+	-- A stack of square waffles, each turned a little, topped with whipped cream and a strawberry.
+	waffleTower = function(base: CFrame, s: number, spot: LandmarkSpot, parent: Instance, kit: Kit)
+		local frame = base * CFrame.Angles(0, math.rad(spot.index * 17), 0)
+		for i, waffle in { { w = 18, y = 1.6 }, { w = 16, y = 4.8 }, { w = 14, y = 8 } } do
+			kit.decor({
+				Name = "Waffle",
+				Size = Vector3.new(waffle.w, 3.2, waffle.w) * s,
+				CFrame = frame * CFrame.new(0, waffle.y * s, 0) * CFrame.Angles(0, math.rad(i * 15), 0),
+				Color = world("waffle"),
+				Material = Enum.Material.DiamondPlate,
+				Parent = parent,
+			})
+		end
+		local cream = kit.decor({
+			Name = "Cream",
+			Size = Vector3.new(9, 5, 9) * s,
+			CFrame = frame * CFrame.new(0, 11.4 * s, 0),
+			Color = world("cream"),
+			Parent = parent,
+		})
+		sphereMesh(cream)
+		local berry = kit.decor({
+			Name = "Strawberry",
+			Size = Vector3.new(4, 5, 4) * s,
+			CFrame = frame * CFrame.new(0.4 * s, 15.2 * s, 0) * CFrame.Angles(0, 0, math.rad(12)),
+			Color = world("strawberry"),
+			Parent = parent,
+		})
+		sphereMesh(berry)
 	end,
 }
 
