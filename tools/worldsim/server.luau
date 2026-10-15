@@ -508,7 +508,9 @@ local function scenario()
 	Sim.chat(alice, "/mod eclipse")
 	task.wait(0.1)
 	check(BeltService.mutationConditions()[eclipseKey] == true, "the Eclipse lets Eclipse Snacklings roll")
-	check(worldSky.CelestialBodiesShown == false, "it takes the sky's own sun away")
+	check(worldSky.CelestialBodiesShown == true, "the sun first moves to where the eclipse will be")
+	task.wait(5.3) -- the light's 4 s and a moment (real time: the lighting's own delay)
+	check(worldSky.CelestialBodiesShown == false, "then the eclipse takes the sky's own sun away")
 	local eclipseSky = Modifiers.modifiers.eclipse.lighting
 	check(math.abs(Lighting.ClockTime - eclipseSky.clockTime) < 1e-3, `and darkens the sky ({Lighting.ClockTime})`)
 	Sim.chat(alice, "/spawn pizza_pup eclipse")
@@ -1059,7 +1061,11 @@ local function scenario()
 	tag(bob, 1001)
 	check(aliceSession.carry == nil, "Bob tags her: the Snackling runs home")
 	local tagPay = BountyRules.payout(Bounty, "tag", bobSession.packIncome)
-	check(bobSession.data.cash - bobBefore == tagPay, `and he claims the bounty, sized from his own income (+{tagPay})`)
+	check(
+		bobSession.data.cash - bobBefore == tagPay
+			and lastToast(1002) == Format.template(Theme.text.bountyReward, { cash = UiTheme.cash(tagPay) }),
+		`and he claims the bounty, sized from his own income (+{tagPay})`
+	)
 	check(
 		announced(Format.template(Theme.text.bountyClaimedTag, { player = "Bob", target = "Alice" })),
 		"announced to everyone"
@@ -1096,9 +1102,19 @@ local function scenario()
 	carry = grab(dan, alice, aliceRecord.podium)
 	check(carry ~= nil, "Dan steals from Alice's base")
 	danBefore = danSession.data.cash
-	local stealPay = BountyRules.payout(Bounty, "steal", danSession.packIncome)
 	check(walkHome(dan, alice) == "delivered", "and gets it home")
-	check(danSession.data.cash - danBefore == stealPay, `claiming the bounty, sized from his own income (+{stealPay})`)
+	-- (sized from his income with the Snackling he just brought home; he may have walked over his own pads on the way)
+	local stealPay = BountyRules.payout(Bounty, "steal", danSession.packIncome)
+	local danToasts = {}
+	for _, args in Sim.received(1004, "Notify") do
+		table.insert(danToasts, args[1].text)
+	end
+	check(
+		danSession.data.cash - danBefore >= stealPay
+			and table.find(danToasts, Format.template(Theme.text.bountyReward, { cash = UiTheme.cash(stealPay) }))
+				~= nil,
+		`claiming the bounty, sized from his own income (+{stealPay})`
+	)
 	check(
 		announced(Format.template(Theme.text.bountyClaimedSteal, { player = "Dan", target = "Alice" })),
 		"announced to everyone"

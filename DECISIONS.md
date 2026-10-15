@@ -1471,13 +1471,15 @@ misty hot spring at dawn, a barbecue at twilight), and four more mutations to co
   around the walkways and the spawn plaza; whoever walks into one first wins cash or a Lucky Spin. **Bounty Hunt**: the
   server's top earner wears a 🎯 BOUNTY for the five minutes; tagging them while they carry, or robbing their base,
   pays the claimer.
-* **The eclipsed sun is built, not painted:** no image asset. The overlay's new `hideSun` makes WorldLighting turn the
-  sky's sun off (`Sky.CelestialBodiesShown`), and each client draws a BillboardGui 1,200 studs out along
-  `Lighting:GetSunDirection()` (so it keeps its place and size as the camera moves, and follows the sun while the
-  lighting changes): round frames for the disc, rim, glow rings and bead, UIGradient streamers. Depth-tested, so hills
-  and buildings in front hide it. When it starts while you are there, the disc slides across the bright sun in the 4 s
-  the lighting darkens, then the corona lights up and the streamers turn 1.5° a second; with Reduce effects it stands
-  still, already eclipsed. Nothing flashes. Eclipse Snacklings (2%, x4, announced, order 41 so no other roll changes)
+* **The eclipsed sun is built, not painted:** no image asset. Each client draws a BillboardGui 1,200 studs out along
+  `Lighting:GetSunDirection()` (beyond all the world's geometry, so it keeps its place and size as the camera moves,
+  and everything in front of it hides it): round frames for the disc, rim, glow rings and bead, UIGradient streamers.
+  When it starts, the light changes first (the sun moves to where the eclipse will be over the overlay's 4 s); once the
+  time of day has stood still for half a second the client draws the bright sun there and the dark disc slides across
+  it over 4 s, then the corona lights up and the streamers turn 1.5° a second. The overlay's new `hideSun` makes
+  WorldLighting turn the sky's own sun off a second after the light has changed (`Sky.CelestialBodiesShown`), so the
+  two suns overlap for a moment rather than leaving a gap; it comes back at once when the Eclipse ends. A player who
+  joins mid-eclipse, or with Reduce effects on, sees it already eclipsed and standing still. Nothing flashes. Eclipse Snacklings (2%, x4, announced, order 41 so no other roll changes)
   are near-black with a gold glow, embers drifting off, and a ring of fire standing behind the body (`corona`: 14 Neon
   segments and a bead, kept out of the tint), so on a podium the Snackling is the dark moon in its own eclipse.
 * **Gadget Frenzy keeps every gadget rule:** a recharge is the gadget's cooldown x 0.5 (`gadgetCooldown`, a new

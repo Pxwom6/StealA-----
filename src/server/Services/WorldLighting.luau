@@ -25,6 +25,9 @@ type Overlay = { lighting: Types.SeasonLighting, priority: number }
 local base: Types.SceneryLighting? = nil
 local overlays: { [string]: Overlay } = {}
 local running: { Tween } = {}
+-- An overlay with `hideSun` takes the sun away this long after the light has finished changing (see apply).
+local HIDE_SUN_AFTER = 1
+local hideToken = 0
 
 -- The child of Lighting called `name`, created as `className` the first time. A Lighting child of the same class
 -- that came with the place (the Baseplate template has an Atmosphere and a Sky) is adopted and renamed, so there is
@@ -149,9 +152,22 @@ function WorldLighting.apply(seconds: number)
 
 	-- Roblox's own skybox textures (a new Sky starts with them); only the sun, moon and stars change. Sizes and star
 	-- counts are whole-number properties: set, not tweened. An overlay with `hideSun` (Eclipse) takes the sun (and the
-	-- moon) away: each client draws the eclipsed sun where it was (WeatherController).
+	-- moon) away once the light has changed (so the sun first moves to where the eclipse will be), a moment after
+	-- every client starts drawing the eclipsed sun there (WeatherController); without one, the sun is back at once.
 	local sky = owned("Sky", "WorldSky") :: Sky
-	sky.CelestialBodiesShown = mood.hideSun ~= true
+	hideToken += 1
+	if mood.hideSun ~= true then
+		sky.CelestialBodiesShown = true
+	elseif seconds <= 0 then
+		sky.CelestialBodiesShown = false
+	else
+		local token = hideToken
+		task.delay(seconds + HIDE_SUN_AFTER, function()
+			if token == hideToken then
+				sky.CelestialBodiesShown = false
+			end
+		end)
+	end
 	sky.SunAngularSize = preset.sky.sunAngularSize
 	sky.MoonAngularSize = preset.sky.moonAngularSize
 	sky.StarCount = preset.sky.starCount

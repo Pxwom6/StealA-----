@@ -94,6 +94,11 @@ local ECLIPSE_BEAD = { angle = 140, size = 0.034, glow = 0.1 } -- upper left: th
 local ECLIPSE_IN_SECONDS = 4
 local ECLIPSE_TURN = 1.5
 local ECLIPSE_STEP = 1 / 20
+-- When it starts, the light changes first (the sun moving to where the eclipse will be): the eclipse waits until the
+-- time of day has stood still this long (at most ECLIPSE_SETTLE_MAX), then starts there; the server hides the sky's own
+-- sun a moment later (WorldLighting).
+local ECLIPSE_SETTLE = 0.5
+local ECLIPSE_SETTLE_MAX = 8
 
 local random = Random.new()
 
@@ -880,10 +885,23 @@ local function buildEclipse(): (Part, (progress: number, t: number?) -> ())
 	return anchor, draw
 end
 
--- Runs the eclipsed sun until the sky effect changes (token), always where the sun is (Lighting:GetSunDirection, which
--- follows the lighting as it changes). `animate`: it starts now, so the disc slides over the sun (not with Reduce
--- effects, nor for a player who joins while it is already on).
+-- Runs the eclipsed sun until the sky effect changes (token), always where the sun is (Lighting:GetSunDirection).
+-- `animate`: it starts now, so once the light has settled the disc slides over the sun (not with Reduce effects, nor
+-- for a player who joins while it is already on).
 local function eclipseLoop(token: number, animate: boolean)
+	if animate then
+		local last, still, waited = Lighting.ClockTime, 0, 0
+		while token == skyToken and still < ECLIPSE_SETTLE and waited < ECLIPSE_SETTLE_MAX do
+			task.wait(ECLIPSE_STEP)
+			waited += ECLIPSE_STEP
+			local clock = Lighting.ClockTime
+			still = if clock == last then still + ECLIPSE_STEP else 0
+			last = clock
+		end
+		if token ~= skyToken then
+			return
+		end
+	end
 	local anchor, draw = buildEclipse()
 	local gui = anchor:FindFirstChildOfClass("BillboardGui")
 	anchor.Parent = folder()
