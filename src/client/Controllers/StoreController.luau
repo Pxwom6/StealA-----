@@ -3,9 +3,12 @@
 	The Snack Shop.
 	  * Forever perks (game passes) show "Owned" once bought.
 	  * Cash packs show the exact amount you'd get right now (scaled to your steady income: no event boost, no
-	    creature that is being stolen or parked beyond your podium capacity).
+	    creature parked beyond your podium capacity; one a thief is carrying off still counts).
 	  * Server Luck shows the exact belt odds now vs. with the boost before you buy (random effect → disclose odds);
-	    while a bought boost is running, buying only adds time, and the card says so.
+	    while a bought boost is running, buying only adds time, and the card says so. It is a paid random item, so it
+	    can only be bought when the player's PolicyService policy allows that (the server publishes the answer as the
+	    player attribute in Logic/PaidRandomItems); otherwise, and while that is still being looked up, it shows as
+	    blocked (the server refuses the receipt too).
 	  * Items whose id is still 0 show "Coming soon" — or, in Studio, a "(Studio) Grant" button that runs the real
 	    server receipt path, so purchases are testable before the IDs exist.
 	Opening the store and tapping an item are reported for the analytics store funnel.
@@ -26,6 +29,7 @@ local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local EconomyMath = require(ReplicatedStorage.Shared.Logic.EconomyMath)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local LiveOpsRules = require(ReplicatedStorage.Shared.Logic.LiveOpsRules)
+local PaidRandomItems = require(ReplicatedStorage.Shared.Logic.PaidRandomItems)
 local RarityRoll = require(ReplicatedStorage.Shared.Logic.RarityRoll)
 local LiveOps = require(ReplicatedStorage.Shared.Config.LiveOps)
 local Modal = require(script.Parent.Parent.UI.Modal)
@@ -301,7 +305,9 @@ local function fillCards(scroller: ScrollingFrame): { [string]: Frame }
 			detail = oddsText(maxed)
 			rich = true
 			accent = UiTheme.palette("luck")
-			if maxed then
+			if not PaidRandomItems.allowedByAttribute(localPlayer:GetAttribute(PaidRandomItems.ATTRIBUTE)) then
+				blockedText = Theme.text.storeLuckUnavailable -- a paid random item this player's policy doesn't allow
+			elseif maxed then
 				blockedText = Theme.text.storeLuckMaxed
 			end
 		elseif product.kind == "LockToken" then
@@ -413,6 +419,8 @@ function StoreController.open(focusKey: string?)
 	for _, name in LUCK_ATTRIBUTES do
 		table.insert(watchers, workspace:GetAttributeChangedSignal(name):Connect(queueRefill))
 	end
+	-- The policy lookup can finish while the store is open.
+	table.insert(watchers, localPlayer:GetAttributeChangedSignal(PaidRandomItems.ATTRIBUTE):Connect(queueRefill))
 end
 
 function StoreController.start()

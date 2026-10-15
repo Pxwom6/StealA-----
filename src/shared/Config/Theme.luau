@@ -437,6 +437,7 @@ local Theme = {
 		storeUnavailable = "Coming soon",
 		storeStudioGrant = "(Studio) Grant",
 		storeLuckMaxed = "Luck maxed",
+		storeLuckUnavailable = "Not available", -- Server Luck where the player's policy doesn't allow paid random items
 		oddsHeader = "Belt odds now -> with Server Luck",
 		oddsExtendHeader = "Server Luck is on: buying adds +{minutes} min (odds stay the same)",
 		oddsMaxedHeader = "Server Luck is on: maximum time reached",

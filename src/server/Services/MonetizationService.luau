@@ -34,6 +34,7 @@ local DataService = require(script.Parent.DataService)
 local EconomyService = require(script.Parent.EconomyService)
 local LiveOpsService = require(script.Parent.LiveOpsService)
 local LockService = require(script.Parent.LockService)
+local PlayerPolicy = require(script.Parent.PlayerPolicy)
 local Remotes = require(script.Parent.Remotes)
 local Replication = require(script.Parent.Replication)
 local Sessions = require(script.Parent.Sessions)
@@ -226,11 +227,13 @@ type AfterGrant = () -> ()
 -- Works out everything a product grants WITHOUT changing anything (it may throw: nothing is lost, Roblox retries).
 -- Returns `apply`, which only writes the precomputed results (plain table writes: no yields, nothing that can fail;
 -- see ReceiptLedger), and a follow-up that runs once the purchase is confirmed saved (announcements, auto-lock...).
+-- `paidRandomAllowed`: the buyer's policy allows paid random items (PlayerPolicy, looked up before this step).
 local function prepareProduct(
 	session: Session,
 	key: string,
 	receipt: { [string]: any },
-	quotedCash: number
+	quotedCash: number,
+	paidRandomAllowed: boolean
 ): (() -> (), AfterGrant?)
 	local product = Monetization.products[key]
 	local perks = Monetization.perks
@@ -276,7 +279,16 @@ local function prepareProduct(
 			end
 		end
 	elseif product.kind == "ServerLuck" then
-		newBoosts = LiveOpsService.boostsWith(perks.serverLuckSeconds, perks.serverLuckMultiplier, "purchase", true)
+		if not paidRandomAllowed then
+			-- Only a client that went around the store's blocked card gets here: never grant it (PlayerPolicy).
+			error("paid random items are not allowed for this player (PolicyService)")
+		end
+		newBoosts = LiveOpsService.boostsWith(
+			perks.serverLuckSeconds,
+			perks.serverLuckMultiplier,
+			LiveOpsService.PURCHASE_SOURCE,
+			true
+		)
 		after = function()
 			LiveOpsService.publishAttributes()
 			Announcer.broadcast({
@@ -316,6 +328,15 @@ local function processFor(player: Player, key: string, receipt: { [string]: any 
 	local purchaseId = tostring(receipt.PurchaseId)
 	local after: AfterGrant? = nil
 	local profile = session.profile
+	-- Server Luck is a paid random item: only for players whose policy allows it (the store shows it blocked
+	-- otherwise). Looked up here, before the grant step, because it may yield.
+	local paidRandomAllowed = true
+	if Monetization.products[key].kind == "ServerLuck" then
+		paidRandomAllowed = PlayerPolicy.paidRandomItemsAllowed(player)
+		if not paidRandomAllowed then
+			warn(`[Monetization] {player.Name} may not buy paid random items: {key} is not granted`)
+		end
+	end
 	-- A cash pack's amount is fixed the first time its receipt reaches the player's session (and saved with the data),
 	-- so if that grant fails and Roblox retries after the player's income changed (e.g. they rebirthed), the retry
 	-- pays what the purchase was worth then. A receipt that finds no session yet waits for the load (see above).
@@ -340,7 +361,7 @@ local function processFor(player: Player, key: string, receipt: { [string]: any 
 			return (profile.Data :: any) :: { [string]: any }
 		end,
 		prepare = function(): () -> ()
-			local apply, followUp = prepareProduct(session, key, receipt, quotedCash)
+			local apply, followUp = prepareProduct(session, key, receipt, quotedCash, paidRandomAllowed)
 			after = followUp
 			return apply
 		end,
