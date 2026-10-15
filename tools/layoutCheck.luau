@@ -24,7 +24,22 @@ local function px(device: ScreenLayout.Device, r: ScreenLayout.Rect): string
 	return `x {span(p.x, p.x + p.w)} y {span(p.y, p.y + p.h)}`
 end
 
-local IMPORTANT = { "cash", "lock", "gear", "shop", "snackdex", "tutorial", "skip", "cashOfferBuy", "modifier", "tag" }
+local IMPORTANT = {
+	"cash",
+	"lock",
+	"gear",
+	"shop",
+	"snackdex",
+	"tutorial",
+	"skip",
+	"cashOfferBuy",
+	"modifier",
+	"tag",
+	"gadget1",
+	"gadget2",
+	"gadget3",
+	"gadget4",
+}
 
 local total = 0
 for _, spec in ScreenLayout.DEVICES do
