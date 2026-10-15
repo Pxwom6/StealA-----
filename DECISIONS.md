@@ -475,6 +475,10 @@ down). Quest ids are saved for one day only: retiring one costs nothing after th
   first-time tutorial; at most one offer per 90 s (`Monetization.cashOffer.cooldownSeconds`), otherwise the old
   "Not enough cash!" toast; never a pack that would still leave them short; the card never blocks play and closes
   itself after 8 s.
+* **Gentler still since #58 (review 3):** only the three small packs (`cashOffer.packs`: Snack Bite, Bag, Pack; CI
+  allows none paying more than 15 minutes of income), never in the first 10 minutes of play (`minPlaySeconds`), at
+  most one every 3 minutes (`cooldownSeconds` = 180), and never for a gap the player's income covers in 45 s or less
+  (`smallGapSeconds`): the toast says how many seconds instead (`Logic/CashOfferRules.decide`).
 * **Analytics:** `cash_offer_shown` (value = cash offered, field = pack key) and `cash_offer_clicked` (pack key),
   to see whether offers help or just annoy (compare with store purchases before deciding to tune the cooldown).
 
@@ -482,6 +486,7 @@ down). Quest ids are saved for one day only: retiring one costs nothing after th
 sell, and sizing the offer to the exact gap keeps it honest (the smallest purchase that actually solves the
 problem, not the biggest).
 **Reversal cost:** low — set a very long cooldown to switch offers off; the remote and card are self-contained.
+The #58 limits are data too (`Monetization.cashOffer`, held to `CashOfferRules.LIMITS` by CI).
 
 ### 26. Friends button: a small icon by the gear, hidden during the tutorial
 

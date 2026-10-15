@@ -157,6 +157,7 @@ Studio test purchases, etc.).
 | `lune run tools/worldsim/cosmetics.luau` | Titles, base skins and What's New through the real remotes on the offline server (CI) |
 | `lune run tools/worldsim/store.luau` | Auto Collect, the Lucky Spin packs and the Starter Pack through the real receipt path on the offline server (CI) |
 | `lune run tools/worldsim/review2.luau` | The second review's server fixes (drop modifiers started again, a private server's pace, Snack Attack's health) on the offline server, with a virtual clock (CI) |
+| `lune run tools/worldsim/review3.luau` | The third review's server fixes (the gentler "Need $X more?" offer...) on the offline server, with a virtual clock (CI) |
 | `lune run tools/worldsim/exportSkins.luau [mapId] [out.json] [--vip]` | Dump a map with a different base skin on every base, for a 3D preview |
 | `lune run tools/worldsim/exportSeason.luau <mapId> <eventId> [out.json]` | Dump a map with a seasonal event's theme on (decorations and lighting), for a 3D preview |
 | `rojo build -o build/sync.rbxl` then `lune run tools/syncTest.luau build/sync.rbxl` | Check the Studio sync script (`studio/SyncFromGitHub.luau`) offline |
