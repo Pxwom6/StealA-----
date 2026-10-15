@@ -412,7 +412,7 @@ function ScreenLayout.voteChoice(strip: Rect, index: number, count: number): Rec
 	return rect(strip.x + (index - 1) * (w + V.choiceGap), strip.y + V.header + V.gap, w, V.choice)
 end
 
--- The toast list: centred, its bottom `toast.bottom` above the screen's (over the vote strip); the newest at the bottom.
+-- The toast list: centred, its bottom `toast.bottom` above the screen's (over the vote strip); the newest on top.
 function ScreenLayout.toastList(device: Device): Rect
 	local T = ScreenLayout.SIZE.toast
 	local h = T.max * T.tall + (T.max - 1) * T.gap
@@ -468,6 +468,12 @@ function ScreenLayout.stackCenter(device: Device, cornerLeft: number?): number
 		cx = math.min(cx, cornerLeft - half)
 	end
 	return cx
+end
+
+-- Where the band under the cash pill starts: below the pill, and below Roblox's top bar (its buttons are in the strip).
+function ScreenLayout.bandTop(device: Device): number
+	local S = ScreenLayout.SIZE
+	return math.max(S.stackTop + S.cash.h + S.stackGap, device.topBar)
 end
 
 -- Status pills in rows: each row as wide as fits the lane, centred, items vertically centred in their row.
@@ -570,8 +576,7 @@ function ScreenLayout.layout(device: Device, state: HudState): Layout
 	-- The top stack: the cash pill, then the band.
 	local cx = ScreenLayout.stackCenter(device, if moved then nil else corner[1].x)
 	add("cash", "info", rect(cx - S.cash.w / 2, S.stackTop, S.cash.w, S.cash.h))
-	-- The band starts under the cash pill, and below Roblox's top bar (its buttons are in the strip at the left).
-	local y = math.max(S.stackTop + S.cash.h + S.stackGap, device.topBar)
+	local y = ScreenLayout.bandTop(device)
 	local statusShown = false
 	if state.tutorial then
 		local h = S.tutorial.h + (if state.tutorial == "full" then S.tutorial.tip else 0)
@@ -622,11 +627,8 @@ function ScreenLayout.layout(device: Device, state: HudState): Layout
 		end
 	end
 	if state.carrying then
-		add(
-			"carry",
-			"overlay",
-			rect(cx - S.carry.w / 2, device.height - S.carry.bottom - S.carry.h, S.carry.w, S.carry.h)
-		)
+		local carryX = device.width / 2 - S.carry.w / 2 -- centred on the screen (StealController anchors it there)
+		add("carry", "overlay", rect(carryX, device.height - S.carry.bottom - S.carry.h, S.carry.w, S.carry.h))
 	end
 
 	-- What drops in over the HUD for a few seconds: below the stack, clear of the buttons beside it.
@@ -682,7 +684,6 @@ function ScreenLayout.tutorialDevice(device: Device): Device
 	if device.playerList <= 0 then
 		return device
 	end
-	local S = ScreenLayout.SIZE
 	local probe = ScreenLayout.layout(device, { tutorial = "full" })
 	local banner = probe.byId.tutorial
 	local list = ScreenLayout.playerListRect(device)

@@ -2,6 +2,11 @@
 --[[
 	Feedback layer: toasts (Notify), floating world numbers (Effect), and loud server-wide announcement banners
 	(Announce) that also land in chat as system messages.
+
+	Toasts have their own screen above the dialogs (DisplayOrder 11 over Modal's 10), so a dialog's answers show: a
+	redeemed code, a spin's prize, a gift's Snackling. A toast whose text would be small on one line wraps onto two
+	(Logic/ScreenLayout.toastHeight). Banners drop in under the HUD's top stack, narrowed to stay clear of the buttons
+	beside it (the TAG button, the feature buttons), and wrap onto two lines.
 ]]
 
 local Debris = game:GetService("Debris")
@@ -11,17 +16,24 @@ local TweenService = game:GetService("TweenService")
 
 local Net = require(ReplicatedStorage.Shared.Net)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
+local ScreenLayout = require(ReplicatedStorage.Shared.Logic.ScreenLayout)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local ClientSettings = require(script.Parent.ClientSettings)
+local HudController = require(script.Parent.HudController)
 local SoundPlayer = require(script.Parent.SoundPlayer)
 
 local NotificationController = {}
 
-local MAX_TOASTS = 3
+local TOAST = ScreenLayout.SIZE.toast
+local TOAST_TEXT = ScreenLayout.TEXT.toast
+local BANNER = ScreenLayout.SIZE.banner
+local BANNER_TEXT = ScreenLayout.TEXT.banner
+local MAX_TOASTS = TOAST.max
 local TOAST_SECONDS = 2.6
 local BANNER_SECONDS = 4.5
 
-local screen: ScreenGui
+local screen: ScreenGui -- announcement banners, above the HUD and below dialogs
+local toastScreen: ScreenGui -- toasts, above dialogs
 local toastList: Frame
 type Banner = { text: string, rarity: string?, color: string? }
 
@@ -39,17 +51,19 @@ local KIND_COLORS: { [string]: string } = {
 function NotificationController.toast(text: string, kind: string?)
 	local colorKey = KIND_COLORS[kind or "info"] or "panelLight"
 	toastCounter += 1
+	local height = ScreenLayout.toastHeight(text)
 	local toast = UiKit.panel({
 		Name = "Toast",
-		Size = UDim2.fromOffset(340, 40),
+		Size = UDim2.fromOffset(TOAST.w, height),
 		BackgroundColor3 = UiTheme.palette(colorKey),
 		LayoutOrder = -toastCounter,
 		Parent = toastList,
 	})
 	UiKit.label({
 		Text = text,
-		Size = UDim2.new(1, -16, 1, -8),
-		Position = UDim2.fromOffset(8, 4),
+		TextWrapped = height == TOAST.tall,
+		Size = UDim2.new(1, -2 * TOAST_TEXT.padX, 1, -2 * TOAST_TEXT.padY),
+		Position = UDim2.fromOffset(TOAST_TEXT.padX, TOAST_TEXT.padY),
 		Parent = toast,
 	})
 	UiKit.popIn(toast)
@@ -156,11 +170,13 @@ local function showNextBanner()
 		then UiTheme.color(entry.color)
 		elseif entry.rarity then UiTheme.rarityColor(entry.rarity)
 		else UiTheme.palette("primary")
+	-- Under the top stack, narrowed to stay clear of the TAG button and the feature buttons (Logic/ScreenLayout).
+	local top = HudController.stackBottom() + ScreenLayout.GAP
+	local x, width = HudController.overlaySpan(BANNER.w, BANNER.h, top)
 	local banner = UiKit.panel({
 		Name = "Announcement",
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, -80),
-		Size = UDim2.fromOffset(560, 64),
+		Position = UDim2.fromOffset(x, -BANNER.h - 16),
+		Size = UDim2.fromOffset(width, BANNER.h),
 		BackgroundColor3 = color,
 		Parent = screen,
 	})
@@ -171,18 +187,20 @@ local function showNextBanner()
 	})
 	UiKit.label({
 		Text = entry.text,
-		Size = UDim2.new(1, -24, 1, -12),
-		Position = UDim2.fromOffset(12, 6),
+		TextWrapped = true,
+		Size = UDim2.new(1, -2 * BANNER_TEXT.padX, 1, -2 * BANNER_TEXT.padY),
+		Position = UDim2.fromOffset(BANNER_TEXT.padX, BANNER_TEXT.padY),
 		Parent = banner,
 	})
 	SoundPlayer.world("announce")
 	TweenService:Create(
 		banner,
 		TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-		{ Position = UDim2.new(0.5, 0, 0, 150) }
+		{ Position = UDim2.fromOffset(x, top) }
 	):Play()
 	task.delay(BANNER_SECONDS, function()
-		local tween = TweenService:Create(banner, TweenInfo.new(0.25), { Position = UDim2.new(0.5, 0, 0, -80) })
+		local tween =
+			TweenService:Create(banner, TweenInfo.new(0.25), { Position = UDim2.fromOffset(x, -BANNER.h - 16) })
 		tween:Play()
 		tween.Completed:Wait()
 		banner:Destroy()
@@ -199,20 +217,22 @@ function NotificationController.announce(text: string, rarity: string?, color: s
 end
 
 function NotificationController.start()
-	screen = UiKit.screen("Notifications", 5)
+	screen = UiKit.screen("Notifications", 5, Enum.ScreenInsets.DeviceSafeInsets)
+	toastScreen = UiKit.screen("Toasts", 11, Enum.ScreenInsets.DeviceSafeInsets)
+	-- Centred, its bottom above the map vote strip (Logic/ScreenLayout.toastList); the newest on top.
 	toastList = UiKit.new("Frame", {
 		Name = "Toasts",
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -110),
-		Size = UDim2.fromOffset(360, 150),
+		Position = UDim2.new(0.5, 0, 1, -TOAST.bottom),
+		Size = UDim2.fromOffset(TOAST.w, TOAST.max * TOAST.tall + (TOAST.max - 1) * TOAST.gap),
 		BackgroundTransparency = 1,
-		Parent = screen,
+		Parent = toastScreen,
 	}) :: Frame
 	UiKit.new("UIListLayout", {
 		SortOrder = Enum.SortOrder.LayoutOrder,
 		VerticalAlignment = Enum.VerticalAlignment.Bottom,
 		HorizontalAlignment = Enum.HorizontalAlignment.Center,
-		Padding = UDim.new(0, 6),
+		Padding = UDim.new(0, TOAST.gap),
 		Parent = toastList,
 	})
 

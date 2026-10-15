@@ -56,6 +56,9 @@ jobs:
       - name: Lune unit tests
         run: lune run tests/run.luau
 
+      - name: HUD layout check (five screens, the busiest states; nothing overlaps, off screen or in the play zone)
+        run: lune run tools/layoutCheck.luau
+
       - name: World smoke test (builds every map theme offline)
         run: lune run tools/worldsim/smoke.luau
 

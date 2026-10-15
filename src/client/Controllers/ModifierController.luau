@@ -2,8 +2,8 @@
 --[[
 	The running server modifier on the client (server: ModifierService):
 
-	  * a chip in the HUD's chip row, beside server luck: "⚡ Rush Hour 4:12" in the modifier's colour; tapping it
-	    repeats the description as a toast
+	  * a button among the HUD's status pills, beside the event: "⚡ Rush Hour 4:12" in the modifier's colour (a full
+	    44 px target above the play zone; Logic/ScreenLayout); tapping it repeats the description as a toast
 	  * effects() / onChanged(): what the modifier changes, worked out from the published id exactly as the server does
 	    (Logic/ModifierRules), so belt prices, the steal hold time and tag reach match what the server checks
 
@@ -17,6 +17,7 @@ local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
 local Format = require(ReplicatedStorage.Shared.Logic.Format)
 local ModifierRules = require(ReplicatedStorage.Shared.Logic.ModifierRules)
+local ScreenLayout = require(ReplicatedStorage.Shared.Logic.ScreenLayout)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local HudController = require(script.Parent.HudController)
 local NotificationController = require(script.Parent.NotificationController)
@@ -84,12 +85,11 @@ local function refresh()
 end
 
 function ModifierController.start()
+	local size = ScreenLayout.SIZE.modifier
 	chip = UiKit.button({
 		Name = "ModifierChip",
-		LayoutOrder = 2,
-		Size = UDim2.fromOffset(160, 34),
+		Size = UDim2.fromOffset(size.w, size.h),
 		Visible = false,
-		Parent = HudController.chipRow(),
 	}, function()
 		local id = current
 		local def = if id then Modifiers.modifiers[id] else nil
@@ -97,7 +97,9 @@ function ModifierController.start()
 			NotificationController.toast(`{def.icon} {def.description}`, "info")
 		end
 	end)
-	chipLabel = UiKit.label({ Name = "Text", Size = UDim2.fromScale(1, 1), Parent = chip })
+	-- Wraps onto a second line for long names ("🌌 Northern Lights / 4:12").
+	chipLabel = UiKit.label({ Name = "Text", Size = UDim2.fromScale(1, 1), TextWrapped = true, Parent = chip })
+	HudController.place("modifier", chip)
 
 	workspace:GetAttributeChangedSignal("Modifier"):Connect(refresh)
 	refresh()
