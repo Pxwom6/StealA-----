@@ -477,13 +477,13 @@ half the time.
 | Clearance Sale | belt prices x0.7 (rounded to whole cash, at least 1) | about 1% off what an always-buying player spends |
 | Golden Hour | every mutation chance x3 (5.15% → 15.5% of spawns; 7.15% → 21.5% while Halloween runs) | about +5% mutations |
 | Lucky Breeze | 2x luck (a LiveOps boost: shows in the luck pill, capped with everything else at 6x) | rare odds doubled ~3.6% of the time (with Snack Party) |
-| Cash Splash | income x1.5 (with LiveOps cash events, capped at 3x) | about +1.2% income; cash packs and quest rewards are not inflated (they use the steady income) |
+| Cash Splash | live income x1.5 (with LiveOps cash events, capped at 3x) | about +1.2% income; cash packs, quest and daily rewards, offline earnings and the saved best cash/sec are not inflated (DECISIONS.md #46) |
 | Sugar Rush | everyone walks (and carries) 25% faster | – |
 | Quick Hands | the steal hold is 0.75 s instead of 1.5 | – |
 | Fortress | locks started while it runs last 1.5x (the open window grows with them: at least half the lock) | – |
 | Snack Patrol | tag reach 13 → 19.5 studs | – |
 | Snack Party (rare) | spawns every 1.7 s and 2x luck | – |
-| Jackpot (rare) | income x2 (with LiveOps cash events, capped at 3x) | about +0.9% income |
+| Jackpot (rare) | live income x2 (with LiveOps cash events, capped at 3x) | about +0.9% income; nothing paid or saved from income doubles |
 | Thunderstorm | rain, lightning and a dark sky; Electric Snacklings can roll (2% of spawns) | about 2–3 Electric per storm |
 | Meteor Shower | a starry midnight with shooting stars; Galaxy Snacklings can roll (2%) | about 2–3 Galaxy per shower |
 | Toxic Fog | green haze and glowing spores; Toxic Snacklings can roll (2%) | about 2–3 Toxic per fog |
@@ -573,8 +573,9 @@ Cash and Snacklings reset; podium upgrades, passes and stats stay.
 The first rebirth lands around the first-Legendary stage (~1 h free); later ones need Mythic-level income, so
 rebirths become a multi-session goal. The multiplier is saved when earned, so later tuning never lowers it.
 
-**Cash packs** (`Economy.cashPacks`) pay N seconds of the buyer's steady income (creatures on active podiums that
-are not being stolen, at the rebirth and pass multipliers, without LiveOps cash events or the friend & group bonus),
+**Cash packs** (`Economy.cashPacks`) pay N seconds of the buyer's steady income (creatures on active podiums, one a
+thief is carrying off included, at the rebirth and pass multipliers, without LiveOps cash events, server modifiers or
+the friend & group bonus),
 rounded down to 2 significant digits, with a floor so they are worth something on day one. They therefore stay
 meaningful at every stage instead of becoming worthless (fixed amounts) or game-breaking (huge fixed amounts).
 
