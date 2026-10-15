@@ -10,8 +10,8 @@
 	(tests/StyleLayout.spec.luau, tests/NewsLayout.spec.luau, tests/HostPanelLayout.spec.luau).
 
 	Then the store additions on the same screens (Logic/StoreLayout): the Rewards panel and the Shop fit below the top
-	bar, and the Spin tab (with and without the Lucky Spin pack buttons) and a pack's Shop card keep their boxes apart,
-	inside and tappable; tests/StoreLayout.spec.luau proves their text sizes.
+	bar, and the Spin tab (with and without the Lucky Spin pack buttons), a pack's Shop card and the Lucky Spin's
+	Details list keep their boxes apart, inside and tappable; tests/StoreLayout.spec.luau proves their text sizes.
 
 	Usage: lune run tools/layoutCheck.luau [--all]   (--all lists every element in every scenario, in screen pixels)
 ]]
@@ -133,6 +133,14 @@ for _, spec in ScreenLayout.DEVICES do
 	local card, height = StoreLayout.packCard()
 	for _, problem in StoreLayout.problems(card, StoreLayout.CARD.w, height) do
 		table.insert(problems, `Lucky Spin pack card: {problem}`)
+	end
+	-- the Lucky Spin's Details list over each dialog's content (its rows' text: tests/StoreLayout.spec.luau)
+	local dialogs: { [string]: { w: number, h: number } } = { Rewards = StoreLayout.REWARDS, Shop = StoreLayout.STORE }
+	for name, dialog in dialogs do
+		local area = StoreLayout.content(dialog)
+		for _, problem in StoreLayout.problems(StoreLayout.oddsDetails(area.w, area.h), area.w, area.h) do
+			table.insert(problems, `Details list ({name}): {problem}`)
+		end
 	end
 	total += #problems
 	print(string.format("  %-16s %s", spec.name, if #problems == 0 then "ok" else `{#problems} PROBLEMS`))

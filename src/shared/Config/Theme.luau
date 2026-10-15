@@ -590,6 +590,19 @@ local Theme = {
 		spinAnnounce = "🎰 {player} won {prize} on the Lucky Spin!",
 		spinOdds = "Odds",
 		spinOddsBack = "Back",
+		-- The Details list (UI/OddsDetails, Logic/SpinOdds): every outcome of a spin and its exact chance, as Roblox's
+		-- Paid Random Items policy asks (its `spinDetailsRounded` wording is the policy's own)
+		spinDetails = "📋 Details",
+		spinDetailsTitle = "🎰 Every Lucky Spin prize",
+		spinDetailsReel = "Each spin wins one of these:",
+		spinDetailsCash = "{icon} {label}: {amount}",
+		spinDetailsCashTime = "{time} of your income",
+		spinDetailsSnackling = "{icon} {label}: a Snackling from the list below",
+		spinDetailsSnacklingMutation = "{icon} {label}: a {mutation} Snackling from the list below",
+		spinDetailsSnacklings = "Which Snackling, chance per spin:",
+		spinDetailsFixed = "These odds never change: events and luck boosts don't apply to the Lucky Spin.",
+		spinDetailsRounded = "Probabilities are rounded; total of displayed individual probabilities may not equal 100%.",
+		spinDetailsSold = "With a full base, a Snackling you win is sold for its refund.",
 		-- Shown in the Spin and Gifts tabs while the base is full (Snackling prizes are sold for their refund then)
 		prizesBaseFull = "⚠️ Base full: Snackling prizes will be sold",
 
@@ -830,11 +843,11 @@ local Theme = {
 		},
 		LuckySpins3 = {
 			name = "3 Lucky Spins",
-			description = "3 more Lucky Spins. Each spin wins one prize, with these exact chances:",
+			description = "3 more Lucky Spins. Each spin wins one prize: Details lists every Snackling's chance.",
 		},
 		LuckySpins10 = {
 			name = "10 Lucky Spins",
-			description = "10 more Lucky Spins. Each spin wins one prize, with these exact chances:",
+			description = "10 more Lucky Spins. Each spin wins one prize: Details lists every Snackling's chance.",
 		},
 	} :: { [string]: { name: string, description: string } },
 

@@ -2,6 +2,7 @@
 --[[
 	Lucky Spin rules (Config/Spin) on the saved `data.spin` (Types.SpinState): whether a spin is available (the free
 	one first, then a banked one), using one, banking spins from gifts, picking the prize by weight, and validation.
+	What a Snackling prize can be, and every outcome's exact chance, is Logic/SpinOdds.
 	Pure: no Roblox APIs; random numbers come in as a function returning [0, 1).
 ]]
 
@@ -138,6 +139,18 @@ function SpinRules.validate(config: SpinConfig, mutations: { [string]: any }): {
 		end
 		for _, message in GiftRules.rewardProblems(segment.reward, name, mutations, false) do
 			table.insert(problems, message)
+		end
+		-- A spin's prizes never depend on what is live (Logic/SpinOdds): a gated mutation (an event's, a map's, a
+		-- weather's) would come only some of the time, or out of its season.
+		local reward = segment.reward :: any
+		local mutation = if reward.kind == "creature" and reward.mutation ~= nil
+			then mutations[reward.mutation]
+			else nil
+		if
+			type(mutation) == "table"
+			and (mutation.eventId ~= nil or mutation.mapTheme ~= nil or mutation.modifierId ~= nil)
+		then
+			table.insert(problems, `{name} mutation must be a permanent one (a spin's odds never change)`)
 		end
 	end
 	if not (total > 0) then

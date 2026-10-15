@@ -12,10 +12,12 @@
 	  * The Starter Pack comes first until it is bought (then it hides): one line per thing it gives, nothing random:
 	    its cash as a receipt would quote it now, its Snackling, and each gadget (or its cash price when owned). Its
 	    buy button asks first, like the Lucky Spin packs'.
-	  * Lucky Spin packs show every prize's exact chance on the card (UI/OddsGrid, laid out by Logic/StoreLayout). They
-	    are paid random items too, so they show only to players whose policy allows them (hidden otherwise, and while
-	    it is being looked up). Their buy button asks first (PurchaseController: the client's check, then the
-	    server's, before Roblox's prompt opens) and says "Bank full" while the spin bank holds Config/Spin.paidBankFull.
+	  * Lucky Spin packs show every prize's exact chance on the card (UI/OddsGrid, laid out by Logic/StoreLayout), and
+	    a Details button beside it opens the list of every outcome of a spin, each Snackling included, over the Shop
+	    (UI/OddsDetails, Logic/SpinOdds: a spin's odds never change). They are paid random items too, so they show
+	    only to players whose policy allows them (hidden otherwise, and while it is being looked up). Their buy button
+	    asks first (PurchaseController: the client's check, then the server's, before Roblox's prompt opens) and says
+	    "Bank full" while the spin bank holds Config/Spin.paidBankFull.
 	  * Items whose id is still 0 (not created on the Creator Hub yet) are hidden outside Studio, headers too when a
 	    section has nothing to show (Logic/StoreRules.visible). In Studio they show a "(Studio) Grant" button that runs
 	    the real server receipt path, so purchases are testable before the IDs exist.
@@ -51,6 +53,7 @@ local StoreLayout = require(ReplicatedStorage.Shared.Logic.StoreLayout)
 local StoreRules = require(ReplicatedStorage.Shared.Logic.StoreRules)
 local LiveOps = require(ReplicatedStorage.Shared.Config.LiveOps)
 local Modal = require(script.Parent.Parent.UI.Modal)
+local OddsDetails = require(script.Parent.Parent.UI.OddsDetails)
 local OddsGrid = require(script.Parent.Parent.UI.OddsGrid)
 local UiKit = require(script.Parent.Parent.UI.UiKit)
 local GadgetsTab = require(script.Parent.GadgetsTab)
@@ -78,6 +81,8 @@ local gadgetsRefresh: ((state: Types.ClientState) -> ())? = nil
 -- The open store's Shop tab: refilled when what its cards show changes (nil while the store is closed).
 local shopRefresh: (() -> ())? = nil
 local shopShows = "" -- what the open Shop tab's cards were built from (shows)
+-- The open store's Lucky Spin Details list (a pack card's Details button; nil while the store is closed).
+local showSpinDetails: (() -> ())? = nil
 
 local function copyVars(): { [string]: any }
 	local perks = Monetization.perks
@@ -417,6 +422,19 @@ local function checkedCard(parent: Instance, key: string, order: number, state: 
 		end
 	else
 		OddsGrid.build(frame, boxes.odds.rect, frame.ZIndex + 1)
+		local details = UiKit.button({
+			Name = "Details",
+			BackgroundColor3 = UiTheme.palette("luck"),
+			Text = Theme.text.spinDetails,
+			Parent = frame,
+		}, function()
+			SoundPlayer.ui("click")
+			local show = showSpinDetails
+			if show then
+				show()
+			end
+		end)
+		place(details, boxes.details.rect)
 	end
 
 	local full = PurchaseController.refusal(key, state) == "bankFull"
@@ -566,6 +584,7 @@ function StoreController.open(focusKey: string?, tab: Tab?)
 		end
 		gadgetsRefresh = nil
 		shopRefresh = nil
+		showSpinDetails = nil
 	end)
 	local tabBar = UiKit.new("Frame", {
 		Name = "Tabs",
@@ -607,10 +626,38 @@ function StoreController.open(focusKey: string?, tab: Tab?)
 	}) :: Frame
 	local refreshGadgets = GadgetsTab.build(gadgetsView)
 	gadgetsRefresh = refreshGadgets
+	-- A pack card's Details: every outcome of a spin over the Shop's content, until Back (or another tab).
+	local detailsView: GuiObject? = nil
+	showSpinDetails = function()
+		local view = detailsView
+		if view == nil then
+			local state = StateStore.get()
+			local area = StoreLayout.content(StoreLayout.STORE)
+			local overlay: GuiObject
+			overlay = OddsDetails.build(
+				content,
+				{ x = 0, y = 0, w = area.w, h = area.h },
+				30,
+				if state then state.spin.rewards else {},
+				function()
+					overlay.Visible = false
+				end
+			)
+			detailsView = overlay
+			view = overlay
+		end
+		if view then
+			view.Visible = true
+		end
+	end
 	local tabButtons: { [string]: TextButton } = {}
 	local function selectTab(id: Tab)
 		scroller.Visible = id == "shop"
 		gadgetsView.Visible = id == "gadgets"
+		local view = detailsView
+		if view then
+			view.Visible = false
+		end
 		for key, button in tabButtons do
 			button.BackgroundColor3 = if key == id then UiTheme.palette("gold") else UiTheme.palette("panelLight")
 		end
