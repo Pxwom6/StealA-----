@@ -514,6 +514,6 @@ for index, id in Gadgets.order do
 end
 printTables(
 	gadgetScenarios,
-	`### Median play time until the first Snackling of each rarity, with and without the gadgets ({RUNS} runs)`,
+	`\n### Median play time until the first Snackling of each rarity, with and without the gadgets ({RUNS} runs)`,
 	"### Median cash/sec after N minutes of play, with and without the gadgets"
 )
