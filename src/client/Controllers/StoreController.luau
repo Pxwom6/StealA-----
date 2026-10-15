@@ -71,6 +71,7 @@ local function copyVars(): { [string]: any }
 		minVulnerable = Gameplay.lock.minVulnerableSeconds,
 		luckMultiplier = perks.serverLuckMultiplier,
 		luckMinutes = math.floor(perks.serverLuckSeconds / 60),
+		autoSeconds = perks.autoCollectSeconds,
 	}
 end
 
@@ -357,7 +358,10 @@ local function fillCards(scroller: ScrollingFrame): { [string]: Frame }
 			kind = "pass",
 			id = pass.id,
 			order = nextOrder(),
-			accent = if key == "VIP" then UiTheme.palette("vip") else UiTheme.palette("primary"),
+			accent = if key == "VIP"
+				then UiTheme.palette("vip")
+				elseif key == "AutoCollect" then UiTheme.palette("autoCollect")
+				else UiTheme.palette("primary"),
 		}, owned)
 	end
 	return cards

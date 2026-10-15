@@ -16,7 +16,7 @@
 	  * the only paid item with a random effect (Server Luck) shows exact before/after odds before purchase
 ]]
 
-export type PassKey = "DoubleCash" | "VIP" | "ExtraPodiums" | "LongerLock"
+export type PassKey = "DoubleCash" | "VIP" | "ExtraPodiums" | "LongerLock" | "AutoCollect"
 export type ProductKey =
 	"CashBite"
 	| "CashBag"
@@ -37,6 +37,8 @@ local Monetization = {
 		VIP = { id = 2025212749 }, -- VIP, 149 R$
 		ExtraPodiums = { id = 2026712754 }, -- +4 Podiums, 99 R$
 		LongerLock = { id = 2026892736 }, -- Longer Lock, 49 R$
+		-- Not created yet (README "Before publishing"): paste the Creator Hub ids here.
+		AutoCollect = { id = 0 }, -- Auto Collect, suggested 149 R$
 	} :: { [string]: PassDef },
 
 	products = {
@@ -59,10 +61,13 @@ local Monetization = {
 		longerLockSeconds = 30,
 		serverLuckMultiplier = 2,
 		serverLuckSeconds = 15 * 60,
+		-- Auto Collect: every active pad's cash, this often, wherever the owner is (Logic/AutoCollectRules keeps it
+		-- between 2 and 30 s).
+		autoCollectSeconds = 5,
 	},
 
 	-- Order of items in the store UI.
-	storePasses = { "DoubleCash", "VIP", "ExtraPodiums", "LongerLock" } :: { string },
+	storePasses = { "DoubleCash", "AutoCollect", "VIP", "ExtraPodiums", "LongerLock" } :: { string },
 	storeProducts = {
 		"ServerLuck",
 		"CashBite",

@@ -41,7 +41,7 @@ local Replication = require(script.Parent.Replication)
 local Sessions = require(script.Parent.Sessions)
 
 type Session = Sessions.Session
-local PASS_KEYS: { string } = { "DoubleCash", "VIP", "ExtraPodiums", "LongerLock" }
+local PASS_KEYS: { string } = { "DoubleCash", "VIP", "ExtraPodiums", "LongerLock", "AutoCollect" }
 -- A receipt can arrive while the buyer's save is still loading (e.g. a retry on join): wait for it, longer than
 -- DataService's 60 s load timeout, so the receipt is handled before the player can play (or rebirth).
 local SESSION_WAIT_SECONDS = 75
@@ -60,6 +60,8 @@ local function hasPass(passes: Types.Passes, key: string): boolean
 		return passes.ExtraPodiums
 	elseif key == "LongerLock" then
 		return passes.LongerLock
+	elseif key == "AutoCollect" then
+		return passes.AutoCollect
 	end
 	return false
 end
@@ -73,6 +75,8 @@ local function setPass(passes: Types.Passes, key: string, value: boolean)
 		passes.ExtraPodiums = value
 	elseif key == "LongerLock" then
 		passes.LongerLock = value
+	elseif key == "AutoCollect" then
+		passes.AutoCollect = value
 	end
 end
 
@@ -180,7 +184,8 @@ end
 -- PlayerLifecycle hook: runs before the session exists. Lookups run in parallel; any that fail are treated as
 -- not owned for now and re-checked in the background.
 function MonetizationService.checkPasses(player: Player): Types.Passes
-	local passes: Types.Passes = { DoubleCash = false, VIP = false, ExtraPodiums = false, LongerLock = false }
+	local passes: Types.Passes =
+		{ DoubleCash = false, VIP = false, ExtraPodiums = false, LongerLock = false, AutoCollect = false }
 	local results = lookupPasses(player.UserId, PASS_KEYS)
 	local failed: { string } = {}
 	for _, key in PASS_KEYS do

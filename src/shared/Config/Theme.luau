@@ -33,6 +33,7 @@ local Theme = {
 		cash = "#8CFF6B",
 		lock = "#4DA8FF",
 		vip = "#FFD700",
+		autoCollect = "#B07CFF", -- the Auto Collect pass's card (the Snack Magnet's colour)
 		luck = "#7CFF4D",
 		social = "#FF6FB5",
 		event = "#FF8C1A", -- event pill / "EVENT" tag when the event has no seasonal theme colour (Config/Seasons)
@@ -719,6 +720,10 @@ local Theme = {
 		shieldBlocked = "Shielded! 🫧 Wait for the bubble to pop.",
 		magnetEmpty = "Nothing to collect yet!",
 		magnetCollected = "🧲 +{amount} from your pads!",
+		-- The Auto Collect pass does the Snack Magnet's job every few seconds (GadgetRules.coveredByAutoCollect)
+		magnetAuto = "🧲 Auto Collect already brings you your pads' cash!",
+		gadgetAutoBadge = "AUTO", -- on the Snack Magnet's button for Auto Collect owners
+		gadgetAutoShop = "Auto ✓", -- the Snack Magnet's Shop button for Auto Collect owners
 		gadgetDizzy = "💫💫", -- over the head of whoever slipped on a banana peel
 
 		-- Map themes (Config/MapThemes): the vote for the next map and the change itself
@@ -733,8 +738,12 @@ local Theme = {
 	},
 
 	-- Store copy per item key (see Config/Monetization). Available placeholders: {vipBonus} {extraPodiums}
-	-- {lockSeconds} {minVulnerable} {luckMultiplier} {luckMinutes}, filled from the perk values.
+	-- {lockSeconds} {minVulnerable} {luckMultiplier} {luckMinutes} {autoSeconds}, filled from the perk values.
 	store = {
+		AutoCollect = {
+			name = "Auto Collect",
+			description = "Every {autoSeconds}s the cash on your pads comes to you, wherever you are. Forever.",
+		},
 		DoubleCash = { name = "2x Cash", description = "Double all Snackling income, forever." },
 		VIP = {
 			name = "VIP",

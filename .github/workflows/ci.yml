@@ -71,6 +71,9 @@ jobs:
       - name: Gadgets (offline server, virtual clock, every gadget through the real remotes)
         run: lune run tools/worldsim/gadgets.luau
 
+      - name: Store (offline server, virtual clock, the store additions through the real receipt path)
+        run: lune run tools/worldsim/store.luau
+
       - name: Host test (the host panel, cross-server LiveOps and shout-outs, offline)
         run: lune run tools/worldsim/host.luau
 

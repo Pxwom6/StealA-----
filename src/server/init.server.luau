@@ -9,6 +9,7 @@ local Services = script.Services
 
 local AchievementService = require(Services.AchievementService)
 local Analytics = require(Services.Analytics)
+local AutoCollectService = require(Services.AutoCollectService)
 local BeltService = require(Services.BeltService)
 local BossService = require(Services.BossService)
 local CodeService = require(Services.CodeService)
@@ -66,6 +67,7 @@ BossService.start(world.walkwayY) -- Snack Attack: giant Snacklings over the bel
 LockService.start()
 StealService.start()
 GadgetService.start() -- cash-bought gear: speed, banana peels, shields, magnets (after steals: peels drop carries)
+AutoCollectService.start() -- the Auto Collect pass: every pad's cash every few seconds, through the pad path
 RebirthService.start()
 PlayerPolicy.start() -- each player's PolicyService answer: paid random items (Server Luck) only where allowed
 MonetizationService.start()

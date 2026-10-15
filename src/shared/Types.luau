@@ -1087,6 +1087,7 @@ export type Passes = {
 	VIP: boolean,
 	ExtraPodiums: boolean,
 	LongerLock: boolean,
+	AutoCollect: boolean, -- every pad collected every few seconds, wherever you are (AutoCollectService)
 }
 
 export type DailyView = {

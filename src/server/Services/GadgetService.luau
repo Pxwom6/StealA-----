@@ -16,7 +16,9 @@
 	    shield  StealService refuses tags on the player for a few seconds and tells the tagger "Shielded!" (locks,
 	            peels and everything else still work)
 	    magnet  every active pad of their base is collected through the pad path (EconomyService.collectPad: same
-	            floating "+$X", same collect event, same analytics); refused when there is nothing to collect
+	            floating "+$X", same collect event, same analytics); refused when there is nothing to collect. The
+	            Auto Collect pass does this every few seconds, so for its owners the magnet is neither used nor sold
+	            ("auto": its button shows AUTO, GadgetRules.coveredByAutoCollect)
 
 	What players see: the Player attributes GadgetSpeedUntil and SlippedUntil (server time) drive the soda fizz and the
 	dizzy stars on every client (GadgetFxController); a shielded player wears a translucent bubble the server makes
@@ -331,6 +333,7 @@ local function onBuy(player: Player, idArg: unknown)
 		owned = id ~= nil and GadgetRules.owns(session.data.flags, id),
 		cash = session.data.cash,
 		price = if def then def.price else math.huge,
+		covered = def ~= nil and GadgetRules.coveredByAutoCollect(def, session.passes.AutoCollect),
 	})
 	if not ok or id == nil or def == nil then
 		local key = if reason then GadgetRules.messageKey(reason) else nil
@@ -393,6 +396,7 @@ local function onUse(player: Player, idArg: unknown)
 		alive = root ~= nil,
 		now = t,
 		readyAt = session.gadgets.readyAt[id],
+		covered = GadgetRules.coveredByAutoCollect(def, session.passes.AutoCollect), -- a magnet: "AUTO"
 	})
 	-- The gadget's own checks, on the server's view of the player (no client position is ever trusted).
 	if ok and root then

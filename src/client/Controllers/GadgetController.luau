@@ -8,6 +8,8 @@
 	  * recharging: a dark disc shrinks away as the gadget recharges, with the seconds left on it
 	  * running (the soda's speed, the shield, a peel lying in your base): a bright pulsing ring
 	  * keys 1-4 on a keyboard use the gadgets in Config/Gadgets order (each button shows its key)
+	  * with the Auto Collect pass, the Snack Magnet shows "AUTO": the pass already does its job every few seconds, so
+	    a tap only says so (GadgetRules.coveredByAutoCollect; the server refuses it too)
 
 	Using one only sends the UseGadget intent; the server checks everything and answers with a toast when it says no.
 	A tap while the button still shows its cooldown says so here instead, without asking the server.
@@ -19,6 +21,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local Gadgets = require(ReplicatedStorage.Shared.Config.Gadgets)
+local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Types = require(ReplicatedStorage.Shared.Types)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
@@ -56,6 +59,7 @@ type Slot = {
 	disc: Frame, -- the cooldown: shrinks from the whole button to nothing
 	time: TextLabel,
 	key: TextLabel,
+	auto: TextLabel, -- "AUTO" over a Snack Magnet while the player owns the Auto Collect pass
 	stroke: UIStroke,
 	id: string?, -- the gadget it shows now
 	pressedAt: number,
@@ -65,6 +69,12 @@ type Slot = {
 local slots: { Slot } = {}
 local view: Types.GadgetsView = { owned = {}, readyAt = {}, activeUntil = {} }
 local inTutorial = true -- until the first state says otherwise (no flash of buttons for a new player)
+local autoCollect = false -- the player owns the Auto Collect pass
+
+-- The Auto Collect pass already does what gadget `id` does (the Snack Magnet): its button shows AUTO.
+local function covered(id: string): boolean
+	return GadgetRules.coveredByAutoCollect(Gadgets.gadgets[id], autoCollect)
+end
 
 local function now(): number
 	return workspace:GetServerTimeNow()
@@ -85,6 +95,10 @@ local function press(slot: Slot)
 		return
 	end
 	slot.pressedAt = t
+	if covered(id) then
+		NotificationController.toast(Theme.text.magnetAuto, "info")
+		return
+	end
 	local readyAt = view.readyAt[id]
 	if readyAt and readyAt > now() then
 		NotificationController.toast(
@@ -151,12 +165,25 @@ local function buildSlot(index: number): Slot
 		ZIndex = 4,
 		Parent = button,
 	})
+	-- "AUTO" across the bottom of a Snack Magnet the Auto Collect pass makes unneeded.
+	local auto = UiKit.label({
+		Name = "Auto",
+		Text = Theme.text.gadgetAutoBadge,
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.fromScale(0.5, 1.02),
+		Size = UDim2.fromScale(0.9, 0.36),
+		TextColor3 = UiTheme.palette("gold"),
+		Visible = false,
+		ZIndex = 4,
+		Parent = button,
+	})
 	slot = {
 		button = button,
 		icon = icon,
 		disc = disc,
 		time = time,
 		key = key,
+		auto = auto,
 		stroke = button:FindFirstChildOfClass("UIStroke") :: UIStroke,
 		id = nil,
 		pressedAt = -math.huge,
@@ -182,6 +209,9 @@ local function bind()
 			end
 		end
 		slot.key.Visible = keyboard and show
+		local isAuto = show and id ~= nil and covered(id)
+		slot.auto.Visible = isAuto
+		slot.icon.TextTransparency = if isAuto then 0.35 else 0
 		if show ~= slot.button.Visible then
 			slot.button.Visible = show
 			if show then
@@ -212,7 +242,7 @@ local function tick()
 			slot.cooling = cooling
 			slot.disc.Visible = cooling
 			slot.time.Visible = cooling
-			slot.icon.TextTransparency = if cooling then 0.35 else 0
+			slot.icon.TextTransparency = if cooling or slot.auto.Visible then 0.35 else 0
 			if not cooling then
 				UiKit.popIn(slot.button) -- ready again
 			end
@@ -237,6 +267,7 @@ function GadgetController.start()
 	StateStore.onChange(function(state)
 		view = state.gadgets
 		inTutorial = state.tutorial.step ~= ""
+		autoCollect = state.passes.AutoCollect == true
 		bind()
 	end)
 	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)

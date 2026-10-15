@@ -7,7 +7,8 @@
 	  values (GameData.income / GameData.price with the record's variant).
 	* Collecting: 4×/s the server checks whether each owner's character stands on one of their collect pads and
 	  moves that podium's stored cash into their wallet. Purely position-based: no client remote can collect. The
-	  Snack Magnet gadget (GadgetService) collects every pad at once through the same path (collectPad).
+	  Snack Magnet gadget (GadgetService) collects every pad at once through the same path (collectPad), and so does
+	  the Auto Collect pass every few seconds (AutoCollectService, quietly).
 	* Intents: BuyPodium, SellCreature.
 	All cash changes go through addCash / trySpend so the HUD is marked dirty and analytics are logged.
 ]]
@@ -176,15 +177,17 @@ function EconomyService.collect(session: Session, podium: number): number
 end
 
 -- Collects one pad the way stepping on it does: the podium's stored cash into the wallet, the floating "+$X" over the
--- pad, and the "collect" gameplay event (tutorial, quests). The pad check and the Snack Magnet both come here.
+-- pad, and the "collect" gameplay event (tutorial, quests). The pad check, the Snack Magnet and Auto Collect all come
+-- here. `quiet` (Auto Collect, every few seconds): the client plays no sound and shows the "+$X" only near the camera.
 -- Returns the amount.
-function EconomyService.collectPad(session: Session, podium: MapBuilder.PodiumRefs): number
+function EconomyService.collectPad(session: Session, podium: MapBuilder.PodiumRefs, quiet: boolean?): number
 	local amount = EconomyService.collect(session, podium.index)
 	if amount > 0 then
 		Remotes.fire(session.player, "Effect", {
 			kind = "collect",
 			amount = amount,
 			position = podium.padPosition,
+			quiet = if quiet then true else nil,
 		})
 		-- Only a pad collect is this event (not selling, not leaving): tutorial, quests.
 		GameEvents.emit(session, { kind = "collect", amount = amount })
