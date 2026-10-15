@@ -28,6 +28,8 @@
 	  /hostas <owner|none|admin>
 	                        try the host panel (Settings) as a private server's owner, as a player with no panel, or
 	                        as an admin again (in Studio everyone is an admin)
+	  /style [off]          every title and base skin counts as unlocked for you this session (Settings ▸ Style; not
+	                        saved); /style off: only what you really earned again
 
 	Map themes (MapThemeService; admins can use these in live servers too, that server only):
 	  /map <id>             switch to that map now, e.g. /map candy, /map volcano
@@ -63,6 +65,7 @@ local Remotes = require(script.Parent.Remotes)
 local Sessions = require(script.Parent.Sessions)
 local SnackdexService = require(script.Parent.SnackdexService)
 local SocialService = require(script.Parent.SocialService)
+local StyleService = require(script.Parent.StyleService)
 local TutorialService = require(script.Parent.TutorialService)
 
 local DevCommands = {}
@@ -299,11 +302,26 @@ function DevCommands.start()
 			"info"
 		)
 	end)
+	add("style", function(player: Player, args: { string })
+		local session = Sessions.get(player)
+		if session == nil then
+			return
+		end
+		local off = string.lower(args[1] or "") == "off"
+		StyleService.setUnlockAll(session, not off)
+		Remotes.notify(
+			player,
+			if off
+				then "[Studio] titles and skins: only what you earned"
+				else "[Studio] every title and base skin unlocked this session (Settings ▸ Style)",
+			"info"
+		)
+	end)
 	print(
 		"[DevCommands] Studio commands enabled: /cash <n>, /spawn <creatureId> [mutationId], /noshield, /friends <n|off>,"
 			.. " /tutorial, /gallery [mutationId|off], /sky <clockTime>,"
 			.. " /quests reset, /dex fill <rarity|event>, /map <id|vote|list>, /playtime <min>, /spins <n|free>,"
-			.. " /runaway [here], /boss [hp], /gadgets [off], /hostas <owner|none|admin>"
+			.. " /runaway [here], /boss [hp], /gadgets [off], /hostas <owner|none|admin>, /style [off]"
 			.. " (LiveOps: /event <id> [minutes], /event off, /luck <x> <min>)"
 	)
 end

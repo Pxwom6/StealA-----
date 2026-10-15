@@ -13,9 +13,14 @@
 	CanTouch / CanQuery off, in each plot's "Decor" folder or next to what it decorates, and never higher than the
 	plot sign players can already stand on.
 
+	A base's cosmetic surfaces (the floor's checker tiles, the aisle rug, the wall tops and corner caps) are painted by
+	MapBuilder.paintPlot: the plot's own colours (Classic), VIP's gold, or a base skin (Config/Skins). Nothing else
+	about a plot ever changes colour, and a map change (restyle) never repaints them.
+
 	Plot local space: origin at floor centre, local -Z (the CFrame LookVector) points at the belt / entrance.
 ]]
 
+local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Gameplay = require(ReplicatedStorage.Shared.Config.Gameplay)
@@ -24,8 +29,12 @@ local Scenery = require(ReplicatedStorage.Shared.Config.Scenery)
 local Theme = require(ReplicatedStorage.Shared.Config.Theme)
 local Types = require(ReplicatedStorage.Shared.Types)
 local UiTheme = require(ReplicatedStorage.Shared.UiTheme)
+local CreatureVisuals = require(ReplicatedStorage.Shared.CreatureVisuals)
 local BeltMath = require(ReplicatedStorage.Shared.Logic.BeltMath)
+local NewsLayout = require(ReplicatedStorage.Shared.Logic.NewsLayout)
+local SceneryLayout = require(ReplicatedStorage.Shared.Logic.SceneryLayout)
 local StealRules = require(ReplicatedStorage.Shared.Logic.StealRules)
+local StyleRules = require(ReplicatedStorage.Shared.Logic.StyleRules)
 local SceneryBuilder = require(script.Parent.SceneryBuilder)
 local WorldLighting = require(script.Parent.WorldLighting)
 
@@ -39,6 +48,9 @@ export type PodiumRefs = {
 	collar: BasePart, -- decoration that follows the podium's active state (MapBuilder.setPodiumActive)
 	ring: BasePart,
 }
+
+-- A floor tile, and where it lies: `row` 0 at the entrance end, `side` 1 or 2 of the aisle (StyleRules.tileIndex).
+export type PlotTile = { part: BasePart, row: number, side: number }
 
 export type PlotRefs = {
 	index: number,
@@ -57,7 +69,12 @@ export type PlotRefs = {
 	signLabel: TextLabel,
 	signIncome: TextLabel,
 	signAvatar: ImageLabel, -- the owner's headshot (MapBuilder.setSignOwner)
-	trims: { BasePart },
+	-- The cosmetic surfaces a base skin paints (MapBuilder.paintPlot): floor tiles, the aisle rug, the wall tops (solid)
+	-- and the corner posts' caps (decoration).
+	tiles: { PlotTile },
+	rug: BasePart,
+	wallTrims: { BasePart },
+	caps: { BasePart },
 	walls: { BasePart },
 	accent: Color3, -- this plot's colour (Theme.plotColors)
 }
@@ -67,6 +84,7 @@ export type World = {
 	belt: BeltMath.Belt,
 	beltSurfaceY: number,
 	leaderboards: { cash: BasePart, steals: BasePart },
+	newsBoard: BasePart, -- the What's New board's panel (NewsService writes the newest update on it)
 	lobbySpawn: CFrame,
 	groundY: number, -- world Y of the top of the ground
 	walkwayY: number, -- world Y of the top of the walkway between the plots and the belt
@@ -220,6 +238,57 @@ function MapBuilder.setSignOwner(plot: PlotRefs, userId: number)
 	plot.signIncome.TextXAlignment = alignment
 end
 
+-- Paints a base's cosmetic surfaces: `look` (a base skin's, Config/Skins) or nil for the plot's own colours (Classic:
+-- a checker of the shared neutrals blended with the plot's colour, a rug of it, white trims), with VIP's gold where
+-- StyleRules.trimSources says (all the trims on a Classic base, the corner caps under any other skin). A rainbow
+-- skin's trims are tagged CreatureVisuals.RAINBOW_TAG, so every client cycles their hue (MutationFxController, off with
+-- Reduce effects); each trim's RestColor attribute is the colour a client puts back when that stops. Walls, the sign,
+-- podiums, pads and buttons are never touched, and neither is anything here by a map change.
+function MapBuilder.paintPlot(plot: PlotRefs, look: Types.SkinLook?, vip: boolean)
+	local accent = plot.accent
+	local light = UiTheme.world("plotTileLight"):Lerp(accent, 0.18)
+	local dark = UiTheme.world("plotTileDark"):Lerp(accent, 0.32)
+	for _, tile in plot.tiles do
+		if look then
+			tile.part.Color = UiTheme.color(look.tiles[StyleRules.tileIndex(tile.row, tile.side, #look.tiles)])
+			tile.part.Material = materialNamed(look.tileMaterial, Enum.Material.CeramicTiles)
+		else
+			tile.part.Color = if StyleRules.tileIndex(tile.row, tile.side, 2) == 1 then light else dark
+			tile.part.Material = Enum.Material.CeramicTiles
+		end
+	end
+	plot.rug.Color = if look then UiTheme.color(look.rug) else accent:Lerp(WHITE, 0.15)
+	plot.rug.Material = if look then materialNamed(look.rugMaterial, Enum.Material.Fabric) else Enum.Material.Fabric
+
+	local wallSource, capSource = StyleRules.trimSources(look, vip)
+	local count = #plot.wallTrims + #plot.caps
+	local function paintTrim(trim: BasePart, source: StyleRules.TrimSource, order: number)
+		local color, material, rainbow = UiTheme.world("wall"), Enum.Material.SmoothPlastic, false
+		if source == "skin" and look then
+			color = UiTheme.color(look.trim)
+			material = materialNamed(look.trimMaterial, Enum.Material.SmoothPlastic)
+			rainbow = look.rainbow == true
+		elseif source == "vip" then
+			color, material = UiTheme.world("vipTrim"), Enum.Material.Neon
+		end
+		trim:SetAttribute("RestColor", color)
+		if rainbow then
+			trim:SetAttribute("HueOffset", order / count) -- the colours chase each other round the base
+			CollectionService:AddTag(trim, CreatureVisuals.RAINBOW_TAG)
+		elseif CollectionService:HasTag(trim, CreatureVisuals.RAINBOW_TAG) then
+			CollectionService:RemoveTag(trim, CreatureVisuals.RAINBOW_TAG)
+		end
+		trim.Color = color
+		trim.Material = material
+	end
+	for i, trim in plot.wallTrims do
+		paintTrim(trim, wallSource, i - 1)
+	end
+	for i, cap in plot.caps do
+		paintTrim(cap, capSource, #plot.wallTrims + i - 1)
+	end
+end
+
 -- The owner sign's face: avatar circle on the left, name and cash/sec on the right.
 local function buildSignGui(sign: BasePart, accent: Color3): (TextLabel, TextLabel, ImageLabel)
 	local gui = Instance.new("SurfaceGui")
@@ -314,38 +383,35 @@ local function buildPlot(index: number, parent: Instance): PlotRefs
 		Parent = model,
 	})
 	floor:SetAttribute("Kind", "Floor")
+	-- Colours and materials of the rug, tiles, trims and caps come from MapBuilder.paintPlot (below).
 	local aisle = MAP.entranceWidth / 2
-	decor({
+	local rug = decor({
 		Name = "Rug",
 		Size = Vector3.new(aisle * 2, FLOOR_TOP, d),
 		CFrame = origin * CFrame.new(0, FLOOR_TOP / 2, 0),
-		Color = plotColor:Lerp(WHITE, 0.15),
-		Material = Enum.Material.Fabric,
 		CastShadow = false,
 		Parent = decorFolder,
 	})
 	local sideWidth = w / 2 - aisle
 	local rows = 4
-	local tileLight = UiTheme.world("plotTileLight"):Lerp(plotColor, 0.18)
-	local tileDark = UiTheme.world("plotTileDark"):Lerp(plotColor, 0.32)
+	local tiles: { PlotTile } = {}
 	for sideIndex, side in { -1, 1 } do
 		for row = 0, rows - 1 do
-			decor({
+			local tile = decor({
 				Name = "Tile",
 				Size = Vector3.new(sideWidth, FLOOR_TOP, d / rows),
 				CFrame = origin
 					* CFrame.new(side * (aisle + sideWidth / 2), FLOOR_TOP / 2, -d / 2 + (row + 0.5) * d / rows),
-				Color = if (row + sideIndex) % 2 == 0 then tileLight else tileDark,
-				Material = Enum.Material.CeramicTiles,
 				CastShadow = false,
 				Parent = decorFolder,
 			})
+			table.insert(tiles, { part = tile, row = row, side = sideIndex })
 		end
 	end
 
 	-- Walls (front wall has an entrance gap facing the belt)
 	local walls: { BasePart } = {}
-	local trims: { BasePart } = {}
+	local wallTrims: { BasePart } = {}
 	local wallY = FLOOR_TOP + h / 2
 	local function wall(name: string, size: Vector3, localPos: Vector3)
 		local wallPart = part({
@@ -360,11 +426,9 @@ local function buildPlot(index: number, parent: Instance): PlotRefs
 			Name = name .. "Trim",
 			Size = Vector3.new(size.X + 0.2, 0.5, size.Z + 0.2),
 			CFrame = origin * CFrame.new(localPos + Vector3.new(0, size.Y / 2 + 0.25, 0)),
-			Color = UiTheme.world("wall"),
-			Material = Enum.Material.SmoothPlastic,
 			Parent = model,
 		})
-		table.insert(trims, trim)
+		table.insert(wallTrims, trim)
 	end
 	wall("LeftWall", Vector3.new(1, h, d), Vector3.new(-w / 2 + 0.5, wallY, 0))
 	wall("RightWall", Vector3.new(1, h, d), Vector3.new(w / 2 - 0.5, wallY, 0))
@@ -381,8 +445,10 @@ local function buildPlot(index: number, parent: Instance): PlotRefs
 		Vector3.new(MAP.entranceWidth / 2 + segment / 2, wallY, -d / 2 + 0.5)
 	)
 
-	-- Corner posts with caps (the caps are trim: VIP gilds them with the rest), and gate posts holding the sign.
+	-- Corner posts with caps (the caps are trim: VIP gilds them with the rest, and keeps them gold under a skin), and
+	-- gate posts holding the sign.
 	local postHeight = h + 0.9
+	local caps: { BasePart } = {}
 	for _, corner in { Vector2.new(-1, -1), Vector2.new(1, -1), Vector2.new(-1, 1), Vector2.new(1, 1) } do
 		local at = Vector3.new(corner.X * (w / 2 - 0.5), 0, corner.Y * (d / 2 - 0.5))
 		decor({
@@ -393,13 +459,12 @@ local function buildPlot(index: number, parent: Instance): PlotRefs
 			Parent = decorFolder,
 		})
 		table.insert(
-			trims,
+			caps,
 			decor({
 				Name = "PostCap",
 				Shape = Enum.PartType.Ball,
 				Size = Vector3.one * 1.6,
 				CFrame = origin * CFrame.new(at + Vector3.new(0, FLOOR_TOP + postHeight + 0.5, 0)),
-				Color = UiTheme.world("wall"),
 				Parent = decorFolder,
 			})
 		)
@@ -600,7 +665,7 @@ local function buildPlot(index: number, parent: Instance): PlotRefs
 	local spawnLocal = Vector3.new(0, FLOOR_TOP + 3, -d / 2 + 14)
 	local spawnPosition = (origin * CFrame.new(spawnLocal)).Position
 	local entranceDirection = origin.LookVector
-	return {
+	local refs: PlotRefs = {
 		index = index,
 		model = model,
 		origin = origin,
@@ -622,10 +687,15 @@ local function buildPlot(index: number, parent: Instance): PlotRefs
 		signLabel = signLabel,
 		signIncome = signIncome,
 		signAvatar = signAvatar,
-		trims = trims,
+		tiles = tiles,
+		rug = rug,
+		wallTrims = wallTrims,
+		caps = caps,
 		walls = walls,
 		accent = plotColor,
 	}
+	MapBuilder.paintPlot(refs, nil, false)
+	return refs
 end
 
 local function buildBelt(parent: Instance): (BeltMath.Belt, number)
@@ -746,6 +816,52 @@ local function buildLeaderboard(name: string, title: string, cframe: CFrame, par
 	return board
 end
 
+-- The What's New board on the spawn plaza (Config/Scenery.plaza.newsBoard, placed by SceneryLayout and checked with
+-- the rest of the scenery): a dark panel in a frame on two legs, facing the fountain. NewsService writes the newest
+-- update on the panel's front. Built here, outside the Scenery folder, so a map change never rebuilds it; its frame and
+-- legs follow the map's colours like the leaderboards'. The panel is solid (sheer, nothing to climb), the rest is
+-- decoration.
+local function buildNewsBoard(parent: Instance): BasePart
+	local spot = SceneryLayout.layout(Scenery).newsBoard
+	local B = NewsLayout.BOARD
+	local middle = Vector3.new(spot.x, B.lift + B.h / 2, spot.z)
+	local yaw = math.rad(spot.yaw)
+	local cframe = CFrame.lookAt(middle, middle + Vector3.new(math.cos(yaw), 0, math.sin(yaw)))
+	local panel = part({
+		Name = "NewsBoard",
+		Size = Vector3.new(B.w, B.h, 0.6),
+		CFrame = cframe,
+		Color = UiTheme.palette("panel"),
+		CanTouch = false,
+		Parent = parent,
+	})
+	paint(
+		decor({
+			Name = "NewsBoardFrame",
+			Size = Vector3.new(B.w + 1, B.h + 1, 0.4),
+			CFrame = cframe * CFrame.new(0, 0, 0.45),
+			Color = UiTheme.world("boardFrame"),
+			Parent = parent,
+		}),
+		"boardFrame"
+	)
+	local legHeight = B.lift + B.h / 2 -- from the ground to the panel's middle, behind it
+	for _, side in { -1, 1 } do
+		paint(
+			decor({
+				Name = "NewsBoardLeg",
+				Size = Vector3.new(0.9, legHeight, 0.9),
+				CFrame = cframe * CFrame.new(side * (B.w / 2 - 1.6), -legHeight / 2, 1.1),
+				Color = UiTheme.world("boardPost"),
+				Material = Enum.Material.Metal,
+				Parent = parent,
+			}),
+			"boardPost"
+		)
+	end
+	return panel
+end
+
 -- Builds the map dressed as map theme `themeId` (Config/MapThemes; an unknown id builds the first theme).
 function MapBuilder.build(themeId: string): World
 	local started = os.clock()
@@ -815,6 +931,7 @@ function MapBuilder.build(themeId: string): World
 	end
 	local cashBoard = buildLeaderboard("CashBoard", Theme.text.leaderboardCash, boardFrame(-plaza.boardZ), map)
 	local stealsBoard = buildLeaderboard("StealsBoard", Theme.text.leaderboardSteals, boardFrame(plaza.boardZ), map)
+	local newsBoard = buildNewsBoard(map)
 
 	-- Players appear on the plaza (for a moment, until their base is assigned), facing back along the belt.
 	local lobby = MAP.lobby
@@ -856,6 +973,7 @@ function MapBuilder.build(themeId: string): World
 		belt = belt,
 		beltSurfaceY = beltSurfaceY,
 		leaderboards = { cash = cashBoard, steals = stealsBoard },
+		newsBoard = newsBoard,
 		lobbySpawn = spawn.CFrame + Vector3.new(0, 3, 0),
 		groundY = 0,
 		walkwayY = WALKWAY_TOP,

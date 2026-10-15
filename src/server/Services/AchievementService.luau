@@ -32,6 +32,7 @@ local AchievementService = {}
 local FULL_CHECK_SECONDS = 10
 local catalog = GameData.catalog
 local pending: { [Session]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+local checkedListeners: { (Session) -> () } = {}
 
 local function awardBadge(userId: number, badgeId: number)
 	task.spawn(function()
@@ -65,6 +66,15 @@ function AchievementService.check(session: Session)
 			awardBadge(session.userId, def.badgeId)
 		end
 	end
+	for _, listener in checkedListeners do
+		listener(session)
+	end
+end
+
+-- Runs `listener` after every check of a player's achievements, once whatever it found is flagged and paid: titles and
+-- base skins earned by achievements (StyleService) follow at once, with their toast after the achievement's.
+function AchievementService.onChecked(listener: (Session) -> ())
+	table.insert(checkedListeners, listener)
 end
 
 local function onGet(player: Player)

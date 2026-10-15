@@ -38,6 +38,7 @@ local GameEvents = require(script.Parent.GameEvents)
 local LockService = require(script.Parent.LockService)
 local ModifierService = require(script.Parent.ModifierService)
 local Movement = require(script.Parent.Movement)
+local Nametags = require(script.Parent.Nametags)
 local PlotService = require(script.Parent.PlotService)
 local PositionTracker = require(script.Parent.PositionTracker)
 local Remotes = require(script.Parent.Remotes)
@@ -133,6 +134,7 @@ local function clearCarry(session: Session)
 		carry.marker:Destroy()
 	end
 	session.player:SetAttribute("Carrying", nil)
+	Nametags.refresh(session) -- the title shows again
 	Movement.apply(session) -- walking speed again (or frozen, after a slip)
 	Replication.markDirty(session)
 end
@@ -358,6 +360,7 @@ local function onStealConfirm(player: Player, plotArg: unknown, podiumArg: unkno
 		LockService.endGrace(thief) -- stealing forfeits your own new-player protection
 		attachCarryVisuals(thief, carry)
 		player:SetAttribute("Carrying", record.id)
+		Nametags.refresh(thief) -- the title hides: the loot sits on the head and THIEF! floats over it
 		Movement.apply(thief) -- the carry slowdown
 		Replication.markDirty(thief)
 
